@@ -31,6 +31,7 @@ See `docs/llm-wiki/release.md`.
 - **Changing proxy settings respawns warm agents** so the new `HTTP_PROXY` is picked up.
 - **Background turns honor provider `RetryState`**: switching away no longer leaves a hung chat until the CLI idle/absolute timeout; Host applies the same abort + `NETWORK_PROVIDER` path as the focused session.
 - **cwd-relative downloads (`curl -O` / `wget` without `-o`) prompt** unless YOLO — no longer assumed to write inside the project.
+- **Opening another chat no longer dumps its history into a still-streaming one**: Host will not warm-reuse a CLI process that already has a mid-turn background (or live) session. The other chat cold-spawns. Idle parked / idle background reuse is unchanged.
 
 **中文 · 修复**
 - **macOS 语音/枚举媒体设备不再闪退**：`Info.plist` 补上 `NSCameraUsageDescription`。WKWebView 即使只开麦克风也会扫摄像头，缺这个 key 会被 TCC 直接 `SIGABRT`，不会弹出授权框。Live Voice 申请媒体时显式 `video: false`。
@@ -52,6 +53,7 @@ See `docs/llm-wiki/release.md`.
 - **改代理设置会回收 warm 进程**。
 - **后台回合也认 provider RetryState**：切走后不再空转到 CLI 超时，和前台一样熔断并记 `NETWORK_PROVIDER`。
 - **不带 `-o` 的下载默认要批准**（YOLO 除外）。
+- **打开另一条会话不再把对方历史灌进还在跑的聊天**：有回合在跑的 CLI 进程不再给别人 warm-reuse，另一条会话会单独冷启动。空闲 parked / 空闲后台的复用不变。
 
 ## [0.2.16] - 2026-08-13
 

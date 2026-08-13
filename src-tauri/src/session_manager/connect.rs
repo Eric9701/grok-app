@@ -408,17 +408,17 @@ impl SessionManager {
         });
 
         // ── Warm-process reuse (per-route pool) ────────────────────────────
-        // A Ready parked process with identical process-level spawn flags
-        // (permission policy / effort / sandbox / route class) can host this
-        // App session's agent session directly: no CLI spawn, no initialize,
-        // no auth — the CLI is a multi-session ACP host, we just session/load
-        // (resume) or session/new on it. The parked session is NOT removed:
-        // process and agent sessions are shared, so switching back later is a
-        // plain unpark (session still live on the process) — both directions
-        // of a chat switch stay free of cold spawns. Tail events carry their
-        // own sessionId and are routed by sid (events.rs). Load-replay must
-        // never rewrite a parked co-tenant journal (bind process_id before
-        // open; drop parked/unstamped turn traffic — see resolve_turn_event_route).
+        // A Ready parked (or idle background) process with identical
+        // process-level spawn flags (permission / effort / sandbox / route)
+        // can host this App session: no CLI spawn, just session/load or
+        // session/new. The parked shell stays — switch-back is an unpark.
+        //
+        // Never reuse a process that still has a mid-turn live/background
+        // co-tenant. CLI 1.0.3 load-replay is often unstamped; unique-busy-
+        // background routing would then write B's history into A's journal
+        // (00f647cd diagnostic: 009ea8c2 / 407d65e2 load on the Streaming
+        // process). Idle Ready reuse is unchanged. Unstamped routing is
+        // unchanged so A's own chunks still land after demote.
         if !pending_fork {
             let eff_sandbox = {
                 let project_sandbox = meta.project_id.as_deref().and_then(|pid| {
@@ -433,16 +433,15 @@ impl SessionManager {
                 )
             };
             let reused = {
-                // Reuse candidates = parked (idle) **and** background (busy)
-                // processes, deduped by process id. The CLI is a multi-session
-                // ACP host with a per-session dispatch lock, so a busy process
-                // can host a brand-new session too — this is what makes "open
-                // another chat while one is running" free of cold spawns.
+                // Reuse candidates = idle parked + idle background only.
+                // Mid-turn background keeps exclusive ownership of its process
+                // so session/load on a peer cannot poison that journal.
                 // Route class must follow active_route(), not prefs.model_id.
                 // Custom channels store the *upstream* model in session prefs
                 // (e.g. deepseek-v4-flash), which is_custom_provider_id rejects
                 // — processes were mis-labeled official and reused after
                 // auth.json was stripped (#528 intermittent re-login).
+                let busy_process_ids = self.busy_process_ids_for_warm_reuse();
                 let target_custom = matches!(
                     crate::providers::active_route(),
                     crate::providers::ActiveRoute::Custom { .. }
@@ -564,6 +563,13 @@ impl SessionManager {
                 if best.is_none() {
                     let parked = self.parked.lock();
                     for p in parked.values() {
+                        if process_blocked_for_warm_reuse(&p.process_id, &busy_process_ids) {
+                            rejected.push(format!(
+                                "parked {}: mid-turn co-tenant on process",
+                                p.app_session_id
+                            ));
+                            continue;
+                        }
                         if !gate(
                             p.acp.is_alive(),
                             p.policy,
@@ -594,6 +600,10 @@ impl SessionManager {
                     let bg = self.background.lock();
                     for s in bg.values() {
                         let s_custom = s.acp.as_ref().is_some_and(|c| c.is_custom_route());
+                        if process_blocked_for_warm_reuse(&s.process_id, &busy_process_ids) {
+                            rejected.push(format!("background {}: mid-turn", s.app_session_id));
+                            continue;
+                        }
                         if !gate(
                             s.acp.as_ref().is_some_and(|c| c.is_alive()),
                             s.policy,
@@ -1297,6 +1307,29 @@ impl SessionManager {
         }
     }
 
+    /// Process ids that currently host a mid-turn live or background session.
+    /// Parked is never mid-turn (`prompt_in_flight` blocks parking).
+    pub(super) fn busy_process_ids_for_warm_reuse(&self) -> HashSet<String> {
+        let live_pid = {
+            let guard = self.inner.lock();
+            guard.as_ref().and_then(|s| {
+                if s.acp.as_ref().is_some_and(|c| c.is_alive()) && Self::live_session_is_busy(s) {
+                    Some(s.process_id.clone())
+                } else {
+                    None
+                }
+            })
+        };
+        let bg_pids: Vec<String> = {
+            let bg = self.background.lock();
+            bg.values()
+                .filter(|s| Self::live_session_is_busy(s))
+                .map(|s| s.process_id.clone())
+                .collect()
+        };
+        collect_busy_reuse_process_ids(live_pid.as_deref(), bg_pids.iter().map(String::as_str))
+    }
+
     /// Pure reuse gate — split out for unit tests (no AcpClient needed).
     /// Process-level spawn flags must match: permission policy, reasoning
     /// effort, sandbox profile, and route class (official OIDC vs custom
@@ -1360,6 +1393,36 @@ impl SessionManager {
                 | AcpEvent::ProcessExited { .. }
         )
     }
+}
+
+/// Process ids that must not be warm-reused for another App session.
+/// `live` is included only when that live shell is itself mid-turn on a
+/// real ACP (the Connecting placeholder with a fresh UUID is omitted by
+/// the caller).
+pub(super) fn collect_busy_reuse_process_ids<'a>(
+    live: Option<&'a str>,
+    backgrounds: impl IntoIterator<Item = &'a str>,
+) -> HashSet<String> {
+    let mut ids = HashSet::new();
+    if let Some(pid) = live {
+        if !pid.is_empty() {
+            ids.insert(pid.to_string());
+        }
+    }
+    for pid in backgrounds {
+        if !pid.is_empty() {
+            ids.insert(pid.to_string());
+        }
+    }
+    ids
+}
+
+/// True when this process currently hosts a mid-turn co-tenant.
+pub(super) fn process_blocked_for_warm_reuse(
+    process_id: &str,
+    busy_process_ids: &HashSet<String>,
+) -> bool {
+    !process_id.is_empty() && busy_process_ids.contains(process_id)
 }
 
 #[cfg(test)]
@@ -1589,5 +1652,36 @@ mod reuse_gate_tests {
             "off",
             true,
         ));
+    }
+
+    #[test]
+    fn mid_turn_process_is_blocked_for_warm_reuse() {
+        // 00f647cd: chat B session/load on A's Streaming process poisoned A's journal.
+        let busy = collect_busy_reuse_process_ids(None, ["proc-a"]);
+        assert!(process_blocked_for_warm_reuse("proc-a", &busy));
+        // Parked co-tenant on the same pid is also blocked.
+        assert!(process_blocked_for_warm_reuse("proc-a", &busy));
+        // A different idle process stays eligible.
+        assert!(!process_blocked_for_warm_reuse("proc-idle", &busy));
+        // Empty / missing id never matches.
+        assert!(!process_blocked_for_warm_reuse("", &busy));
+        let empty = collect_busy_reuse_process_ids(None, std::iter::empty());
+        assert!(!process_blocked_for_warm_reuse("proc-a", &empty));
+    }
+
+    #[test]
+    fn idle_background_process_is_not_collected_as_busy() {
+        // Caller only passes mid-turn pids; idle Ready is omitted.
+        let busy = collect_busy_reuse_process_ids(None, std::iter::empty::<&str>());
+        assert!(busy.is_empty());
+        assert!(!process_blocked_for_warm_reuse("proc-idle-bg", &busy));
+    }
+
+    #[test]
+    fn live_mid_turn_pid_blocks_reuse_of_same_process() {
+        let busy = collect_busy_reuse_process_ids(Some("proc-live"), ["proc-bg"]);
+        assert!(process_blocked_for_warm_reuse("proc-live", &busy));
+        assert!(process_blocked_for_warm_reuse("proc-bg", &busy));
+        assert_eq!(busy.len(), 2);
     }
 }

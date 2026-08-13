@@ -66,8 +66,10 @@ See crash investigation notes: ungated tool_call replay on open could thrash
 Host/UI/disk and correlate with dual-process SIGABRT.
 
 **Shared-process multi-session (P0):** warm reuse keeps co-tenant shells on one
-CLI process. Host must **never** write load-replay / unstamped process traffic
-into a **parked** co-tenant journal:
+CLI process. **Never** warm-reuse a process that still has a mid-turn live or
+background session — the other chat cold-spawns. Idle parked / idle background
+reuse is unchanged. Host must **never** write load-replay / unstamped process
+traffic into a **parked** co-tenant journal:
 
 1. Bind live `process_id` (+ known `agentSessionId`) **before** `session/load`.  
 2. Route by stamped agent session id; parked match → **drop** (no rescue).  
@@ -181,7 +183,7 @@ When Settings flips `session_data_mode` independent↔shared, Host calls `recycl
   the pool is genuinely full of busy work — after parked reclaim, so the
   "all slots are busy turns" wording is accurate.
 
-**No session monopoly:** each App session owns its ACP process. Focus switch never rebinds another chat’s process (`session/new` on a stolen child). UI listens to `session://stream` / `session://runtime` by `sessionId` so background turns keep updating after you leave the chat.
+**No session monopoly:** each App session owns its ACP process. Focus switch never rebinds another chat’s process (`session/new` on a stolen child). A **mid-turn background** process is not a warm-reuse candidate — opening another chat cold-spawns instead of `session/load` on the busy stdio (that wrote foreign load-replay into the streaming journal). UI listens to `session://stream` / `session://runtime` by `sessionId` so background turns keep updating after you leave the chat.
 
 **Busy demote rules (must not park):** FSM `Streaming` / `AwaitingPermission` / `Connecting`, or non-empty `open_tool_ids`, or deferred `prompt_complete`, or pending plan/ask_user. Long tools (e.g. `find`) stay background-busy until terminal tool status. Capacity reclaim **only** kills idle `parked` Ready shells. `soft_respawn` is a no-op mid-turn. UI **skips warm `sessionConnect` on open** when another session is busy — first send still demotes+spawns.
 
