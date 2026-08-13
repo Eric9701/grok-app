@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 CI Release body = this section only (via `scripts/changelog-for-release.py`; no repeated download/install boilerplate).  
 See `docs/llm-wiki/release.md`.
 
-## [Unreleased]
+## [0.2.17] - 2026-08-14
+
+> **Highlight:** Stability release — shared-process session isolation (no cross-chat history poisoning, per-session turn completion), thinking timer stays live across tool loops, chat bottom jitter gone, side-terminal Powerline/truecolor, MCP OAuth follows the selected server, and macOS no longer crashes on voice.
+>
+> **中文 · 亮点：** 稳定性版本——共享进程会话隔离（历史不再互灌、收尾按会话隔离）、思考计时全程在线、聊天贴底不再抖动、侧栏终端 Powerline/真彩、MCP 授权跟所选服务器走、macOS 语音不再闪退。
 
 ### Fixed
 - **macOS no longer aborts on voice / media-device probe**: Info.plist now includes `NSCameraUsageDescription`. WKWebView `getUserMedia` (even mic-only) enumerates cameras; missing the key is a TCC `SIGABRT`, not a permission dialog. Live Voice also passes `video: false`.
@@ -27,7 +31,7 @@ See `docs/llm-wiki/release.md`.
 - **Allow for session on write/edit tools no longer cancels the turn (#600)**: When the CLI list has no session-scoped option, Host answers with `allow-once` (and still caches session scope) instead of inventing `always-allow`.
 - **Stop cancels pending tool permission** (not only ask/plan), so reconnect is not stuck on an unanswered `request_permission`.
 - **Media path grant is file-exact**: `paths_classify` / `grant_path` no longer authorize the parent directory (no sibling read of e.g. `~/.ssh`).
-- **Composer draft is kept until send succeeds**; send targets the viewing chat, not a stale shell session id.
+- **Composer draft is kept until send succeeds**; send targets the viewing chat, not a stale shell session id. Text or attachments added while a slow send is in flight are never wiped by the success cleanup.
 - **Changing proxy settings respawns warm agents** so the new `HTTP_PROXY` is picked up.
 - **Background turns honor provider `RetryState`**: switching away no longer leaves a hung chat until the CLI idle/absolute timeout; Host applies the same abort + `NETWORK_PROVIDER` path as the focused session.
 - **cwd-relative downloads (`curl -O` / `wget` without `-o`) prompt** unless YOLO — no longer assumed to write inside the project.
@@ -49,7 +53,7 @@ See `docs/llm-wiki/release.md`.
 - **写文件等工具点「会话内允许」不再整轮取消（#600）**：没有 session 档 option 时用列表里的 `allow-once` 作答。
 - **Stop 会取消未答复的工具权限**，避免重连卡在 `request_permission`。
 - **媒体路径只授权该文件本身**，不再授权父目录。
-- **发送失败前不丢草稿**；发送目标跟当前查看的会话，而不是过期的 shell id。
+- **发送失败前不丢草稿**；发送目标跟当前查看的会话，而不是过期的 shell id。发送期间新输入的文字/附件也不会被成功后的清空吞掉。
 - **改代理设置会回收 warm 进程**。
 - **后台回合也认 provider RetryState**：切走后不再空转到 CLI 超时，和前台一样熔断并记 `NETWORK_PROVIDER`。
 - **不带 `-o` 的下载默认要批准**（YOLO 除外）。
