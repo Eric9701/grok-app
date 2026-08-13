@@ -5,8 +5,8 @@
  * Pin model mirrors use-stick-to-bottom's escapedFromLock:
  * - User scroll-up escapes; we do NOT re-pin merely because they are still
  *   within the near-bottom threshold (that thrash is what causes bounce).
- * - Re-pin only after they scroll down again and land near the bottom,
- *   or after force-stick / conversation switch.
+ * - Re-pin only after they scroll down again and land on the absolute
+ *   bottom, or after force-stick / conversation switch.
  * - Programmatic follows are instant and ignored by the scroll handler so
  *   resize + stream growth cannot fight the user mid-gesture.
  */
@@ -328,13 +328,10 @@ export function useStickToBottom(
           requestAnimationFrame(() => {
             if (!viewportRef.current) return;
             const v = viewportRef.current;
+            // Hard bottom only — the 100px near band yanks back after a
+            // trackpad escape and is the bottom-of-chat jitter.
             if (
-              isNearBottom(
-                v.scrollTop,
-                v.scrollHeight,
-                v.clientHeight,
-                thresholdRef.current,
-              )
+              isHardBottom(v.scrollTop, v.scrollHeight, v.clientHeight)
             ) {
               escapedRef.current = false;
               isPinnedRef.current = true;
@@ -375,19 +372,12 @@ export function useStickToBottom(
     };
     const onTouchEnd = () => {
       touchY = null;
-      // After a fling toward latest, re-pin if we settled near the bottom.
+      // After a fling toward latest, re-pin only if we settled on the end.
       if (userIntentDownRef.current && escapedRef.current) {
         requestAnimationFrame(() => {
           if (!viewportRef.current) return;
           const v = viewportRef.current;
-          if (
-            isNearBottom(
-              v.scrollTop,
-              v.scrollHeight,
-              v.clientHeight,
-              thresholdRef.current,
-            )
-          ) {
+          if (isHardBottom(v.scrollTop, v.scrollHeight, v.clientHeight)) {
             escapedRef.current = false;
             isPinnedRef.current = true;
             userIntentDownRef.current = false;

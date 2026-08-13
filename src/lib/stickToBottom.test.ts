@@ -270,13 +270,30 @@ describe("nextStickPinState", () => {
     expect(next).toEqual({ pinned: false, escaped: true });
   });
 
-  it("scroll-down + intent clears escape; re-pins when near", () => {
+  it("does not re-pin from the near band after escape (bottom jitter)", () => {
+    // Escaped 14–80px from the end; a down-tick is still "near" (100px).
+    // Snapping to max here is the bounce when landing / leaving the bottom.
     const next = nextStickPinState(
       { pinned: false, escaped: true },
       {
         scrollingUp: false,
         scrollingDown: true,
         nearBottom: true,
+        hardBottom: false,
+        userIntentDown: true,
+      },
+    );
+    expect(next).toEqual({ pinned: false, escaped: true });
+  });
+
+  it("scroll-down + intent re-pins only on the hard bottom after escape", () => {
+    const next = nextStickPinState(
+      { pinned: false, escaped: true },
+      {
+        scrollingUp: false,
+        scrollingDown: true,
+        nearBottom: true,
+        hardBottom: true,
         userIntentDown: true,
       },
     );

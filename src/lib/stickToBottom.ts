@@ -5,8 +5,8 @@
  * After an intentional scroll-up (`escaped`), we do NOT re-pin merely
  * because the viewport is still within the near-bottom threshold — that
  * thrash is what makes the chat bounce while the user is reading.
- * Re-pin when they scroll down again and land near the bottom, land on
- * the absolute bottom, send a message, or switch conversation.
+ * Re-pin when they scroll down again and land on the absolute bottom,
+ * send a message, or switch conversation.
  */
 
 /** Distance from bottom (px) still treated as "near" for re-engage. */
@@ -180,8 +180,11 @@ export type StickPinState = {
  * `userIntentDown`: last user gesture was toward the latest content
  * (wheel/touch/scrollbar down). Combined with hardBottom this re-engages
  * even when the final scroll event has no positive delta at max scrollTop.
- * It does NOT re-engage after a scroll-up that left the user still inside
- * the near-bottom band (that thrash is the bounce bug).
+ *
+ * While escaped, do NOT re-pin from the 100px near band. A trackpad bounce
+ * or 10px down-tick after leaving the bottom sits well inside that band;
+ * snapping to max scrollTop is the "jitter when I reach / leave the end"
+ * bug. Re-engage only after they land on the absolute bottom again.
  */
 export function nextStickPinState(
   state: StickPinState,
@@ -206,23 +209,10 @@ export function nextStickPinState(
   if (input.hardBottom && (input.scrollingDown || input.userIntentDown)) {
     return { pinned: true, escaped: false };
   }
-  let { pinned, escaped } = state;
-  // Only clear escape when the user has actually reached the bottom band.
-  // Clearing escape on any scroll-down while mid-list was safe when
-  // scrollHeight matched real content — with virtualized/estimated heights
-  // a short totalHeight made mid-document look "near bottom", then the next
-  // frame re-pinned and yanked the viewport (bounce at tall messages).
-  //
-  // While escaped, also require userIntentDown: layout thrash / clamp after a
-  // height shrink produces synthetic scrollingDown without a user gesture and
-  // was re-pinning media-heavy sessions (scroll up → empty gap → snap back).
-  if (input.scrollingDown && input.nearBottom) {
-    if (!escaped || input.userIntentDown) {
-      escaped = false;
-      pinned = true;
-    }
-  } else if (!escaped && input.nearBottom) {
-    pinned = true;
+  // Stay pinned while following and still near the tail. Never use this
+  // path to *clear* escape — that yank is the bottom jitter.
+  if (!state.escaped && input.nearBottom) {
+    return { pinned: true, escaped: false };
   }
-  return { pinned, escaped };
+  return state;
 }

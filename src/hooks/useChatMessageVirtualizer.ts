@@ -269,6 +269,17 @@ export function useChatMessageVirtualizer(
         ignoreScrollAdjustRef.current = false;
         return;
       }
+      // Pin-lock follow / clamp writes look like scroll events. Treating
+      // them as a user fling buffers height commits for 140ms, then flushes
+      // a spacer jump that stick snaps back — bounce at the locked bottom.
+      if (isPinnedRef.current) {
+        if (scrollRafRef.current != null) return;
+        scrollRafRef.current = requestAnimationFrame(() => {
+          scrollRafRef.current = null;
+          recomputeNow();
+        });
+        return;
+      }
       scrollingRef.current = true;
       if (scrollIdleTimerRef.current != null) {
         clearTimeout(scrollIdleTimerRef.current);
@@ -333,6 +344,28 @@ export function useChatMessageVirtualizer(
     if (!virtualized) return;
     recomputeNow();
   }, [virtualized, itemCount, forceIndices, recomputeNow]);
+
+  // After a pin-window spacer commit, snap before paint so the user never
+  // sees one frame of "scrolled up" then stick yanking back.
+  useLayoutEffect(() => {
+    if (!virtualized || !isPinnedRef.current) return;
+    const v = viewportRef.current;
+    if (!v) return;
+    const top = Math.max(0, v.scrollHeight - v.clientHeight);
+    if (Math.abs(v.scrollTop - top) > 0.5) {
+      ignoreScrollAdjustRef.current = true;
+      v.scrollTop = top;
+    }
+  }, [
+    virtualized,
+    win.start,
+    win.end,
+    win.paddingTop,
+    win.paddingBottom,
+    win.totalHeight,
+    isPinnedRef,
+    viewportRef,
+  ]);
 
   // Drop row observers when virtualization turns off.
   useEffect(() => {
@@ -409,18 +442,14 @@ export function useChatMessageVirtualizer(
       }
 
       recompute();
-      // Stay glued to the true bottom after a height commit while pinned —
-      // avoids one-frame empty play at the tail then snap-back flash.
+      // Sync (not rAF): RO already ran after layout and before paint.
+      // Deferring one frame painted the stale scrollTop — bottom jitter.
       if (pin && viewport) {
-        requestAnimationFrame(() => {
-          if (!isPinnedRef.current || !viewportRef.current) return;
-          const v = viewportRef.current;
-          const top = Math.max(0, v.scrollHeight - v.clientHeight);
-          if (Math.abs(v.scrollTop - top) > 0.5) {
-            ignoreScrollAdjustRef.current = true;
-            v.scrollTop = top;
-          }
-        });
+        const top = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+        if (Math.abs(viewport.scrollTop - top) > 0.5) {
+          ignoreScrollAdjustRef.current = true;
+          viewport.scrollTop = top;
+        }
       }
     },
     [virtualized, isPinnedRef, viewportRef, recompute, itemCount],
