@@ -102,6 +102,11 @@ impl SessionManager {
         }
     }
 
+    /// Drop bookkeeping for a chat that no longer exists in the store.
+    pub fn forget_deleted_session(&self, session_id: &str) {
+        self.pending_soft_respawn.lock().remove(session_id);
+    }
+
     pub(super) fn post_turn_journal_lock(
         &self,
         app_session_id: &str,

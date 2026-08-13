@@ -235,7 +235,16 @@ impl SessionManager {
                         "unpark spawn-flag mismatch — cold spawn"
                     );
                     if let Some(acp) = live.acp {
-                        acp.kill().await;
+                        let busy = self.busy_process_ids_for_warm_reuse();
+                        if should_kill_parked_after_flag_mismatch(&live.process_id, &busy) {
+                            acp.kill().await;
+                        } else {
+                            tracing::info!(
+                                session = %meta.id,
+                                process = %live.process_id,
+                                "unpark spawn-flag mismatch — skip kill, mid-turn cohabitant"
+                            );
+                        }
                     }
                 } else {
                     // Refresh prefs on shell (model may have changed in UI).
@@ -1425,6 +1434,20 @@ pub(super) fn process_blocked_for_warm_reuse(
     !process_id.is_empty() && busy_process_ids.contains(process_id)
 }
 
+/// After a parked entry is removed for a spawn-flag mismatch (effort /
+/// permission / pending soft-respawn), kill the process only when no
+/// mid-turn live/background session still shares it.
+///
+/// Parked entries are per-session; the ACP child is shared. Killing on the
+/// parked grain would abort a cohabitant's in-flight turn. The parked row
+/// stays gone so this chat cold-spawns on next connect.
+pub(crate) fn should_kill_parked_after_flag_mismatch(
+    process_id: &str,
+    busy_process_ids: &HashSet<String>,
+) -> bool {
+    !process_blocked_for_warm_reuse(process_id, busy_process_ids)
+}
+
 #[cfg(test)]
 mod connect_preserve_tests {
     use super::*;
@@ -1683,5 +1706,24 @@ mod reuse_gate_tests {
         assert!(process_blocked_for_warm_reuse("proc-live", &busy));
         assert!(process_blocked_for_warm_reuse("proc-bg", &busy));
         assert_eq!(busy.len(), 2);
+    }
+
+    #[test]
+    fn flag_mismatch_does_not_kill_parked_with_mid_turn_cohabitant() {
+        let busy = collect_busy_reuse_process_ids(Some("proc-shared"), ["proc-bg"]);
+        assert!(!should_kill_parked_after_flag_mismatch(
+            "proc-shared",
+            &busy
+        ));
+        assert!(!should_kill_parked_after_flag_mismatch("proc-bg", &busy));
+        // Idle / unknown process: no cohabitant → safe to kill.
+        assert!(should_kill_parked_after_flag_mismatch("proc-idle", &busy));
+        let empty = collect_busy_reuse_process_ids(None, std::iter::empty());
+        assert!(should_kill_parked_after_flag_mismatch(
+            "proc-shared",
+            &empty
+        ));
+        // Empty id never matches the busy set → treat as unshared (kill).
+        assert!(should_kill_parked_after_flag_mismatch("", &busy));
     }
 }

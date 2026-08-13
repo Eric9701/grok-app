@@ -160,7 +160,8 @@ pub async fn session_set_fork_agent_session(
     let meta = store::set_session_fork_agent_session(&id, fork_agent_session)?;
     let snap = mgr.snapshot();
     if fork_agent_session && snap.session_id.as_deref() == Some(meta.id.as_str()) {
-        mgr.soft_respawn_with_reason(&app, "session_fork_agent").await;
+        mgr.soft_respawn_with_reason(&app, "session_fork_agent")
+            .await;
     }
     Ok(meta)
 }
@@ -189,11 +190,9 @@ pub async fn session_resolve_plan(
         .resolve_plan(app, decision.clone(), feedback, rpc_id, session_id)
         .await;
     if result.is_ok() {
-        if let Some(sid) = target.or_else(|| {
-            mgr.snapshot()
-                .session_id
-                .filter(|s| !s.trim().is_empty())
-        }) {
+        if let Some(sid) =
+            target.or_else(|| mgr.snapshot().session_id.filter(|s| !s.trim().is_empty()))
+        {
             crate::plan_chrome::apply_decision(&sid, &decision, true);
         }
     }
@@ -269,14 +268,7 @@ pub async fn session_resolve_permission(
     tool_name: Option<String>,
 ) -> Result<SessionSnapshot, String> {
     mgr.resolve_permission(
-        app,
-        rpc_id,
-        decision,
-        option_id,
-        scope_key,
-        session_id,
-        options,
-        tool_name,
+        app, rpc_id, decision, option_id, scope_key, session_id, options, tool_name,
     )
     .await
 }
@@ -318,16 +310,14 @@ pub async fn cli_repair_agent_sidecar(
         .or_else(|| store::load_settings().manual_cli_path)
         .filter(|s| !s.trim().is_empty());
     let path_for_probe = path.clone();
-    let repaired = tokio::task::spawn_blocking(move || {
-        cli_probe::repair_agent_sidecar_link(path.as_deref())
-    })
-    .await
-    .map_err(|e| format!("cli_repair_agent_sidecar join: {e}"))??;
-    let after = tokio::task::spawn_blocking(move || {
-        cli_probe::probe_cli(path_for_probe.as_deref())
-    })
-    .await
-    .map_err(|e| format!("re-probe join: {e}"))?;
+    let repaired =
+        tokio::task::spawn_blocking(move || cli_probe::repair_agent_sidecar_link(path.as_deref()))
+            .await
+            .map_err(|e| format!("cli_repair_agent_sidecar join: {e}"))??;
+    let after =
+        tokio::task::spawn_blocking(move || cli_probe::probe_cli(path_for_probe.as_deref()))
+            .await
+            .map_err(|e| format!("re-probe join: {e}"))?;
     Ok(serde_json::json!({
         "ok": true,
         "agentPath": repaired,
@@ -372,9 +362,8 @@ pub async fn cli_install_latest(
     app: tauri::AppHandle,
     allow_unverified: Option<bool>,
 ) -> Result<crate::cli_install::CliInstallResult, String> {
-    let allow = allow_unverified.unwrap_or_else(|| {
-        store::load_settings().allow_unverified_cli_install
-    });
+    let allow =
+        allow_unverified.unwrap_or_else(|| store::load_settings().allow_unverified_cli_install);
     let result = crate::cli_install::install_cli_latest(app, allow).await?;
     // Remember last install verification for Doctor.
     let mut s = store::load_settings();
@@ -646,14 +635,12 @@ pub async fn cli_sessions_search(
     let settings = store::load_settings();
     let mode = settings.session_data_mode.clone();
     let probe = cli_probe::probe_cli(settings.manual_cli_path.as_deref());
-    let cli_path = probe.path.filter(|_| probe.found).map(std::path::PathBuf::from);
+    let cli_path = probe
+        .path
+        .filter(|_| probe.found)
+        .map(std::path::PathBuf::from);
     tauri::async_runtime::spawn_blocking(move || {
-        crate::cli_sessions::search_cli_sessions(
-            &query,
-            limit,
-            &mode,
-            cli_path.as_deref(),
-        )
+        crate::cli_sessions::search_cli_sessions(&query, limit, &mode, cli_path.as_deref())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -667,12 +654,7 @@ pub async fn cli_session_import(
     project_id: Option<String>,
 ) -> Result<SessionMeta, String> {
     let mode = store::load_settings().session_data_mode;
-    crate::cli_sessions::import_cli_session(
-        &agent_session_id,
-        dir.as_deref(),
-        project_id,
-        &mode,
-    )
+    crate::cli_sessions::import_cli_session(&agent_session_id, dir.as_deref(), project_id, &mode)
 }
 
 /// Find the most recent CLI agent session for a project path (CLI `-c/--continue`).
@@ -723,11 +705,7 @@ pub async fn cli_sessions_delete(
     let mode = store::load_settings().session_data_mode;
     // Blocking disk IO off the async runtime.
     tauri::async_runtime::spawn_blocking(move || {
-        crate::cli_sessions::delete_cli_session(
-            &agent_session_id,
-            dir.as_deref(),
-            &mode,
-        )
+        crate::cli_sessions::delete_cli_session(&agent_session_id, dir.as_deref(), &mode)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -743,10 +721,7 @@ pub async fn session_create(
 }
 
 #[tauri::command]
-pub async fn session_set_scheduled(
-    id: String,
-    scheduled: bool,
-) -> Result<SessionMeta, String> {
+pub async fn session_set_scheduled(id: String, scheduled: bool) -> Result<SessionMeta, String> {
     store::set_session_scheduled(&id, scheduled)
 }
 
@@ -787,8 +762,7 @@ fn sanitize_session_id_for_label(session_id: &str) -> Option<&str> {
 }
 
 fn session_window_label(session_id: &str) -> Option<String> {
-    sanitize_session_id_for_label(session_id)
-        .map(|id| format!("{SESSION_WINDOW_LABEL_PREFIX}{id}"))
+    sanitize_session_id_for_label(session_id).map(|id| format!("{SESSION_WINDOW_LABEL_PREFIX}{id}"))
 }
 
 /// Open (or focus) a secondary webview window for a chat (`#/session/<id>`).
@@ -877,8 +851,10 @@ mod multi_window_tests {
 }
 
 #[tauri::command]
-pub async fn session_delete(id: String) -> Result<(), String> {
-    store::delete_session(&id)
+pub async fn session_delete(mgr: State<'_, Arc<SessionManager>>, id: String) -> Result<(), String> {
+    store::delete_session(&id)?;
+    mgr.forget_deleted_session(&id);
+    Ok(())
 }
 
 #[tauri::command]
@@ -962,7 +938,8 @@ pub async fn session_set_plugin_dirs(
     let meta = store::set_session_plugin_dirs(&id, plugin_dirs)?;
     let snap = mgr.snapshot();
     if snap.session_id.as_deref() == Some(meta.id.as_str()) {
-        mgr.soft_respawn_with_reason(&app, "session_plugin_dirs").await;
+        mgr.soft_respawn_with_reason(&app, "session_plugin_dirs")
+            .await;
     }
     Ok(meta)
 }
@@ -979,7 +956,8 @@ pub async fn session_set_extra_rules(
     let meta = store::set_session_extra_rules(&id, extra_rules)?;
     let snap = mgr.snapshot();
     if snap.session_id.as_deref() == Some(meta.id.as_str()) {
-        mgr.soft_respawn_with_reason(&app, "session_extra_rules").await;
+        mgr.soft_respawn_with_reason(&app, "session_extra_rules")
+            .await;
     }
     Ok(meta)
 }
@@ -1034,7 +1012,8 @@ pub async fn session_set_no_ask_user(
     let meta = store::set_session_no_ask_user(&id, no_ask_user)?;
     let snap = mgr.snapshot();
     if snap.session_id.as_deref() == Some(meta.id.as_str()) {
-        mgr.soft_respawn_with_reason(&app, "session_no_ask_user").await;
+        mgr.soft_respawn_with_reason(&app, "session_no_ask_user")
+            .await;
     }
     Ok(meta)
 }
@@ -1082,4 +1061,3 @@ pub async fn media_server_endpoint(
         .ok_or_else(|| "media server not running".to_string())?;
     Ok(handle.endpoint())
 }
-

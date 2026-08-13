@@ -12,6 +12,7 @@ use crate::process_limits::{normalize_idle_minutes, normalize_max_concurrent};
 use crate::session_fsm::SessionState;
 use crate::store::{self};
 
+use super::connect::should_kill_parked_after_flag_mismatch;
 use super::*;
 
 impl SessionManager {
@@ -98,16 +99,27 @@ impl SessionManager {
             self.soft_respawn_with_reason(app, &reason).await;
             return;
         }
-        // Parked: drop the warm process so the next connect respawns.
+        // Parked: drop the warm entry so the next connect respawns.
         // Take the entry first — parking_lot guards are !Send across await.
+        // Do not kill a process that still hosts a mid-turn cohabitant.
         let parked = self.parked.lock().remove(session_id);
         if let Some(p) = parked {
-            p.acp.kill().await;
-            tracing::info!(
-                session = %session_id,
-                reason = %reason,
-                "dropped parked agent for pending soft-respawn"
-            );
+            let busy = self.busy_process_ids_for_warm_reuse();
+            if should_kill_parked_after_flag_mismatch(&p.process_id, &busy) {
+                p.acp.kill().await;
+                tracing::info!(
+                    session = %session_id,
+                    reason = %reason,
+                    "dropped parked agent for pending soft-respawn"
+                );
+            } else {
+                tracing::info!(
+                    session = %session_id,
+                    process = %p.process_id,
+                    reason = %reason,
+                    "pending soft-respawn: removed parked entry, skip kill (mid-turn cohabitant)"
+                );
+            }
         }
     }
 
@@ -456,19 +468,36 @@ impl SessionManager {
             }
         }
         {
-            let mut parked = self.parked.lock();
-            let stale: Vec<String> = parked
-                .iter()
-                .filter(|(_, p)| p.policy != policy)
-                .map(|(id, _)| id.clone())
-                .collect();
-            for id in stale {
-                if let Some(p) = parked.remove(&id) {
-                    // Kill after drop to avoid holding the map lock across await.
-                    tokio::spawn(async move {
-                        p.acp.kill().await;
-                    });
+            // Snapshot busy pids before locking parked (distinct locks).
+            let busy = self.busy_process_ids_for_warm_reuse();
+            let to_kill: Vec<Arc<AcpClient>> = {
+                let mut parked = self.parked.lock();
+                let stale: Vec<String> = parked
+                    .iter()
+                    .filter(|(_, p)| p.policy != policy)
+                    .map(|(id, _)| id.clone())
+                    .collect();
+                let mut kill = Vec::new();
+                for id in stale {
+                    if let Some(p) = parked.remove(&id) {
+                        if should_kill_parked_after_flag_mismatch(&p.process_id, &busy) {
+                            kill.push(p.acp);
+                        } else {
+                            tracing::info!(
+                                session = %id,
+                                process = %p.process_id,
+                                "permission policy: removed parked entry, skip kill (mid-turn cohabitant)"
+                            );
+                        }
+                    }
                 }
+                kill
+            };
+            for acp in to_kill {
+                // Kill after drop to avoid holding the map lock across await.
+                tokio::spawn(async move {
+                    acp.kill().await;
+                });
             }
         }
         if need_respawn {
@@ -650,11 +679,23 @@ impl SessionManager {
                         .insert(sid.to_string(), "effort".into());
                 }
             }
-            if let Some(p) = self.parked.lock().remove(sid) {
+            // Let-binding so the parking_lot guard drops before the if-let body
+            // (edition 2021 keeps if-let temps alive through else — re-lock deadlock).
+            let removed = self.parked.lock().remove(sid);
+            if let Some(p) = removed {
                 if p.effort.as_deref() != Some(effort.as_str()) {
-                    tokio::spawn(async move {
-                        p.acp.kill().await;
-                    });
+                    let busy = self.busy_process_ids_for_warm_reuse();
+                    if should_kill_parked_after_flag_mismatch(&p.process_id, &busy) {
+                        tokio::spawn(async move {
+                            p.acp.kill().await;
+                        });
+                    } else {
+                        tracing::info!(
+                            session = %sid,
+                            process = %p.process_id,
+                            "effort change: removed parked entry, skip kill (mid-turn cohabitant)"
+                        );
+                    }
                 } else {
                     self.parked.lock().insert(sid.to_string(), p);
                 }
@@ -1051,5 +1092,23 @@ mod recycle_tests {
         assert_eq!(drained.prewarm_count, 0);
         assert!(drained.acps.is_empty());
         assert!(matches!(*mgr.prewarm.lock(), PrewarmState::None));
+    }
+
+    #[test]
+    fn forget_deleted_session_drops_pending_soft_respawn() {
+        let mgr = SessionManager::new();
+        mgr.pending_soft_respawn
+            .lock()
+            .insert("gone".into(), "effort".into());
+        mgr.pending_soft_respawn
+            .lock()
+            .insert("keep".into(), "permission_policy".into());
+        mgr.forget_deleted_session("gone");
+        let map = mgr.pending_soft_respawn.lock();
+        assert!(!map.contains_key("gone"));
+        assert_eq!(
+            map.get("keep").map(String::as_str),
+            Some("permission_policy")
+        );
     }
 }

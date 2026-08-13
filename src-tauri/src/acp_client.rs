@@ -3266,12 +3266,20 @@ impl AcpClient {
     /// old session thread to finish, and an evicted (shutdown) thread finishes
     /// immediately instead of hanging for the whole deadline.
     pub async fn evict_sessions(&self, session_ids: &[String]) -> Result<Value, String> {
-        self.request_timeout(
-            "x.ai/internal/evict_sessions",
-            json!({ "sessionIds": session_ids }),
-            5,
-        )
-        .await
+        let result = self
+            .request_timeout(
+                "x.ai/internal/evict_sessions",
+                json!({ "sessionIds": session_ids }),
+                5,
+            )
+            .await;
+        if result.is_ok() {
+            let mut map = self.last_update_by_session.lock();
+            for sid in session_ids {
+                map.remove(sid);
+            }
+        }
+        result
     }
 
     /// List rewind points (one per user prompt). Grok extension `x.ai/rewind/points`.
@@ -3409,6 +3417,8 @@ impl AcpClient {
             let _ = child.kill().await;
         }
         *self.stdin.lock().await = None;
+        self.last_update_by_session.lock().clear();
+        *self.last_update_unstamped.lock() = None;
     }
 }
 
