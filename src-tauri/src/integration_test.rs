@@ -28,6 +28,33 @@ mod integration {
         dir
     }
 
+    struct RestoreHome(Option<String>);
+    impl Drop for RestoreHome {
+        fn drop(&mut self) {
+            match self.0.take() {
+                Some(v) => std::env::set_var("GROK_APP_HOME", v),
+                None => std::env::remove_var("GROK_APP_HOME"),
+            }
+        }
+    }
+
+    /// Isolate GROK_APP_HOME and serialize against store/path_scope tests.
+    fn with_isolated_project_store(f: impl FnOnce()) {
+        let _home = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let _guard = PROJECTS_STORE_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let home = unique_dir();
+        let prev = std::env::var("GROK_APP_HOME").ok();
+        std::env::set_var("GROK_APP_HOME", &home);
+        let _restore = RestoreHome(prev);
+        crate::paths::ensure_app_dirs().ok();
+        f();
+        let _ = fs::remove_dir_all(&home);
+    }
+
     #[test]
     fn probe_cli_shape_and_local_install() {
         let r = probe_cli(None);
@@ -49,63 +76,61 @@ mod integration {
 
     #[test]
     fn project_add_trust_remove_roundtrip() {
-        let _guard = PROJECTS_STORE_LOCK
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
-        let dir = unique_dir();
-        let path = dir.display().to_string();
-        let p = add_project(path.clone(), false).expect("add");
-        assert!(!p.trusted);
-        assert_eq!(p.path, path);
-        assert!(p.path_ok);
-        let trusted = trust_project(&p.id).expect("trust");
-        assert!(trusted.trusted);
-        let list = load_projects();
-        assert!(list.iter().any(|x| x.id == p.id && x.trusted));
-        remove_project(&p.id).expect("remove");
-        let list2 = load_projects();
-        assert!(!list2.iter().any(|x| x.id == p.id));
-        let _ = fs::remove_dir_all(&dir);
+        with_isolated_project_store(|| {
+            let dir = unique_dir();
+            let path = dir.display().to_string();
+            let p = add_project(path.clone(), false).expect("add");
+            assert!(!p.trusted);
+            assert_eq!(p.path, path);
+            assert!(p.path_ok);
+            let trusted = trust_project(&p.id).expect("trust");
+            assert!(trusted.trusted);
+            let list = load_projects();
+            assert!(list.iter().any(|x| x.id == p.id && x.trusted));
+            remove_project(&p.id).expect("remove");
+            let list2 = load_projects();
+            assert!(!list2.iter().any(|x| x.id == p.id));
+            let _ = fs::remove_dir_all(&dir);
+        });
     }
 
     #[test]
     fn project_relocate_updates_path_and_path_ok() {
-        let _guard = PROJECTS_STORE_LOCK
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
-        let old_dir = unique_dir();
-        let new_dir = unique_dir();
-        let old_path = old_dir.display().to_string();
-        let new_path = new_dir.display().to_string();
-        let p = add_project(old_path.clone(), true).expect("add");
-        assert_eq!(p.path, old_path);
-        assert!(p.path_ok);
+        with_isolated_project_store(|| {
+            let old_dir = unique_dir();
+            let new_dir = unique_dir();
+            let old_path = old_dir.display().to_string();
+            let new_path = new_dir.display().to_string();
+            let p = add_project(old_path.clone(), true).expect("add");
+            assert_eq!(p.path, old_path);
+            assert!(p.path_ok);
 
-        // Simulate deleted folder: list re-check marks path_ok false.
-        let _ = fs::remove_dir_all(&old_dir);
-        assert!(
-            !std::path::Path::new(&old_path).is_dir(),
-            "old path should be gone"
-        );
-        let listed = load_projects();
-        let stale = listed
-            .iter()
-            .find(|x| x.id == p.id)
-            .expect("project row must remain after folder delete");
-        assert!(!stale.path_ok);
+            // Simulate deleted folder: list re-check marks path_ok false.
+            let _ = fs::remove_dir_all(&old_dir);
+            assert!(
+                !std::path::Path::new(&old_path).is_dir(),
+                "old path should be gone"
+            );
+            let listed = load_projects();
+            let stale = listed
+                .iter()
+                .find(|x| x.id == p.id)
+                .expect("project row must remain after folder delete");
+            assert!(!stale.path_ok);
 
-        let moved = relocate_project(&p.id, new_path.clone()).expect("relocate");
-        assert_eq!(moved.path, new_path);
-        assert!(moved.path_ok);
+            let moved = relocate_project(&p.id, new_path.clone()).expect("relocate");
+            assert_eq!(moved.path, new_path);
+            assert!(moved.path_ok);
 
-        let listed2 = load_projects();
-        let again = listed2.iter().find(|x| x.id == p.id).expect("listed");
-        assert_eq!(again.path, new_path);
-        assert!(again.path_ok);
+            let listed2 = load_projects();
+            let again = listed2.iter().find(|x| x.id == p.id).expect("listed");
+            assert_eq!(again.path, new_path);
+            assert!(again.path_ok);
 
-        assert!(relocate_project(&p.id, "/no/such/dir-xyz".into()).is_err());
-        remove_project(&p.id).expect("remove");
-        let _ = fs::remove_dir_all(&new_dir);
+            assert!(relocate_project(&p.id, "/no/such/dir-xyz".into()).is_err());
+            remove_project(&p.id).expect("remove");
+            let _ = fs::remove_dir_all(&new_dir);
+        });
     }
 
     #[test]

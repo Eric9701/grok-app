@@ -141,18 +141,34 @@ pub fn require_allowed(path: &Path) -> Result<PathBuf, String> {
     Ok(canonical)
 }
 
+/// Serializes tests that mutate the process-global roots/grants.
+/// `tokio::sync` so async media_server tests can hold it across `.await`.
+#[cfg(test)]
+pub(crate) static TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
-    use std::sync::Mutex;
 
-    static TEST_LOCK: Mutex<()> = Mutex::new(());
+    struct RestoreHome(Option<String>);
+    impl Drop for RestoreHome {
+        fn drop(&mut self) {
+            match self.0.take() {
+                Some(v) => std::env::set_var("GROK_APP_HOME", v),
+                None => std::env::remove_var("GROK_APP_HOME"),
+            }
+        }
+    }
 
     fn with_isolated_roots(project: &Path, app: &Path, include_temp: bool, f: impl FnOnce()) {
-        let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _g = TEST_LOCK.blocking_lock();
+        let _home = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let prev = std::env::var("GROK_APP_HOME").ok();
         std::env::set_var("GROK_APP_HOME", app);
+        let _restore = RestoreHome(prev);
         let _ = fs::create_dir_all(app);
         let _ = fs::create_dir_all(project);
         let projects_file = app.join("projects.json");
@@ -178,10 +194,6 @@ mod tests {
         f();
         *extra_grants().write() = Vec::new();
         *roots().write() = Vec::new();
-        match prev {
-            Some(v) => std::env::set_var("GROK_APP_HOME", v),
-            None => std::env::remove_var("GROK_APP_HOME"),
-        }
     }
 
     #[test]

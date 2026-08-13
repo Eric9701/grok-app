@@ -2019,6 +2019,9 @@ mod tests {
 
     #[test]
     fn engine_lang_follows_product_locale_not_hardcoded_zh() {
+        let _home = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let engine = Engine::new_ephemeral(OutboundRouter::new(), false);
         let lang = engine.lang();
         assert!(
