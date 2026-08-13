@@ -40,6 +40,7 @@ export async function startPcmCapture(
       echoCancellation: true,
       noiseSuppression: true,
     },
+    video: false,
   });
   const ctx = new AudioContext({ sampleRate });
   const source = ctx.createMediaStreamSource(stream);

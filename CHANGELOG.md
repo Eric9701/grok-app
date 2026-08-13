@@ -12,6 +12,7 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Fixed
+- **macOS no longer aborts on voice / media-device probe**: Info.plist now includes `NSCameraUsageDescription`. WKWebView `getUserMedia` (even mic-only) enumerates cameras; missing the key is a TCC `SIGABRT`, not a permission dialog. Live Voice also passes `video: false`.
 - **Thinking timer no longer dies mid-turn or after switching chats**: Later think→tool loops stay on “思考中 / Thinking for …” (not frozen “思考了”) even after the first status sentence. Switching away and back while the agent is still running keeps `streaming` and restores the live assistant from Host state, so journal reconcile cannot paint a finished thought over a live turn. The live clock follows the turn start and resumes when the window is shown again.
 - **Model / floating menu flicker** (#602): When a portal menu sits above its trigger, `maxHeight` is no longer rewritten from the already-capped rendered height (`ph + 8`). That write-back plus `ResizeObserver` grew the panel every frame.
 - **Side terminal Starship / Powerline** (#603): Multi-word Nerd Font families are quoted (WebKit no longer splits them onto unpatched JetBrains Mono). The stack prefers Mono faces; xterm loads the WebGL addon so Powerline extras fill the cell. PTY spawn drops inherited `NO_COLOR` and forces truecolor.
@@ -32,6 +33,7 @@ See `docs/llm-wiki/release.md`.
 - **cwd-relative downloads (`curl -O` / `wget` without `-o`) prompt** unless YOLO — no longer assumed to write inside the project.
 
 **中文 · 修复**
+- **macOS 语音/枚举媒体设备不再闪退**：`Info.plist` 补上 `NSCameraUsageDescription`。WKWebView 即使只开麦克风也会扫摄像头，缺这个 key 会被 TCC 直接 `SIGABRT`，不会弹出授权框。Live Voice 申请媒体时显式 `video: false`。
 - **思考计时不再在中途或切会话后停住**：第一句正文之后的 think→tool 轮次仍显示「思考中」并继续走秒。切走再切回时保留 `streaming`，并按 Host 状态把当前助手标回直播，避免 journal 回灌把还在跑的一轮画成「思考了」。
 - **模型/浮层菜单底边闪烁**（#602）：菜单在触发器上方时不再把已受 `max-height` 限制的渲染高度 `+8` 回写成新上限；避免 `ResizeObserver` 正反馈。
 - **侧栏终端 Starship / Powerline**（#603）：多词 Nerd Font 族名加引号，优先 Mono 面；xterm 走 WebGL 画分隔符；PTY 去掉宿主带来的 `NO_COLOR` 并强制 truecolor。

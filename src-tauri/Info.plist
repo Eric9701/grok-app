@@ -2,9 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Grok may access the camera when a session lists media devices or a page requests video capture.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Grok needs the microphone for voice dictation into the composer.</string>
-  <key>NSMicrophoneUsageDescription</key>
-  <string>Grok needs the microphone for voice dictation and live voice sessions with agent delegation.</string>
+	<string>Grok needs the microphone for voice dictation and live voice sessions with agent delegation.</string>
 </dict>
 </plist>
