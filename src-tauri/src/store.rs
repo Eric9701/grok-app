@@ -369,6 +369,10 @@ pub struct AppSettings {
     /// One-shot: official grok-4.6 product effort high → xhigh.
     #[serde(default)]
     pub official_effort_xhigh_migrated: bool,
+    /// One-shot: lift stamped session/project `effort: high` rows to xhigh
+    /// (the previous flag only migrated `settings.effort`).
+    #[serde(default)]
+    pub official_effort_xhigh_rows_migrated: bool,
     /// One-shot: product workflows default off → on (CLI ≥0.2.111 / 1.0 align).
     #[serde(default)]
     pub workflows_default_migrated: bool,
@@ -613,6 +617,7 @@ impl Default for AppSettings {
             effort_default_migrated: true,
             official_model_default_migrated: true,
             official_effort_xhigh_migrated: true,
+            official_effort_xhigh_rows_migrated: true,
             workflows_default_migrated: true,
             plan_enabled: default_plan_enabled(),
             subagents_enabled: true,
@@ -845,6 +850,11 @@ pub fn load_settings() -> AppSettings {
         s.official_effort_xhigh_migrated = true;
         let _ = write_json(&settings_file(), &s);
     }
+    if !s.official_effort_xhigh_rows_migrated {
+        migrate_official_effort_xhigh_rows(s.model_id.as_deref());
+        s.official_effort_xhigh_rows_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
     // One-time: product workflows default off → on (CLI ≥0.2.111 / 1.0).
     // Only lifts false → true once; users who turn it off again stay off.
     if !s.workflows_default_migrated {
@@ -904,6 +914,85 @@ pub fn migrate_official_effort_to_xhigh(stored: Option<&str>) -> Option<String> 
         Some("high") => Some(DEFAULT_OFFICIAL_EFFORT.into()),
         Some(_) => None,
     }
+}
+
+/// Session / project row: lift `high` → `xhigh` only for official 4.6 (or
+/// inherited global official 4.6). grok-4.5 and custom ids stay put.
+pub fn row_should_lift_official_high_to_xhigh(
+    row_model_id: Option<&str>,
+    row_effort: Option<&str>,
+    global_model_id: Option<&str>,
+) -> bool {
+    if row_effort.map(str::trim) != Some("high") {
+        return false;
+    }
+    match row_model_id.map(str::trim).filter(|s| !s.is_empty()) {
+        None => official_route_should_default_xhigh(global_model_id),
+        Some("grok-4.6") => true,
+        Some(_) => false,
+    }
+}
+
+fn migrate_official_effort_xhigh_rows(global_model_id: Option<&str>) {
+    let mut sessions = load_sessions_index();
+    let mut sessions_changed = false;
+    for s in &mut sessions {
+        if row_should_lift_official_high_to_xhigh(
+            s.model_id.as_deref(),
+            s.effort.as_deref(),
+            global_model_id,
+        ) {
+            s.effort = Some(DEFAULT_OFFICIAL_EFFORT.into());
+            sessions_changed = true;
+        }
+    }
+    if sessions_changed {
+        if let Err(e) = save_sessions_index(&sessions) {
+            tracing::warn!("effort row migration: sessions_index: {e}");
+        }
+    }
+    let mut projects = load_projects();
+    let mut projects_changed = false;
+    for p in &mut projects {
+        if row_should_lift_official_high_to_xhigh(
+            p.model_id.as_deref(),
+            p.effort.as_deref(),
+            global_model_id,
+        ) {
+            p.effort = Some(DEFAULT_OFFICIAL_EFFORT.into());
+            projects_changed = true;
+        }
+    }
+    if projects_changed {
+        if let Err(e) = save_projects(&projects) {
+            tracing::warn!("effort row migration: projects: {e}");
+        }
+    }
+}
+
+/// Clamp a remembered effort to the catalog of the resolved model.
+/// grok-4.5 has no xhigh → high. Unknown / custom catalogs are left alone.
+pub fn clamp_effort_for_model(model_id: &str, effort: &str) -> String {
+    let allowed: &[&str] = match model_id.trim() {
+        "grok-4.5" => &["low", "medium", "high"],
+        "" | "grok-4.6" => &["low", "medium", "high", "xhigh"],
+        id if id.starts_with("grok-") => &["low", "medium", "high", "xhigh"],
+        _ => return effort.to_string(),
+    };
+    if allowed
+        .iter()
+        .any(|id| id.eq_ignore_ascii_case(effort.trim()))
+    {
+        return effort.to_string();
+    }
+    // Only clamp the official overflow: 4.5 has no xhigh → high.
+    // Leave custom / unknown ids (e.g. max) untouched.
+    if effort.trim().eq_ignore_ascii_case("xhigh")
+        && allowed.iter().any(|a| a.eq_ignore_ascii_case("high"))
+    {
+        return "high".to_string();
+    }
+    effort.to_string()
 }
 
 pub fn save_settings(s: &AppSettings) -> Result<(), String> {
@@ -1775,15 +1864,17 @@ pub fn save_messages(session_id: &str, messages: &[ChatMessageStored]) -> Result
 }
 
 pub fn append_message(session_id: &str, msg: ChatMessageStored) -> Result<(), String> {
-    let mut msgs = load_messages(session_id);
-    // Upsert by id — never double-insert the same host message (stream complete +
-    // reconnect edge cases). Keeps journal length honest for multi-turn chats.
-    if let Some(slot) = msgs.iter_mut().find(|m| m.id == msg.id) {
-        *slot = msg;
-    } else {
-        msgs.push(msg);
-    }
-    save_messages(session_id, &msgs)
+    let path = session_dir(session_id).join("messages.json");
+    crate::store_lock::with_exclusive_lock(&path, || {
+        let mut msgs: Vec<ChatMessageStored> = read_json_recover(&path);
+        if let Some(slot) = msgs.iter_mut().find(|m| m.id == msg.id) {
+            *slot = msg;
+        } else {
+            msgs.push(msg);
+        }
+        let s = serde_json::to_string_pretty(&msgs).map_err(|e| e.to_string())?;
+        crate::store_lock::write_bytes_replace(&path, s.as_bytes())
+    })
 }
 
 /// True for a normal user prompt turn. Mid-turn interjections belong to the
@@ -2152,19 +2243,45 @@ pub fn save_secrets(s: &SecretsFile) -> Result<(), String> {
     crate::secrets::save_secrets(s)
 }
 
+fn collect_agent_home_api_keys() -> Vec<String> {
+    let home = crate::paths::resolve_agent_grok_home(&load_settings().session_data_mode);
+    let path = home.join("config.toml");
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let t = line.trim();
+        let Some(rest) = t
+            .strip_prefix("api_key")
+            .or_else(|| t.strip_prefix("\"api_key\""))
+        else {
+            continue;
+        };
+        let rest = rest.trim().trim_start_matches('=').trim();
+        let val = rest.trim_matches('"').trim_matches('\'').trim();
+        if val.len() >= 8 {
+            out.push(val.to_string());
+        }
+    }
+    out
+}
+
 /// Redact secrets from a string for logs/Doctor export.
 pub fn redact_text(input: &str) -> String {
     let mut out = input.to_string();
     let secrets = load_secrets();
-    for key in [
-        secrets.official_api_key.as_deref(),
-        secrets.relay_api_key.as_deref(),
+    let mut keys: Vec<String> = [
+        secrets.official_api_key.clone(),
+        secrets.relay_api_key.clone(),
     ]
     .into_iter()
     .flatten()
-    {
+    .collect();
+    keys.extend(collect_agent_home_api_keys());
+    for key in keys {
         if key.len() >= 8 {
-            out = out.replace(key, "[REDACTED]");
+            out = out.replace(&key, "[REDACTED]");
         }
     }
     // common token scrubbing without regex crate
@@ -2254,7 +2371,7 @@ pub fn resolve_composer_prefs(project_id: Option<&str>, session_id: Option<&str>
         })
         .unwrap_or(g_effort);
 
-    match scope {
+    let mut prefs = match scope {
         ComposerPrefsScope::Global => ComposerPrefs {
             model_id: g_model,
             effort,
@@ -2323,7 +2440,9 @@ pub fn resolve_composer_prefs(project_id: Option<&str>, session_id: Option<&str>
                 }
             }
         }
-    }
+    };
+    prefs.effort = clamp_effort_for_model(&prefs.model_id, &prefs.effort);
+    prefs
 }
 
 /// Plan mode is a **transient, per-session** state, never a sticky default.
@@ -2680,6 +2799,7 @@ mod tests {
         assert_eq!(s.effort.as_deref(), Some("xhigh"));
         assert_eq!(s.model_id.as_deref(), Some("grok-4.6"));
         assert!(s.official_effort_xhigh_migrated);
+        assert!(s.official_effort_xhigh_rows_migrated);
         assert_eq!(s.preferred_agent, "");
         assert_eq!(s.agent_profile_path, "");
         assert_eq!(s.agents_json, "");
@@ -2739,6 +2859,42 @@ mod tests {
         assert_eq!(migrate_official_effort_to_xhigh(Some("low")), None);
         assert_eq!(migrate_official_effort_to_xhigh(Some("medium")), None);
         assert_eq!(migrate_official_effort_to_xhigh(Some("xhigh")), None);
+    }
+
+    #[test]
+    fn official_effort_row_lift_skips_4_5_and_custom() {
+        assert!(row_should_lift_official_high_to_xhigh(
+            Some("grok-4.6"),
+            Some("high"),
+            Some("grok-4.6"),
+        ));
+        assert!(row_should_lift_official_high_to_xhigh(
+            None,
+            Some("high"),
+            Some("grok-4.6"),
+        ));
+        assert!(!row_should_lift_official_high_to_xhigh(
+            Some("grok-4.5"),
+            Some("high"),
+            Some("grok-4.6"),
+        ));
+        assert!(!row_should_lift_official_high_to_xhigh(
+            Some("my-relay"),
+            Some("high"),
+            Some("grok-4.6"),
+        ));
+        assert!(!row_should_lift_official_high_to_xhigh(
+            Some("grok-4.6"),
+            Some("low"),
+            Some("grok-4.6"),
+        ));
+    }
+
+    #[test]
+    fn clamp_effort_drops_xhigh_on_4_5() {
+        assert_eq!(clamp_effort_for_model("grok-4.5", "xhigh"), "high");
+        assert_eq!(clamp_effort_for_model("grok-4.6", "xhigh"), "xhigh");
+        assert_eq!(clamp_effort_for_model("custom-relay", "xhigh"), "xhigh");
     }
 
     #[test]
@@ -3448,7 +3604,7 @@ mod tests {
         assert_eq!(resolve_composer_prefs(None, Some(&a.id)).effort, "low");
         assert_eq!(resolve_composer_prefs(None, Some(&b.id)).effort, "max");
         // The global seed for future chats is left untouched by a per-chat change.
-        assert_eq!(load_settings().effort.as_deref(), Some("high"));
+        assert_eq!(load_settings().effort.as_deref(), Some("xhigh"));
 
         let _ = delete_session(&a.id);
         let _ = delete_session(&b.id);

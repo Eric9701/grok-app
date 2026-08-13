@@ -437,9 +437,10 @@ impl SessionManager {
     /// before recycle/kill (CLI upgrade, auth switch, provider route, …).
     pub(super) fn journal_hard_end_for_busy_agents(&self, app: &AppHandle, reason: &str) {
         let cancel = normalize_hard_end_reason(reason);
+        let mut ids: Vec<String> = Vec::new();
         {
-            let mut guard = self.inner.lock();
-            if let Some(s) = guard.as_mut() {
+            let guard = self.inner.lock();
+            if let Some(s) = guard.as_ref() {
                 let st = s.fsm.state();
                 let busy = Self::live_session_is_busy(s)
                     || matches!(
@@ -447,13 +448,13 @@ impl SessionManager {
                         SessionState::Streaming | SessionState::AwaitingPermission
                     );
                 if busy {
-                    Self::journal_turn_cancelled(s, Some(app), cancel);
+                    ids.push(s.app_session_id.clone());
                 }
             }
         }
         {
-            let mut bg = self.background.lock();
-            for s in bg.values_mut() {
+            let bg = self.background.lock();
+            for s in bg.values() {
                 let st = s.fsm.state();
                 let busy = Self::live_session_is_busy(s)
                     || matches!(
@@ -461,9 +462,40 @@ impl SessionManager {
                         SessionState::Streaming | SessionState::AwaitingPermission
                     );
                 if busy {
-                    Self::journal_turn_cancelled(s, Some(app), cancel);
+                    ids.push(s.app_session_id.clone());
                 }
             }
+        }
+        for id in ids {
+            if has_turn_end_marker_after_last_user(&id) {
+                continue;
+            }
+            let mid = Uuid::new_v4().to_string();
+            let content = format!("turn_cancelled|{cancel}");
+            let is_error = !matches!(cancel, "user_stop" | "cancelled");
+            let _ = store::append_message(
+                &id,
+                ChatMessageStored {
+                    id: mid.clone(),
+                    role: "tool".into(),
+                    content: content.clone(),
+                    thought: None,
+                    created_at: chrono::Utc::now(),
+                    is_error,
+                    attachments: None,
+                    marker: Some("turn_cancelled".into()),
+                },
+            );
+            let _ = app.emit(
+                "session://turn_marker",
+                serde_json::json!({
+                    "sessionId": id,
+                    "messageId": mid,
+                    "marker": "turn_cancelled",
+                    "reason": cancel,
+                    "content": content,
+                }),
+            );
         }
     }
 
@@ -1152,6 +1184,13 @@ pub(crate) fn has_turn_end_marker_after_last_user(app_session_id: &str) -> bool 
 
 /// Detect permission-reject style tool failures in the current turn journal
 /// (CLI: `unknown permission option` / `Failed to request permission`).
+pub(crate) fn journal_content_suggests_permission_reject(content: &str) -> bool {
+    let c = content.to_ascii_lowercase();
+    c.contains("unknown permission option")
+        || c.contains("failed to request permission")
+        || c.contains("permission_rejected")
+}
+
 pub(crate) fn journal_suggests_permission_reject(app_session_id: &str) -> bool {
     let msgs = store::load_messages(app_session_id);
     let start = msgs
@@ -1159,13 +1198,9 @@ pub(crate) fn journal_suggests_permission_reject(app_session_id: &str) -> bool {
         .rposition(|m| m.role == "user")
         .map(|i| i + 1)
         .unwrap_or(0);
-    msgs[start..].iter().any(|m| {
-        let c = m.content.to_ascii_lowercase();
-        c.contains("unknown permission option")
-            || c.contains("failed to request permission")
-            || c.contains("permission_rejected")
-            || c.contains("permission denied")
-    })
+    msgs[start..]
+        .iter()
+        .any(|m| journal_content_suggests_permission_reject(&m.content))
 }
 
 #[cfg(test)]
@@ -1198,5 +1233,24 @@ mod hard_end_tests {
             infer_hard_end_reason_from_stop("end_turn", "s", |_| true),
             None
         );
+    }
+
+    #[test]
+    fn tool_permission_denied_is_not_a_hard_end() {
+        assert!(!journal_content_suggests_permission_reject(
+            "bash: Permission denied"
+        ));
+        assert!(!journal_content_suggests_permission_reject(
+            "cat: /root/x: Permission denied"
+        ));
+        assert!(journal_content_suggests_permission_reject(
+            "unknown permission option"
+        ));
+        assert!(journal_content_suggests_permission_reject(
+            "Failed to request permission"
+        ));
+        assert!(journal_content_suggests_permission_reject(
+            "permission_rejected"
+        ));
     }
 }

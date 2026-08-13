@@ -3,8 +3,9 @@
 
 #![allow(dead_code)] // residual-clippy: kind_from_mime
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -168,7 +169,7 @@ pub fn is_allowed_media_url(url: &str) -> bool {
 }
 
 /// Extract a numeric X/Twitter status snowflake from a URL (or bare id).
-/// Short digit runs are noise — real snowflakes are long.
+/// Only pathname `status|statuses/<digits>` counts — query/fragment are ignored.
 fn extract_status_id_from_url(url: &str) -> Option<String> {
     let u = url.trim();
     if u.is_empty() {
@@ -177,25 +178,50 @@ fn extract_status_id_from_url(url: &str) -> Option<String> {
     if u.chars().all(|c| c.is_ascii_digit()) && u.len() >= 8 {
         return Some(u.to_string());
     }
-    let lower = u.to_ascii_lowercase();
-    if !(lower.contains("x.com/") || lower.contains("twitter.com/")) {
+    let parsed = url::Url::parse(u).ok()?;
+    let segs: Vec<&str> = parsed.path().split('/').filter(|s| !s.is_empty()).collect();
+    for i in 0..segs.len().saturating_sub(1) {
+        let name = segs[i].to_ascii_lowercase();
+        if name != "status" && name != "statuses" {
+            continue;
+        }
+        let id = segs[i + 1];
+        if id.len() >= 8 && id.chars().all(|c| c.is_ascii_digit()) {
+            return Some(id.to_string());
+        }
         return None;
     }
-    for marker in ["/status/", "/statuses/"] {
-        if let Some(idx) = lower.find(marker) {
-            let after = &u[idx + marker.len()..];
-            let id: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
-            if id.len() >= 8 {
-                return Some(id);
-            }
-        }
-    }
     None
+}
+
+fn is_canonical_x_status_url(url: &str) -> bool {
+    let parsed = match url::Url::parse(url.trim()) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    let scheme = parsed.scheme();
+    if scheme != "https" && scheme != "http" {
+        return false;
+    }
+    let host = parsed
+        .host_str()
+        .unwrap_or("")
+        .trim_start_matches("www.")
+        .to_ascii_lowercase();
+    if host != "x.com" && host != "twitter.com" && host != "mobile.twitter.com" {
+        return false;
+    }
+    extract_status_id_from_url(url).is_some()
 }
 
 /// Normalize to `https://x.com/<user>/status/<id>` when a real status id is present.
 /// Returns `None` when the URL is not a citable status page (never invents ids).
 fn normalize_status_url(url: &str, username: Option<&str>) -> Option<String> {
+    let trimmed = url.trim();
+    let bare_id = trimmed.chars().all(|c| c.is_ascii_digit()) && trimmed.len() >= 8;
+    if !bare_id && !is_canonical_x_status_url(trimmed) {
+        return None;
+    }
     let status_id = extract_status_id_from_url(url)?;
     let mut handle = String::new();
     if let Ok(parsed) = url::Url::parse(url.trim()) {
@@ -593,36 +619,41 @@ pub(crate) fn run_grok_headless(
     }
     proxy::apply_to_std_command(&mut cmd);
 
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let started = Instant::now();
-    let output = std::thread::spawn(move || cmd.output())
-        .join()
-        .map_err(|_| "search_failed".to_string())?
-        .map_err(|e| format!("cli spawn: {e}"))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let over_budget = started.elapsed() > timeout;
-    if over_budget {
-        // v1: process is not killed mid-flight; still surface timeout honesty
-        // when the budget is exceeded and we have nothing usable.
-        tracing::warn!(
-            "wallpaper source: headless grok took {:?} (budget {:?})",
-            started.elapsed(),
-            timeout
-        );
-        if stdout.trim().is_empty() || !output.status.success() {
-            return Err("timeout".into());
+    let mut child = cmd.spawn().map_err(|e| format!("cli spawn: {e}"))?;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let mut stdout = String::new();
+                let mut stderr = String::new();
+                if let Some(mut pipe) = child.stdout.take() {
+                    let _ = pipe.read_to_string(&mut stdout);
+                }
+                if let Some(mut pipe) = child.stderr.take() {
+                    let _ = pipe.read_to_string(&mut stderr);
+                }
+                if !status.success() && stdout.trim().is_empty() {
+                    tracing::warn!("wallpaper source cli failed: {stderr}");
+                    return Err("search_failed".into());
+                }
+                if stdout.trim().is_empty() {
+                    tracing::warn!("wallpaper source empty stdout: {stderr}");
+                    return Err("empty".into());
+                }
+                return Ok(stdout);
+            }
+            Ok(None) => {
+                if started.elapsed() > timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err("timeout".into());
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(e) => return Err(format!("cli wait: {e}")),
         }
     }
-    if !output.status.success() && stdout.trim().is_empty() {
-        tracing::warn!("wallpaper source cli failed: {stderr}");
-        return Err("search_failed".into());
-    }
-    if stdout.trim().is_empty() {
-        tracing::warn!("wallpaper source empty stdout: {stderr}");
-        return Err("empty".into());
-    }
-    Ok(stdout)
 }
 
 // ── Parse gallery from model JSON ───────────────────────────────────────────
@@ -1667,6 +1698,16 @@ and https://pbs.twimg.com/media/HNccFG2X0AE8gQ6.jpg?format=jpg&name=small
         );
         assert!(normalize_status_url("https://pbs.twimg.com/media/a.jpg", Some("u")).is_none());
         assert!(normalize_status_url("https://x.com/alice", Some("alice")).is_none());
+        assert!(extract_status_id_from_url("https://x.com/search?q=/status/12345678").is_none());
+        assert!(extract_status_id_from_url("https://x.com/search#/status/12345678").is_none());
+        assert!(
+            extract_status_id_from_url("https://x.com/victim/photo?u=/status/99999999").is_none()
+        );
+        assert!(is_canonical_x_status_url("ftp://x.com/user/status/12345678") == false);
+        assert!(normalize_status_url("https://cdn.evil.com/x.com/status/12345678", None).is_none());
+        assert!(
+            normalize_status_url("https://x.com.evil.com/user/status/12345678", None).is_none()
+        );
     }
 
     #[test]

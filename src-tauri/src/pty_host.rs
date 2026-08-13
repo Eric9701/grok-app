@@ -169,10 +169,12 @@ pub fn spawn(
 
     // Move child into a waiter; keep nothing in the map that would Drop-kill early.
     // Killing is done by dropping master/writer (SIGHUP) via kill().
+    let (exit_tx, exit_rx) = std::sync::mpsc::channel::<Option<u32>>();
     thread::Builder::new()
         .name(format!("pty-child-{sid}"))
         .spawn(move || {
-            let _ = child.wait();
+            let code = child.wait().ok().map(|st| st.exit_code());
+            let _ = exit_tx.send(code);
         })
         .map_err(|e| format!("spawn child waiter: {e}"))?;
 
@@ -252,11 +254,15 @@ pub fn spawn(
             if let Ok(mut g) = sessions().lock() {
                 g.remove(&sid_r);
             }
+            let code = exit_rx
+                .recv_timeout(std::time::Duration::from_millis(800))
+                .ok()
+                .flatten();
             let _ = app_r.emit(
                 EVENT_EXIT,
                 &PtyExitPayload {
                     session_id: sid_r,
-                    code: None,
+                    code,
                 },
             );
         })

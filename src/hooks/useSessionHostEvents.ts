@@ -1237,10 +1237,10 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
               // Session listed ⇒ process/gates gone; drop plan Approve even if
               // planRpcId was already taken in Host before emit.
               dropPlanGate(sid);
+              c.clearPendingGatesRef.current?.(sid);
               if (sid === viewing) {
                 c.setPerm(null);
                 c.setAskUser?.(null);
-                c.clearPendingGatesRef.current?.(sid);
               }
             }
             // Also clear any focused permission that lost its process even if

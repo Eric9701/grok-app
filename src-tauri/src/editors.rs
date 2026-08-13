@@ -819,6 +819,13 @@ pub fn list_editors_with_icons() -> EditorsListResult {
             .cloned()
             .map(|e| (e.id.clone(), e))
             .collect();
+        let fast_ids: std::collections::HashSet<&str> =
+            fast.editors.iter().map(|e| e.id.as_str()).collect();
+        for e in &mut by_id.values_mut() {
+            if !fast_ids.contains(e.id.as_str()) {
+                e.available = false;
+            }
+        }
         for e in &fast.editors {
             by_id
                 .entry(e.id.clone())

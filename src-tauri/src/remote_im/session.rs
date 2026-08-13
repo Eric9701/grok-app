@@ -103,4 +103,10 @@ impl SessionStore {
         self.save_disk();
         rec
     }
+
+    /// Drop a persisted binding (scope narrowed or no longer valid).
+    pub fn remove(&self, key: &str) {
+        self.inner.lock().remove(key);
+        self.save_disk();
+    }
 }

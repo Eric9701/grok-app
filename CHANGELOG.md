@@ -56,6 +56,15 @@ See `docs/llm-wiki/release.md`.
 - **Goal 会话指示菜单**：有真实 `goal_updated` 显示阶段 chip，仅 `/goal` 无事件时虚线等待态；点击打开菜单（可靠性中心 / 复制摘要 / 清除本机时间线）。仍不虚构进度。
 
 ### Fixed
+- **Grok preset effort catalog**: Amux / Yun presets use the official 4.6 enum (`low` / `medium` / `high` / `xhigh`, default Extra high). Legacy saved `max` ladders on those relays remap to `xhigh`. Blank custom channels still default to `max`.
+- **Changes accept/reject/restore path guard**: Accept / reject / restore never write file B using another file’s after-text. Hunk accept confirms drop-the-rest, caches the full after-text before write, and rebuilds the open diff so later hunks compose. All-dirty tabs refuse a new open instead of discarding unsaved buffers. Patch join keeps the source trailing-newline state.
+- **Remote IM empty / narrowed scope**: `{allow: []}` and out-of-scope bindings no longer spawn a turn (or fall back to `$HOME`). Telegram (and other channel) validate errors strip the request URL so bot tokens stay out of the settings panel. Only `/stop` / `/help` run inline on the pump so `/account` cannot block `/stop`.
+- **Memory clear fail-closed**: Workspace / all never fall back to `$HOME`; missing or non-directory cwd and unknown scope return an error (new i18n toast) and do not spawn the CLI.
+- **Live Voice + dictation**: Overlay `voice://*` / `session://permission` listeners survive parent re-renders and unregister on close. Dictation auto-send follows `commit.kind === "send"` without a `setDraft` side-effect.
+- **X status ids + wallpaper**: Status ids come only from pathname `status|statuses/<digits>` (TS + Rust). Query / fragment / `ftp:` / spoofed hosts are not verified. Library delete confirms via GlassModal; search/imagine over-budget kills the child.
+- **Workbench dirty / deep-link**: ⌘W and bulk close honor dirty confirm. `path:line` keeps line/column. `..` segments are rejected. Unknown project is not default-trusted.
+- **Effort + session core**: Official `high`→`xhigh` also migrates matching session/project rows under a new flag. Switching to a catalog without `xhigh` persists and resolves a clamped effort. Heatmap `local_usage` is off the async thread and skips old sessions. Tool `Permission denied` is not a hard-end error. Custom-route + shared mode self-heals. `append_message` load+save is atomic. AskUser clocks drop for every session on invalidate/clear.
+- **Settings / workflows cleanup**: Stale provider-test epoch dropped; unknown provider keys preserved; empty key not sent as `Bearer `; abandoned plan `closed_rpc_id` set; goal “clear local timeline” is per-session; doctor export cleans temp + kills on timeout; stop-all re-enumerates busy set; duplicate task-tree ids fail closed; Workflows native `<select>` replaced with project `Select`.
 - **Composer Extra High chip**: Selecting 极高/`xhigh` on grok-4.6 no longer remaps back to 高. Official route validates against the selected model's effort catalog.
 - **“Thinking for N” no longer restarts on every chat switch**: The turn clock is kept per chat instead of one global value. Opening a chat now resumes its own clock.
 - **Reasoning effort is remembered per chat**: Effort cascades session → project → global like permission. `settings.effort` is only the seed for chats that never picked one.
@@ -73,6 +82,15 @@ See `docs/llm-wiki/release.md`.
 - **Remote IM status lights**: Sidebar `deriveStatus` no longer treats Bridge running alone as connected (requires `connectedChannels` link). Incomplete drafts (any channel) cannot show Connected.
 
 **中文 · 修复**
+- **Grok 预设思考档对齐官方**：Amux / 云驿使用官方 4.6 枚举（`low` / `medium` / `high` / `xhigh`，默认极高）。旧存档里的 `max` 档会映射为 `xhigh`。空白自定义通道仍默认 `max`。
+- **Changes 跨文件写错 / hunk 还原**：accept/reject/restore 只写路径匹配的 after；逐 hunk 接受先确认、先缓存完整 after、再重建 diff。全脏标签拒绝打开新标签。补丁重组保留源文件末尾换行。
+- **Remote IM 空白名单 / 泄漏**：`{allow: []}` 与过期绑定不再 spawn，也不回退 `$HOME`。渠道测试错误去掉 URL（避免 Telegram token）。消息泵仅内联 `/stop`/`/help`。
+- **记忆清除 fail-closed**：workspace/all 不再回退主目录；路径缺失或未知 scope 报错且不执行 CLI。
+- **Live Voice / 听写**：监听在父组件重渲染后仍有效，关闭时退订。听写自动发送只看 `commit.kind === "send"`。
+- **X 证据 + 壁纸**：status id 只从 pathname 提取（前后端一致）；query/fragment/伪造 host 不验证。图库删除走 GlassModal；超时杀掉子进程。
+- **工作台脏数据 / deep link**：⌘W 与批量关闭尊重脏确认；`path:line` 保留行号；拒绝 `..`；未知项目不再默认 trusted。
+- **Effort / 会话核心**：存量会话与项目行再跑一次 high→xhigh；切到无 xhigh 的模型会钳制并持久化。热力图离异步线程并跳过过旧会话。工具输出 Permission denied 不再当硬错误。custom+shared 自愈。`append_message` 全程持锁。AskUser 时钟随会话清理。
+- **设置 / 工作流清理**：连接测试 epoch 丢弃过期结果；未知 provider 键保留；空 key 不发 Bearer；放弃 plan 写入 closed_rpc_id；Goal 清除本机会话时间线；doctor export 超时杀进程并删临时文件；stop-all 重新枚举忙碌集；重复 task-tree id fail-closed；工作流原生 select 换成项目 Select。
 - **Composer 极高档回弹**：在 grok-4.6 选极高/`xhigh` 后不再被 3 档校验打回「高」。
 - **「思考中 N 秒」不再因切换会话归零**：回合计时按会话保存；打开会话恢复它自己的计时。
 - **思考等级改为按会话记忆**：effort 按 会话 → 项目 → 全局 级联；`settings.effort` 只作为从未选过的会话的初始值。

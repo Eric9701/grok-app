@@ -62,7 +62,8 @@
   font: inherit;
   font-size: 12.5px;
   font-weight: 500;
-  line-height: 1;
+  /* 1 clips Latin descenders (g/y/p) inside the overflow:hidden label. */
+  line-height: var(--leading-tight);
   cursor: default;
   flex-shrink: 1;
   min-width: 0;
@@ -100,6 +101,7 @@ button.composer__context-item {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+  line-height: var(--leading-tight);
 }
 
 .cpm--context {

@@ -30,8 +30,10 @@ import {
   planFileRestore,
   planHunkActionGates,
   preferGitCheckoutReject,
+  rebuildDiffViewAfterHunkAccept,
   rejectSelectedHunks,
   remainingHunkIndices,
+  resolveDiffAfterSource,
   reverseHunks,
   splitPatchLines,
   summarizeBatchResults,
@@ -152,9 +154,7 @@ describe("reverseHunks / rejectSelectedHunks", () => {
 });
 
 describe("applySelectedHunks", () => {
-  it("applies only selected indices", () => {
-    const original = "a\nb\nc\nd\n";
-    const diff = `--- a/f
+  const TWO_HUNK_DIFF = `--- a/f
 +++ b/f
 @@ -1,2 +1,2 @@
 -a
@@ -165,10 +165,128 @@ describe("applySelectedHunks", () => {
 +C
  d
 `;
-    const hunks = parseUnifiedDiff(diff).hunks;
+
+  it("applies only selected indices", () => {
+    const original = "a\nb\nc\nd\n";
+    const hunks = parseUnifiedDiff(TWO_HUNK_DIFF).hunks;
     const r = applySelectedHunks(original, hunks, [1]);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.content).toBe("a\nb\nC\nd\n");
+  });
+
+  it("sequential accept composes and restorable is the full after", () => {
+    const original = "a\nb\nc\nd\n";
+    const hunks = parseUnifiedDiff(TWO_HUNK_DIFF).hunks;
+    const full = applyHunks(original, hunks);
+    expect(full.ok).toBe(true);
+    if (!full.ok) return;
+    const first = applySelectedHunks(original, hunks, [0]);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const second = applySelectedHunks(first.content, hunks, [1]);
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    const both = applySelectedHunks(original, hunks, [0, 1]);
+    expect(both.ok).toBe(true);
+    if (!both.ok) return;
+    expect(second.content).toBe(both.content);
+    expect(full.content).toBe(both.content);
+
+    const cache: Record<string, string> = { "/proj/f": full.content };
+    expect(
+      resolveDiffAfterSource({
+        key: "/proj/f",
+        diffView: { path: "/proj/f", afterText: first.content },
+        cache,
+        preferCache: true,
+      }),
+    ).toBe(full.content);
+
+    const rebuilt = rebuildDiffViewAfterHunkAccept({
+      fileName: "f",
+      written: first.content,
+      fullAfter: full.content,
+    });
+    expect(rebuilt.beforeText).toBe(first.content);
+    expect(rebuilt.afterText).toBe(full.content);
+    const remaining = parseUnifiedDiff(rebuilt.unified).hunks;
+    expect(remaining.length).toBeGreaterThan(0);
+    const fromView = applySelectedHunks(rebuilt.beforeText, remaining, [0]);
+    expect(fromView.ok).toBe(true);
+    if (fromView.ok) expect(fromView.content).toBe(full.content);
+  });
+
+  it("does not invent a trailing newline when the source lacked one", () => {
+    const original = "a\nb\nc";
+    const hunks = parseUnifiedDiff(TWO_HUNK_DIFF).hunks;
+    const r = applySelectedHunks(original, hunks, [0]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.content.endsWith("\n")).toBe(false);
+    expect(r.content).toBe("A\nb\nc");
+    const rejected = rejectSelectedHunks("A\nb\nC\nd", hunks, [1]);
+    expect(rejected.ok).toBe(true);
+    if (rejected.ok) {
+      expect(rejected.content.endsWith("\n")).toBe(false);
+      expect(rejected.content).toBe("A\nb\nc\nd");
+    }
+  });
+});
+
+describe("resolveDiffAfterSource", () => {
+  it("does not use another file's open after-text (accept B while viewing A)", () => {
+    const after = resolveDiffAfterSource({
+      key: "/proj/b.ts",
+      diffView: { path: "/proj/a.ts", afterText: "CONTENT_OF_A" },
+      cache: {},
+    });
+    expect(after).toBeNull();
+    expect(planFileAccept({ after })).toEqual({ mode: "keep_current" });
+  });
+
+  it("uses override, then path-matched view, then cache", () => {
+    expect(
+      resolveDiffAfterSource({
+        key: "/proj/a.ts",
+        override: "OVERRIDE",
+        diffView: { path: "/proj/a.ts", afterText: "VIEW" },
+        cache: { "/proj/a.ts": "CACHE" },
+      }),
+    ).toBe("OVERRIDE");
+    expect(
+      resolveDiffAfterSource({
+        key: "/proj/a.ts",
+        diffView: { path: "/proj/a.ts", afterText: "VIEW" },
+        cache: { "/proj/a.ts": "CACHE" },
+      }),
+    ).toBe("VIEW");
+    expect(
+      resolveDiffAfterSource({
+        key: "/proj/b.ts",
+        diffView: { path: "/proj/a.ts", afterText: "VIEW" },
+        cache: { "/proj/b.ts": "CACHE_B" },
+      }),
+    ).toBe("CACHE_B");
+  });
+
+  it("cache is only for the matched path (never another file's body)", () => {
+    const after = resolveDiffAfterSource({
+      key: "/proj/b.ts",
+      diffView: { path: "/proj/a.ts", afterText: "CONTENT_OF_A" },
+      cache: { "/proj/a.ts": "CONTENT_OF_A" },
+    });
+    expect(after).toBeNull();
+  });
+
+  it("restore prefers cache over a path-matched view", () => {
+    expect(
+      resolveDiffAfterSource({
+        key: "/proj/a.ts",
+        diffView: { path: "/proj/a.ts", afterText: "VIEW" },
+        cache: { "/proj/a.ts": "CACHED_FULL" },
+        preferCache: true,
+      }),
+    ).toBe("CACHED_FULL");
   });
 });
 

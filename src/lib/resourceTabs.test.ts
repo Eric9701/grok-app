@@ -8,6 +8,7 @@ import {
   openResourceTab,
   pickResourceTabLruDropIndex,
   resolveFilesWorkbenchSplitLayout,
+  resolveResourceTabsAllDirtySoftFail,
   resolveResourceTabsCapSoftFail,
   resolveResourceTabsEmptyState,
   resourceTabPathsEqual,
@@ -119,15 +120,18 @@ describe("openResourceTab", () => {
     expect(r.tabs.some((t) => t.id === "dirty-old")).toBe(true);
   });
 
-  it("soft-fails dirty drop only when every LRU candidate is dirty", () => {
+  it("refuses a new tab when every LRU candidate is dirty", () => {
     const tabs = [
       tab({ id: "a", path: "a.ts", dirty: true }),
       tab({ id: "b", path: "b.ts", dirty: true }),
     ];
     const r = openResourceTab(tabs, "c.ts", undefined, 2);
-    expect(r.tabs).toHaveLength(2);
-    expect(r.droppedIds).toEqual(["b"]);
-    expect(r.droppedDirty).toBe(true);
+    expect(r.created).toBe(false);
+    expect(r.refusedAllDirty).toBe(true);
+    expect(r.tabs).toEqual(tabs);
+    expect(r.droppedIds).toEqual([]);
+    expect(r.droppedDirty).toBe(false);
+    expect(r.tabs.some((t) => t.path === "c.ts")).toBe(false);
   });
 
   it("respects a custom max of 1", () => {
@@ -267,6 +271,14 @@ describe("closeActiveResourceTab / dirty honesty helpers", () => {
     ];
     expect(pickResourceTabLruDropIndex(tabs, "keep")).toBe(2);
   });
+
+  it("pickResourceTabLruDropIndex refuses to drop a dirty-only strip", () => {
+    const tabs = [
+      tab({ id: "keep", path: "k.ts", dirty: true }),
+      tab({ id: "d", path: "d.ts", dirty: true }),
+    ];
+    expect(pickResourceTabLruDropIndex(tabs, "keep")).toBe(-1);
+  });
 });
 
 describe("resolveResourceTabsCapSoftFail / split layout", () => {
@@ -287,6 +299,19 @@ describe("resolveResourceTabsCapSoftFail / split layout", () => {
       max: 12,
       droppedCount: 2,
       droppedDirty: true,
+    });
+  });
+
+  it("all-dirty refuse notice", () => {
+    expect(
+      resolveResourceTabsAllDirtySoftFail({ refusedAllDirty: false }),
+    ).toBeNull();
+    expect(
+      resolveResourceTabsAllDirtySoftFail({ refusedAllDirty: true, max: 12 }),
+    ).toEqual({
+      kind: "all_dirty",
+      messageKey: "resources.tabsMaxAllDirty",
+      max: 12,
     });
   });
 

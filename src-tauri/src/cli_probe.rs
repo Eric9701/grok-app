@@ -6,6 +6,7 @@
 //! - Windows: `.exe` / `.cmd` / `.bat`, PATHEXT, `USERPROFILE`, WinGet/Scoop.
 //! - macOS: `~/.grok/bin`, Homebrew Intel/ARM, `~/.local/bin`.
 
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{LazyLock, Mutex};
@@ -498,7 +499,28 @@ fn is_executable(path: &Path) -> bool {
 /// One extra `--version` exec per session start, which is negligible next to
 /// spawning the agent itself.
 pub fn read_version_of(path: &Path) -> Option<String> {
-    read_version(path)
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::SystemTime;
+
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, (SystemTime, String)>>> = OnceLock::new();
+    let mtime = fs::metadata(path).and_then(|m| m.modified()).ok();
+    if let Some(mt) = mtime {
+        if let Ok(g) = CACHE.get_or_init(|| Mutex::new(HashMap::new())).lock() {
+            if let Some((cached_mt, ver)) = g.get(path) {
+                if *cached_mt == mt {
+                    return Some(ver.clone());
+                }
+            }
+        }
+    }
+    let ver = read_version(path)?;
+    if let Some(mt) = mtime {
+        if let Ok(mut g) = CACHE.get_or_init(|| Mutex::new(HashMap::new())).lock() {
+            g.insert(path.to_path_buf(), (mt, ver.clone()));
+        }
+    }
+    Some(ver)
 }
 
 /// Wall-clock budget for a single `grok --version` (hung binaries must not

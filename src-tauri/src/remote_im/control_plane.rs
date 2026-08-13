@@ -335,7 +335,26 @@ pub fn format_session_menu(sessions: &[AppSessionEntry], lang: &str) -> String {
 }
 
 /// Whether this channel should use interactive cards for /p /r.
+/// Instance `presenter` / `enable_card` override the channel default.
 pub fn channel_uses_cards(channel: &str) -> bool {
+    channel_uses_cards_with_options(channel, None)
+}
+
+pub fn channel_uses_cards_with_options(channel: &str, options: Option<&serde_json::Value>) -> bool {
+    if let Some(opts) = options {
+        if let Some(p) = opts.get("presenter").and_then(|v| v.as_str()) {
+            let p = p.trim().to_ascii_lowercase();
+            if p == "card" || p == "cards" {
+                return true;
+            }
+            if p == "text" || p == "plain" {
+                return false;
+            }
+        }
+        if let Some(b) = opts.get("enable_card").and_then(|v| v.as_bool()) {
+            return b;
+        }
+    }
     matches!(channel, "feishu" | "lark" | "dingtalk" | "telegram")
 }
 
@@ -1063,6 +1082,14 @@ mod tests {
         assert!(channel_uses_cards("dingtalk"));
         assert!(channel_uses_cards("telegram"));
         assert!(!channel_uses_cards("weixin"));
+        assert!(channel_uses_cards_with_options(
+            "weixin",
+            Some(&serde_json::json!({ "enable_card": true })),
+        ));
+        assert!(!channel_uses_cards_with_options(
+            "feishu",
+            Some(&serde_json::json!({ "presenter": "text" })),
+        ));
     }
 
     #[test]

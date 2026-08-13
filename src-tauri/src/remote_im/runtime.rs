@@ -23,14 +23,10 @@ pub struct RuntimeHandle {
 }
 
 fn should_handle_inline(content: &str) -> bool {
-    let trimmed = content.trim();
-    if matches!(
-        slash::parse_slash(trimmed),
-        Some(BuiltinCommand::Compact { .. })
-    ) {
-        return false;
-    }
-    trimmed.starts_with('/') || trimmed.starts_with("__card_action__:")
+    matches!(
+        slash::parse_slash(content.trim()),
+        Some(BuiltinCommand::Stop) | Some(BuiltinCommand::Help)
+    )
 }
 
 impl RuntimeHandle {
@@ -175,5 +171,9 @@ mod tests {
         assert!(!should_handle_inline("cancel"));
         assert!(should_handle_inline("/stop"));
         assert!(should_handle_inline("/help"));
+        assert!(should_handle_inline("/start"));
+        assert!(!should_handle_inline("/account"));
+        assert!(!should_handle_inline("/p"));
+        assert!(!should_handle_inline("__card_action__:pick:1"));
     }
 }

@@ -23,6 +23,7 @@ import {
   closeActiveResourceTab,
   closeResourceTab,
   openResourceTab,
+  resolveResourceTabsAllDirtySoftFail,
   resolveResourceTabsCapSoftFail,
   resolveResourceTabsEmptyState,
   shouldConfirmCloseResourceTab,
@@ -78,7 +79,16 @@ export function useResourceFileTabs({
     (open: {
       droppedIds: string[];
       droppedDirty?: boolean;
+      refusedAllDirty?: boolean;
     }) => {
+      const allDirty = resolveResourceTabsAllDirtySoftFail({
+        refusedAllDirty: open.refusedAllDirty,
+        max: RESOURCE_TABS_MAX,
+      });
+      if (allDirty) {
+        setError(tr(allDirty.messageKey, { max: String(allDirty.max) }));
+        return;
+      }
       const notice = resolveResourceTabsCapSoftFail({
         droppedIds: open.droppedIds,
         droppedDirty: open.droppedDirty,
@@ -345,6 +355,10 @@ const openFile = async (relativePath: string) => {
         }
       : { name: baseName(relativePath) },
   );
+  if (open.refusedAllDirty) {
+    notifyCapSoftFail(open);
+    return;
+  }
   if (!open.created) {
     setTabs((prev) => mergeFileTabsFromOpen(prev, open));
     setActiveId(open.activeId);
@@ -432,6 +446,10 @@ const openAbsoluteFile = useCallback(
           }
         : { name: title || baseName(norm) },
     );
+    if (open.refusedAllDirty) {
+      notifyCapSoftFail(open);
+      return;
+    }
     if (!open.created) {
       // Move existing to front + activate (Chrome-like focus / MRU)
       // Refresh focus line when re-opening the same path from a citation.
@@ -545,6 +563,10 @@ const openUrl = useCallback(
         ? { id: existing.id, name: title || existing.name, kind: "url" }
         : { name, kind: "url" },
     );
+    if (open.refusedAllDirty) {
+      notifyCapSoftFail(open);
+      return;
+    }
     if (!open.created) {
       setTabs((prev) => mergeFileTabsFromOpen(prev, open));
       setActiveId(open.activeId);

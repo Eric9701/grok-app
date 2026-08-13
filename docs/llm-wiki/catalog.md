@@ -41,13 +41,13 @@ Composer **UI 阶梯**统一为 4 档（低 → 高）：**低 / 中 / 高 / 极
 2. 否则官方 catalog 的 `reasoningEfforts`（**以 CLI `models_cache` / `isDefault` 为准**）
 3. 再回退：`grok-4.6` → `GROK_4_6_EFFORTS`（`low` · `medium` · `high` · `xhigh`，默认 **xhigh**）；其余 → `GROK_BUILD_EFFORTS`（`low` · `medium` · `high`，默认 **high**）
 
-自定义通道默认档（`GROK_CHANNEL_EFFORTS`，点「恢复 Grok 默认」得到）：`low` · `medium` · `high` · `max`——4 档，`max` 映射极高 UI 槽（catalog kind `tier4`）。官方 `GROK_BUILD_EFFORTS` 仍为 3 档。
+自定义通道默认档（`GROK_CHANNEL_EFFORTS`，空白自定义点「恢复 Grok 默认」得到）：`low` · `medium` · `high` · `max`——4 档，`max` 映射极高 UI 槽（catalog kind `tier4`）。**Grok 中转预设**（Amux / 云驿）与官方 4.6 对齐：`low` · `medium` · `high` · `xhigh`（默认 **xhigh**；显示名 Low / Medium / High / Extra high）。官方 `GROK_BUILD_EFFORTS` 仍为 3 档。
 
 展示标签走 UI 阶梯 i18n（`effort.low|medium|high|xhigh`），不直接用上游 id 文案。
 
 Spawn：`--reasoning-effort <spawnId>`。Host **透传** catalog / 通道 id（含 `max` 等），不硬白名单仅 low/medium/high。切换通道时按阶梯对齐（极高在 3 档上钳到「高」）。中途修改：soft-disconnect agent → 下一条消息重连。无 `session/set_effort` RPC。
 
-**产品默认（4.6）：** 官方冷启动与未设 prefs 时 model = **grok-4.6**、effort = **xhigh**。CLI cache 可能同时把 `xhigh` 和 `high` 标成 default，Host/前端归一为 **xhigh**。用户可在 Composer 降为 high/medium/low 以缩短 TTFT。旧安装若全局 model 仍为历史产品默认 `grok-4.5`，`load_settings` 一次性抬到 `grok-4.6`；官方路由上旧 effort `high` 一次性抬到 `xhigh`（显式 low/medium/max 不动）。旧 effort `medium` 仍一次性抬到 high（3 档兜底）。
+**产品默认（4.6）：** 官方冷启动与未设 prefs 时 model = **grok-4.6**、effort = **xhigh**。CLI cache 可能同时把 `xhigh` 和 `high` 标成 default，Host/前端归一为 **xhigh**。用户可在 Composer 降为 high/medium/low 以缩短 TTFT。旧安装若全局 model 仍为历史产品默认 `grok-4.5`，`load_settings` 一次性抬到 `grok-4.6`；官方路由上旧 effort `high` 一次性抬到 `xhigh`（显式 low/medium/max 不动）。**存量会话 / 项目行**同样在 `official_effort_xhigh_rows_migrated` 下把 `effort: high` 且 model 为空（继承官方 4.6）或 `grok-4.6` 的行抬到 `xhigh`；`grok-4.5` 与自定义 id 不动。切到无 xhigh 的 catalog 时 resolve 层钳到该模型最高档。旧 effort `medium` 仍一次性抬到 high（3 档兜底）。
 
 **Apply honesty（UI）**：纯 helper `src/lib/modelEffortApply.ts`。Composer 改模型 / 推理后 toast + 菜单 footer 说明生效路径：
 

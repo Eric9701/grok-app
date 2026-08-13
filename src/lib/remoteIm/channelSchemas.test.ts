@@ -83,6 +83,14 @@ describe("remoteIm channelSchemas", () => {
     );
   });
 
+  it("hides unwired mention_map / resolve_mentions (B8 honesty)", () => {
+    for (const id of ["feishu", "lark"] as const) {
+      const fields = getChannelSchema(id)?.fields ?? [];
+      expect(fields.some((f) => f.key === "mention_map")).toBe(false);
+      expect(fields.some((f) => f.key === "resolve_mentions")).toBe(false);
+    }
+  });
+
   it("wecom switches fields by connect_mode", () => {
     const wecom = getChannelSchema("wecom")!;
     const ws = visibleFields(wecom, { connect_mode: "websocket" }, "bind");

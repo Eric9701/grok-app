@@ -144,6 +144,8 @@ export const zhSettingsMemory = {
   "settings.memoryOps.clear.unavailable.session": "host CLI 尚不支持仅清除会话范围。",
   "settings.memoryOps.clear.unavailable.memoryOff": "请先打开上方的「跨会话记忆」再清除。",
   "settings.memoryOps.clear.unavailable.noCwd": "请先打开项目以清除工作区记忆。",
+  "memory.clear.pathMissing": "无法清除工作区记忆 — 项目目录不存在或不是文件夹。",
+  "memory.clear.unknownScope": "未知的记忆清除范围。请使用 workspace、global 或 all。",
   "settings.memoryOps.clear.unavailable.host": "应用 host 暂不支持此清除范围。",
   "settings.memoryOps.empty.memoryOff": "记忆已关闭",
   "settings.memoryOps.empty.memoryOffHint": "请先打开上方的「跨会话记忆」以浏览文件与清除范围。",

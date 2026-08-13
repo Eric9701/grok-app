@@ -42,6 +42,8 @@ export type OpenResourceTabResult = ResourceTabsState & {
   droppedIds: string[];
   /** True when at least one dropped tab was dirty (soft-fail honesty). */
   droppedDirty: boolean;
+  /** True when open was refused because every LRU candidate is dirty. */
+  refusedAllDirty: boolean;
 };
 
 export type ResourceTabsEmptyKind = "no_tabs";
@@ -63,6 +65,13 @@ export type ResourceTabsCapSoftFail = {
   max: number;
   droppedCount: number;
   droppedDirty: boolean;
+};
+
+/** Soft-fail when every open tab is dirty and a new tab would exceed the cap. */
+export type ResourceTabsAllDirtySoftFail = {
+  kind: "all_dirty";
+  messageKey: "resources.tabsMaxAllDirty";
+  max: number;
 };
 
 /**
@@ -102,9 +111,22 @@ export function resolveResourceTabsCapSoftFail(input: {
   };
 }
 
+/** Soft-fail when a new tab is refused because every LRU candidate is dirty. */
+export function resolveResourceTabsAllDirtySoftFail(input: {
+  refusedAllDirty?: boolean;
+  max?: number;
+}): ResourceTabsAllDirtySoftFail | null {
+  if (!input.refusedAllDirty) return null;
+  return {
+    kind: "all_dirty",
+    messageKey: "resources.tabsMaxAllDirty",
+    max: clampMax(input.max),
+  };
+}
+
 /**
- * Pick LRU drop index (end of list = oldest). Prefer clean tabs so dirty
- * buffers are not silently discarded; fall back to any non-protected tab.
+ * Pick LRU drop index (end of list = oldest). Only clean tabs are droppable —
+ * when every candidate is dirty, return -1 so the caller can refuse the open.
  */
 export function pickResourceTabLruDropIndex(
   tabs: readonly ResourceTab[],
@@ -115,9 +137,6 @@ export function pickResourceTabLruDropIndex(
     const t = list[i]!;
     if (t.id === protectId) continue;
     if (!t.dirty) return i;
-  }
-  for (let i = list.length - 1; i >= 0; i--) {
-    if (list[i]!.id !== protectId) return i;
   }
   return -1;
 }
@@ -222,6 +241,7 @@ export function openResourceTab(
       created: false,
       droppedIds: [],
       droppedDirty: false,
+      refusedAllDirty: false,
     };
   }
 
@@ -233,6 +253,7 @@ export function openResourceTab(
       created: false,
       droppedIds: [],
       droppedDirty: false,
+      refusedAllDirty: false,
     };
   }
 
@@ -244,12 +265,34 @@ export function openResourceTab(
     kind: meta?.kind,
     dirty: meta?.dirty ?? false,
   };
+  if (list.length >= cap) {
+    const probe = [tab, ...list];
+    if (pickResourceTabLruDropIndex(probe, id) < 0) {
+      return {
+        tabs: list,
+        activeId: list[0]?.id ?? "",
+        created: false,
+        droppedIds: [],
+        droppedDirty: false,
+        refusedAllDirty: true,
+      };
+    }
+  }
   let next = [tab, ...list];
   const droppedIds: string[] = [];
   let droppedDirty = false;
   while (next.length > cap) {
     const dropIdx = pickResourceTabLruDropIndex(next, id);
-    if (dropIdx < 0) break;
+    if (dropIdx < 0) {
+      return {
+        tabs: list,
+        activeId: list[0]?.id ?? "",
+        created: false,
+        droppedIds: [],
+        droppedDirty: false,
+        refusedAllDirty: true,
+      };
+    }
     const drop = next[dropIdx]!;
     if (drop.dirty) droppedDirty = true;
     droppedIds.push(drop.id);
@@ -261,6 +304,7 @@ export function openResourceTab(
     created: true,
     droppedIds,
     droppedDirty,
+    refusedAllDirty: false,
   };
 }
 

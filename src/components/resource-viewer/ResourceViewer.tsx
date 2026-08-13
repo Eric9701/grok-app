@@ -312,6 +312,9 @@ export function ResourceViewer({
     setBatchRejectConfirm,
     batchHunkRejectConfirm,
     setBatchHunkRejectConfirm,
+    acceptHunkConfirm,
+    setAcceptHunkConfirm,
+    executeAcceptHunk,
     diffCommentTarget,
     setDiffCommentTarget,
     diffCommentNote,
@@ -1653,6 +1656,9 @@ export function ResourceViewer({
         executeBatchReject={executeBatchReject}
         batchHunkRejectConfirm={batchHunkRejectConfirm}
         setBatchHunkRejectConfirm={setBatchHunkRejectConfirm}
+        acceptHunkConfirm={acceptHunkConfirm}
+        setAcceptHunkConfirm={setAcceptHunkConfirm}
+        executeAcceptHunk={executeAcceptHunk}
         runBatchRemainingHunks={runBatchRemainingHunks}
         remainingHunkCount={remainingHunkCount}
         diffView={diffView}

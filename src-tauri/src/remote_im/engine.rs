@@ -7,9 +7,10 @@ use super::context::{
     ContextUsageSnapshot,
 };
 use super::control_plane::{
-    self, apply_project_pick, apply_session_pick, binding_after_agent_turn, channel_uses_cards,
-    format_project_menu, format_session_menu, list_sessions_for_project, parse_card_action,
-    resolve_turn_intent, AppSessionEntry, CardAction, PendingMode, ScopeBinding, TurnIntent,
+    self, apply_project_pick, apply_session_pick, binding_after_agent_turn,
+    channel_uses_cards_with_options, format_project_menu, format_session_menu,
+    list_sessions_for_project, parse_card_action, resolve_turn_intent, AppSessionEntry, CardAction,
+    PendingMode, ScopeBinding, TurnIntent,
 };
 use super::grok_agent;
 use super::i18n::{self, MessageKey};
@@ -183,6 +184,15 @@ impl Engine {
         agent_error_user_message(&self.lang(), classify_rim_error(error), error)
     }
 
+    fn channel_prefers_cards(&self, msg: &IncomingMessage) -> bool {
+        let opts = self
+            .instances
+            .lock()
+            .get(&msg.instance_id)
+            .map(|i| i.options.clone());
+        channel_uses_cards_with_options(&msg.channel, opts.as_ref())
+    }
+
     /// Trusted projects limited by instance project_scope (GUI whitelist or all).
     fn scoped_projects_for(&self, instance_id: &str) -> Vec<TrustedProject> {
         let scope = self
@@ -286,7 +296,7 @@ impl Engine {
             &msg.sender_id,
             &msg.sender_id,
         );
-        let default_wd = projects::default_work_dir(&inst.project_scope);
+        let default_wd = projects::default_work_dir(&inst.project_scope).unwrap_or_default();
 
         // Single lock scope — never nest pending.lock() (parking_lot is not reentrant;
         // or_else(|| self.pending.lock()...) deadlocked every first message after start).
@@ -333,9 +343,11 @@ impl Engine {
         // Soft inbound rate limit — honest reply, never silent drop.
         // Drop parking_lot guard before any `.await` (Send + no hold across await).
         let rate_block = {
+            // Per chat (not per sender) — matches UI copy "8 / chat / 60s".
+            let chat_scope = format!("{}:{}:{}", msg.channel, msg.instance_id, msg.chat_id);
             let mut lim = self.rate_limiter.lock();
             lim.prune_if_large(4096);
-            lim.try_acquire(&scope).err()
+            lim.try_acquire(&chat_scope).err()
         };
         if let Some(retry_after) = rate_block {
             let t = rate_limit_user_message(&self.lang(), retry_after);
@@ -381,7 +393,7 @@ impl Engine {
             &msg.sender_id,
             &msg.sender_id,
         );
-        let default_wd = projects::default_work_dir(&inst.project_scope);
+        let default_wd = projects::default_work_dir(&inst.project_scope).unwrap_or_default();
         // Prefer existing binding from either scope key
         let binding = self
             .store
@@ -1016,7 +1028,25 @@ impl Engine {
         default_wd: &str,
         registered: Option<RegisteredTurn>,
     ) {
-        let binding = self.store.get_or_create(scope, default_wd);
+        let scoped = self.scoped_projects_for(&msg.instance_id);
+        if scope_blocks_agent_io(default_wd, &scoped, self.store.get(scope).as_ref()) {
+            if self.store.get(scope).is_some() {
+                self.store.remove(scope);
+            }
+            let _ = self
+                .reply_msg(msg, i18n::t(&self.lang(), MessageKey::NoAvailableProject))
+                .await;
+            return;
+        }
+        let Some(binding) = self.store.get(scope) else {
+            let text = if self.lang() == "en" {
+                "No active agent session. Send a message or use /r first."
+            } else {
+                "当前没有可压缩的 agent 会话。请先发送一条消息，或使用 /r 恢复会话。"
+            };
+            let _ = self.reply_msg(msg, &text).await;
+            return;
+        };
         let Some(agent_session_id) = binding
             .agent_session_id
             .as_deref()
@@ -1191,7 +1221,7 @@ impl Engine {
         }
 
         // Menu: native cards/buttons where supported, text otherwise.
-        if channel_uses_cards(&msg.channel) {
+        if self.channel_prefers_cards(msg) {
             let card = match msg.channel.as_str() {
                 "dingtalk" => control_plane::build_dingtalk_project_card(&projects, &self.lang()),
                 "telegram" => {
@@ -1245,6 +1275,16 @@ impl Engine {
         msg: &IncomingMessage,
         default_wd: &str,
     ) {
+        let scoped = self.scoped_projects_for(&msg.instance_id);
+        if scope_blocks_agent_io(default_wd, &scoped, self.store.get(scope).as_ref()) {
+            if self.store.get(scope).is_some() {
+                self.store.remove(scope);
+            }
+            let _ = self
+                .reply_msg(msg, i18n::t(&self.lang(), MessageKey::NoAvailableProject))
+                .await;
+            return;
+        }
         let binding = self.store.get_or_create(scope, default_wd);
         if binding.project_id.is_none() {
             // Try match work_dir to a scoped trusted project
@@ -1296,7 +1336,7 @@ impl Engine {
             return;
         }
 
-        if channel_uses_cards(&msg.channel) {
+        if self.channel_prefers_cards(msg) {
             let card = match msg.channel.as_str() {
                 "dingtalk" => control_plane::build_dingtalk_session_card(&sessions, &self.lang()),
                 "telegram" => {
@@ -1340,14 +1380,27 @@ impl Engine {
         prompt: &str,
         registered: Option<RegisteredTurn>,
     ) {
-        let binding = self.store.get_or_create(scope, default_wd);
-        if binding.project_id.is_none() && binding.work_dir.is_empty() {
-            let t = if self.lang() == "en" {
-                "No project bound. Send /p first."
-            } else {
-                "尚未绑定项目。请先发送 /p。"
-            };
-            let _ = self.reply_msg(msg, t).await;
+        let scoped = self.scoped_projects_for(&msg.instance_id);
+        let existing = self.store.get(scope);
+        let binding = match existing {
+            Some(b) => b,
+            None if default_wd.is_empty() || scoped.is_empty() => {
+                let _ = self
+                    .reply_msg(msg, i18n::t(&self.lang(), MessageKey::NoAvailableProject))
+                    .await;
+                return;
+            }
+            None => self.store.get_or_create(scope, default_wd),
+        };
+        if !projects::binding_allowed_in_scope(
+            binding.project_id.as_deref(),
+            &binding.work_dir,
+            &scoped,
+        ) {
+            self.store.remove(scope);
+            let _ = self
+                .reply_msg(msg, i18n::t(&self.lang(), MessageKey::NoAvailableProject))
+                .await;
             return;
         }
 
@@ -1521,6 +1574,24 @@ impl Engine {
                 Err(e)
             }
         }
+    }
+}
+
+/// Empty / narrowed project scope must not start a compact or resume turn
+/// (and leftover out-of-scope bindings are treated as blocked).
+fn scope_blocks_agent_io(
+    default_wd: &str,
+    scoped: &[TrustedProject],
+    binding: Option<&ScopeBinding>,
+) -> bool {
+    if default_wd.trim().is_empty() || scoped.is_empty() {
+        return true;
+    }
+    match binding {
+        Some(b) => {
+            !projects::binding_allowed_in_scope(b.project_id.as_deref(), &b.work_dir, scoped)
+        }
+        None => false,
     }
 }
 
@@ -1909,6 +1980,41 @@ mod tests {
         assert!(!grok_agent::cancellation_signaled(&mut cancel_rx));
         assert_eq!(engine.cancel_active_turns("scope-stop"), 1);
         assert!(grok_agent::cancellation_signaled(&mut cancel_rx));
+    }
+
+    #[test]
+    fn empty_scope_and_narrowed_binding_do_not_spawn() {
+        assert!(projects::default_work_dir(&json!({ "allow": [] })).is_none());
+        assert!(!projects::binding_allowed_in_scope(
+            None,
+            "/Users/whoever",
+            &[]
+        ));
+        let scoped = vec![TrustedProject {
+            id: "p1".into(),
+            name: "One".into(),
+            path: "/tmp/one".into(),
+        }];
+        assert!(!projects::binding_allowed_in_scope(
+            Some("retired"),
+            "/tmp/retired",
+            &scoped
+        ));
+        assert!(projects::binding_allowed_in_scope(
+            Some("p1"),
+            "/tmp/one",
+            &scoped
+        ));
+        assert!(scope_blocks_agent_io("", &[], None));
+        assert!(scope_blocks_agent_io("/tmp/one", &[], None));
+        let mut leftover = ScopeBinding::fresh("/tmp/retired");
+        leftover.project_id = Some("retired".into());
+        leftover.agent_session_id = Some("agent-stale".into());
+        assert!(scope_blocks_agent_io("/tmp/one", &scoped, Some(&leftover)));
+        let mut ok = ScopeBinding::fresh("/tmp/one");
+        ok.project_id = Some("p1".into());
+        assert!(!scope_blocks_agent_io("/tmp/one", &scoped, Some(&ok)));
+        assert!(!scope_blocks_agent_io("/tmp/one", &scoped, None));
     }
 
     #[test]

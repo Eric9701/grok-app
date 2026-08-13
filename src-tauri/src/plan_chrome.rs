@@ -231,6 +231,7 @@ pub fn apply_decision(session_id: &str, decision: &str, keep_body: bool) {
         return;
     }
     let mut prev = load_plan_chrome(session_id).unwrap_or_default();
+    let closed = prev.rpc_id.clone();
     let d = decision.trim().to_ascii_lowercase();
     prev.rpc_id = None;
     prev.gate_stale = false;
@@ -238,7 +239,7 @@ pub fn apply_decision(session_id: &str, decision: &str, keep_body: bool) {
     prev.waiting = false;
     if d == "abandoned" {
         prev.user_closed = true;
-        prev.closed_rpc_id = prev.closed_rpc_id.or(None);
+        prev.closed_rpc_id = closed;
         prev.closed_tool_call_id = prev.tool_call_id.clone();
         prev.visible = false;
         prev.bar_dismissed = true;

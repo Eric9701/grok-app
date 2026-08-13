@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import * as api from "@/lib/api";
+import type { GitReviewFile } from "@/lib/api";
 import { createT, type Locale } from "@/i18n";
 import {
   IconArrowsMinimize,
@@ -104,6 +105,98 @@ type BundleMeta = {
 const INITIAL_EXPAND = 4;
 /** Cap rendered change lines per file before "show more". */
 const LINE_CAP = 320;
+const EMPTY_BUNDLE: BundleMeta = {
+  branch: null,
+  upstream: null,
+  totalAdded: 0,
+  totalRemoved: 0,
+};
+
+type WorkspaceSnap = {
+  files: GitReviewFile[];
+  meta: BundleMeta;
+  error: WorkspaceGitUnavailableKind | null;
+};
+
+/** Merge session rows with a cached workspace bundle (no IPC). */
+function composeReviewList(
+  sessionEntries: ReviewFileEntry[],
+  snap: WorkspaceSnap | null,
+  scope: ReviewScope,
+  projectPath: string | null | undefined,
+): {
+  list: ReviewFileEntry[];
+  meta: BundleMeta;
+  error: WorkspaceGitUnavailableKind | null;
+} {
+  const includeSession = scope === "all" || scope === "session";
+  const includeWorkspace = scope === "all" || scope === "workspace";
+  const byRel = new Map<string, ReviewFileEntry>();
+
+  if (includeSession) {
+    for (const e of sessionEntries) {
+      byRel.set(e.relPath.toLowerCase(), { ...e });
+    }
+  }
+
+  let meta: BundleMeta =
+    includeWorkspace && snap ? { ...snap.meta } : { ...EMPTY_BUNDLE };
+  const error = includeWorkspace ? (snap?.error ?? null) : null;
+
+  if (includeWorkspace && snap) {
+    for (const f of snap.files) {
+      const rel =
+        decodeGitPath(normalizePath(f.path) || f.name || "") ||
+        decodeGitPath(f.name || "");
+      if (!rel) continue;
+      const key = rel.toLowerCase();
+      const existing = byRel.get(key);
+      const name = decodeGitPath(f.name || "") || pathBaseName(rel);
+      const entry: ReviewFileEntry = {
+        key: existing?.key ?? `w:${key}`,
+        relPath: rel,
+        path:
+          normalizePath(f.absolutePath) ||
+          (projectPath ? `${normalizePath(projectPath)}/${rel}` : rel),
+        name,
+        source: existing ? "both" : "workspace",
+        kind: f.kind,
+        added: f.added ?? 0,
+        removed: f.removed ?? 0,
+        patch:
+          existing?.patch && existing.patch.trim()
+            ? existing.patch
+            : (f.diff ?? null),
+        binary: !!f.binary,
+        loading: false,
+        error: null,
+        session: existing?.session,
+      };
+      if (existing?.patch && existing.patch.trim()) {
+        const d = countPatchDelta(existing.patch);
+        entry.added = d.added;
+        entry.removed = d.removed;
+      }
+      byRel.set(key, entry);
+    }
+  }
+
+  const list = Array.from(byRel.values()).sort((a, b) =>
+    a.relPath.localeCompare(b.relPath),
+  );
+
+  if (scope !== "workspace" || !meta.totalAdded) {
+    let a = 0;
+    let r = 0;
+    for (const f of list) {
+      a += f.added;
+      r += f.removed;
+    }
+    meta = { ...meta, totalAdded: a, totalRemoved: r };
+  }
+
+  return { list, meta, error };
+}
 
 function sessionRel(
   change: SessionFileChange,
@@ -334,12 +427,10 @@ export function ReviewTab({
     () => new Set(),
   );
   const [files, setFiles] = useState<ReviewFileEntry[]>([]);
-  const [bundle, setBundle] = useState<BundleMeta>({
-    branch: null,
-    upstream: null,
-    totalAdded: 0,
-    totalRemoved: 0,
-  });
+  const [bundle, setBundle] = useState<BundleMeta>(EMPTY_BUNDLE);
+  const [workspaceSnap, setWorkspaceSnap] = useState<WorkspaceSnap | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [loadErrorKind, setLoadErrorKind] =
     useState<WorkspaceGitUnavailableKind | null>(null);
@@ -384,147 +475,131 @@ export function ReviewTab({
     });
   }, [sessionChanges, projectPath]);
 
-  const refresh = useCallback(async () => {
+  const applyComposed = useCallback(
+    (sessionEntries: ReviewFileEntry[], snap: WorkspaceSnap | null) => {
+      const { list, meta, error } = composeReviewList(
+        sessionEntries,
+        snap,
+        scope,
+        projectPath,
+      );
+      setLoadErrorKind(error);
+      setBundle(meta);
+      setFiles(list);
+      setExpanded((prev) => {
+        if (prev.size > 0) {
+          const next = new Set<string>();
+          for (const k of prev) {
+            if (list.some((f) => f.key === k)) next.add(k);
+          }
+          if (next.size > 0) return next;
+        }
+        return new Set(list.slice(0, INITIAL_EXPAND).map((f) => f.key));
+      });
+      setSelectedKey((cur) => {
+        if (cur && list.some((f) => f.key === cur)) return cur;
+        return list[0]?.key ?? null;
+      });
+    },
+    [projectPath, scope],
+  );
+
+  const loadWorkspaceBundle = useCallback(async () => {
     const seq = ++loadSeq.current;
     const path = (projectPath || "").trim();
-    setLoading(true);
-    setLoadErrorKind(null);
-
-    const sessionEntries = buildSessionEntries();
-    const byRel = new Map<string, ReviewFileEntry>();
-
-    const includeSession = scope === "all" || scope === "session";
     const includeWorkspace = scope === "all" || scope === "workspace";
 
-    if (includeSession) {
-      for (const e of sessionEntries) {
-        byRel.set(e.relPath.toLowerCase(), { ...e });
-      }
+    if (!includeWorkspace) {
+      if (seq !== loadSeq.current) return;
+      setWorkspaceSnap({ files: [], meta: { ...EMPTY_BUNDLE }, error: null });
+      setLoading(false);
+      return;
     }
 
-    let meta: BundleMeta = {
-      branch: null,
-      upstream: null,
-      totalAdded: 0,
-      totalRemoved: 0,
+    setLoading(true);
+    let next: WorkspaceSnap = {
+      files: [],
+      meta: { ...EMPTY_BUNDLE },
+      error: null,
     };
-    let nextLoadError: WorkspaceGitUnavailableKind | null = null;
 
-    if (includeWorkspace && path && api.isTauri()) {
+    if (path && api.isTauri()) {
       try {
         const res = await api.gitReviewBundle(path);
         if (seq !== loadSeq.current) return;
         if (res?.available) {
-          meta = {
-            branch: res.branch ?? null,
-            upstream: res.upstream ?? null,
-            totalAdded: res.totalAdded ?? 0,
-            totalRemoved: res.totalRemoved ?? 0,
+          next = {
+            files: res.files ?? [],
+            meta: {
+              branch: res.branch ?? null,
+              upstream: res.upstream ?? null,
+              totalAdded: res.totalAdded ?? 0,
+              totalRemoved: res.totalRemoved ?? 0,
+            },
+            error: null,
           };
-          for (const f of res.files ?? []) {
-            const rel =
-              decodeGitPath(normalizePath(f.path) || f.name || "") ||
-              decodeGitPath(f.name || "");
-            if (!rel) continue;
-            const key = rel.toLowerCase();
-            const existing = byRel.get(key);
-            const name =
-              decodeGitPath(f.name || "") || pathBaseName(rel);
-            const entry: ReviewFileEntry = {
-              key: existing?.key ?? `w:${key}`,
-              relPath: rel,
-              path:
-                normalizePath(f.absolutePath) ||
-                (projectPath
-                  ? `${normalizePath(projectPath)}/${rel}`
-                  : rel),
-              name,
-              source: existing ? "both" : "workspace",
-              kind: f.kind,
-              added: f.added ?? 0,
-              removed: f.removed ?? 0,
-              // Prefer session payload when present (agent-local edit).
-              patch:
-                existing?.patch && existing.patch.trim()
-                  ? existing.patch
-                  : f.diff ?? null,
-              binary: !!f.binary,
-              loading: false,
-              error: null,
-              session: existing?.session,
-            };
-            if (existing?.patch && existing.patch.trim()) {
-              const d = countPatchDelta(existing.patch);
-              entry.added = d.added;
-              entry.removed = d.removed;
-            }
-            byRel.set(key, entry);
-          }
         } else {
-          nextLoadError = classifyWorkspaceGitUnavailable({
+          next = {
+            files: [],
+            meta: { ...EMPTY_BUNDLE },
+            error: classifyWorkspaceGitUnavailable({
+              projectPath: path,
+              isTauri: true,
+              available: false,
+              reason: res?.reason ?? "unavailable",
+            }),
+          };
+        }
+      } catch (e) {
+        if (seq !== loadSeq.current) return;
+        next = {
+          files: [],
+          meta: { ...EMPTY_BUNDLE },
+          error: classifyWorkspaceGitUnavailable({
             projectPath: path,
             isTauri: true,
             available: false,
-            reason: res?.reason ?? "unavailable",
-          });
-        }
-      } catch (e) {
-        nextLoadError = classifyWorkspaceGitUnavailable({
-          projectPath: path,
-          isTauri: true,
-          available: false,
-          reason: String(e),
-        });
+            reason: String(e),
+          }),
+        };
       }
-    } else if (includeWorkspace && path && !api.isTauri()) {
-      nextLoadError = "host_only";
-    } else if (includeWorkspace && !path) {
-      nextLoadError = "no_project";
+    } else if (path && !api.isTauri()) {
+      next = { files: [], meta: { ...EMPTY_BUNDLE }, error: "host_only" };
+    } else {
+      next = { files: [], meta: { ...EMPTY_BUNDLE }, error: "no_project" };
     }
 
     if (seq !== loadSeq.current) return;
-    setLoadErrorKind(nextLoadError);
-
-    const list = Array.from(byRel.values()).sort((a, b) =>
-      a.relPath.localeCompare(b.relPath),
-    );
-
-    // Recompute totals from visible list when scope filters session-only etc.
-    if (scope !== "workspace" || !meta.totalAdded) {
-      let a = 0;
-      let r = 0;
-      for (const f of list) {
-        a += f.added;
-        r += f.removed;
-      }
-      meta = { ...meta, totalAdded: a, totalRemoved: r };
-    }
-
-    setBundle(meta);
-    setFiles(list);
+    setWorkspaceSnap(next);
     setLoading(false);
+  }, [projectPath, scope]);
 
-    // Default expand first few files; preserve open keys that still exist.
-    setExpanded((prev) => {
-      if (prev.size > 0) {
-        const next = new Set<string>();
-        for (const k of prev) {
-          if (list.some((f) => f.key === k)) next.add(k);
-        }
-        if (next.size > 0) return next;
-      }
-      return new Set(list.slice(0, INITIAL_EXPAND).map((f) => f.key));
-    });
+  const refresh = useCallback(async () => {
+    await loadWorkspaceBundle();
+  }, [loadWorkspaceBundle]);
 
-    setSelectedKey((cur) => {
-      if (cur && list.some((f) => f.key === cur)) return cur;
-      return list[0]?.key ?? null;
-    });
-  }, [projectPath, scope, buildSessionEntries]);
+  const sessionEntriesRef = useRef(buildSessionEntries);
+  sessionEntriesRef.current = buildSessionEntries;
+  const workspaceSnapRef = useRef(workspaceSnap);
+  workspaceSnapRef.current = workspaceSnap;
 
+  // Workspace IPC only when project/scope changes (or manual refresh).
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void loadWorkspaceBundle();
+  }, [loadWorkspaceBundle]);
+
+  // Re-merge as soon as the cached bundle (or scope/path) changes.
+  useEffect(() => {
+    applyComposed(sessionEntriesRef.current(), workspaceSnap);
+  }, [applyComposed, workspaceSnap]);
+
+  // Streamed sessionChanges: local recompose only, debounced — no git IPC.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      applyComposed(sessionEntriesRef.current(), workspaceSnapRef.current);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [sessionChanges, applyComposed]);
 
   // Close menus on outside click
   useEffect(() => {

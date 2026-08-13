@@ -1123,7 +1123,15 @@ pub async fn wallpaper_fetch_media(
     source: Option<String>,
 ) -> Result<crate::wallpaper_source::WallpaperFetchResult, String> {
     crate::wallpaper_source::ensure_wallpaper_dirs();
-    crate::wallpaper_source::fetch_media(&url, source.as_deref()).await
+    let source = source.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        tauri::async_runtime::block_on(crate::wallpaper_source::fetch_media(
+            &url,
+            source.as_deref(),
+        ))
+    })
+    .await
+    .map_err(|e| format!("fetch_media task failed: {e}"))?
 }
 
 #[tauri::command]

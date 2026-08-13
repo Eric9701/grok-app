@@ -180,6 +180,16 @@ pub async fn settings_set(
     }
 
     if session_data_mode_changed {
+        // Custom route + shared mode cannot see agent-home config.toml.
+        // Self-heal back to independent and return the value that actually landed.
+        if settings.session_data_mode == "shared"
+            && crate::providers::ensure_independent_for_custom_route()
+        {
+            settings = store::load_settings();
+            tracing::info!(
+                "settings_set: custom route self-healed session_data_mode shared → independent"
+            );
+        }
         // Rebuild media/fs roots so shared (`~/.grok`) vs independent agent-home
         // switch takes effect for media:// previews immediately.
         crate::path_scope::refresh_from_store();

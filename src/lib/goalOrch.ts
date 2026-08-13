@@ -723,9 +723,15 @@ export type ClearGoalOrchPlan = {
  */
 export function planClearGoalOrchEvents(
   events: readonly GoalOrchEvent[] | null | undefined,
+  sessionId?: string | null,
 ): ClearGoalOrchPlan {
   const list = Array.isArray(events) ? events : [];
-  return { next: [], cleared: list.length };
+  if (!sessionId) {
+    // Missing session id must not wipe the whole ring (draft / waiting chip).
+    return { next: list.slice(), cleared: 0 };
+  }
+  const next = list.filter((e) => e.sessionId !== sessionId);
+  return { next, cleared: list.length - next.length };
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   joinProjectRoot,
   normalizeSidePath,
   resolveSidePathDeepLink,
+  sidePathHasDotDot,
   toProjectRelative,
 } from "./sidePathDeepLink";
 
@@ -135,6 +136,27 @@ describe("resolveSidePathDeepLink", () => {
     });
     expect(u.ok).toBe(false);
     if (!u.ok) expect(u.reason).toBe("url");
+  });
+
+  it("rejects .. segments and Windows escape", () => {
+    expect(sidePathHasDotDot("/project/../../etc/hosts")).toBe(true);
+    expect(sidePathHasDotDot("C:\\proj\\..\\..\\Windows")).toBe(true);
+    expect(sidePathHasDotDot("/proj/%2e%2e/secret")).toBe(true);
+    expect(normalizeSidePath("/project/../../etc/hosts")).toBe("");
+    expect(normalizeSidePath("C:/proj/../..")).toBe("");
+    const r = resolveSidePathDeepLink({
+      path: "/Users/me/proj/../../etc/hosts",
+      projectPath: root,
+      projectTrusted: true,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("outside_project");
+    const win = resolveSidePathDeepLink({
+      path: "C:\\proj\\..\\..\\Windows\\System32",
+      projectPath: "C:\\proj",
+      projectTrusted: true,
+    });
+    expect(win.ok).toBe(false);
   });
 
   it("allows when trusted is undefined (only false blocks)", () => {

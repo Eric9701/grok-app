@@ -30,6 +30,11 @@ export type ResourceViewerDialogsProps = {
   executeBatchReject: (plan: BatchDiffPlan, confirmed: boolean) => void;
   batchHunkRejectConfirm: boolean;
   setBatchHunkRejectConfirm: (v: boolean) => void;
+  acceptHunkConfirm: { hunkIndex: number; discardCount: number } | null;
+  setAcceptHunkConfirm: (
+    v: { hunkIndex: number; discardCount: number } | null,
+  ) => void;
+  executeAcceptHunk: (hunkIndex: number) => void | Promise<void>;
   runBatchRemainingHunks: (action: "accept" | "reject") => void;
   remainingHunkCount: number;
   diffView: DiffViewState | null;
@@ -76,6 +81,9 @@ export function ResourceViewerDialogs({
   executeBatchReject,
   batchHunkRejectConfirm,
   setBatchHunkRejectConfirm,
+  acceptHunkConfirm,
+  setAcceptHunkConfirm,
+  executeAcceptHunk,
   runBatchRemainingHunks,
   remainingHunkCount,
   diffView,
@@ -247,6 +255,46 @@ export function ResourceViewerDialogs({
       : tr("changes.batchRejectConfirmBody", {
           n: String(batchRejectConfirm?.plan.runCount ?? 0),
         })}
+  </p>
+</GlassModal>
+
+<GlassModal
+  open={!!acceptHunkConfirm}
+  onClose={() => setAcceptHunkConfirm(null)}
+  title={tr("changes.acceptHunkConfirmTitle")}
+  size="sm"
+  closeLabel={tr("common.close")}
+  footer={
+    <>
+      <button
+        type="button"
+        className="btn btn--ghost"
+        onClick={() => setAcceptHunkConfirm(null)}
+        disabled={diffActionBusy}
+      >
+        {tr("common.cancel")}
+      </button>
+      <button
+        type="button"
+        className="btn btn--solid"
+        data-testid="changes-accept-hunk-confirm"
+        disabled={diffActionBusy}
+        onClick={() => {
+          const idx = acceptHunkConfirm?.hunkIndex;
+          if (idx != null) void executeAcceptHunk(idx);
+        }}
+      >
+        {diffActionBusy
+          ? tr("changes.actionBusy")
+          : tr("changes.acceptHunkConfirmAction")}
+      </button>
+    </>
+  }
+>
+  <p className="rp-modal-copy">
+    {tr("changes.acceptHunkConfirmBody", {
+      n: String(acceptHunkConfirm?.discardCount ?? 0),
+    })}
   </p>
 </GlassModal>
 

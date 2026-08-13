@@ -144,6 +144,8 @@ export const zhTWSettingsMemory = {
   "settings.memoryOps.clear.unavailable.session": "host CLI 尚不支援僅清除工作階段範圍。",
   "settings.memoryOps.clear.unavailable.memoryOff": "請先開啟上方的「跨工作階段記憶」再清除。",
   "settings.memoryOps.clear.unavailable.noCwd": "請先開啟專案以清除工作區記憶。",
+  "memory.clear.pathMissing": "無法清除工作區記憶 — 專案目錄不存在或不是資料夾。",
+  "memory.clear.unknownScope": "未知的記憶清除範圍。請使用 workspace、global 或 all。",
   "settings.memoryOps.clear.unavailable.host": "應用 host 暫不支援此清除範圍。",
   "settings.memoryOps.empty.memoryOff": "記憶已關閉",
   "settings.memoryOps.empty.memoryOffHint": "請先開啟上方的「跨工作階段記憶」以瀏覽檔案與清除範圍。",

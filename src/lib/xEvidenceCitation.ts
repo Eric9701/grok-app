@@ -55,12 +55,20 @@ export function extractXStatusId(urlOrId: string | null | undefined): string | n
 
   if (/^\d{8,}$/.test(raw)) return raw;
 
-  const lower = raw.toLowerCase();
-  if (!(lower.includes("x.com/") || lower.includes("twitter.com/"))) {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
     return null;
   }
-  const m = /\/status(?:es)?\/(\d{8,})/i.exec(raw);
-  return m?.[1] ?? null;
+  const segs = parsed.pathname.split("/").filter(Boolean);
+  for (let i = 0; i < segs.length - 1; i++) {
+    const name = (segs[i] ?? "").toLowerCase();
+    if (name !== "status" && name !== "statuses") continue;
+    const id = segs[i + 1] ?? "";
+    return /^\d{8,}$/.test(id) ? id : null;
+  }
+  return null;
 }
 
 /**
@@ -77,6 +85,8 @@ export function isCanonicalXStatusUrl(url: string | null | undefined): boolean {
   } catch {
     return false;
   }
+  const proto = parsed.protocol.toLowerCase();
+  if (proto !== "https:" && proto !== "http:") return false;
   const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
   if (host !== "x.com" && host !== "twitter.com" && host !== "mobile.twitter.com") {
     return false;
@@ -95,6 +105,10 @@ export function normalizeXStatusUrl(
   if (url == null) return null;
   const trimmed = String(url).trim();
   if (!trimmed) return null;
+
+  if (!/^\d{8,}$/.test(trimmed) && !isCanonicalXStatusUrl(trimmed)) {
+    return null;
+  }
 
   const statusId = extractXStatusId(trimmed);
   if (!statusId) return null;

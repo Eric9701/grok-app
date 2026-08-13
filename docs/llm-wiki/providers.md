@@ -50,8 +50,8 @@ Add flow opens a **preset gallery** (`providerPresets.ts`):
 |--------|--------|-----------------|
 | **Custom** | empty (user fills) | Grok `low`/`medium`/`high` |
 | **DeepSeek** | `deepseek-v4-flash`, `deepseek-v4-pro` | `low` / `high` / `xhigh` / `max` (docs mapping table; default `high`) |
-| **Amux** | `grok-4.6` + `grok-4.5` | Grok `low`/`medium`/`high`/`max` |
-| **Yun API** | `grok-4.6` + `grok-4.5` | Grok `low`/`medium`/`high`/`max` |
+| **Amux** | `grok-4.6` + `grok-4.5` | Official Grok `low`/`medium`/`high`/`xhigh` (default `xhigh`) |
+| **Yun API** | `grok-4.6` + `grok-4.5` | Official Grok `low`/`medium`/`high`/`xhigh` (default `xhigh`) |
 | **OpenCode Go** | `deepseek-v4-flash`, `deepseek-v4-pro` | DeepSeek efforts (default `high`) |
 | **火山方舟** (Volcengine Ark) | `deepseek-v4-flash` | Grok `low`/`medium`/`high`/`max` (default `medium`); **full path** on |
 

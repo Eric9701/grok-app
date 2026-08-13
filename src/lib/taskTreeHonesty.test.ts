@@ -166,6 +166,16 @@ describe("taskTreeIdsAreHonest / collectTaskTreeIds", () => {
     ];
     expect(taskTreeIdsAreHonest(fakeTree, ["real"])).toBe(false);
   });
+
+  it("rejects duplicate ids even when the allowed set has the same length", () => {
+    const dupTree = [
+      {
+        task: task({ id: "a", name: "A" }),
+        children: [{ task: task({ id: "a", name: "A2" }), children: [] }],
+      },
+    ];
+    expect(taskTreeIdsAreHonest(dupTree, ["a", "b"])).toBe(false);
+  });
 });
 
 describe("shouldShowTaskTreeChrome", () => {

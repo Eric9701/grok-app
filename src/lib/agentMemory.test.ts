@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   memoryClearArgs,
+  memoryClearErrorMessageKey,
   memoryConfigEnabled,
   memorySpawnEnv,
   memorySpawnFlags,
@@ -66,6 +67,16 @@ describe("memoryClearArgs", () => {
       "--global",
     ]);
     expect(memoryClearArgs("all")).toEqual(["memory", "clear", "-y", "--all"]);
+  });
+
+  it("maps host fail-closed errors to i18n keys", () => {
+    expect(memoryClearErrorMessageKey("workspace_path_missing")).toBe(
+      "memory.clear.pathMissing",
+    );
+    expect(
+      memoryClearErrorMessageKey("unknown_memory_scope:session"),
+    ).toBe("memory.clear.unknownScope");
+    expect(memoryClearErrorMessageKey("grok memory clear failed")).toBeNull();
   });
 
   it("never invents non-CLI scopes", () => {

@@ -14,6 +14,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { nextIndex } from "@/lib/a11yFocus";
+import { memoryClearErrorMessageKey } from "@/lib/agentMemory";
 import {
   IconArrowLeft,
   IconChevronRight,
@@ -835,7 +836,8 @@ export function SettingsPage({
       setClearMemoryOpen(false);
       setMemoryBrowserEpoch((n) => n + 1);
     } catch (e) {
-      showSettingsToast(String(e), 4500);
+      const key = memoryClearErrorMessageKey(e);
+      showSettingsToast(key ? t(key) : String(e), 4500);
     } finally {
       setClearMemoryBusy(false);
     }

@@ -136,6 +136,11 @@ const [batchRejectConfirm, setBatchRejectConfirm] = useState<{
 } | null>(null);
 /** In-app confirm for file-scoped reject-all-remaining hunks. */
 const [batchHunkRejectConfirm, setBatchHunkRejectConfirm] = useState(false);
+/** In-app confirm for partial hunk accept (drop remaining hunks). */
+const [acceptHunkConfirm, setAcceptHunkConfirm] = useState<{
+  hunkIndex: number;
+  discardCount: number;
+} | null>(null);
 /** Per-hunk review comment → insert structured prompt into composer. */
 const [diffCommentTarget, setDiffCommentTarget] = useState<{
   path: string;
@@ -648,6 +653,7 @@ const workspaceUnavailableHint = useCallback(() => {
     setRejectConfirm,
     setBatchRejectConfirm,
     setBatchHunkRejectConfirm,
+    setAcceptHunkConfirm,
     setBatchProgress,
     setBatchStatus,
     refreshWorkspaceStatus,
@@ -662,6 +668,7 @@ const workspaceUnavailableHint = useCallback(() => {
     requestRejectFile,
     runRestoreFile,
     runAcceptHunk,
+    executeAcceptHunk,
     runRejectHunk,
     buildSessionBatchInputs,
     hostAcceptOne,
@@ -713,6 +720,8 @@ const workspaceUnavailableHint = useCallback(() => {
     setBatchRejectConfirm,
     batchHunkRejectConfirm,
     setBatchHunkRejectConfirm,
+    acceptHunkConfirm,
+    setAcceptHunkConfirm,
     diffCommentTarget,
     setDiffCommentTarget,
     diffCommentNote,
@@ -745,6 +754,7 @@ const workspaceUnavailableHint = useCallback(() => {
     runRestoreFile,
     diffHunks,
     runAcceptHunk,
+    executeAcceptHunk,
     runRejectHunk,
     buildSessionBatchInputs,
     hostAcceptOne,

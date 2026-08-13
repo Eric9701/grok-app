@@ -133,14 +133,53 @@ pub fn load_scoped_projects(project_scope: &serde_json::Value) -> Vec<TrustedPro
 }
 
 /// Default work dir from instance project_scope JSON (first scoped trusted path).
-pub fn default_work_dir(project_scope: &serde_json::Value) -> String {
-    let projects = load_scoped_projects(project_scope);
-    if projects.is_empty() {
-        return std::env::var("HOME")
-            .or_else(|_| std::env::var("USERPROFILE"))
-            .unwrap_or_else(|_| ".".into());
+/// Empty / fail-closed scope → `None` (never `$HOME`).
+pub fn default_work_dir(project_scope: &serde_json::Value) -> Option<String> {
+    load_scoped_projects(project_scope)
+        .into_iter()
+        .next()
+        .map(|p| p.path)
+}
+
+fn normalize_scope_path(path: &str) -> String {
+    let mut s = path.trim().replace('\\', "/");
+    while s.len() > 1 && s.ends_with('/') {
+        s.pop();
     }
-    projects[0].path.clone()
+    s
+}
+
+fn path_is_under_project(work_dir: &str, project_path: &str) -> bool {
+    let child = normalize_scope_path(work_dir);
+    let root = normalize_scope_path(project_path);
+    if child.is_empty() || root.is_empty() {
+        return false;
+    }
+    child == root || child.starts_with(&(root + "/"))
+}
+
+/// True when a persisted binding is still inside the instance project scope.
+///
+/// - `project_id` present → must match a scoped project id
+/// - legacy work_dir-only → path must be the project root or a subdirectory
+/// - empty scope or empty binding → false
+pub fn binding_allowed_in_scope(
+    project_id: Option<&str>,
+    work_dir: &str,
+    scoped: &[TrustedProject],
+) -> bool {
+    if scoped.is_empty() {
+        return false;
+    }
+    if let Some(id) = project_id.map(str::trim).filter(|s| !s.is_empty()) {
+        return scoped.iter().any(|p| p.id == id);
+    }
+    if work_dir.trim().is_empty() {
+        return false;
+    }
+    scoped
+        .iter()
+        .any(|p| path_is_under_project(work_dir, &p.path))
 }
 
 #[cfg(test)]
@@ -209,5 +248,22 @@ mod tests {
     fn unknown_string_scope_is_fail_closed() {
         let all = sample();
         assert!(filter_by_scope(&all, &json!("weird")).is_empty());
+    }
+
+    #[test]
+    fn default_work_dir_is_none_for_empty_allow() {
+        assert!(default_work_dir(&json!({ "allow": [] })).is_none());
+        assert!(default_work_dir(&json!("weird")).is_none());
+    }
+
+    #[test]
+    fn binding_allowed_requires_scoped_project() {
+        let scoped = sample();
+        assert!(binding_allowed_in_scope(Some("p2"), "/tmp/two", &scoped));
+        assert!(!binding_allowed_in_scope(Some("gone"), "/tmp/two", &scoped));
+        assert!(binding_allowed_in_scope(None, "/tmp/one/src", &scoped));
+        assert!(!binding_allowed_in_scope(None, "/tmp/other", &scoped));
+        assert!(!binding_allowed_in_scope(Some("p1"), "/tmp/one", &[]));
+        assert!(!binding_allowed_in_scope(None, "", &scoped));
     }
 }

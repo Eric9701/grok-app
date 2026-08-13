@@ -51,6 +51,16 @@ export function memoryClearArgs(
   return args;
 }
 
+/** Map host `memory_clear` errors to i18n keys (null → show raw string). */
+export function memoryClearErrorMessageKey(
+  err: unknown,
+): "memory.clear.pathMissing" | "memory.clear.unknownScope" | null {
+  const s = String(err ?? "");
+  if (s.includes("workspace_path_missing")) return "memory.clear.pathMissing";
+  if (s.includes("unknown_memory_scope")) return "memory.clear.unknownScope";
+  return null;
+}
+
 /**
  * Resolve whether experimental memory is on from settings + optional env
  * override (App settings win over process env for spawn decisions).

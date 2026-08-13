@@ -1371,7 +1371,7 @@ pub fn upsert_custom_provider(input: UpsertProviderInput) -> Result<ProvidersLis
     };
 
     text = remove_section(&text, &id);
-    let mut fields = vec![
+    let mut fields: Vec<(String, String)> = vec![
         ("model".into(), model),
         ("base_url".into(), base_url.clone()),
         ("name".into(), name),
@@ -1410,6 +1410,15 @@ pub fn upsert_custom_provider(input: UpsertProviderInput) -> Result<ProvidersLis
                 crate::relay_stream_proxy::APP_UPSTREAM_BASE_URL_KEY.into(),
                 prev,
             ));
+        }
+    }
+    if let Some(ex) = existing {
+        let known: std::collections::HashSet<String> =
+            fields.iter().map(|(k, _)| k.clone()).collect();
+        for (k, v) in &ex.fields {
+            if !known.contains(k) {
+                fields.push((k.clone(), v.clone()));
+            }
         }
     }
     text = append_section(&text, &id, &fields);
@@ -1796,8 +1805,10 @@ pub async fn test_model_connection(
     let mut req = client
         .post(&endpoint)
         .header("content-type", "application/json")
-        .header("accept", "application/json")
-        .header("Authorization", format!("Bearer {key}"));
+        .header("accept", "application/json");
+    if !key.is_empty() {
+        req = req.header("Authorization", format!("Bearer {key}"));
+    }
     // Anthropic-style channels need the version header + x-api-key (ZCode sends both).
     if backend == "messages" {
         req = req

@@ -7,6 +7,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type MouseEvent,
 } from "react";
@@ -41,6 +42,7 @@ import {
 } from "@/lib/providerRouteHonesty";
 import {
   PROVIDER_PRESETS,
+  alignGrokPresetEfforts,
   defaultCustomChannelEfforts,
   resolveProviderApiKeyUrl,
   resolveProviderBrandId,
@@ -142,8 +144,14 @@ function modelsFromProvider(p: api.CustomProvider): FormModel[] {
 }
 
 function effortsFromProvider(p: api.CustomProvider): FormEffort[] {
-  if (p.efforts?.length) {
-    return p.efforts.map((e) => ({
+  const aligned = alignGrokPresetEfforts({
+    providerId: p.id,
+    baseUrl: p.baseUrl,
+    efforts: p.efforts,
+  });
+  const source = aligned ?? p.efforts;
+  if (source?.length) {
+    return source.map((e) => ({
       id: e.id,
       name: e.name?.trim() || e.id,
       isDefault: !!e.isDefault,
@@ -237,6 +245,7 @@ export function ProvidersPanel({
   const [modelTestStatus, setModelTestStatus] = useState<
     Record<string, { state: "idle" | "testing" | "ok" | "error"; reason?: string }>
   >({});
+  const modelTestEpochRef = useRef(0);
   /** Draft row for manually adding a model. */
   const [draftModelId, setDraftModelId] = useState("");
   const [draftModelName, setDraftModelName] = useState("");
@@ -853,6 +862,7 @@ export function ProvidersPanel({
     setBalanceResult(null);
     setBalanceError(null);
     setModelTestStatus({});
+    modelTestEpochRef.current += 1;
   }, [editingId, form.id, form.baseUrl]);
 
   const checkBalance = async () => {
@@ -924,6 +934,7 @@ export function ProvidersPanel({
       onToast?.(msg, 4000);
       return;
     }
+    const epoch = modelTestEpochRef.current;
     setModelTestStatus((s) => ({ ...s, [id]: { state: "testing" } }));
     try {
       const r = await api.providersTestModel({
@@ -934,6 +945,7 @@ export function ProvidersPanel({
         apiBackend: form.apiBackend,
         baseUrlFullPath: form.baseUrlFullPath,
       });
+      if (epoch !== modelTestEpochRef.current) return;
       if (r.ok) {
         setModelTestStatus((s) => ({ ...s, [id]: { state: "ok" } }));
         return;
@@ -954,6 +966,7 @@ export function ProvidersPanel({
           reason = r.error?.trim() || tr("prov.testModel.failed");
           break;
       }
+      if (epoch !== modelTestEpochRef.current) return;
       setModelTestStatus((s) => ({ ...s, [id]: { state: "error", reason } }));
     } catch (e) {
       const kind = classifyProviderPingError(e);
@@ -967,6 +980,7 @@ export function ProvidersPanel({
       } else {
         reason = tr(providerPingErrorMessageKey(kind) as MessageKey);
       }
+      if (epoch !== modelTestEpochRef.current) return;
       setModelTestStatus((s) => ({ ...s, [id]: { state: "error", reason } }));
     }
   };
@@ -1888,14 +1902,22 @@ export function ProvidersPanel({
                       className="btn btn--ghost btn--sm"
                       disabled={busy}
                       onClick={() =>
-                        setForm((f) => ({
-                          ...f,
-                          efforts: defaultCustomChannelEfforts().map((e) => ({
-                            id: e.id,
-                            name: e.name || e.id,
-                            isDefault: !!e.isDefault,
-                          })),
-                        }))
+                        setForm((f) => {
+                          const grok = alignGrokPresetEfforts({
+                            providerId: f.id,
+                            baseUrl: f.baseUrl,
+                            efforts: [],
+                          });
+                          const reset = grok ?? defaultCustomChannelEfforts();
+                          return {
+                            ...f,
+                            efforts: reset.map((e) => ({
+                              id: e.id,
+                              name: e.name || e.id,
+                              isDefault: !!e.isDefault,
+                            })),
+                          };
+                        })
                       }
                     >
                       {tr("prov.effortsResetGrok")}

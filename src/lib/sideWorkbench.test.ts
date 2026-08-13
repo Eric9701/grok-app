@@ -14,6 +14,7 @@ import {
   isSideTabMiddleClick,
   resolveSideStripCloseTarget,
   applySideStripClose,
+  planBulkClose,
   sideTabCloseNeedsConfirm,
   setActiveSideTab,
   sidePickerOptions,
@@ -304,6 +305,22 @@ describe("tab close batch helpers", () => {
     expect(left.tabs.map((t) => t.id)).toEqual([b, s.tabs[2]!.id]);
     const right = closeSideTabsToRight(s, b);
     expect(right.tabs.map((t) => t.id)).toEqual([s.tabs[0]!.id, b]);
+  });
+
+  it("planBulkClose reports dirty tabs that would close", () => {
+    const s = threeTabs();
+    const mid = s.tabs[1]!.id;
+    const dirty = [s.tabs[0]!.id, mid];
+    const others = planBulkClose(s, "others", mid, dirty);
+    expect(others.next.tabs.map((t) => t.id)).toEqual([mid]);
+    expect(others.dirtyClosing.map((t) => t.id)).toEqual([s.tabs[0]!.id]);
+    const all = planBulkClose(s, "all", mid, dirty);
+    expect(all.next.tabs).toEqual([]);
+    expect(all.dirtyClosing.map((t) => t.id).sort()).toEqual(
+      [...dirty].sort(),
+    );
+    const clean = planBulkClose(s, "left", mid, []);
+    expect(clean.dirtyClosing).toEqual([]);
   });
 
   it("sideTabCopyPath is file absolute only + neighbor flags", () => {

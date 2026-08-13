@@ -245,9 +245,11 @@ export function openSideTab(
     existingIdx = tabs.findIndex((t) => t.id === meta.id);
   }
   if (existingIdx < 0 && kind === "file" && meta?.path) {
-    const p = meta.path.trim();
+    const p = meta.path.trim().replace(/\\/g, "/");
     existingIdx = tabs.findIndex(
-      (t) => t.kind === "file" && (t.path || "").trim() === p,
+      (t) =>
+        t.kind === "file" &&
+        (t.path || "").trim().replace(/\\/g, "/") === p,
     );
   }
   if (existingIdx < 0 && kind === "browser" && meta?.url) {
@@ -494,6 +496,41 @@ export function closeOtherSideTabs(
     return state.activeId === tabId ? state : { ...state, activeId: tabId };
   }
   return { ...state, tabs: [hit], activeId: tabId };
+}
+
+export type BulkCloseAction = "others" | "all" | "left" | "right";
+
+/**
+ * Plan Close Others / All / Left / Right. `dirtyClosing` is the subset of
+ * tabs that would be discarded while marked dirty (caller confirms).
+ */
+export function planBulkClose(
+  state: SideWorkbenchState,
+  action: BulkCloseAction,
+  targetId: string,
+  dirtyTabIds: readonly string[] = [],
+): { next: SideWorkbenchState; dirtyClosing: SideTab[] } {
+  let next: SideWorkbenchState;
+  switch (action) {
+    case "others":
+      next = closeOtherSideTabs(state, targetId);
+      break;
+    case "all":
+      next = closeAllSideTabs(state);
+      break;
+    case "left":
+      next = closeSideTabsToLeft(state, targetId);
+      break;
+    case "right":
+      next = closeSideTabsToRight(state, targetId);
+      break;
+  }
+  const remaining = new Set(next.tabs.map((t) => t.id));
+  const dirty = new Set(dirtyTabIds);
+  const dirtyClosing = state.tabs.filter(
+    (t) => !remaining.has(t.id) && dirty.has(t.id),
+  );
+  return { next, dirtyClosing };
 }
 
 /** Close every tab (empty workbench). */

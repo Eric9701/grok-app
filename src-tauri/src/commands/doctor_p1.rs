@@ -865,34 +865,59 @@ fn session_cli_export_blocking(
         tmp_s.clone(),
     ];
 
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let mut cmd = std::process::Command::new(&cli_path);
-        cmd.args(&args);
-        cmd.env("GROK_HOME", &grok_home);
-        crate::process_util::apply_no_window_std(&mut cmd);
-        if let Some(path_env) = crate::process_util::enriched_path_env() {
-            cmd.env("PATH", path_env);
-        }
-        let _ = tx.send(cmd.output());
-    });
-
-    let output = match rx.recv_timeout(std::time::Duration::from_secs(CLI_EXPORT_TIMEOUT_SECS)) {
-        Ok(Ok(o)) => o,
-        Ok(Err(e)) => {
-            return Err(store::redact_text(&format!("Failed to run grok export: {e}")));
-        }
-        Err(_) => {
-            return Err(format!(
-                "grok export timed out after {CLI_EXPORT_TIMEOUT_SECS}s"
-            ));
+    let mut cmd = std::process::Command::new(&cli_path);
+    cmd.args(&args);
+    cmd.env("GROK_HOME", &grok_home);
+    crate::process_util::apply_no_window_std(&mut cmd);
+    if let Some(path_env) = crate::process_util::enriched_path_env() {
+        cmd.env("PATH", path_env);
+    }
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        store::redact_text(&format!("Failed to run grok export: {e}"))
+    })?;
+    let started = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(CLI_EXPORT_TIMEOUT_SECS);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(st)) => break st,
+            Ok(None) => {
+                if started.elapsed() > timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    let _ = std::fs::remove_file(&tmp);
+                    return Err(format!(
+                        "grok export timed out after {CLI_EXPORT_TIMEOUT_SECS}s"
+                    ));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(40));
+            }
+            Err(e) => {
+                let _ = child.kill();
+                let _ = std::fs::remove_file(&tmp);
+                return Err(store::redact_text(&format!(
+                    "Failed to run grok export: {e}"
+                )));
+            }
         }
     };
+    let mut stdout_buf = Vec::new();
+    let mut stderr_buf = Vec::new();
+    if let Some(mut pipe) = child.stdout.take() {
+        use std::io::Read;
+        let _ = pipe.read_to_end(&mut stdout_buf);
+    }
+    if let Some(mut pipe) = child.stderr.take() {
+        use std::io::Read;
+        let _ = pipe.read_to_end(&mut stderr_buf);
+    }
+    let stdout = String::from_utf8_lossy(&stdout_buf).trim().to_string();
+    let stderr = String::from_utf8_lossy(&stderr_buf).trim().to_string();
 
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-
-    if !output.status.success() {
+    if !status.success() {
+        let _ = std::fs::remove_file(&tmp);
         let msg = if !stderr.is_empty() {
             stderr
         } else if !stdout.is_empty() {
@@ -910,6 +935,7 @@ fn session_cli_export_blocking(
     // Prefer the file we asked for; fall back to stdout (CLI may print MD when path fails).
     let markdown = if tmp.is_file() {
         let body = std::fs::read_to_string(&tmp).map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
             store::redact_text(&format!("Failed to read grok export output: {e}"))
         })?;
         let _ = std::fs::remove_file(&tmp);

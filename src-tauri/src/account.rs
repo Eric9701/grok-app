@@ -1094,9 +1094,24 @@ fn local_usage_from_roots(
     let mut day_map: BTreeMap<NaiveDate, DayAgg> = BTreeMap::new();
     let mut logs: Vec<(i64, CallLogEntry)> = Vec::new();
     let mut seen_sessions = HashSet::new();
+    let today = Utc::now().date_naive();
+    let start = today - ChronoDuration::days(i64::from(days.saturating_sub(1)));
+    let skip_before = start - ChronoDuration::days(1);
+    let skip_before_epoch = skip_before
+        .and_hms_opt(0, 0, 0)
+        .and_then(|d| d.and_utc().timestamp().try_into().ok())
+        .unwrap_or(0i64);
+
     for root in roots {
         if root.is_dir() {
-            walk_sessions(root, 0, &mut logs, &mut day_map, &mut seen_sessions);
+            walk_sessions(
+                root,
+                0,
+                &mut logs,
+                &mut day_map,
+                &mut seen_sessions,
+                skip_before_epoch,
+            );
         }
     }
 
@@ -1104,8 +1119,6 @@ fn local_usage_from_roots(
     logs.truncate(log_limit);
     let call_logs: Vec<CallLogEntry> = logs.into_iter().map(|(_, e)| e).collect();
 
-    let today = Utc::now().date_naive();
-    let start = today - ChronoDuration::days(i64::from(days.saturating_sub(1)));
     let mut heatmap = Vec::with_capacity(days as usize);
     let mut d = start;
     while d <= today {
@@ -1141,6 +1154,7 @@ fn walk_sessions(
     logs: &mut Vec<(i64, CallLogEntry)>,
     day_map: &mut BTreeMap<NaiveDate, DayAgg>,
     seen_sessions: &mut HashSet<String>,
+    skip_before_epoch: i64,
 ) {
     if depth > 6 {
         return;
@@ -1160,11 +1174,29 @@ fn walk_sessions(
                 .file_name()
                 .map(|name| name.to_string_lossy().to_string())
                 .unwrap_or_default();
-            if seen_sessions.insert(id) {
-                ingest_session(&path, &signals, day_map, logs);
+            if !seen_sessions.insert(id) {
+                continue;
             }
+            let mtime = fs::metadata(&signals)
+                .or_else(|_| fs::metadata(&path))
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            if mtime < skip_before_epoch {
+                continue;
+            }
+            ingest_session(&path, &signals, day_map, logs);
         } else {
-            walk_sessions(&path, depth + 1, logs, day_map, seen_sessions);
+            walk_sessions(
+                &path,
+                depth + 1,
+                logs,
+                day_map,
+                seen_sessions,
+                skip_before_epoch,
+            );
         }
     }
 }
@@ -1508,7 +1540,10 @@ pub async fn account_status(manual_cli: Option<&str>, refresh_billing: bool) -> 
     };
 
     // 371 days ≈ GitHub contribution year (matches grok-go heatmap).
-    let (heatmap, call_logs) = local_usage(371, 40);
+    // Blocking jsonl walk — never hold the async runtime.
+    let (heatmap, call_logs) = tauri::async_runtime::spawn_blocking(|| local_usage(371, 40))
+        .await
+        .unwrap_or_else(|_| (empty_heatmap(371), vec![]));
 
     AccountStatus {
         profile,

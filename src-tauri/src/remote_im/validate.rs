@@ -45,7 +45,14 @@ pub async fn test_connection(
                 message: if ok {
                     "credentials_present_stream".into()
                 } else {
-                    "missing_client_id_or_secret".into()
+                    let mut missing = Vec::new();
+                    if !creds.contains_key("client_id") {
+                        missing.push("client_id");
+                    }
+                    if !creds.contains_key("client_secret") {
+                        missing.push("client_secret");
+                    }
+                    format!("missing_dingtalk:{}", missing.join(","))
                 },
                 mock: false,
             })
@@ -265,7 +272,7 @@ async fn test_feishu(
                     .unwrap_or("token_failed")
                     .to_string();
             }
-            Err(e) => last = e.to_string(),
+            Err(e) => last = reqwest_err_message(e),
         }
     }
     Ok(TestConnectionDto {
@@ -447,7 +454,7 @@ async fn test_telegram(secrets: &HashMap<String, String>) -> Result<TestConnecti
         }
         Err(e) => Ok(TestConnectionDto {
             ok: false,
-            message: e.to_string(),
+            message: reqwest_err_message(e),
             mock: false,
         }),
     }
@@ -494,7 +501,7 @@ async fn test_discord(secrets: &HashMap<String, String>) -> Result<TestConnectio
         }
         Err(e) => Ok(TestConnectionDto {
             ok: false,
-            message: e.to_string(),
+            message: reqwest_err_message(e),
             mock: false,
         }),
     }
@@ -537,7 +544,7 @@ async fn test_slack(secrets: &HashMap<String, String>) -> Result<TestConnectionD
         }
         Err(e) => Ok(TestConnectionDto {
             ok: false,
-            message: e.to_string(),
+            message: reqwest_err_message(e),
             mock: false,
         }),
     }
@@ -847,7 +854,7 @@ async fn test_qqbot(creds: &HashMap<String, String>) -> Result<TestConnectionDto
             // Soft-fail network — never panics; does not claim Gateway live.
             Ok(TestConnectionDto {
                 ok: false,
-                message: format!("qqbot_token_network: {e}"),
+                message: format!("qqbot_token_network: {}", reqwest_err_message(e)),
                 mock: false,
             })
         }
@@ -1097,6 +1104,11 @@ fn is_qqbot_app_id_format(raw: &str) -> bool {
             .next()
             .map(|c| c.is_ascii_alphanumeric())
             .unwrap_or(false)
+}
+
+/// reqwest Display can embed the request URL (Telegram bot token lives there).
+fn reqwest_err_message(e: reqwest::Error) -> String {
+    e.without_url().to_string()
 }
 
 #[cfg(test)]
@@ -1633,5 +1645,19 @@ mod tests {
         assert!(!is_qqbot_app_id_format("ab"));
         assert!(!is_qqbot_app_id_format("has space"));
         assert!(!is_qqbot_app_id_format("bad!id"));
+    }
+
+    #[tokio::test]
+    async fn reqwest_error_message_strips_telegram_bot_token() {
+        let token = "123456:AA-SECRET-TOKEN-VALUE";
+        let url = format!("https://127.0.0.1:1/bot{token}/getMe");
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let err = client.get(&url).send().await.expect_err("must fail");
+        let safe = reqwest_err_message(err);
+        assert!(!safe.contains(token), "validate error leaked token: {safe}");
+        assert!(!safe.contains("api.telegram.org/bot"));
     }
 }

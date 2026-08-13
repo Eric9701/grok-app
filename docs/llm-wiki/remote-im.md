@@ -310,8 +310,8 @@ Doctor 折叠区可提供「复制调试命令」给高级用户。
 | 入站表情 | `reaction_emoji` | T 或「无」 | OnIt |
 | 完成表情 | `done_emoji` | T 或「无」 | 无 |
 | 多图合批窗口 ms | `image_batch_window_ms` | Num | 500 |
-| 解析 @ 名称为 at | `resolve_mentions` | Cb | false |
-| 机器人 @ 映射 | `mention_map` | 键值列表编辑器（高级折叠） | — |
+
+`resolve_mentions` / `mention_map` are **not** shown. Host does not consume them yet; leftover option keys in saved configs are ignored (no false-promise GUI).
 
 #### ACL / 项目 / 交互
 
@@ -589,7 +589,7 @@ Callout：社区桥、风险自负。
 | 项 | 规格 |
 |----|------|
 | Agent | 仅 Grok Build CLI / ACP（`--resume` + `GROK_HOME=agent-home`） |
-| work_dir | 仅 App 信任项目 path |
+| work_dir | 仅 App 信任项目 path。`{ allow: [] }` / 未知 scope **不**回退 `$HOME`，自由文本不 spawn，回复「没有可用项目，请 /p」 |
 | 新会话 | IM 首轮后写入 `sessions_index` + `sessions/<id>/messages.json`；标题取自首条用户消息 |
 | 继续 | 绑定 `agentSessionId`；每轮 append user/assistant 到 App journal |
 | 恢复 | `/r` 读 `sessions_index`；`--resume` 用 `agentSessionId` |

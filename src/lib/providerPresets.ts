@@ -36,7 +36,7 @@ export type ProviderPreset = {
 };
 
 /**
- * Default reasoning tiers for custom Grok-compatible channels:
+ * Default reasoning tiers for blank / non-Grok custom channels:
  * low · medium · high · max (max maps to the 极高 UI slot via `tier4` kind).
  */
 export const GROK_CHANNEL_EFFORTS: ProviderEffortEntry[] = [
@@ -45,6 +45,82 @@ export const GROK_CHANNEL_EFFORTS: ProviderEffortEntry[] = [
   { id: "high", name: "high" },
   { id: "max", name: "max" },
 ];
+
+/**
+ * Official Grok 4.6 effort enum (ids, display names, default).
+ * Grok relay presets (Amux / Yun) use this instead of `GROK_CHANNEL_EFFORTS`.
+ */
+export const GROK_OFFICIAL_EFFORTS: ProviderEffortEntry[] = [
+  { id: "low", name: "Low" },
+  { id: "medium", name: "Medium" },
+  { id: "high", name: "High" },
+  { id: "xhigh", name: "Extra high", isDefault: true },
+];
+
+const GROK_RELAY_PRESET_IDS = new Set(["amux", "yun-api"]);
+
+export function isGrokRelayPresetId(id: string | null | undefined): boolean {
+  return !!id && GROK_RELAY_PRESET_IDS.has(id);
+}
+
+export function officialGrokChannelEfforts(): ProviderEffortEntry[] {
+  return GROK_OFFICIAL_EFFORTS.map((e) => ({ ...e }));
+}
+
+/** Saved ladder shipped as low/medium/high/max before official xhigh align. */
+export function isLegacyGrokChannelEffortIds(ids: readonly string[]): boolean {
+  const norm = ids.map((id) => id.trim().toLowerCase()).filter(Boolean);
+  if (norm.length !== 4) return false;
+  const set = new Set(norm);
+  return (
+    set.has("low") &&
+    set.has("medium") &&
+    set.has("high") &&
+    set.has("max") &&
+    !set.has("xhigh")
+  );
+}
+
+/**
+ * When the channel is a Grok relay preset, rewrite the effort catalog to the
+ * official enum. Returns null when the provider is not a Grok preset or the
+ * list is already a user-custom catalog we should not clobber.
+ */
+export function alignGrokPresetEfforts(opts: {
+  providerId?: string | null;
+  baseUrl?: string | null;
+  efforts?: Array<{ id: string; name?: string; isDefault?: boolean }> | null;
+}): ProviderEffortEntry[] | null {
+  const preset = matchPreset({
+    providerId: opts.providerId,
+    baseUrl: opts.baseUrl,
+  });
+  if (!isGrokRelayPresetId(preset?.id)) return null;
+  const list = opts.efforts ?? [];
+  const ids = list.map((e) => e.id);
+  if (list.length === 0 || isLegacyGrokChannelEffortIds(ids)) {
+    return officialGrokChannelEfforts();
+  }
+  const hasMax = ids.some((id) => id.trim().toLowerCase() === "max");
+  const hasXhigh = ids.some((id) => id.trim().toLowerCase() === "xhigh");
+  if (hasMax && !hasXhigh) {
+    return list.map((e) => {
+      if (e.id.trim().toLowerCase() !== "max") {
+        return { id: e.id, name: e.name || e.id, isDefault: !!e.isDefault };
+      }
+      const rawName = (e.name || "").trim();
+      return {
+        id: "xhigh",
+        name:
+          !rawName || rawName.toLowerCase() === "max"
+            ? "Extra high"
+            : rawName,
+        isDefault: !!e.isDefault,
+      };
+    });
+  }
+  return null;
+}
 
 /**
  * DeepSeek thinking-mode efforts (OpenAI `reasoning_effort` mapping table):
@@ -103,7 +179,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     baseUrl: "https://api.amux.ai/v1",
     apiBackend: "responses",
     models: AMUX_MODELS,
-    efforts: GROK_CHANNEL_EFFORTS.map((e) => ({ ...e })),
+    efforts: officialGrokChannelEfforts(),
     blurbKey: "prov.preset.amux.blurb",
     apiKeyUrl: "https://api.amux.ai/register?aff=Vccp",
     brandId: "amux",
@@ -115,7 +191,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     baseUrl: "https://api.yunyi.ai/v1",
     apiBackend: "responses",
     models: YUN_API_MODELS,
-    efforts: GROK_CHANNEL_EFFORTS.map((e) => ({ ...e })),
+    efforts: officialGrokChannelEfforts(),
     blurbKey: "prov.preset.yunApi.blurb",
     apiKeyUrl: "https://api.yunyi.ai/register/?aff_code=W0iw",
     // No logo yet

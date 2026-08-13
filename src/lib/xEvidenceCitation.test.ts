@@ -59,6 +59,33 @@ describe("extractXStatusId / isCanonicalXStatusUrl", () => {
     );
     expect(isCanonicalXStatusUrl("not a url")).toBe(false);
   });
+
+  it("ignores query, fragment, spoofed hosts, and non-http schemes", () => {
+    expect(
+      extractXStatusId("https://x.com/search?q=/status/12345678"),
+    ).toBeNull();
+    expect(
+      extractXStatusId("https://x.com/victim/photo?u=/status/99999999"),
+    ).toBeNull();
+    expect(
+      extractXStatusId("https://x.com/user/status/12345678#/status/87654321"),
+    ).toBe("12345678");
+    expect(isCanonicalXStatusUrl("ftp://x.com/user/status/12345678")).toBe(
+      false,
+    );
+    expect(
+      isCanonicalXStatusUrl("https://cdn.evil.com/x.com/status/12345678"),
+    ).toBe(false);
+    expect(
+      isCanonicalXStatusUrl("https://x.com.evil.com/user/status/12345678"),
+    ).toBe(false);
+    expect(
+      normalizeXStatusUrl("https://cdn.evil.com/x.com/status/12345678"),
+    ).toBeNull();
+    expect(
+      normalizeXStatusUrl("https://x.com/search?q=/status/12345678"),
+    ).toBeNull();
+  });
 });
 
 describe("normalizeXStatusUrl", () => {

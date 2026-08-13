@@ -4,6 +4,8 @@
  * decide when reject needs untracked wipe confirmation or git checkout.
  */
 
+import { buildUnifiedDiff, normalizePath } from "@/lib/sessionChanges";
+
 /** One unified-diff hunk (@@ … @@ body). */
 export interface UnifiedHunk {
   /** 1-based old-file start line (0 for pure additions). */
@@ -97,9 +99,10 @@ export function splitPatchLines(text: string): string[] {
   return parts;
 }
 
-function joinPatchLines(lines: string[]): string {
+function joinPatchLines(lines: string[], trailingNewline = true): string {
   if (lines.length === 0) return "";
-  return lines.join("\n") + "\n";
+  const body = lines.join("\n");
+  return trailingNewline ? `${body}\n` : body;
 }
 
 const HUNK_HEADER_RE =
@@ -263,9 +266,10 @@ export function applyHunks(
     ];
   }
 
-  // Preserve "no trailing newline" only when original had none and result empty?
-  // Always end text files with newline when non-empty (same as joinPatchLines).
-  return { ok: true, content: joinPatchLines(lines) };
+  // Empty source has no trailing-newline signal — keep the conventional
+  // trailing newline for newly created text. Otherwise preserve the source.
+  const trailingNewline = original === "" || original.endsWith("\n");
+  return { ok: true, content: joinPatchLines(lines, trailingNewline) };
 }
 
 /**
@@ -400,6 +404,58 @@ export type AcceptPlan =
   | { mode: "write_after"; content: string }
   | { mode: "keep_current" }
   | { mode: "unavailable"; reason: string };
+
+/** Open diff preview used to pick after-text (must match the target path). */
+export type DiffAfterSourceView = {
+  path?: string | null;
+  afterText?: string | null;
+};
+
+/**
+ * Pick after-text for accept / reject / restore. Never returns another
+ * file's body: `diffView.afterText` is used only when its path matches `key`.
+ * Missing path-matched source → null (caller uses keep_current / unavailable).
+ */
+export function resolveDiffAfterSource(opts: {
+  key: string;
+  override?: string | null;
+  diffView?: DiffAfterSourceView | null;
+  cache?: Record<string, string>;
+  /** Restore prefers the restorable cache over the open view. */
+  preferCache?: boolean;
+}): string | null {
+  if (typeof opts.override === "string") return opts.override;
+  const key = normalizePath(opts.key);
+  const fromView =
+    typeof opts.diffView?.afterText === "string" &&
+    key &&
+    normalizePath(opts.diffView.path ?? "") === key
+      ? opts.diffView.afterText
+      : null;
+  const fromCache =
+    key && opts.cache && typeof opts.cache[key] === "string"
+      ? opts.cache[key]!
+      : null;
+  if (opts.preferCache) return fromCache ?? fromView;
+  return fromView ?? fromCache;
+}
+
+/**
+ * After a partial hunk accept write, the open view's *before* is the new
+ * disk text and *after* stays the full restorable. Remaining hunks then
+ * compose on later accepts.
+ */
+export function rebuildDiffViewAfterHunkAccept(opts: {
+  fileName: string;
+  written: string;
+  fullAfter: string;
+}): { beforeText: string; afterText: string; unified: string } {
+  return {
+    beforeText: opts.written,
+    afterText: opts.fullAfter,
+    unified: buildUnifiedDiff(opts.fileName, opts.written, opts.fullAfter),
+  };
+}
 
 export function planFileAccept(opts: {
   after?: string | null;

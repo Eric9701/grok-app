@@ -116,7 +116,7 @@ impl BridgeRuntime {
             "starting".into()
         } else if self.last_error.is_some() && phase == "error" {
             "error".into()
-        } else if self.last_error.is_some() || (self.enabled && !connected.is_empty()) {
+        } else if self.enabled && (self.last_error.is_some() || !connected.is_empty()) {
             // Enabled with credentials but not running yet (boot gap / crash).
             "degraded".into()
         } else {
@@ -235,6 +235,7 @@ impl BridgeRuntime {
         self.connected_cache.lock().clear();
         *self.phase.lock() = "stopped".into();
         if clear_enabled {
+            self.last_error = None;
             self.enabled = false;
             RESTART_ATTEMPTS.store(0, Ordering::SeqCst);
             NEXT_RETRY_UNIX.store(0, Ordering::SeqCst);

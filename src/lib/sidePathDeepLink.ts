@@ -71,6 +71,47 @@ const MSG: Record<SidePathDeepLinkReason, MessageKey> = {
   missing: "resources.openErr.notFound",
 };
 
+/** True when any path segment is `..` (raw or after decode). */
+export function sidePathHasDotDot(path: string): boolean {
+  const variants = [path, (() => {
+    try {
+      return decodeURIComponent(path);
+    } catch {
+      return path;
+    }
+  })()];
+  for (const v of variants) {
+    const parts = String(v ?? "")
+      .replace(/\\/g, "/")
+      .split("/");
+    if (parts.some((s) => s === ".." || s.toLowerCase() === "%2e%2e")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function foldDotSegments(posix: string): string {
+  const drive = posix.match(/^([A-Za-z]:)(\/|$)/);
+  const isAbs = posix.startsWith("/") || !!drive;
+  const rest = drive ? posix.slice(drive[1].length) : posix;
+  const out: string[] = [];
+  for (const part of rest.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      if (out.length === 0) return "";
+      out.pop();
+      continue;
+    }
+    out.push(part);
+  }
+  if (drive) {
+    return out.length === 0 ? `${drive[1]}/` : `${drive[1]}/${out.join("/")}`;
+  }
+  if (isAbs) return `/${out.join("/")}`;
+  return out.join("/");
+}
+
 /** Normalize for open / under-root compare (POSIX separators, trim trailing slash). */
 export function normalizeSidePath(path: string): string {
   const raw = (path ?? "").trim().replace(/^<|>$/g, "");
@@ -81,7 +122,8 @@ export function normalizeSidePath(path: string): string {
     return unescaped.replace(/\\/g, "/").replace(/\/?$/, "/");
   }
   if (unescaped === "/" || unescaped === "\\") return "/";
-  return unescaped.replace(/\\/g, "/").replace(/\/+$/, "");
+  const posix = unescaped.replace(/\\/g, "/").replace(/\/+$/, "");
+  return foldDotSegments(posix);
 }
 
 /** True when `target` is the project root or a path inside it. */
@@ -157,6 +199,10 @@ export function resolveSidePathDeepLink(
   if (!raw) return fail("empty");
 
   if (isHttpUrl(raw)) return fail("url");
+
+  if (sidePathHasDotDot(raw)) {
+    return fail("outside_project", { shouldReveal: false });
+  }
 
   if (input.missing) {
     const hint = isFsAbsolutePath(raw) || isHomeRelativePath(raw)

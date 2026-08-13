@@ -24,6 +24,8 @@ export type SideContextOpenResult = {
   /** Aside should open if currently collapsed. */
   needAsideOpen: boolean;
   kind: "file" | "browser" | "review";
+  /** i18n key for a honesty toast (non-git changes chip). */
+  noticeKey?: "side.review.notGit";
 };
 
 /**
@@ -54,7 +56,12 @@ export function applySideContextOpen(
   }
   // changes → review
   if (!opts?.isGitProject) {
-    return { state, needAsideOpen: false, kind: "review" };
+    return {
+      state,
+      needAsideOpen: false,
+      kind: "review",
+      noticeKey: "side.review.notGit",
+    };
   }
   const next = openSideTab(state, "review");
   return { state: next, needAsideOpen: true, kind: "review" };

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "@/lib/api";
 import { createT, type Locale, type MessageKey } from "@/i18n";
 import { GlassModal } from "@/components/GlassModal";
+import { Select } from "@/components/Select";
 import {
   WORKFLOW_RUN_PROGRESS_EVENT,
   appendWorkflowRunLiveLog,
@@ -962,25 +963,26 @@ export function WorkflowsDiscoveryBlock({
           </label>
           <label className="field">
             <span>{t("settings.workflows.create.scope")}</span>
-            <select
-              className="app-dialog__input"
+            <Select
               value={createScope}
               disabled={createBusy}
-              onChange={(e) => {
-                setCreateScope(
-                  e.target.value === "project" ? "project" : "user",
-                );
+              aria-label={t("settings.workflows.create.scope")}
+              onChange={(v) => {
+                setCreateScope(v === "project" ? "project" : "user");
                 setCreateError(null);
               }}
-              aria-label={t("settings.workflows.create.scope")}
-            >
-              <option value="user">
-                {t("settings.workflows.scope.user")}
-              </option>
-              <option value="project" disabled={!projectPath?.trim()}>
-                {t("settings.workflows.scope.project")}
-              </option>
-            </select>
+              options={[
+                {
+                  value: "user",
+                  label: t("settings.workflows.scope.user"),
+                },
+                {
+                  value: "project",
+                  label: t("settings.workflows.scope.project"),
+                  disabled: !projectPath?.trim(),
+                },
+              ]}
+            />
             {!projectPath?.trim() ? (
               <span className="ext-field-hint">
                 {t("settings.workflows.create.needProjectHint")}

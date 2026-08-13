@@ -59,12 +59,24 @@ pub fn sync_memory_to_agent_profile(
     Ok(())
 }
 
-/// Args for `grok memory clear` (workspace scope = product default).
-pub fn memory_clear_cli_args(scope: &str) -> Vec<&'static str> {
+/// Args for `grok memory clear`. Unknown scope is an error (never default to workspace).
+pub fn memory_clear_cli_args(scope: &str) -> Result<Vec<&'static str>, String> {
     match scope.trim().to_ascii_lowercase().as_str() {
-        "global" => vec!["memory", "clear", "-y", "--global"],
-        "all" => vec!["memory", "clear", "-y", "--all"],
-        _ => vec!["memory", "clear", "-y", "--workspace"],
+        "global" => Ok(vec!["memory", "clear", "-y", "--global"]),
+        "all" => Ok(vec!["memory", "clear", "-y", "--all"]),
+        "workspace" => Ok(vec!["memory", "clear", "-y", "--workspace"]),
+        other => Err(format!("unknown_memory_scope:{other}")),
+    }
+}
+
+/// Resolve cwd for `grok memory clear`. Workspace / all never fall back to `$HOME`.
+pub fn resolve_memory_clear_cwd(cwd: Option<&Path>, scope: &str) -> Result<PathBuf, String> {
+    let scope = scope.trim().to_ascii_lowercase();
+    let dir = cwd.map(Path::to_path_buf).filter(|p| p.is_dir());
+    match scope.as_str() {
+        "workspace" | "all" => dir.ok_or_else(|| "workspace_path_missing".to_string()),
+        "global" => Ok(dir.unwrap_or_else(process_util::user_home)),
+        other => Err(format!("unknown_memory_scope:{other}")),
     }
 }
 
@@ -90,13 +102,10 @@ pub fn clear_workspace_memory(
         .filter(|_| probe.found)
         .ok_or_else(|| "Grok Build CLI not found".to_string())?;
 
-    let work_dir = cwd
-        .map(Path::to_path_buf)
-        .filter(|p| p.is_dir())
-        .unwrap_or_else(process_util::user_home);
+    let args = memory_clear_cli_args(scope)?;
+    let work_dir = resolve_memory_clear_cwd(cwd, scope)?;
 
     let grok_home = resolve_agent_grok_home(session_data_mode);
-    let args = memory_clear_cli_args(scope);
 
     let mut cmd = Command::new(&cli_path);
     cmd.args(&args)
@@ -1115,30 +1124,58 @@ mod tests {
     #[test]
     fn clear_args() {
         assert_eq!(
-            memory_clear_cli_args("workspace"),
+            memory_clear_cli_args("workspace").unwrap(),
             vec!["memory", "clear", "-y", "--workspace"]
         );
         assert_eq!(
-            memory_clear_cli_args("global"),
+            memory_clear_cli_args("global").unwrap(),
             vec!["memory", "clear", "-y", "--global"]
         );
         assert_eq!(
-            memory_clear_cli_args("all"),
+            memory_clear_cli_args("all").unwrap(),
             vec!["memory", "clear", "-y", "--all"]
         );
-        // Soft-fail unknown / empty → product default workspace (never invents --session).
+        assert!(memory_clear_cli_args("")
+            .unwrap_err()
+            .contains("unknown_memory_scope"));
+        assert!(memory_clear_cli_args("session")
+            .unwrap_err()
+            .contains("unknown_memory_scope"));
         assert_eq!(
-            memory_clear_cli_args(""),
-            vec!["memory", "clear", "-y", "--workspace"]
-        );
-        assert_eq!(
-            memory_clear_cli_args("session"),
-            vec!["memory", "clear", "-y", "--workspace"]
-        );
-        assert_eq!(
-            memory_clear_cli_args("GLOBAL"),
+            memory_clear_cli_args("GLOBAL").unwrap(),
             vec!["memory", "clear", "-y", "--global"]
         );
+    }
+
+    #[test]
+    fn clear_cwd_fail_closed() {
+        assert_eq!(
+            resolve_memory_clear_cwd(None, "workspace").unwrap_err(),
+            "workspace_path_missing"
+        );
+        let missing = std::env::temp_dir().join("grok-app-no-such-memory-dir");
+        let _ = std::fs::remove_dir_all(&missing);
+        assert_eq!(
+            resolve_memory_clear_cwd(Some(&missing), "workspace").unwrap_err(),
+            "workspace_path_missing"
+        );
+        assert_eq!(
+            resolve_memory_clear_cwd(Some(&missing), "all").unwrap_err(),
+            "workspace_path_missing"
+        );
+        assert!(resolve_memory_clear_cwd(None, "session")
+            .unwrap_err()
+            .contains("unknown_memory_scope"));
+        assert!(resolve_memory_clear_cwd(None, "global").is_ok());
+        assert!(resolve_memory_clear_cwd(Some(&std::env::temp_dir()), "workspace").is_ok());
+        let file_cwd = std::env::temp_dir().join("grok-app-memory-not-a-dir");
+        let _ = std::fs::remove_file(&file_cwd);
+        std::fs::write(&file_cwd, b"not a dir").expect("write not-dir cwd");
+        assert_eq!(
+            resolve_memory_clear_cwd(Some(&file_cwd), "workspace").unwrap_err(),
+            "workspace_path_missing"
+        );
+        let _ = std::fs::remove_file(&file_cwd);
     }
 
     #[test]

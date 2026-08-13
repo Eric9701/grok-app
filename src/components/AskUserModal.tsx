@@ -19,6 +19,16 @@ import { dropGateClock, gateClockKey, resumeGateClock } from "@/lib/gateClock";
  */
 const askUserClocks = new Map<string, number>();
 
+/** Drop auto-cancel clocks for every AskUser request on `sessionId`. */
+export function dropAskUserClocks(sessionId: string): void {
+  const prefix = `${sessionId}:`;
+  for (const key of [...askUserClocks.keys()]) {
+    if (key.startsWith(prefix) || key === sessionId) {
+      askUserClocks.delete(key);
+    }
+  }
+}
+
 export type AskUserLabels = {
   title: string;
   submit: string;

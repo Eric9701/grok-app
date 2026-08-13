@@ -80,24 +80,27 @@ pub fn with_exclusive_lock<T>(
     body()
 }
 
+/// Write bytes to `path` via temp file + rename (caller must hold the lock).
+pub fn write_bytes_replace(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let tmp = {
+        let mut p = path.as_os_str().to_os_string();
+        p.push(".tmp");
+        PathBuf::from(p)
+    };
+    fs::write(&tmp, bytes).map_err(|e| format!("write temp: {e}"))?;
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("rename into place: {e}")
+    })?;
+    Ok(())
+}
+
 /// Write bytes to `path` via temp file + rename under exclusive lock.
 pub fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    with_exclusive_lock(path, || {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        let tmp = {
-            let mut p = path.as_os_str().to_os_string();
-            p.push(".tmp");
-            PathBuf::from(p)
-        };
-        fs::write(&tmp, bytes).map_err(|e| format!("write temp: {e}"))?;
-        fs::rename(&tmp, path).map_err(|e| {
-            let _ = fs::remove_file(&tmp);
-            format!("rename into place: {e}")
-        })?;
-        Ok(())
-    })
+    with_exclusive_lock(path, || write_bytes_replace(path, bytes))
 }
 
 /// True if error string is a lock contention failure.

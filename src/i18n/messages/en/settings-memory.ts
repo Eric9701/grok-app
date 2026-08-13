@@ -144,6 +144,8 @@ export const enSettingsMemory = {
   "settings.memoryOps.clear.unavailable.session": "Session-only clear is not supported by the host CLI yet.",
   "settings.memoryOps.clear.unavailable.memoryOff": "Turn on Cross-session memory before clearing.",
   "settings.memoryOps.clear.unavailable.noCwd": "Open a project to clear workspace memory.",
+  "memory.clear.pathMissing": "Cannot clear workspace memory — the project folder is missing or is not a directory.",
+  "memory.clear.unknownScope": "Unknown memory-clear scope. Use workspace, global, or all.",
   "settings.memoryOps.clear.unavailable.host": "This clear scope is not available from the App host.",
   "settings.memoryOps.empty.memoryOff": "Memory is off",
   "settings.memoryOps.empty.memoryOffHint": "Enable Cross-session memory above to browse files and clear scopes.",

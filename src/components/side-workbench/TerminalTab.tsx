@@ -381,7 +381,6 @@ export function TerminalTab({
           .terminalPtyResize(sid, term.cols, term.rows)
           .catch(() => undefined);
       }
-      term.focus();
     };
 
     const t = window.setTimeout(apply, 0);
@@ -398,6 +397,12 @@ export function TerminalTab({
       ro?.disconnect();
       window.removeEventListener("resize", apply);
     };
+  }, [active]);
+
+  useEffect(() => {
+    if (!active) return;
+    const term = termRef.current;
+    if (term) term.focus();
   }, [active]);
 
   const honesty = useMemo(

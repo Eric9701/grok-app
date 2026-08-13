@@ -420,11 +420,22 @@ export function WallpaperSourceModal({
    * Soft-delete a library file. Failures keep the card and show a soft warn —
    * never invent a successful delete.
    */
-  const deleteLibraryItem = useCallback(
-    async (item: WallpaperGalleryItem, ev?: { preventDefault(): void; stopPropagation(): void }) => {
+  const [deleteConfirm, setDeleteConfirm] = useState<WallpaperGalleryItem | null>(
+    null,
+  );
+
+  const requestDeleteLibraryItem = useCallback(
+    (item: WallpaperGalleryItem, ev?: { preventDefault(): void; stopPropagation(): void }) => {
       ev?.preventDefault();
       ev?.stopPropagation();
       if (busy || applying || previewingId) return;
+      setDeleteConfirm(item);
+    },
+    [busy, applying, previewingId],
+  );
+
+  const deleteLibraryItem = useCallback(
+    async (item: WallpaperGalleryItem) => {
       const path = item.localPath?.trim();
       if (!path) return;
       if (!isDesktopHost()) {
@@ -593,6 +604,7 @@ export function WallpaperSourceModal({
       !error);
 
   return (
+    <>
     <GlassModal
       open={open}
       onClose={onClose}
@@ -1042,7 +1054,7 @@ export function WallpaperSourceModal({
                     type="button"
                     className="wallpaper-masonry__delete"
                     disabled={locked}
-                    onClick={(e) => void deleteLibraryItem(item, e)}
+                    onClick={(e) => requestDeleteLibraryItem(item, e)}
                     aria-label={t("settings.wallpaperSource.delete")}
                     title={t("settings.wallpaperSource.delete")}
                   >
@@ -1055,5 +1067,38 @@ export function WallpaperSourceModal({
         </div>
       </div>
     </GlassModal>
+    <GlassModal
+      open={!!deleteConfirm}
+      onClose={() => setDeleteConfirm(null)}
+      title={t("wallpaper.library.deleteConfirmTitle")}
+      size="sm"
+      closeLabel={t("common.close")}
+      footer={
+        <>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => setDeleteConfirm(null)}
+          >
+            {t("common.cancel")}
+          </button>
+          <button
+            type="button"
+            className="btn btn--solid btn--danger"
+            data-testid="wallpaper-library-delete-confirm"
+            onClick={() => {
+              const item = deleteConfirm;
+              setDeleteConfirm(null);
+              if (item) void deleteLibraryItem(item);
+            }}
+          >
+            {t("wallpaper.library.deleteConfirmAction")}
+          </button>
+        </>
+      }
+    >
+      <p className="rp-modal-copy">{t("wallpaper.library.deleteConfirm")}</p>
+    </GlassModal>
+    </>
   );
 }

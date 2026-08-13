@@ -374,7 +374,7 @@ import {
   formatPermissionSummary,
   mapPermissionButtons
 } from "@/lib/permissionOptions";
-import { AskUserModal } from "@/components/AskUserModal";
+import { AskUserModal, dropAskUserClocks } from "@/components/AskUserModal";
 import { TraceHistoryList } from "@/components/TraceHistoryList";
 import { PlanHistoryList } from "@/components/PlanHistoryList";
 import { MarkdownBody } from "@/components/MarkdownBody";
@@ -908,7 +908,10 @@ import {
   ComposerModelMenu
 } from "@/components/ComposerModelMenu";
 import type { ComposerModelPick } from "@/lib/composerModelGroups";
-import { resolveProviderBrandId } from "@/lib/providerPresets";
+import {
+  alignGrokPresetEfforts,
+  resolveProviderBrandId,
+} from "@/lib/providerPresets";
 import {
   ProviderBrandIcon,
   providerAvatarLetter
@@ -1347,6 +1350,10 @@ export function AppWorkbench() {
   );
   const sideWorkbenchRef = useRef(sideWorkbench);
   sideWorkbenchRef.current = sideWorkbench;
+  const [closeActiveSideRequest, setCloseActiveSideRequest] = useState<{
+    token: number;
+  } | null>(null);
+  const closeActiveSideTokenRef = useRef(0);
   /**
    * When side is expanded: optional bottom-docked compressed composer (icon toggle).
    * Resets whenever expand ends.
@@ -2244,6 +2251,7 @@ export function AppWorkbench() {
     pendingAskUserBySessionRef.current.delete(sessionId);
     // The request is settled — its clock must not outlive it.
     dropGateClocks(permRaisedAtRef.current, sessionId);
+    dropAskUserClocks(sessionId);
     const cached = planBySessionRef.current.get(sessionId);
     if (cached && cached.rpcId != null) {
       const next = invalidatePlanGate(cached);
@@ -2753,19 +2761,24 @@ export function AppWorkbench() {
     });
   }, []);
 
-  /** Route chat context opens into Side Workbench tabs (Phase 6). */
+  /** Route chat context opens into Side Workbench tabs (Phase 6).
+   * When the aside is mounted, SideWorkbench `openRequest` is the only consumer. */
   useEffect(() => {
     if (!resourceOpenTarget) return;
+    if (!layout.asideCollapsed) return;
     const result = applySideContextOpen(sideWorkbench, resourceOpenTarget, {
       isGitProject: sideIsGitProject,
     });
+    if (result.noticeKey) {
+      showToast(tr(result.noticeKey), 2400);
+    }
     if (result.needAsideOpen) {
       setSideWorkbench(result.state);
       openAsidePane();
     }
     setResourceOpenTarget(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume once per target
-  }, [resourceOpenTarget]);
+  }, [resourceOpenTarget, layout.asideCollapsed]);
 
   /** Open the left project rail; one window fit (+ reclamp open files pane). */
   const openSidebarPane = useCallback(() => {
@@ -9355,6 +9368,13 @@ export function AppWorkbench() {
     }, ms);
   }, []);
 
+  const onLiveVoiceClassifiedNotice = useCallback(
+    (message: string) => {
+      showToast(message, 4800);
+    },
+    [showToast],
+  );
+
   const applyWallpaperChoice = (
     record: Parameters<typeof applyWallpaperChoiceBase>[0],
   ) =>
@@ -9444,14 +9464,24 @@ export function AppWorkbench() {
       if (!ids.length) return;
       const n = ids.length;
       const runStop = async () => {
+        const live = stoppableActivitySessions(
+          collectActivitySessions({
+            liveMap: liveMapRef.current,
+            sessions,
+            currentSessionId: session.sessionId,
+            untitledLabel: tr("session.untitled"),
+          }),
+        );
+        const liveIds = new Set(live.map((s) => s.sessionId));
+        const toStop = ids.filter((id) => liveIds.has(id));
         const results = await Promise.allSettled(
-          ids.map((id) => api.sessionStop(id)),
+          toStop.map((id) => api.sessionStop(id)),
         );
         let ok = 0;
         let fail = 0;
         for (let i = 0; i < results.length; i++) {
           const r = results[i]!;
-          const id = ids[i]!;
+          const id = toStop[i]!;
           if (r.status === "fulfilled") {
             ok += 1;
             settleStoppedSessionUi(id);
@@ -9495,7 +9525,14 @@ export function AppWorkbench() {
         },
       });
     },
-    [clearPendingGates, settleStoppedSessionUi, showToast, tr],
+    [
+      clearPendingGates,
+      settleStoppedSessionUi,
+      sessions,
+      session.sessionId,
+      showToast,
+      tr,
+    ],
   );
 
   /**
@@ -9748,17 +9785,15 @@ export function AppWorkbench() {
           applyVoiceFail("no_speech", 4200);
           return;
         }
-        let inserted = "";
         setDraft((d) => {
           const at =
             caret == null ? d.length : Math.max(0, Math.min(caret, d.length));
           const plan = planTranscriptInsert(d, commit.text, at);
           if (!plan) return d;
-          inserted = plan.text;
           return plan.text;
         });
         setVoice((s) => reduceVoice(s, { type: "transcribe_ok" }));
-        if (commit.kind === "send" && inserted.trim().length > 0) {
+        if (commit.kind === "send") {
           window.setTimeout(() => {
             void sendRef.current?.();
           }, 0);
@@ -11825,7 +11860,14 @@ export function AppWorkbench() {
     if (providerActiveSource !== "custom" || !activeCustomProvider) {
       return null;
     }
-    return effortOptionsFromProvider(activeCustomProvider.efforts);
+    const aligned = alignGrokPresetEfforts({
+      providerId: activeCustomProvider.id,
+      baseUrl: activeCustomProvider.baseUrl,
+      efforts: activeCustomProvider.efforts,
+    });
+    return effortOptionsFromProvider(
+      aligned ?? activeCustomProvider.efforts,
+    );
   }, [providerActiveSource, activeCustomProvider]);
 
   /**
@@ -11877,18 +11919,18 @@ export function AppWorkbench() {
           const targetOfficial = effortCatalogForRoute({
             model: findModel(pick.modelId, availableModels),
           });
-          setEffort((prev) =>
-            mapEffortToTargetCatalog(
-              prev,
-              targetOfficial,
-              channelEffortOptions ?? officialEffortCatalog,
-            ),
+          const clampedOfficial = mapEffortToTargetCatalog(
+            effort,
+            targetOfficial,
+            channelEffortOptions ?? officialEffortCatalog,
           );
+          setEffort(clampedOfficial);
           void api
             .composerPrefsSet({
               projectId: activeProject?.id ?? null,
               sessionId: session.sessionId ?? null,
               modelId: pick.modelId,
+              effort: clampedOfficial,
             })
             .catch((e) => showToast(String(e), 4000));
         } else {
@@ -11942,15 +11984,28 @@ export function AppWorkbench() {
           }
           await refreshProviderRoute();
           // Map effort into the picked channel's catalog (Grok ↔ DeepSeek tiers).
+          const alignedPick = alignGrokPresetEfforts({
+            providerId: provider.id,
+            baseUrl: provider.baseUrl,
+            efforts: provider.efforts,
+          });
           const nextEfforts =
-            effortOptionsFromProvider(provider.efforts) ?? GROK_BUILD_EFFORTS;
-          setEffort((prev) =>
-            mapEffortToTargetCatalog(
-              prev,
-              nextEfforts,
-              channelEffortOptions ?? officialEffortCatalog,
-            ),
+            effortOptionsFromProvider(alignedPick ?? provider.efforts) ??
+            GROK_BUILD_EFFORTS;
+          const clampedCustom = mapEffortToTargetCatalog(
+            effort,
+            nextEfforts,
+            channelEffortOptions ?? officialEffortCatalog,
           );
+          setEffort(clampedCustom);
+          void api
+            .composerPrefsSet({
+              projectId: activeProject?.id ?? null,
+              sessionId: session.sessionId ?? null,
+              modelId: pick.modelId,
+              effort: clampedCustom,
+            })
+            .catch((e) => showToast(String(e), 4000));
         }
       } catch (e) {
         showToast(String(e), 4000);
@@ -11966,6 +12021,9 @@ export function AppWorkbench() {
       customProviders,
       activeProject?.id,
       session.sessionId,
+      effort,
+      channelEffortOptions,
+      officialEffortCatalog,
       refreshProviderRoute,
       showToast,
       tr,
@@ -13997,13 +14055,9 @@ export function AppWorkbench() {
       })();
       return;
     }
-    // needsConfirm: host has no dirty map for outer side tabs yet — force close.
-    // Nested FilesWorkspace drafts keep their own discard dialogs.
-    setSideWorkbench(result.state);
-    if (result.state.tabs.length === 0) {
-      closeAsidePane();
-    }
-  }, [closeAsidePane]);
+    closeActiveSideTokenRef.current += 1;
+    setCloseActiveSideRequest({ token: closeActiveSideTokenRef.current });
+  }, []);
 
   useEffect(() => {
     if (!api.isTauri()) return;
@@ -14141,7 +14195,10 @@ export function AppWorkbench() {
   );
 
   const clearLocalGoalOrchTimeline = useCallback(() => {
-    const plan = planClearGoalOrchEvents(goalOrchEvents);
+    const plan = planClearGoalOrchEvents(
+      goalOrchEvents,
+      session.sessionId ?? null,
+    );
     setGoalOrchEvents(plan.next);
     if (plan.cleared > 0) {
       showToast(
@@ -14149,10 +14206,13 @@ export function AppWorkbench() {
         2400,
       );
     }
-  }, [goalOrchEvents, showToast, tr]);
+  }, [goalOrchEvents, session.sessionId, showToast, tr]);
 
   const requestClearLocalGoalOrchTimeline = useCallback(() => {
-    const plan = planClearGoalOrchEvents(goalOrchEvents);
+    const plan = planClearGoalOrchEvents(
+      goalOrchEvents,
+      session.sessionId ?? null,
+    );
     if (plan.cleared <= 0) return;
     if (shouldConfirmClearGoalOrch(plan.cleared)) {
       setAppDialog({
@@ -18795,13 +18855,14 @@ export function AppWorkbench() {
                       }
                       onJump={(jump) => {
                         if (jump.type === "review") {
-                          // Phase 3: env review jump only for git projects.
-                          if (!sideIsGitProject) return;
                           const result = applySideContextOpen(
                             sideWorkbench,
                             { type: "changes" },
-                            { isGitProject: true },
+                            { isGitProject: sideIsGitProject },
                           );
+                          if (result.noticeKey) {
+                            showToast(tr(result.noticeKey), 2400);
+                          }
                           if (!result.needAsideOpen) return;
                           setSideWorkbench(result.state);
                           openAsidePane();
@@ -19196,7 +19257,7 @@ export function AppWorkbench() {
               phaseLabel={tr(
                 goalOrchPhaseLabelKey(goalOrchSessionChip.phase),
               )}
-              canClear={goalOrchEvents.length > 0}
+              canClear={goalOrchSessionEvents.length > 0}
               labels={{
                 chipLabel:
                   goalOrchSessionChip.kind === "waiting"
@@ -19479,9 +19540,7 @@ export function AppWorkbench() {
                   projectPath: effectiveProjectPath,
                   projectTrusted: activeProject
                     ? activeProject.trusted
-                    : effectiveProjectPath
-                      ? true
-                      : null,
+                    : null,
                 });
                 if (!decision.ok) {
                   setLocalError(tr(decision.messageKey));
@@ -19501,6 +19560,8 @@ export function AppWorkbench() {
                   type: "file",
                   path: decision.path,
                   title: decision.title,
+                  line: target.line ?? null,
+                  column: target.column ?? null,
                 });
                 return;
               }
@@ -20632,6 +20693,10 @@ export function AppWorkbench() {
                 onOpenPlanHistory={() => setShowPlanHistory(true)}
                 openRequest={resourceOpenTarget}
                 onOpenRequestConsumed={() => setResourceOpenTarget(null)}
+                closeActiveRequest={closeActiveSideRequest}
+                onCloseActiveRequestConsumed={() =>
+                  setCloseActiveSideRequest(null)
+                }
                 onCloseSide={closeAsidePane}
                 onExpandedChange={(expanded) => {
                   if (phoneLayout) return;
@@ -21468,7 +21533,7 @@ export function AppWorkbench() {
           status: liveMap[s.id]?.state ?? "idle",
         }))}
         onClose={() => setLiveVoiceOpen(false)}
-        onClassifiedNotice={(message) => showToast(message, 4800)}
+        onClassifiedNotice={onLiveVoiceClassifiedNotice}
         onSendTranscriptAsPrompt={
           session.sessionId
             ? async (prompt) => {

@@ -269,22 +269,50 @@ fn get_evidence(conn: &Connection, ids: &[String]) -> Result<Vec<EvidenceItem>, 
 
 // ── URL / id helpers ─────────────────────────────────────────────────────────
 
-/// Extract the numeric status id from an `x.com` / `twitter.com` status URL.
+/// Extract the numeric status id from pathname `status|statuses/<digits>`.
+/// Query / fragment / spoofed hosts are ignored here; callers still gate host.
 pub fn extract_status_id(url: &str) -> Option<String> {
     let u = url.trim();
-    let lower = u.to_ascii_lowercase();
-    if !(lower.contains("x.com/") || lower.contains("twitter.com/")) {
+    if u.is_empty() {
         return None;
     }
-    let idx = lower.find("/status/")?;
-    let rest = &u[idx + "/status/".len()..];
-    let id: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
-    // Real snowflake ids are long; short digit runs are noise, not anchors.
-    if id.len() >= 8 {
-        Some(id)
-    } else {
-        None
+    if u.chars().all(|c| c.is_ascii_digit()) && u.len() >= 8 {
+        return Some(u.to_string());
     }
+    let parsed = url::Url::parse(u).ok()?;
+    let segs: Vec<&str> = parsed.path().split('/').filter(|s| !s.is_empty()).collect();
+    for i in 0..segs.len().saturating_sub(1) {
+        let name = segs[i].to_ascii_lowercase();
+        if name != "status" && name != "statuses" {
+            continue;
+        }
+        let id = segs[i + 1];
+        if id.len() >= 8 && id.chars().all(|c| c.is_ascii_digit()) {
+            return Some(id.to_string());
+        }
+        return None;
+    }
+    None
+}
+
+fn is_canonical_x_status_url(url: &str) -> bool {
+    let parsed = match url::Url::parse(url.trim()) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    let scheme = parsed.scheme();
+    if scheme != "https" && scheme != "http" {
+        return false;
+    }
+    let host = parsed
+        .host_str()
+        .unwrap_or("")
+        .trim_start_matches("www.")
+        .to_ascii_lowercase();
+    if host != "x.com" && host != "twitter.com" && host != "mobile.twitter.com" {
+        return false;
+    }
+    extract_status_id(url).is_some()
 }
 
 fn evidence_id_for(status_id: Option<&str>, url: Option<&str>, fallback: &str) -> String {
@@ -397,6 +425,7 @@ fn items_to_evidence(
             continue;
         }
         let status_id = url.as_deref().and_then(extract_status_id);
+        let verified = url.as_deref().is_some_and(is_canonical_x_status_url);
         let fallback = text.clone().unwrap_or_default();
         let evidence_id = evidence_id_for(status_id.as_deref(), url.as_deref(), &fallback);
         if !seen.insert(evidence_id.clone()) {
@@ -404,7 +433,7 @@ fn items_to_evidence(
         }
         out.push(EvidenceItem {
             evidence_id,
-            verified: status_id.is_some(),
+            verified,
             status_id,
             url,
             author: raw
@@ -701,7 +730,31 @@ mod tests {
         assert_eq!(extract_status_id("https://x.com/xai"), None);
         assert_eq!(
             extract_status_id("https://example.com/status/1234567890"),
+            Some("1234567890".into())
+        );
+        assert_eq!(
+            extract_status_id("https://x.com/search?q=/status/12345678"),
             None
+        );
+        assert_eq!(
+            extract_status_id("https://x.com/search#/status/12345678"),
+            None
+        );
+        assert_eq!(
+            extract_status_id("https://x.com/victim/photo?u=/status/99999999"),
+            None
+        );
+        assert_eq!(
+            extract_status_id("ftp://x.com/user/status/12345678"),
+            Some("12345678".into())
+        );
+        assert_eq!(
+            extract_status_id("https://cdn.evil.com/x.com/status/12345678"),
+            Some("12345678".into())
+        );
+        assert_eq!(
+            extract_status_id("https://x.com.evil.com/user/status/12345678"),
+            Some("12345678".into())
         );
     }
 
@@ -769,11 +822,15 @@ mod tests {
         let v = serde_json::json!({
             "items": [
                 { "url": "https://example.com/blog", "text": "not a status" },
-                { "text": "no url at all" }
+                { "text": "no url at all" },
+                { "url": "ftp://x.com/user/status/11111111", "text": "ftp" },
+                { "url": "https://cdn.evil.com/x.com/status/22222222", "text": "cdn" },
+                { "url": "https://x.com.evil.com/user/status/33333333", "text": "suffix" },
+                { "url": "https://x.com/search#/status/44444444", "text": "fragment" }
             ]
         });
         let items = items_to_evidence(&v, "q", None, "x_search");
-        assert_eq!(items.len(), 2);
+        assert_eq!(items.len(), 6);
         assert!(items.iter().all(|i| !i.verified));
     }
 

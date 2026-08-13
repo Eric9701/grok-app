@@ -1,10 +1,11 @@
 /**
  * Context usage chip — pure token format + state for honest UX.
  *
- * Token estimate heuristic (when the agent has not reported counts):
- *   tokens ≈ ceil(visibleChars / 4)
- * Chip total sums user + assistant body (+ thought) only (tools skipped),
- * except tools/system-only transcripts soft-fall back to breakdown total.
+ * Token estimate heuristic (`estimateTokensFromMessages`, when the agent
+ * has not reported counts): tokens ≈ ceil(visibleChars / 4) over the same
+ * visible message set the chip uses. Chip total sums user + assistant body
+ * (+ thought) only (tools skipped), except tools/system-only transcripts
+ * soft-fall back to breakdown total.
  * Menu breakdown classifies further:
  *   user / assistant / thought / tools (tool_step & activity) / system-like,
  *   plus history = user+assistant+thought rollup.

@@ -33,6 +33,7 @@ import {
   type MemoryBrowserRow,
 } from "@/lib/memoryBrowserSearch";
 import { isEmbeddingConfigured } from "@/lib/memoryEmbedConfig";
+import { memoryClearErrorMessageKey } from "@/lib/agentMemory";
 import {
   CLI_MEMORY_HYBRID_SEARCH_AVAILABLE,
   effectiveMemorySearchKind,
@@ -485,8 +486,10 @@ export function MemoryBrowserPanel({
       onMemoryCleared?.();
       onToast?.(t(clearDoneKey(clearScope)), 3500);
     } catch (e) {
-      onToast?.(String(e), 4500);
-      setError(String(e));
+      const key = memoryClearErrorMessageKey(e);
+      const msg = key ? t(key) : String(e);
+      onToast?.(msg, 4500);
+      setError(msg);
     } finally {
       setClearBusy(false);
     }

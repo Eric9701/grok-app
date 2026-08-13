@@ -152,10 +152,7 @@ export function taskTreeIdsAreHonest(
   const allowed =
     allowedIds instanceof Set ? allowedIds : new Set(allowedIds);
   const ids = collectTaskTreeIds(nodes);
-  if (ids.length !== allowed.size && ids.length !== new Set(ids).size) {
-    // Duplicates in tree are dishonest / broken.
-    if (ids.length !== new Set(ids).size) return false;
-  }
+  if (ids.length !== new Set(ids).size) return false;
   for (const id of ids) {
     if (!allowed.has(id)) return false;
   }

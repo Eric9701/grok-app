@@ -248,6 +248,15 @@ export function VoiceOverlay({
     [appendLine, tt],
   );
 
+  const appendLineRef = useRef(appendLine);
+  const applyToolEventRef = useRef(applyToolEvent);
+  const noticeClassifiedRef = useRef(noticeClassified);
+  const ttRef = useRef(tt);
+  appendLineRef.current = appendLine;
+  applyToolEventRef.current = applyToolEvent;
+  noticeClassifiedRef.current = noticeClassified;
+  ttRef.current = tt;
+
   const resolveVoicePermission = useCallback(
     async (
       prompt: VoicePermissionPrompt,
@@ -353,7 +362,19 @@ export function VoiceOverlay({
     setToolLoop(initialToolLoopState());
     setPendingPermission(null);
 
-    let unsubs: Array<() => void> = [];
+    let cancelled = false;
+    const unsubs: Array<() => void> = [];
+    const pushUnsub = (u: () => void) => {
+      if (cancelled) {
+        try {
+          u();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      unsubs.push(u);
+    };
 
     (async () => {
       try {
@@ -364,11 +385,12 @@ export function VoiceOverlay({
           voiceId: voiceId ?? null,
           keepAgentsOnEnd,
         });
+        if (cancelled) return;
         setState(st);
         delegatedIdsRef.current = st.delegatedSessionIds ?? [];
-        appendLine(
+        appendLineRef.current(
           "system",
-          st.mock ? tt("voice.mockReady") : tt("voice.ready"),
+          st.mock ? ttRef.current("voice.mockReady") : ttRef.current("voice.ready"),
           true,
         );
 
@@ -378,16 +400,25 @@ export function VoiceOverlay({
           const cap = await startPcmCapture((b64) => {
             void voicePushPcm(b64).catch(() => {});
           });
+          if (cancelled) {
+            cap.stop();
+            return;
+          }
           stopCapture.current = cap.stop;
         } catch (micErr) {
+          if (cancelled) return;
           const cls = classifyLiveVoiceError(String(micErr));
           if (isSoftMicFailure(cls)) {
             setSoftMicWarning(cls);
-            appendLine("system", tt(liveVoiceErrorMessageKey(cls) as MessageKey), true);
-            noticeClassified(String(micErr), cls);
+            appendLineRef.current(
+              "system",
+              ttRef.current(liveVoiceErrorMessageKey(cls) as MessageKey),
+              true,
+            );
+            noticeClassifiedRef.current(String(micErr), cls);
           } else {
-            setError(formatLiveError(tt, String(micErr)));
-            noticeClassified(String(micErr), cls);
+            setError(formatLiveError(ttRef.current, String(micErr)));
+            noticeClassifiedRef.current(String(micErr), cls);
           }
         }
 
@@ -418,7 +449,11 @@ export function VoiceOverlay({
             );
           }
         });
-        unsubs.push(u1);
+        if (cancelled) {
+          u1();
+          return;
+        }
+        pushUnsub(u1);
 
         const u2 = await listen<{ role?: string; text?: string; final?: boolean }>(
           "voice://transcript",
@@ -426,10 +461,14 @@ export function VoiceOverlay({
             const role = e.payload.role ?? "assistant";
             const text = e.payload.text ?? "";
             // Host text only — never invent STT when payload is empty.
-            if (text) appendLine(role, text, e.payload.final);
+            if (text) appendLineRef.current(role, text, e.payload.final);
           },
         );
-        unsubs.push(u2);
+        if (cancelled) {
+          u2();
+          return;
+        }
+        pushUnsub(u2);
 
         const u3 = await listen<{ delta?: string }>("voice://audio", (e) => {
           if (e.payload.delta) {
@@ -437,7 +476,11 @@ export function VoiceOverlay({
             void playPcm16Base64(e.payload.delta).catch(() => {});
           }
         });
-        unsubs.push(u3);
+        if (cancelled) {
+          u3();
+          return;
+        }
+        pushUnsub(u3);
 
         const u4 = await listen<{
           message?: string;
@@ -449,23 +492,35 @@ export function VoiceOverlay({
           );
           if (isSoftMicFailure(cls)) {
             setSoftMicWarning(cls);
-            appendLine(
+            appendLineRef.current(
               "system",
-              tt(liveVoiceErrorMessageKey(cls) as MessageKey),
+              ttRef.current(liveVoiceErrorMessageKey(cls) as MessageKey),
               true,
             );
-            noticeClassified(e.payload.message, e.payload.errorClass);
+            noticeClassifiedRef.current(e.payload.message, e.payload.errorClass);
             return;
           }
-          setError(formatLiveError(tt, e.payload.message, e.payload.errorClass));
-          noticeClassified(e.payload.message, e.payload.errorClass);
+          setError(
+            formatLiveError(ttRef.current, e.payload.message, e.payload.errorClass),
+          );
+          noticeClassifiedRef.current(e.payload.message, e.payload.errorClass);
         });
-        unsubs.push(u4);
+        if (cancelled) {
+          u4();
+          return;
+        }
+        pushUnsub(u4);
 
         const u5 = await listen<Record<string, unknown>>("voice://tool", (e) => {
-          applyToolEvent(e.payload as Parameters<typeof applyToolEvent>[0]);
+          applyToolEventRef.current(
+            e.payload as Parameters<typeof applyToolEvent>[0],
+          );
         });
-        unsubs.push(u5);
+        if (cancelled) {
+          u5();
+          return;
+        }
+        pushUnsub(u5);
 
         const u6 = await listen("voice://tool_result", () => {
           // Lifecycle lines come from voice://tool.
@@ -477,7 +532,11 @@ export function VoiceOverlay({
             })
             .catch(() => {});
         });
-        unsubs.push(u6);
+        if (cancelled) {
+          u6();
+          return;
+        }
+        pushUnsub(u6);
 
         // Permission prompts for voice-delegated Build sessions only.
         // Same path as the main workbench bar (sessionResolvePermission);
@@ -499,9 +558,9 @@ export function VoiceOverlay({
             setToolLoop((prev) =>
               reduceToolLoopState(prev, permissionPendingToolLoopState(prompt)),
             );
-            appendLine(
+            appendLineRef.current(
               "system",
-              tt("voice.permissionPending", {
+              ttRef.current("voice.permissionPending", {
                 name: prompt.toolName || "tool",
                 title: prompt.title || prompt.toolName || "tool",
               }),
@@ -509,16 +568,23 @@ export function VoiceOverlay({
             );
           },
         );
-        unsubs.push(u7);
+        if (cancelled) {
+          u7();
+          return;
+        }
+        pushUnsub(u7);
       } catch (e) {
-        setError(formatLiveError(tt, String(e)));
-        noticeClassified(String(e));
+        if (cancelled) return;
+        setError(formatLiveError(ttRef.current, String(e)));
+        noticeClassifiedRef.current(String(e));
       } finally {
-        setBusy(false);
+        if (!cancelled) setBusy(false);
       }
     })();
 
     return () => {
+      cancelled = true;
+      started.current = false;
       unsubs.forEach((u) => {
         try {
           u();
@@ -527,18 +593,7 @@ export function VoiceOverlay({
         }
       });
     };
-  }, [
-    open,
-    projectPath,
-    projectId,
-    projectName,
-    voiceId,
-    keepAgentsOnEnd,
-    appendLine,
-    applyToolEvent,
-    noticeClassified,
-    tt,
-  ]);
+  }, [open, projectPath, projectId, projectName, voiceId, keepAgentsOnEnd]);
 
   const handleEnd = async () => {
     stopCapture.current?.();

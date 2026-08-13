@@ -7,6 +7,7 @@
 pub enum MessageKey {
     StopSignalSent,
     NoInFlightTurn,
+    NoAvailableProject,
 }
 
 /// Canonical catalog id: `en` | `zh` | `zh-TW`.
@@ -23,10 +24,17 @@ pub fn t(lang: &str, key: MessageKey) -> &'static str {
     match (normalize_lang(lang), key) {
         ("zh", MessageKey::StopSignalSent) => "已发送中断信号。",
         ("zh", MessageKey::NoInFlightTurn) => "当前没有进行中的任务。",
+        ("zh", MessageKey::NoAvailableProject) => "当前实例没有可用项目，请发送 /p 或联系管理员。",
         ("zh-TW", MessageKey::StopSignalSent) => "已傳送中斷訊號。",
         ("zh-TW", MessageKey::NoInFlightTurn) => "目前沒有進行中的任務。",
+        ("zh-TW", MessageKey::NoAvailableProject) => {
+            "目前執行個體沒有可用專案，請傳送 /p 或聯絡管理員。"
+        }
         (_, MessageKey::StopSignalSent) => "Stop signal sent.",
         (_, MessageKey::NoInFlightTurn) => "No in-flight turn.",
+        (_, MessageKey::NoAvailableProject) => {
+            "This instance has no available project. Send /p or contact an admin."
+        }
     }
 }
 
@@ -46,6 +54,12 @@ mod tests {
             t("zh-Hant", MessageKey::NoInFlightTurn),
             "目前沒有進行中的任務。"
         );
+        assert_eq!(
+            t("zh", MessageKey::NoAvailableProject),
+            "当前实例没有可用项目，请发送 /p 或联系管理员。"
+        );
+        assert!(t("en", MessageKey::NoAvailableProject).contains("/p"));
+        assert!(t("zh-TW", MessageKey::NoAvailableProject).contains("/p"));
     }
 
     #[test]

@@ -5,22 +5,21 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Locale } from "@/i18n";
+import { createT, type Locale, type MessageKey } from "@/i18n";
+import { GlassModal } from "@/components/GlassModal";
 import type { PlanReviewState } from "@/lib/planBody";
 import { shouldOpenPlanSideTab } from "@/lib/planModePro";
 import type { SessionFileChange } from "@/lib/sessionChanges";
 import {
   activeSideTab,
   applySideStripClose,
-  closeAllSideTabs,
-  closeOtherSideTabs,
   closeSideTab,
-  closeSideTabsToLeft,
-  closeSideTabsToRight,
   emptySideWorkbenchState,
   isCloseSideTabChord,
   openSideTab,
   openSideTabFromPicker,
+  planBulkClose,
+  type BulkCloseAction,
   setActiveSideTab,
   setTreeVisible,
   toggleSideExpanded,
@@ -64,6 +63,9 @@ export type SideWorkbenchProps = {
   onOpenPlanHistory?: () => void;
   openRequest?: ResourceOpenTarget | null;
   onOpenRequestConsumed?: () => void;
+  /** Host ⌘W: close the active tab via the same dirty-confirm path as ×. */
+  closeActiveRequest?: { token: number } | null;
+  onCloseActiveRequestConsumed?: () => void;
   autoOpenPlanTab?: boolean;
   /** Host skills catalog for Find skills side tab. */
   skillInfos?: readonly SkillInfo[];
@@ -94,6 +96,8 @@ export function SideWorkbench({
   onOpenPlanHistory,
   openRequest = null,
   onOpenRequestConsumed,
+  closeActiveRequest = null,
+  onCloseActiveRequestConsumed,
   autoOpenPlanTab = true,
   skillInfos = [],
   skillsLoading = false,
@@ -110,6 +114,15 @@ export function SideWorkbench({
     sideTabId: string;
   } | null>(null);
   const closeTokenRef = useRef(0);
+  const [bulkCloseConfirm, setBulkCloseConfirm] = useState<{
+    next: SideWorkbenchState;
+    dirtyCount: number;
+    totalCount: number;
+  } | null>(null);
+  const tr = useMemo(
+    () => createT((locale as Locale) || "en"),
+    [locale],
+  );
 
   const setState = useCallback(
     (next: SideWorkbenchState) => {
@@ -164,6 +177,39 @@ export function SideWorkbench({
     },
     [applyCloseState, isFilePathDirty, state],
   );
+
+  const dirtyTabIds = useMemo(
+    () =>
+      state.tabs
+        .filter((t) => t.kind === "file" && isFilePathDirty(t.path))
+        .map((t) => t.id),
+    [state.tabs, isFilePathDirty],
+  );
+
+  const requestBulkClose = useCallback(
+    (action: BulkCloseAction, targetId: string) => {
+      const planned = planBulkClose(state, action, targetId, dirtyTabIds);
+      if (planned.dirtyClosing.length === 0) {
+        applyCloseState(planned.next);
+        return;
+      }
+      const totalCount = state.tabs.length - planned.next.tabs.length;
+      setBulkCloseConfirm({
+        next: planned.next,
+        dirtyCount: planned.dirtyClosing.length,
+        totalCount,
+      });
+    },
+    [applyCloseState, dirtyTabIds, state],
+  );
+
+  useEffect(() => {
+    if (!closeActiveRequest) return;
+    const id = state.activeId ?? state.tabs[0]?.id;
+    if (id) requestCloseSideTab(id);
+    onCloseActiveRequestConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeActiveRequest]);
 
   const onClosePathResult = useCallback(
     (path: string, closed: boolean) => {
@@ -297,10 +343,12 @@ export function SideWorkbench({
         dirtyFilePaths={dirtyPaths}
         onActivate={(id) => setState(setActiveSideTab(state, id))}
         onCloseTab={requestCloseSideTab}
-        onCloseOtherTabs={(id) => setState(closeOtherSideTabs(state, id))}
-        onCloseAllTabs={() => applyCloseState(closeAllSideTabs(state))}
-        onCloseTabsToLeft={(id) => setState(closeSideTabsToLeft(state, id))}
-        onCloseTabsToRight={(id) => setState(closeSideTabsToRight(state, id))}
+        onCloseOtherTabs={(id) => requestBulkClose("others", id)}
+        onCloseAllTabs={() =>
+          requestBulkClose("all", state.activeId ?? state.tabs[0]?.id ?? "")
+        }
+        onCloseTabsToLeft={(id) => requestBulkClose("left", id)}
+        onCloseTabsToRight={(id) => requestBulkClose("right", id)}
         onPickNew={pick}
         onToggleExpand={onToggleExpand}
         onToggleDockComposer={onToggleDockComposer}
@@ -411,6 +459,44 @@ export function SideWorkbench({
           </>
         )}
       </div>
+
+      <GlassModal
+        open={!!bulkCloseConfirm}
+        onClose={() => setBulkCloseConfirm(null)}
+        title={tr("side.tabs.bulkCloseConfirmTitle")}
+        size="sm"
+        closeLabel={tr("common.close")}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setBulkCloseConfirm(null)}
+            >
+              {tr("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="btn btn--solid btn--danger"
+              data-testid="side-bulk-close-confirm"
+              onClick={() => {
+                const next = bulkCloseConfirm?.next;
+                setBulkCloseConfirm(null);
+                if (next) applyCloseState(next);
+              }}
+            >
+              {tr("side.tabs.bulkCloseConfirmAction")}
+            </button>
+          </>
+        }
+      >
+        <p className="rp-modal-copy">
+          {tr("side.tabs.bulkCloseConfirm" as MessageKey, {
+            dirty: String(bulkCloseConfirm?.dirtyCount ?? 0),
+            total: String(bulkCloseConfirm?.totalCount ?? 0),
+          })}
+        </p>
+      </GlassModal>
     </div>
   );
 }

@@ -461,14 +461,34 @@ describe("resolveGoalControlEmptyState", () => {
 describe("planClearGoalOrchEvents / shouldConfirmClearGoalOrch / canClearGoalBar", () => {
   it("plans a local empty ring and reports cleared count", () => {
     const events = [
-      sampleEvent({ id: "a", phase: "planner" }),
-      sampleEvent({ id: "b", phase: "worker" }),
+      sampleEvent({ id: "a", phase: "planner", sessionId: "s1" }),
+      sampleEvent({ id: "b", phase: "worker", sessionId: "s1" }),
     ];
-    const plan = planClearGoalOrchEvents(events);
+    const plan = planClearGoalOrchEvents(events, "s1");
     expect(plan.next).toEqual([]);
     expect(plan.cleared).toBe(2);
     expect(planClearGoalOrchEvents([]).cleared).toBe(0);
     expect(planClearGoalOrchEvents(null).cleared).toBe(0);
+  });
+
+  it("does not wipe the ring when sessionId is missing", () => {
+    const events = [
+      sampleEvent({ id: "a", phase: "planner", sessionId: "s1" }),
+      sampleEvent({ id: "b", phase: "worker", sessionId: "s2" }),
+    ];
+    const plan = planClearGoalOrchEvents(events);
+    expect(plan.cleared).toBe(0);
+    expect(plan.next.map((e) => e.id)).toEqual(["a", "b"]);
+  });
+
+  it("clears only the given session's events when sessionId is set", () => {
+    const events = [
+      sampleEvent({ id: "a", phase: "planner", sessionId: "s1" }),
+      sampleEvent({ id: "b", phase: "worker", sessionId: "s2" }),
+    ];
+    const plan = planClearGoalOrchEvents(events, "s1");
+    expect(plan.cleared).toBe(1);
+    expect(plan.next.map((e) => e.id)).toEqual(["b"]);
   });
 
   it("confirms clear when count >= min (default 1)", () => {

@@ -29,6 +29,8 @@ import {
   planFileReject,
   planFileRestore,
   rejectSelectedHunks,
+  rebuildDiffViewAfterHunkAccept,
+  resolveDiffAfterSource,
   remainingHunkIndices,
   summarizeBatchResults,
   type BatchDiffPlan,
@@ -67,6 +69,9 @@ export type UseResourceDiffActionsArgs = {
     SetStateAction<{ plan: BatchDiffPlan; untracked: boolean } | null>
   >;
   setBatchHunkRejectConfirm: Dispatch<SetStateAction<boolean>>;
+  setAcceptHunkConfirm: Dispatch<
+    SetStateAction<{ hunkIndex: number; discardCount: number } | null>
+  >;
   setBatchProgress: Dispatch<
     SetStateAction<{
       action: "accept" | "reject";
@@ -97,6 +102,7 @@ export function useResourceDiffActions({
   setRejectConfirm,
   setBatchRejectConfirm,
   setBatchHunkRejectConfirm,
+  setAcceptHunkConfirm,
   setBatchProgress,
   setBatchStatus,
   refreshWorkspaceStatus,
@@ -140,11 +146,12 @@ export function useResourceDiffActions({
         return;
       }
       const key = normalizePath(path);
-      const after =
-        afterOverride ??
-        (typeof diffView?.afterText === "string" ? diffView.afterText : null) ??
-        restorableAfterByPath[key] ??
-        null;
+      const after = resolveDiffAfterSource({
+        key,
+        override: afterOverride,
+        diffView,
+        cache: restorableAfterByPath,
+      });
       if (typeof after === "string") {
         rememberRestorable(path, after);
       }
@@ -192,10 +199,11 @@ export function useResourceDiffActions({
         return;
       }
       const key = normalizePath(path);
-      const after =
-        (typeof diffView?.afterText === "string" ? diffView.afterText : null) ??
-        restorableAfterByPath[key] ??
-        null;
+      const after = resolveDiffAfterSource({
+        key,
+        diffView,
+        cache: restorableAfterByPath,
+      });
       if (typeof after === "string") {
         rememberRestorable(path, after);
       }
@@ -374,9 +382,12 @@ export function useResourceDiffActions({
         return;
       }
       const key = normalizePath(path);
-      const after =
-        restorableAfterByPath[key] ??
-        (typeof diffView?.afterText === "string" ? diffView.afterText : null);
+      const after = resolveDiffAfterSource({
+        key,
+        diffView,
+        cache: restorableAfterByPath,
+        preferCache: true,
+      });
       const plan = planFileRestore({ after });
       if (plan.mode !== "write_after") {
         setError(
@@ -415,7 +426,7 @@ export function useResourceDiffActions({
       tr,
     ],
   );
-  const runAcceptHunk = useCallback(
+  const executeAcceptHunk = useCallback(
     async (hunkIndex: number) => {
       if (!projectPath || !api.isTauri() || !diffView) return;
       const before =
@@ -433,12 +444,28 @@ export function useResourceDiffActions({
         setError(tr("changes.actionFailed", { reason: result.error }));
         return;
       }
-      // If other hunks should stay applied, start from full after and only
-      // re-apply is wrong — accept one hunk from original means original+hunk.
-      // When working tree already has all hunks, accepting one is keep_current
-      // for that hunk. Prefer: write original+selected only when rejecting rest
-      // is not desired. File-level accept is primary; hunk accept applies just
-      // that hunk onto before (partial accept).
+      // Cache the full after-text *before* the write so Restore can still
+      // recover it. Rebuild the open view so later accepts compose onto disk.
+      const fullAfter = resolveDiffAfterSource({
+        key: normalizePath(diffView.path),
+        diffView,
+        cache: restorableAfterByPath,
+      });
+      const restorable =
+        typeof fullAfter === "string"
+          ? fullAfter
+          : typeof diffView.afterText === "string"
+            ? diffView.afterText
+            : null;
+      if (restorable == null) {
+        setError(
+          tr("changes.actionUnavailable", {
+            reason: "hunk apply needs after snapshot",
+          }),
+        );
+        return;
+      }
+      rememberRestorable(diffView.path, restorable);
       setDiffActionBusy(true);
       try {
         const res = await api.applyFilePatch(
@@ -454,7 +481,24 @@ export function useResourceDiffActions({
           );
           return;
         }
-        rememberRestorable(diffView.path, result.content);
+        setAcceptHunkConfirm(null);
+        const rebuilt = rebuildDiffViewAfterHunkAccept({
+          fileName:
+            pathRelativeToProject(diffView.path, projectPath) || diffView.name,
+          written: result.content,
+          fullAfter: restorable,
+        });
+        setDiffView((prev) =>
+          prev
+            ? {
+                ...prev,
+                beforeText: rebuilt.beforeText,
+                afterText: rebuilt.afterText,
+                unified: rebuilt.unified,
+                source: "after",
+              }
+            : prev,
+        );
         void refreshWorkspaceStatus();
       } catch (e) {
         setError(tr("changes.actionFailed", { reason: String(e) }));
@@ -466,10 +510,24 @@ export function useResourceDiffActions({
       projectPath,
       diffView,
       diffHunks,
+      restorableAfterByPath,
       rememberRestorable,
       refreshWorkspaceStatus,
+      setAcceptHunkConfirm,
       tr,
     ],
+  );
+  const runAcceptHunk = useCallback(
+    async (hunkIndex: number) => {
+      if (!projectPath || !api.isTauri() || !diffView) return;
+      const discardCount = Math.max(0, diffHunks.length - 1);
+      if (discardCount > 0) {
+        setAcceptHunkConfirm({ hunkIndex, discardCount });
+        return;
+      }
+      await executeAcceptHunk(hunkIndex);
+    },
+    [projectPath, diffView, diffHunks.length, executeAcceptHunk],
   );
   const runRejectHunk = useCallback(
     async (hunkIndex: number) => {
@@ -1009,6 +1067,7 @@ export function useResourceDiffActions({
     requestRejectFile,
     runRestoreFile,
     runAcceptHunk,
+    executeAcceptHunk,
     runRejectHunk,
     buildSessionBatchInputs,
     hostAcceptOne,

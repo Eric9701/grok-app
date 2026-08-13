@@ -50,6 +50,7 @@ describe("applySideContextOpen", () => {
     );
     expect(no.state.tabs).toHaveLength(0);
     expect(no.needAsideOpen).toBe(false);
+    expect(no.noticeKey).toBe("side.review.notGit");
 
     const yes = applySideContextOpen(
       emptySideWorkbenchState(),

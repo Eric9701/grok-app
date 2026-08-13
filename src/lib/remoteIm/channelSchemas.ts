@@ -170,21 +170,6 @@ const FEISHU_FIELDS: ChannelSchema["fields"] = [
     section: "advanced",
     defaultValue: 500,
   },
-  {
-    key: "resolve_mentions",
-    labelKey: "settings.remoteIm.field.resolveMentions",
-    control: "checkbox",
-    section: "advanced",
-    defaultValue: false,
-  },
-  {
-    key: "mention_map",
-    labelKey: "settings.remoteIm.field.mentionMap",
-    control: "text",
-    section: "advanced",
-    helpKey: "settings.remoteIm.feishu.mentionMapHelp",
-    placeholderKey: "settings.remoteIm.feishu.mentionMapPlaceholder",
-  },
 ];
 
 const DINGTALK_FIELDS: ChannelSchema["fields"] = [
@@ -572,14 +557,6 @@ const MATRIX_FIELDS: ChannelSchema["fields"] = [
   {
     ...SHARED_SESSION,
     helpKey: "settings.remoteIm.matrix.shareSessionHelp",
-  },
-  {
-    key: "group_reply_all",
-    labelKey: "settings.remoteIm.field.groupReplyAll",
-    control: "checkbox",
-    section: "options",
-    defaultValue: false,
-    helpKey: "settings.remoteIm.matrix.groupReplyHelp",
   },
   {
     ...PROXY,

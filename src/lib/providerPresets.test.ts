@@ -3,11 +3,14 @@ import {
   AMUX_MODELS,
   DEEPSEEK_EFFORTS,
   DEEPSEEK_MODELS,
+  GROK_OFFICIAL_EFFORTS,
   PROVIDER_PRESETS,
   VOLCANO_ARK_MODELS,
   YUN_API_MODELS,
+  alignGrokPresetEfforts,
   defaultCustomChannelEfforts,
   findProviderPreset,
+  isLegacyGrokChannelEffortIds,
   resolveProviderApiKeyUrl,
   resolveProviderBrandId,
 } from "./providerPresets";
@@ -45,8 +48,15 @@ describe("providerPresets", () => {
       "low",
       "medium",
       "high",
-      "max",
+      "xhigh",
     ]);
+    expect(amux!.efforts.map((e) => e.name)).toEqual([
+      "Low",
+      "Medium",
+      "High",
+      "Extra high",
+    ]);
+    expect(amux!.efforts.find((e) => e.isDefault)?.id).toBe("xhigh");
     expect(amux!.apiKeyUrl).toContain("api.amux.ai/register");
   });
 
@@ -70,6 +80,10 @@ describe("providerPresets", () => {
     expect(yun!.apiKeyUrl).toBe(
       "https://api.yunyi.ai/register/?aff_code=W0iw",
     );
+    expect(yun!.efforts.map((e) => e.id)).toEqual(
+      GROK_OFFICIAL_EFFORTS.map((e) => e.id),
+    );
+    expect(yun!.efforts.find((e) => e.isDefault)?.id).toBe("xhigh");
   });
 
   it("resolves get-api-key URLs by id or base host", () => {
@@ -138,6 +152,51 @@ describe("providerPresets", () => {
       "medium",
       "high",
       "max",
+    ]);
+  });
+
+  it("rewrites legacy Amux/Yun max ladders to official xhigh", () => {
+    expect(
+      isLegacyGrokChannelEffortIds(["low", "medium", "high", "max"]),
+    ).toBe(true);
+    expect(
+      isLegacyGrokChannelEffortIds(["low", "medium", "high", "xhigh"]),
+    ).toBe(false);
+    const aligned = alignGrokPresetEfforts({
+      providerId: "amux",
+      efforts: [
+        { id: "low", name: "low" },
+        { id: "medium", name: "medium", isDefault: true },
+        { id: "high", name: "high" },
+        { id: "max", name: "max" },
+      ],
+    });
+    expect(aligned?.map((e) => e.id)).toEqual([
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+    ]);
+    expect(aligned?.find((e) => e.isDefault)?.id).toBe("xhigh");
+    expect(
+      alignGrokPresetEfforts({
+        providerId: "deepseek",
+        efforts: [{ id: "max", name: "max" }],
+      }),
+    ).toBeNull();
+    expect(
+      alignGrokPresetEfforts({
+        providerId: "yun-api",
+        efforts: [
+          { id: "low", name: "Low" },
+          { id: "custom", name: "Custom" },
+          { id: "max", name: "Turbo" },
+        ],
+      })?.map((e) => ({ id: e.id, name: e.name })),
+    ).toEqual([
+      { id: "low", name: "Low" },
+      { id: "custom", name: "Custom" },
+      { id: "xhigh", name: "Turbo" },
     ]);
   });
 });
