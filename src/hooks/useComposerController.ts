@@ -61,6 +61,8 @@ export function useComposerController(initialDraft = "") {
   const setDraft = storeSetDraft;
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
 
   /**
    * Skip debounced project-draft persist while programmatically loading a
@@ -153,6 +155,7 @@ export function useComposerController(initialDraft = "") {
       getDraft,
       setDraft,
       attachments,
+      attachmentsRef,
       setAttachments: setAttachments as Dispatch<
         SetStateAction<Attachment[]>
       >,

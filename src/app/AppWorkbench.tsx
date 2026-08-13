@@ -667,6 +667,7 @@ import {
   loadComposerSessionDraft,
   saveComposerSessionDraft,
 } from "@/lib/composerSessionDraft";
+import { shouldClearComposerAfterSubmit } from "@/lib/composerSubmitClear";
 import {
   DEFERRED_RECONCILE_MS,
   WARM_CONNECT_DEBOUNCE_MS,
@@ -1450,6 +1451,7 @@ export function AppWorkbench() {
     getDraft,
     setDraft,
     attachments,
+    attachmentsRef,
     setAttachments,
     suppressProjectDraftPersistRef,
     setPromptHistoryIndex,
@@ -8075,7 +8077,17 @@ export function AppWorkbench() {
       att,
       goalMode,
     });
-    if (sent) clearComposerAfterSubmit(clearDraftOpts);
+    if (
+      sent &&
+      shouldClearComposerAfterSubmit({
+        sentText: storedDisplay,
+        sentAttachments: att,
+        currentText: getDraft(),
+        currentAttachments: attachmentsRef.current,
+      })
+    ) {
+      clearComposerAfterSubmit(clearDraftOpts);
+    }
   };
   sendRef.current = send;
   voiceDictationAutoSendRef.current = voiceDictationAutoSend;
@@ -10410,7 +10422,7 @@ export function AppWorkbench() {
       if (guidingQueueItemId || sendInFlightRef.current) return;
       sendQueue.removeItem(item.id);
       setGuidingQueueItemId(item.id);
-      const ok = await executeSend({
+      const ok = await executeSendFromQueueRef.current({
         storedDisplay: item.storedDisplay,
         att: item.attachments,
         goalMode: item.goalMode,
