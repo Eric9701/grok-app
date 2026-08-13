@@ -16,7 +16,10 @@ import {
 } from "./session";
 import { extractThinkingSummary } from "./thinkingSummary";
 import { buildTurnActivity } from "./turnActivity";
-import { buildTimelineUnits } from "./timelinePhases";
+import {
+  buildTimelineUnits,
+  shouldShowTrailingLiveThinking,
+} from "./timelinePhases";
 import { mapEndOfTurnReason } from "./endOfTurn";
 import {
   armStopLatch,
@@ -211,6 +214,35 @@ describe("chat UX fixtures (shipped path)", () => {
     units = buildTimelineUnits(segs, { streaming: true });
     expect(units.map((u) => u.kind)).toEqual(["phase", "content"]);
     if (units[0]?.kind === "phase") expect(units[0].live).toBe(false);
+    // First status sentence must not freeze later reasoning: either a live
+    // trailing thought, or a placeholder while waiting for the next episode.
+    expect(
+      shouldShowTrailingLiveThinking(units, {
+        messageStreaming: true,
+        hasRunningTool: false,
+      }),
+    ).toBe(true);
+
+    messages = applyStreamChunk(messages, {
+      sessionId: "s",
+      messageId: "a1",
+      text: "下一轮还在想",
+      done: false,
+      kind: "thought",
+    });
+    segs = messageSegments(messages.find((m) => m.role === "assistant")!);
+    units = buildTimelineUnits(segs, { streaming: true });
+    const last = units[units.length - 1]!;
+    expect(last.kind === "thought" || last.kind === "thought-group").toBe(true);
+    if (last.kind === "thought" || last.kind === "thought-group") {
+      expect(last.streaming).toBe(true);
+    }
+    expect(
+      shouldShowTrailingLiveThinking(units, {
+        messageStreaming: true,
+        hasRunningTool: false,
+      }),
+    ).toBe(false);
   });
 
   it("b3) tools before first stream token prepend onto assistant", () => {

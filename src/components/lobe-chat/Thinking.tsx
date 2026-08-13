@@ -65,8 +65,8 @@ export const Thinking = memo(function Thinking({
   }, []);
 
   // Live wall-clock while streaming; freeze when done.
-  // Prefer `startedAt` (turn / post-steer clock) so remounts after steer do not
-  // collapse a long wait into “Thought for 1s”.
+  // Prefer `startedAt` (turn / post-steer clock) so remounts after steer /
+  // session switch do not collapse a long wait into “Thought for 1s”.
   const frozenRef = useRef(false);
   useEffect(() => {
     if (thinking) {
@@ -84,14 +84,20 @@ export const Thinking = memo(function Thinking({
         startRef.current = anchor;
       }
       const tick = () => {
-        if (startRef.current != null) {
-          setLocalDuration(Math.max(0, Date.now() - startRef.current));
+        const origin = startRef.current;
+        if (origin != null) {
+          setLocalDuration(Math.max(0, Date.now() - origin));
         }
       };
       tick();
       const id = window.setInterval(tick, 1000);
+      const onVis = () => {
+        if (document.visibilityState === "visible") tick();
+      };
+      document.addEventListener("visibilitychange", onVis);
       return () => {
         window.clearInterval(id);
+        document.removeEventListener("visibilitychange", onVis);
       };
     }
     // Episode ended — freeze once (do not keep advancing via startedAt).
@@ -118,8 +124,11 @@ export const Thinking = memo(function Thinking({
   }, [thinking, startedAt, durationMs]);
 
   useEffect(() => {
+    // History duration only applies to finished blocks. A live timer must
+    // not be overwritten by a stale journal ms (that froze “思考了 N”).
+    if (thinking) return;
     if (durationMs != null) setLocalDuration(durationMs);
-  }, [durationMs]);
+  }, [durationMs, thinking]);
 
   /**
    * Chrome label:

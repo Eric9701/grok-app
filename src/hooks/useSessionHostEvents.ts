@@ -19,6 +19,7 @@ import {
   isSessionLiveStreaming,
   upgradeMessagesFromJournal,
   weaveToolsIntoAssistantSegments,
+  ensureBusyTurnStreaming,
   type AskUserPayload,
   type ChatMessage,
   type GeneratedImagePayload,
@@ -289,6 +290,17 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             .sessionMessages(sid)
             .then((stored) => {
               if (cancelled || c.viewingSessionIdRef.current !== sid) return;
+              const hostState =
+                c.liveMapRef.current[sid]?.state ??
+                (c.liveHostRef.current?.sessionId === sid
+                  ? c.liveHostRef.current.state
+                  : undefined);
+              const stillBusy =
+                hostState === "streaming" ||
+                hostState === "awaiting_permission";
+              // Never freeze a turn Host still marks live (switch-back
+              // journal heal used to clear streaming and stop the timer).
+              const shouldClear = !!opts?.clearStreaming && !stillBusy;
               const woven = weaveToolsIntoAssistantSegments(
                 mapStoredMessagesToChat(stored),
               );
@@ -296,17 +308,21 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
               // previous chat's still-painted React prev (#529 pollution).
               const cached: ChatMessage[] =
                 c.messagesBySessionRef.current.get(sid) ?? [];
-              const base = opts?.clearStreaming
+              const base = shouldClear
                 ? cached.map((m) =>
                     m.streaming ? { ...m, streaming: false } : m,
                   )
                 : cached;
               // Empty cache → journal is sole source (openSession may race-write).
               // Non-empty → lift longer journal tails into this session only.
-              const next =
+              let next =
                 base.length === 0
                   ? woven
                   : upgradeMessagesFromJournal(base, woven);
+              if (stillBusy) {
+                next = ensureBusyTurnStreaming(next, hostState);
+                next = weaveToolsIntoAssistantSegments(next);
+              }
               c.messagesBySessionRef.current.set(sid, next);
               // patchSession / setMessages both honor session ownership.
               c.patchSessionMessages(sid, () => next);
@@ -392,7 +408,13 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
               if (cancelled || !p?.sessionId) return;
               const sid = p.sessionId;
               if (c.viewingSessionIdRef.current === sid) {
-                scheduleJournalRehydrate(sid, 0, { clearStreaming: true });
+                const liveState = c.liveMapRef.current[sid]?.state;
+                const stillBusy =
+                  liveState === "streaming" ||
+                  liveState === "awaiting_permission";
+                scheduleJournalRehydrate(sid, 0, {
+                  clearStreaming: !stillBusy,
+                });
               }
               void c.tryApplyAutomationFromSession(sid);
             },

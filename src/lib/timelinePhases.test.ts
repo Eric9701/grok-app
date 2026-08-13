@@ -4,6 +4,7 @@ import {
   buildTimelineUnits,
   isPhaseWorthy,
   phaseTitleModel,
+  shouldShowTrailingLiveThinking,
 } from "./timelinePhases";
 
 function tool(
@@ -226,5 +227,51 @@ describe("timelinePhases", () => {
       expect(units[0]!.live).toBe(false);
       expect(units[0]!.tools).toHaveLength(3);
     }
+  });
+
+  it("thought after first content stays live while the turn is streaming", () => {
+    const segs: MessageSegment[] = [
+      { kind: "thought", text: "round1" },
+      { kind: "content", text: "先睇 Ego Lite。" },
+      { kind: "thought", text: "round2 still thinking" },
+    ];
+    const live = buildTimelineUnits(segs, { streaming: true });
+    expect(live.map((u) => u.kind)).toEqual(["thought", "content", "thought"]);
+    const last = live[2]!;
+    expect(last.kind).toBe("thought");
+    if (last.kind === "thought") expect(last.streaming).toBe(true);
+    const first = live[0]!;
+    expect(first.kind).toBe("thought");
+    if (first.kind === "thought") expect(first.streaming).toBe(false);
+  });
+
+  it("shouldShowTrailingLiveThinking after body while waiting for next episode", () => {
+    const segs: MessageSegment[] = [
+      { kind: "thought", text: "round1" },
+      tool("t1", "Read a"),
+      { kind: "content", text: "先睇 Ego Lite。" },
+    ];
+    const units = buildTimelineUnits(segs, { streaming: true });
+    expect(shouldShowTrailingLiveThinking(units, {
+      messageStreaming: true,
+      hasRunningTool: false,
+    })).toBe(true);
+    expect(shouldShowTrailingLiveThinking(units, {
+      messageStreaming: true,
+      hasRunningTool: true,
+    })).toBe(false);
+    expect(shouldShowTrailingLiveThinking(units, {
+      messageStreaming: false,
+      hasRunningTool: false,
+    })).toBe(false);
+
+    const thinking = buildTimelineUnits(
+      [...segs, { kind: "thought", text: "round2" }],
+      { streaming: true },
+    );
+    expect(shouldShowTrailingLiveThinking(thinking, {
+      messageStreaming: true,
+      hasRunningTool: false,
+    })).toBe(false);
   });
 });

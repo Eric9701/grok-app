@@ -2317,7 +2317,10 @@ export function upgradeMessagesFromJournal(
         ? (j.thoughtPhases ?? m.thoughtPhases)
         : m.thoughtPhases,
       attachments: richerAtts ? j.attachments : m.attachments,
-      streaming: false,
+      // Mid-turn switch-back reconcile must not freeze a still-running
+      // bubble (that stopped the thinking timer while the agent kept going).
+      // Turn-end callers clear streaming on `ui` *before* this merge.
+      streaming: !!m.streaming,
     };
 
     const hasLiveTools = out.segments?.some((s) => s.kind === "tool");
@@ -2390,7 +2393,7 @@ export function upgradeMessagesFromJournal(
             ? bestJ.thought
             : uiAsst.thought,
         leadFragments: bestJ.leadFragments ?? uiAsst.leadFragments,
-        streaming: false,
+        streaming: !!uiAsst.streaming,
       };
       const hasLiveTools = out.segments?.some((s) => s.kind === "tool");
       if (!hasLiveTools) {
@@ -2426,6 +2429,33 @@ export function upgradeMessagesFromJournal(
   }
 
   return changed ? next : ui;
+}
+
+/**
+ * Switch-back / journal-heal safety net: if Host still has a live turn but
+ * disk rows never carry `streaming`, mark the current-turn assistant live
+ * so thinking chrome and stream attach keep ticking.
+ *
+ * No-op when the session is idle/ready, an assistant is already streaming,
+ * or the turn has no assistant yet (quiet thinking covers that).
+ */
+export function ensureBusyTurnStreaming(
+  messages: ChatMessage[],
+  sessionState: SessionState | string | null | undefined,
+): ChatMessage[] {
+  if (sessionState !== "streaming" && sessionState !== "awaiting_permission") {
+    return messages;
+  }
+  if (messages.some((m) => m.role === "assistant" && m.streaming)) {
+    return messages;
+  }
+  const idx = lastTurnAssistantIndex(messages);
+  if (idx < 0) return messages;
+  const row = messages[idx]!;
+  if (row.isError) return messages;
+  const next = messages.slice();
+  next[idx] = { ...row, streaming: true };
+  return next;
 }
 
 /**

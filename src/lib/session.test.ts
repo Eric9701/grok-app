@@ -30,6 +30,7 @@ import {
   presentErrorBanner,
   snapshotOutgoingMessages,
   upgradeMessagesFromJournal,
+  ensureBusyTurnStreaming,
   mergeSessionMessagesById,
   reconcileOptimisticDuplicates,
   isClientOptimisticId,
@@ -477,6 +478,81 @@ describe("session projection", () => {
     );
     // Idempotent when UI already has full body
     expect(upgradeMessagesFromJournal(out, journal)).toBe(out);
+  });
+
+  it("upgradeMessagesFromJournal keeps streaming on a live mid-turn bubble", () => {
+    const ui: ChatMessage[] = [
+      { id: "u1", role: "user", content: "测一下" },
+      {
+        id: "a1",
+        role: "assistant",
+        content: "先睇 Ego Lite",
+        thought: "plan",
+        streaming: true,
+      },
+    ];
+    const journal: ChatMessage[] = [
+      { id: "u1", role: "user", content: "测一下" },
+      {
+        id: "a1",
+        role: "assistant",
+        content: "先睇 Ego Lite 點用，再確認本地 5173。",
+        thought: "plan\n\nmore reasoning after tools",
+      },
+    ];
+    const out = upgradeMessagesFromJournal(ui, journal);
+    const asst = out.find((m) => m.id === "a1");
+    expect(asst?.content).toContain("5173");
+    expect(asst?.thought).toContain("more reasoning");
+    expect(asst?.streaming).toBe(true);
+  });
+
+  it("ensureBusyTurnStreaming restores live flag when Host is still streaming", () => {
+    const msgs: ChatMessage[] = [
+      { id: "u1", role: "user", content: "go" },
+      { id: "a1", role: "assistant", content: "先睇 Ego Lite", thought: "plan" },
+    ];
+    expect(ensureBusyTurnStreaming(msgs, "ready")).toBe(msgs);
+    const live = ensureBusyTurnStreaming(msgs, "streaming");
+    expect(live.find((m) => m.id === "a1")?.streaming).toBe(true);
+    const already: ChatMessage[] = [
+      { id: "u1", role: "user", content: "go" },
+      { id: "a1", role: "assistant", content: "hi", streaming: true },
+    ];
+    expect(ensureBusyTurnStreaming(already, "streaming")).toBe(already);
+    expect(ensureBusyTurnStreaming(msgs, "awaiting_permission")[1]?.streaming).toBe(
+      true,
+    );
+  });
+
+  it("ensureBusyTurnStreaming + weave keeps a switch-back turn live", () => {
+    // Disk journal after background tools: no streaming flag (stored rows
+    // never have one). Switching back must not look finished.
+    const stored: ChatMessage[] = [
+      { id: "u1", role: "user", content: "测" },
+      {
+        id: "a1",
+        role: "assistant",
+        content: "先睇 Ego Lite。5173 已經開住。",
+        thought: "round1\n\nround2",
+        createdAt: "2026-08-13T14:54:20Z",
+      },
+      {
+        id: "tool-t1",
+        role: "tool",
+        content: "Read skill",
+        marker: "tool_step",
+        toolCallId: "t1",
+        toolKind: "read_file",
+        toolStatus: "completed",
+      },
+    ];
+    const painted = ensureBusyTurnStreaming(
+      weaveToolsIntoAssistantSegments(stored),
+      "streaming",
+    );
+    const asst = painted.find((m) => m.role === "assistant");
+    expect(asst?.streaming).toBe(true);
   });
 
   it("preferSessionMessages merges Remote IM disk rows into cache", () => {

@@ -157,6 +157,7 @@ import {
   preferSessionMessages,
   presentErrorBanner,
   snapshotOutgoingMessages,
+  ensureBusyTurnStreaming,
   type ErrorBannerView,
   weaveToolsIntoAssistantSegments,
   truncateBeforeLastUser,
@@ -4502,11 +4503,15 @@ export function AppWorkbench() {
       // Prefer in-memory cache (optimistic user msg + partial stream) over disk.
       // Weave journal tool_step rows into preceding assistant segments so reload
       // still shows tools on the message timeline (live already interleaves).
-      let chosen = weaveToolsIntoAssistantSegments(
-        preferSessionMessages(
-          messagesBySessionRef.current.get(s.id),
-          mapped,
+      let chosen = ensureBusyTurnStreaming(
+        weaveToolsIntoAssistantSegments(
+          preferSessionMessages(
+            messagesBySessionRef.current.get(s.id),
+            mapped,
+          ),
         ),
+        resumeStateForSession(s.id, liveHostRef.current, liveMapRef.current)
+          .state,
       );
       // Grant path_scope + refine isDir before first paint so history
       // thumbnails (Desktop/Downloads drops, etc.) do not flash broken.
@@ -4653,11 +4658,18 @@ export function AppWorkbench() {
               });
               if (!stillThisOpen()) return;
               const mappedR = mapStoredMessagesToChat(reconciled);
-              const chosenR = weaveToolsIntoAssistantSegments(
-                preferSessionMessages(
-                  messagesBySessionRef.current.get(s.id),
-                  mappedR,
+              const chosenR = ensureBusyTurnStreaming(
+                weaveToolsIntoAssistantSegments(
+                  preferSessionMessages(
+                    messagesBySessionRef.current.get(s.id),
+                    mappedR,
+                  ),
                 ),
+                resumeStateForSession(
+                  s.id,
+                  liveHostRef.current,
+                  liveMapRef.current,
+                ).state,
               );
               if (
                 sessionJournalLooksUnchanged(

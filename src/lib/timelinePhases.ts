@@ -383,6 +383,31 @@ export function coalesceAdjacentThoughts(
   });
 }
 
+/**
+ * After the first answer fragment, later think→tool loops still need a live
+ * “思考中” row. Timeline units already mark the trailing thought/phase live;
+ * when the last unit is finished content or a closed phase, paint a trailing
+ * thinking placeholder until the next thought/tool arrives.
+ *
+ * Empty timelines stay on the existing empty-shell placeholder.
+ */
+export function shouldShowTrailingLiveThinking(
+  units: TimelineUnit[],
+  opts: { messageStreaming: boolean; hasRunningTool: boolean },
+): boolean {
+  if (!opts.messageStreaming || opts.hasRunningTool) return false;
+  if (units.length === 0) return false;
+  const last = units[units.length - 1]!;
+  if (
+    (last.kind === "thought" || last.kind === "thought-group") &&
+    last.streaming
+  ) {
+    return false;
+  }
+  if (last.kind === "phase" && last.live) return false;
+  return true;
+}
+
 /** One-line title pieces for a phase trigger (caller localizes). */
 export function phaseTitleModel(phase: TimelinePhase): {
   gist: string | null;

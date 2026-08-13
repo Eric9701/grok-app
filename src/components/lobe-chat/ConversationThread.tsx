@@ -120,7 +120,10 @@ import {
   toolSegmentIsRunning,
 } from "./TimelineToolRow";
 import { TimelinePhaseBlock } from "./TimelinePhaseBlock";
-import { buildTimelineUnits } from "@/lib/timelinePhases";
+import {
+  buildTimelineUnits,
+  shouldShowTrailingLiveThinking,
+} from "@/lib/timelinePhases";
 import {
   BACK_BOTTOM_ALWAYS_CHANGE_EVENT,
   loadBackBottomAlwaysPref,
@@ -1219,12 +1222,13 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   const timelineUnits = buildTimelineUnits(segs, {
     streaming: !!m.streaming,
   });
-  // Once the body has started streaming, every thinking episode is over: the
-  // live thought block must collapse immediately (streaming-expand → content-
-  // collapse), not stay open until the whole turn finishes.
-  const messageHasContent = segs.some(
-    (s) => s.kind === "content" && s.text.trim().length > 0,
-  );
+  // Live chrome follows the *current* episode (trailing thought / phase),
+  // not “this message already has some body text”. Grok 4.x think→tool
+  // loops keep reasoning after the first status sentence.
+  const showTrailingThinking = shouldShowTrailingLiveThinking(timelineUnits, {
+    messageStreaming: !!m.streaming,
+    hasRunningTool: hasInlinedRunningTool || !!showLiveToolBelow,
+  });
 
   return wrap(
     <ChatItem
@@ -1347,10 +1351,9 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                   >
                     <Thinking
                       locale={locale}
-                      // “Live” = the message is streaming AND the body hasn’t
-                      // started yet. Mirrors the work/phase block, which opens
-                      // while live and collapses the instant content splits it.
-                      thinking={!!m.streaming && !messageHasContent}
+                      // Live = this episode is still the trailing stream
+                      // (unit.streaming). Earlier body text must not freeze it.
+                      thinking={!!m.streaming && !!streaming}
                       content={joined}
                       startedAt={
                         isPrimary || streaming ? thinkingStartedAt : null
@@ -1403,6 +1406,19 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
               );
             });
           })()}
+          {showTrailingThinking ? (
+            <div
+              key={`${m.id}-thinking-trail`}
+              className="lobe-timeline-rail"
+              data-testid="thinking-trail"
+            >
+              <Thinking
+                locale={locale}
+                thinking
+                startedAt={thinkingStartedAt}
+              />
+            </div>
+          ) : null}
           {/* Body-less turn with only attachments */}
           {!contentSegCount && m.attachments?.length ? (
             <AssistantMessageBody
