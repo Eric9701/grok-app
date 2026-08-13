@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.16] - 2026-08-13
+
+> **Highlight:** Official default is Grok 4.6 with Extra High (`xhigh`); Changes / Remote IM / Voice / workbench honesty remediations; Amux/Yun effort ids match official `low`/`medium`/`high`/`xhigh`.
+>
+> **中文 · 亮点：** 官方默认 Grok 4.6 + 极高推理；Changes / Remote IM / Voice / 工作台诚实整改；Amux/云驿思考档与官方枚举对齐。
+
 ### Added
 - **Grok 4.6 + Extra High effort**: Official catalog default is `grok-4.6` (4.5 stays selectable). Composer shows 极高/`xhigh` on 4.6; product default effort on 4.6 is **xhigh**. One-shot settings lift `grok-4.5` → `grok-4.6` and official `high` → `xhigh`. Amux/Yun presets list both models. Official aux / spawn target is `grok-4.6`.
 - **Per-provider appended prompt**: The provider editor gains an **Appended prompt** box for relays that need specific instructions. It rides the CLI's `--rules` flag, so the text is *appended* to the agent's system prompt rather than replacing it (`--system-prompt-override` would drop the built-in prompt). Stored per channel in agent-home `config.toml` as `app_append_prompt` (ignored by Grok Build), merged at connect alongside session rules. Empty by default.
