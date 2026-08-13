@@ -288,6 +288,74 @@ describe("resolveDiffAfterSource", () => {
       }),
     ).toBe("CACHED_FULL");
   });
+
+  describe("A3 regression: partial hunk accept does not corrupt other files' restorable cache", () => {
+    it("accepting hunk on file B does not overwrite file A's restorable cache", () => {
+      const cacheBefore = { "/proj/a.ts": "FULL_A_AFTER" };
+      const bDiffView = {
+        path: "/proj/b.ts",
+        afterText: "PARTIAL_B_AFTER_HUNK0",
+      };
+      const bAfter = resolveDiffAfterSource({
+        key: "/proj/b.ts",
+        diffView: bDiffView,
+        cache: cacheBefore,
+      });
+      expect(bAfter).toBe("PARTIAL_B_AFTER_HUNK0");
+      const cacheAfter = {
+        ...cacheBefore,
+        "/proj/b.ts": "FULL_B_AFTER",
+      };
+      const aAfter = resolveDiffAfterSource({
+        key: "/proj/a.ts",
+        diffView: bDiffView,
+        cache: cacheAfter,
+        preferCache: true,
+      });
+      expect(aAfter).toBe("FULL_A_AFTER");
+    });
+
+    it("A3: rebuildDiffViewAfterHunkAccept keeps full after in rebuilt view", () => {
+      const fullAfter = "A\nB\nC\nD\n";
+      const written = "A\nb\nc\nd\n";
+      const rebuilt = rebuildDiffViewAfterHunkAccept({
+        fileName: "f.txt",
+        written,
+        fullAfter,
+      });
+      expect(rebuilt.beforeText).toBe(written);
+      expect(rebuilt.afterText).toBe(fullAfter);
+      const remaining = parseUnifiedDiff(rebuilt.unified).hunks;
+      // Adjacent line edits coalesce into one unified hunk.
+      expect(remaining.length).toBeGreaterThan(0);
+      const composed = applySelectedHunks(
+        written,
+        remaining,
+        remaining.map((_, i) => i),
+      );
+      expect(composed.ok).toBe(true);
+      if (composed.ok) expect(composed.content).toBe(fullAfter);
+    });
+
+    it("A3: partial accept on file A does not contaminate cache entry for file B", () => {
+      const cacheBefore = { "/proj/b.ts": "FULL_B_AFTER" };
+      const aPartialAfter = "A_part1\nb\nc\nd\n";
+      const aAfter = resolveDiffAfterSource({
+        key: "/proj/a.ts",
+        diffView: { path: "/proj/a.ts", afterText: aPartialAfter },
+        cache: cacheBefore,
+      });
+      expect(aAfter).toBe(aPartialAfter);
+      const cacheAfter = { ...cacheBefore, "/proj/a.ts": aPartialAfter };
+      const bAfter = resolveDiffAfterSource({
+        key: "/proj/b.ts",
+        diffView: { path: "/proj/a.ts", afterText: aPartialAfter },
+        cache: cacheAfter,
+        preferCache: true,
+      });
+      expect(bAfter).toBe("FULL_B_AFTER");
+    });
+  });
 });
 
 describe("safety / plans", () => {
