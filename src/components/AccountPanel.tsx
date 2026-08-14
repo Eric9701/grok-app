@@ -36,14 +36,16 @@ import {
 import {
   heatmapErrorView,
   heatmapHasSamples,
-  heatmapSummaryChips,
   listHeatmapGranularityChips,
   resolveHeatmapErrorChip,
-  summarizeHeatmapRange,
 } from "@/lib/heatmapUsagePro";
+import {
+  formatStatDuration,
+  summarizeHeatmapStats,
+} from "@/lib/heatmapStats";
 import { GlassModal } from "@/components/GlassModal";
 import { Tip } from "@/components/ui/tooltip";
-import { IconPlus, IconTrash, IconUser } from "@/components/icons";
+import { IconHelp, IconPlus, IconTrash, IconUser } from "@/components/icons";
 
 export interface AccountPanelLabels {
   signedIn: string;
@@ -71,6 +73,7 @@ export interface AccountPanelLabels {
   colSession: string;
   colModel: string;
   colTurns: string;
+  colUsage: string;
   colTokens: string;
   colDuration: string;
   colWhen: string;
@@ -272,15 +275,6 @@ export function AccountPanel({
     [heatDays],
   );
 
-  /** Honest counts for full heatmap or selected day/week range. */
-  const heatSummary = useMemo(
-    () => summarizeHeatmapRange(heatDays, selectedHeatRange),
-    [heatDays, selectedHeatRange],
-  );
-  const heatChips = useMemo(
-    () => heatmapSummaryChips(heatSummary),
-    [heatSummary],
-  );
   const heatErrChip = useMemo(
     () => resolveHeatmapErrorChip(heatmapError),
     [heatmapError],
@@ -322,7 +316,15 @@ export function AccountPanel({
     : null;
 
   /** Tokens in selected range or full heatmap — only when real activity exists. */
-  const heatTokenTotal = heatChips?.totalTokens ?? 0;
+  const heatStats = useMemo(
+    () => summarizeHeatmapStats(heatDays, status?.callLogs),
+    [heatDays, status?.callLogs],
+  );
+  const locCount = locale === "zh-TW" ? "zh-TW" : "zh";
+  const statDays = (n: number | null) =>
+    n == null
+      ? "—"
+      : t("account.heatmap.stat.days", { count: String(n) });
 
   const filteredCallLogs = useMemo(() => {
     const logs = status?.callLogs ?? [];
@@ -918,7 +920,27 @@ export function AccountPanel({
         <>
           <section className="account-section">
             <div className="account-section__title account-section__title--row">
-              <span>{labels.heatmap}</span>
+              <span className="account-heatmap-title">
+                <span>{labels.heatmap}</span>
+                <Tip
+                  label={labels.heatmapHint}
+                  placement="top"
+                  className="ui-tip--wrap"
+                  delayMs={280}
+                >
+                  <button
+                    type="button"
+                    className="settings-label-help"
+                    aria-label={labels.heatmapHint}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                  >
+                    <IconHelp size={14} stroke={1.75} />
+                  </button>
+                </Tip>
+              </span>
               <div className="account-heatmap-title-meta">
                 {heatErrChip ? (
                   <span
@@ -929,58 +951,6 @@ export function AccountPanel({
                     {heatmapErrTitle}
                   </span>
                 ) : null}
-                {heatChips ? (
-                  <div className="account-heatmap-summary" aria-live="polite">
-                    <span
-                      className="account-heatmap-total account-heatmap-chip"
-                      title={String(heatChips.activeDays)}
-                    >
-                      {labels.heatmapActiveDays.replace(
-                        "{count}",
-                        formatChineseCount(
-                          heatChips.activeDays,
-                          locale === "zh-TW" ? "zh-TW" : "zh",
-                        ),
-                      )}
-                    </span>
-                    <span
-                      className="account-heatmap-total account-heatmap-chip"
-                      title={
-                        Number.isFinite(heatTokenTotal)
-                          ? String(Math.round(heatTokenTotal))
-                          : undefined
-                      }
-                    >
-                      {labels.heatmapTotalTokens.replace(
-                        "{count}",
-                        // Always Chinese units (千 / 万·萬 / 亿·億), not English k/M.
-                        formatChineseCount(
-                          heatTokenTotal,
-                          locale === "zh-TW" ? "zh-TW" : "zh",
-                        ),
-                      )}
-                    </span>
-                    <span
-                      className="account-heatmap-total account-heatmap-chip"
-                      title={String(heatChips.totalRequests)}
-                    >
-                      {labels.heatmapSessionsCount.replace(
-                        "{count}",
-                        formatChineseCount(
-                          heatChips.totalRequests,
-                          locale === "zh-TW" ? "zh-TW" : "zh",
-                        ),
-                      )}
-                    </span>
-                  </div>
-                ) : heatHasSamples || loading ? null : (
-                  <span
-                    className="account-heatmap-total account-heatmap-chip account-heatmap-chip--muted"
-                    title={labels.heatmapNoDataHint}
-                  >
-                    {labels.heatmapNoData}
-                  </span>
-                )}
                 <div
                   className="account-heat-toggle"
                   role="group"
@@ -999,15 +969,78 @@ export function AccountPanel({
                     >
                       {chip.id === "day"
                         ? labels.heatmapDay
-                        : labels.heatmapWeek}
+                        : chip.id === "week"
+                          ? labels.heatmapWeek
+                          : t("account.heatmap.cumulative")}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
-            <p className="account-section__hint account-heatmap-hint">
-              {labels.heatmapHint}
-            </p>
+            {heatHasSamples ? (
+              <div className="account-heat-stats" aria-live="polite">
+                <div
+                  className="account-heat-stat"
+                  title={
+                    heatStats.totalTokens != null
+                      ? String(heatStats.totalTokens)
+                      : undefined
+                  }
+                >
+                  <span className="account-heat-stat__value">
+                    {formatChineseCount(heatStats.totalTokens, locCount)}
+                  </span>
+                  <span className="account-heat-stat__label">
+                    {t("account.heatmap.stat.total")}
+                  </span>
+                </div>
+                <div
+                  className="account-heat-stat"
+                  title={heatStats.peakDate ?? undefined}
+                >
+                  <span className="account-heat-stat__value">
+                    {formatChineseCount(heatStats.peakTokens, locCount)}
+                  </span>
+                  <span className="account-heat-stat__label">
+                    {t("account.heatmap.stat.peak")}
+                  </span>
+                </div>
+                <div className="account-heat-stat">
+                  <span className="account-heat-stat__value">
+                    {formatStatDuration(
+                      heatStats.longestDurationSecs,
+                      locale,
+                    )}
+                  </span>
+                  <span className="account-heat-stat__label">
+                    {t("account.heatmap.stat.longestChat")}
+                  </span>
+                </div>
+                <div className="account-heat-stat">
+                  <span className="account-heat-stat__value">
+                    {statDays(heatStats.currentStreak)}
+                  </span>
+                  <span className="account-heat-stat__label">
+                    {t("account.heatmap.stat.streak")}
+                  </span>
+                </div>
+                <div className="account-heat-stat">
+                  <span className="account-heat-stat__value">
+                    {statDays(heatStats.longestStreak)}
+                  </span>
+                  <span className="account-heat-stat__label">
+                    {t("account.heatmap.stat.longestStreak")}
+                  </span>
+                </div>
+              </div>
+            ) : loading ? null : (
+              <span
+                className="account-heatmap-total account-heatmap-chip account-heatmap-chip--muted"
+                title={labels.heatmapNoDataHint}
+              >
+                {labels.heatmapNoData}
+              </span>
+            )}
             <div className="account-section__body account-section__body--heat">
               <Heatmap
                 days={heatDays}
@@ -1032,6 +1065,7 @@ export function AccountPanel({
                   aria: labels.heatmapAria,
                   requests: labels.heatmapRequests,
                   tokens: labels.heatmapTokens,
+                  cumulative: t("account.heatmap.tipCumulative"),
                   errorTitle: heatmapErrTitle,
                   errorHint: heatmapErrHint,
                 }}
@@ -1067,6 +1101,7 @@ export function AccountPanel({
                     <span>{labels.colSession}</span>
                     <span>{labels.colModel}</span>
                     <span>{labels.colTurns}</span>
+                    <span>{labels.colUsage}</span>
                     <span>{labels.colTokens}</span>
                     <span>{labels.colDuration}</span>
                     <span>{labels.colWhen}</span>
@@ -1088,6 +1123,14 @@ export function AccountPanel({
                         {row.model || "—"}
                       </span>
                       <span>{row.turns}</span>
+                      <span>
+                        {row.usageTokens != null && row.usageTokens > 0
+                          ? formatCompactNumber(
+                              row.usageTokens,
+                              locale === "zh-TW" ? "zh-TW" : "zh",
+                            )
+                          : "—"}
+                      </span>
                       <span>
                         {formatCompactNumber(
                           row.contextTokens,
