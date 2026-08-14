@@ -369,7 +369,7 @@ fn pid_alive(pid: u32) -> bool {
     }
     #[cfg(windows)]
     {
-        let out = std::process::Command::new("tasklist")
+        let out = process_util::command("tasklist")
             .args(["/FI", &format!("PID eq {pid}"), "/NH"])
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -397,7 +397,7 @@ fn kill_tracked(pid: u32, pgid: Option<i32>) {
     #[cfg(windows)]
     {
         let _ = pgid;
-        let _ = std::process::Command::new("taskkill")
+        let _ = process_util::command("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .stdout(Stdio::null())
             .stderr(Stdio::null())

@@ -402,9 +402,13 @@ pub fn workspace_match_tokens(cwd: &Path) -> Vec<String> {
 }
 
 fn git_origin_url(cwd: &Path) -> Option<String> {
-    let output = Command::new("git")
+    // GUI spawn: hide the Windows console (Agent tab memory list used to flash).
+    let output = process_util::command("git")
         .args(["remote", "get-url", "origin"])
         .current_dir(cwd)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
         .output()
         .ok()?;
     if !output.status.success() {

@@ -434,6 +434,7 @@ fn find_docker_binary() -> Option<PathBuf> {
 
 async fn ensure_docker_daemon(docker: &Path) -> Result<(), String> {
     let mut probe = Command::new(docker);
+    crate::process_util::apply_no_window_tokio(&mut probe);
     probe
         .arg("info")
         .arg("--format")
@@ -461,6 +462,7 @@ async fn cleanup_stale_docker_containers(docker: &Path) -> Result<(), String> {
     // Grok is single-instance, any container with our private name prefix is
     // stale when a new mirror adapter is being selected.
     let mut list = Command::new(docker);
+    crate::process_util::apply_no_window_tokio(&mut list);
     list.args([
         "ps",
         "--all",
@@ -493,6 +495,7 @@ async fn cleanup_stale_docker_containers(docker: &Path) -> Result<(), String> {
     }
 
     let mut remove = Command::new(docker);
+    crate::process_util::apply_no_window_tokio(&mut remove);
     remove
         .args(["rm", "--force"])
         .args(&ids)
@@ -685,7 +688,7 @@ fn kill_process_group(pid: Option<u32>, pgid: Option<i32>) {
     {
         let _ = pgid;
         if let Some(p) = pid {
-            let _ = std::process::Command::new("taskkill")
+            let _ = crate::process_util::command("taskkill")
                 .args(["/PID", &p.to_string(), "/T", "/F"])
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())

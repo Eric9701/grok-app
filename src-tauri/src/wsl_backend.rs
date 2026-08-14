@@ -450,6 +450,7 @@ pub fn start_wsl_tokio_command(
         }
     }
     let mut cmd = tokio::process::Command::new(wsl);
+    process_util::apply_no_window_tokio(&mut cmd);
     if let Some(ref d) = launch.distro {
         cmd.arg("-d").arg(d);
     }

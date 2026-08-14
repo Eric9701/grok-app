@@ -1123,7 +1123,7 @@ pub fn mcp_server_acp_entry() -> Option<serde_json::Value> {
 
 fn which_node() -> Option<String> {
     for name in ["node", "nodejs"] {
-        if let Ok(out) = Command::new("which").arg(name).output() {
+        if let Ok(out) = process_util::command("which").arg(name).output() {
             if out.status.success() {
                 let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
                 if !p.is_empty() {

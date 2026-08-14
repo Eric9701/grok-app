@@ -3,7 +3,8 @@
 
 :root,
 [data-theme="dark"] {
-  color-scheme: dark;
+  /* color-scheme is set on [data-theme] only — :root alone would force dark
+     native form chrome (number/date/time) before the light attribute wins. */
 
   --radius-window: 12px;
   --radius-lg: 10px;
@@ -183,6 +184,10 @@
   --titlebar-safe-left: 96px;
 }
 
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 [data-theme="light"] {
   color-scheme: light;
 
@@ -290,4 +295,32 @@
     --motion-fast: 0ms;
     --motion-normal: 0ms;
   }
+}
+
+/*
+ * Native form chrome follows WebView color-scheme. On Windows WebView2 a
+ * mismatch (OS dark + app light, or :root dark leaking) paints number/date/
+ * time/file controls as a black rectangle for a frame — Settings → Agent is
+ * the obvious case (max-turns is the first control). Inherit document scheme
+ * and drop the OS spinner so the first paint matches CSS.
+ */
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="file"],
+input[type="color"],
+input[type="datetime-local"] {
+  color-scheme: inherit;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
 }

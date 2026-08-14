@@ -503,6 +503,23 @@
   background: var(--bg-input);
   color: var(--text-primary);
   font-size: 13px;
+  color-scheme: inherit;
+  /* WebView2 native number/date/time chrome follows OS scheme and can flash
+     a black box on Windows when the Settings Agent tab mounts. */
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.settings-input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.settings-input[type="number"]::-webkit-inner-spin-button,
+.settings-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
 }
 
 /* Settings → Agent · inline --agents JSON (multi-line). */

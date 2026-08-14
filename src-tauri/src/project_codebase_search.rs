@@ -8,10 +8,11 @@
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Duration;
 
 use serde::Serialize;
+
+use crate::process_util;
 
 /// Default hit cap returned to the UI.
 pub const CODEBASE_SEARCH_DEFAULT_LIMIT: usize = 50;
@@ -354,7 +355,8 @@ fn try_rg_content(
     limit: usize,
 ) -> Option<(Vec<CodebaseSearchHit>, bool)> {
     let rg = which::which("rg").ok()?;
-    let mut cmd = Command::new(rg);
+    // GUI spawn: hide the Windows console (Settings → Agent codebase search).
+    let mut cmd = process_util::command(rg);
     cmd.current_dir(root)
         .arg("--color=never")
         .arg("--line-number")

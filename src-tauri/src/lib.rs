@@ -504,13 +504,6 @@ pub fn run() {
                 ) {
                     tracing::warn!("window vibrancy: {e}");
                 }
-                // Lock native chrome to the same resolved theme so the first frame
-                // matches (system preference is resolved above when theme=system).
-                let _ = window.set_theme(Some(if boot_theme == "light" {
-                    tauri::Theme::Light
-                } else {
-                    tauri::Theme::Dark
-                }));
             }
 
             #[cfg(not(target_os = "macos"))]
@@ -523,6 +516,15 @@ pub fn run() {
                 };
                 let _ = window.set_background_color(Some(tauri::window::Color(r, g, b, 255)));
             }
+
+            // Lock WebView / native form chrome to the boot theme on every OS.
+            // Windows WebView2 otherwise follows the OS scheme, so number/date/time
+            // inputs paint as black boxes on a light Settings page (Agent tab).
+            let _ = window.set_theme(Some(if boot_theme == "light" {
+                tauri::Theme::Light
+            } else {
+                tauri::Theme::Dark
+            }));
 
             #[cfg(windows)]
             win_shell::ensure_main_window_shell_integration(&window);
@@ -1486,7 +1488,7 @@ fn os_prefers_dark() -> bool {
     #[cfg(target_os = "macos")]
     {
         // AppleInterfaceStyle is set only in dark mode; missing → light.
-        let out = std::process::Command::new("defaults")
+        let out = process_util::command("defaults")
             .args(["read", "-g", "AppleInterfaceStyle"])
             .output();
         if let Ok(o) = out {
@@ -1498,7 +1500,8 @@ fn os_prefers_dark() -> bool {
     #[cfg(target_os = "windows")]
     {
         // AppsUseLightTheme DWORD: 0 = dark apps, 1 = light.
-        let out = std::process::Command::new("reg")
+        // `reg query` is a console app — hide the window (Fixes boot black flash).
+        let out = process_util::command("reg")
             .args([
                 "query",
                 r"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
