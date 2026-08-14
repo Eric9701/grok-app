@@ -208,10 +208,9 @@ const AUTH_TIMEOUT_SECS: u64 = 12;
 /// any other Host→agent RPC before the request-level timeout could start.
 const STDIN_WRITE_TIMEOUT_SECS: u64 = 8;
 /// Max **silence** (no `session/update`) while waiting for `session/prompt`.
-/// Long tool chains that keep emitting updates re-arm this window.
-const PROMPT_IDLE_TIMEOUT_SECS: u64 = 600;
-/// Absolute ceiling for one `session/prompt` wait (wedged process / lost RPC).
-const PROMPT_ABSOLUTE_TIMEOUT_SECS: u64 = 4 * 60 * 60;
+/// Every inbound update re-arms this window — do **not** cap on total turn age.
+/// 30 minutes: a single image_gen can stay quiet longer than the old 10 min.
+const PROMPT_IDLE_TIMEOUT_SECS: u64 = 1800;
 /// Poll slice while waiting for the `session/prompt` oneshot.
 const PROMPT_WAIT_SLICE_SECS: u64 = 5;
 /// Legacy alias used in docs/comments — idle silence window for prompt RPC.
@@ -228,30 +227,27 @@ const PROMPT_TIMEOUT_SECS: u64 = PROMPT_IDLE_TIMEOUT_SECS;
 /// it is still streaming the answer, and resolving the RPC on a fixed timer
 /// ended the turn mid-answer — the host then dropped every later chunk as
 /// replay, so the journal kept only a prefix and the chat looked stuck.
-/// Prompt wait uses the same idle idea (`PROMPT_IDLE_TIMEOUT_SECS`) plus an
-/// absolute ceiling (`PROMPT_ABSOLUTE_TIMEOUT_SECS`).
+/// Prompt wait uses the same idle idea (`PROMPT_IDLE_TIMEOUT_SECS`) only —
+/// total turn age is not a timeout.
 const PROMPT_COMPLETE_FALLBACK_GRACE_MS: u64 = 3000;
 
-/// Whether a `session/prompt` wait should fail for silence or absolute age.
+/// Whether a `session/prompt` wait should fail for silence.
 ///
 /// - `last_update`: last inbound `session/update` (None → use wait start as baseline)
 /// - `wait_started`: when the RPC was dispatched
 /// - `now`: current time
+///
+/// Progress resets the clock. A turn that keeps emitting updates may run
+/// indefinitely; the user can Stop. Lost RPC / wedged silence still dies
+/// after `idle_timeout`.
 fn prompt_wait_should_timeout(
     last_update: Option<Instant>,
     wait_started: Instant,
     now: Instant,
     idle_timeout: Duration,
-    absolute_timeout: Duration,
-) -> Option<&'static str> {
-    if now.saturating_duration_since(wait_started) >= absolute_timeout {
-        return Some("absolute");
-    }
+) -> bool {
     let baseline = last_update.unwrap_or(wait_started);
-    if now.saturating_duration_since(baseline) >= idle_timeout {
-        return Some("idle");
-    }
-    None
+    now.saturating_duration_since(baseline) >= idle_timeout
 }
 
 /// Whether a pending prompt belongs to the fallback target session.
@@ -2534,9 +2530,9 @@ impl AcpClient {
         }
     }
 
-    /// `session/prompt` wait: idle-based silence timeout (re-armed by every
-    /// `session/update`) plus an absolute ceiling. A fixed wall-clock timer
-    /// killed multi-tool turns that were still healthy past 10 minutes.
+    /// `session/prompt` wait: idle-based silence timeout, re-armed by every
+    /// `session/update`. No absolute turn-age ceiling — a fixed wall clock
+    /// killed healthy multi-image / multi-tool turns past 4 hours.
     async fn request_prompt(&self, params: Value) -> Result<Value, String> {
         let method = "session/prompt";
         if !self.reader_alive.load(Ordering::SeqCst) {
@@ -2578,7 +2574,6 @@ impl AcpClient {
         // Mark activity at dispatch so pure silence is measured from send time.
         self.touch_last_update(prompt_sid.as_deref(), wait_started);
         let idle = Duration::from_secs(PROMPT_IDLE_TIMEOUT_SECS);
-        let absolute = Duration::from_secs(PROMPT_ABSOLUTE_TIMEOUT_SECS);
         let slice = Duration::from_secs(PROMPT_WAIT_SLICE_SECS);
         let mut rx = rx;
 
@@ -2614,24 +2609,16 @@ impl AcpClient {
                     }
                     let last = self.last_update_for(prompt_sid.as_deref());
                     let now = Instant::now();
-                    if let Some(kind) =
-                        prompt_wait_should_timeout(last, wait_started, now, idle, absolute)
-                    {
+                    if prompt_wait_should_timeout(last, wait_started, now, idle) {
                         self.pending.lock().remove(&id);
                         let idle_secs = last
                             .unwrap_or(wait_started)
                             .elapsed()
                             .as_secs();
-                        let head = match kind {
-                            "absolute" => format!(
-                                "rpc timeout on {method} (id={id}) after {}s absolute (idle {idle_secs}s)",
-                                wait_started.elapsed().as_secs()
-                            ),
-                            _ => format!(
-                                "rpc timeout on {method} (id={id}) after {idle_secs}s idle (wall {}s)",
-                                wait_started.elapsed().as_secs()
-                            ),
-                        };
+                        let head = format!(
+                            "rpc timeout on {method} (id={id}) after {idle_secs}s idle (wall {}s)",
+                            wait_started.elapsed().as_secs()
+                        );
                         let logged = self.format_exit_detail(&head);
                         error!("{logged}");
                         return Err(head);
@@ -5666,30 +5653,26 @@ mod prompt_wait_timeout_tests {
     fn idle() -> Duration {
         Duration::from_secs(PROMPT_IDLE_TIMEOUT_SECS)
     }
-    fn absolute() -> Duration {
-        Duration::from_secs(PROMPT_ABSOLUTE_TIMEOUT_SECS)
-    }
 
     #[test]
     fn healthy_activity_never_times_out() {
         let started = Instant::now();
         let last = started + Duration::from_secs(30 * 60);
         let now = last + Duration::from_secs(60);
-        // 30+ min wall clock, but last update 60s ago — under 600s idle.
-        assert_eq!(
-            prompt_wait_should_timeout(Some(last), started, now, idle(), absolute()),
-            None
-        );
+        // 30+ min wall clock, but last update 60s ago — under 1800s idle.
+        assert!(!prompt_wait_should_timeout(
+            Some(last),
+            started,
+            now,
+            idle()
+        ));
     }
 
     #[test]
     fn pure_silence_hits_idle() {
         let started = Instant::now();
         let now = started + idle();
-        assert_eq!(
-            prompt_wait_should_timeout(None, started, now, idle(), absolute()),
-            Some("idle")
-        );
+        assert!(prompt_wait_should_timeout(None, started, now, idle()));
     }
 
     #[test]
@@ -5697,21 +5680,26 @@ mod prompt_wait_timeout_tests {
         let started = Instant::now();
         let last = started + Duration::from_secs(10);
         let now = last + idle();
-        assert_eq!(
-            prompt_wait_should_timeout(Some(last), started, now, idle(), absolute()),
-            Some("idle")
-        );
+        assert!(prompt_wait_should_timeout(
+            Some(last),
+            started,
+            now,
+            idle()
+        ));
     }
 
     #[test]
-    fn absolute_ceiling_even_with_fresh_updates() {
+    fn long_running_with_fresh_updates_does_not_timeout() {
         let started = Instant::now();
-        let now = started + absolute();
+        // Former 4h absolute ceiling plus a bit — still healthy if progress is fresh.
+        let now = started + Duration::from_secs(5 * 60 * 60);
         let last = now - Duration::from_secs(1);
-        assert_eq!(
-            prompt_wait_should_timeout(Some(last), started, now, idle(), absolute()),
-            Some("absolute")
-        );
+        assert!(!prompt_wait_should_timeout(
+            Some(last),
+            started,
+            now,
+            idle()
+        ));
     }
 }
 

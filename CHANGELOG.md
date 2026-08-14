@@ -17,6 +17,7 @@ See `docs/llm-wiki/release.md`.
 - **Account heatmap stats strip**: Codex-style totals — cumulative tokens, peak day, longest chat, current / longest streak — plus a **Cumulative** calendar view (running-total color).
 
 ### Fixed
+- **Long image / tool turns no longer die at 4 hours**: `session/prompt` wait is silence-only (30 minutes with no `session/update`). Fresh progress re-arms the clock; there is no absolute turn-age ceiling. Batch image jobs that were still working used to get `TURN_TIMEOUT` at 4h.
 - **Windows Settings → Agent no longer flashes a black box**: Opening the Agent tab (and other similar surfaces) no longer pops a console window (`git` / `rg` / `tasklist` / `taskkill` / `reg`) and no longer paints native number/date/time inputs with the OS dark scheme. WebView2 now boots with the same light/dark theme as the page.
 - **Usage modal cache > input, then empty**: Session spend only sums `turn_completed` snapshots. Cache-heavy fragments (cache > input, no `modelCalls`) are dropped so cached cannot exceed input; a real turn without `modelCalls` still counts. Totals persist in sessionStorage, and an in-flight turn says usage updates when it finishes.
 - **Chat image cards no longer die after the turn ends**: Leftover remote https thumbs (web-fetch charts, etc.) first-paint from the in-memory thumb cache on journal remount. Swapping `src` mid-load used to abort the original `<img>` and lock `broken_blob` (“preview failed”). Abort / stale-src errors are ignored; a working https original is not wiped when thumb resolve returns empty.

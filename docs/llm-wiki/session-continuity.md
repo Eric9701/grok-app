@@ -246,10 +246,13 @@ journal holds a clean prefix of the answer, UI frozen mid-sentence, agent-side
 **idle-based**: every inbound `session/update` re-arms it (`prompt_fallback_due`),
 so the waiter is freed only after real silence.
 
-**`session/prompt` wait (same idea):** not a fixed 600s wall clock. Host uses
-`PROMPT_IDLE_TIMEOUT_SECS` (600s **silence** without `session/update`) plus
-`PROMPT_ABSOLUTE_TIMEOUT_SECS` (4h) so multi-tool turns that keep emitting
-progress can run past 10 minutes without a false `rpc timeout`.
+**`session/prompt` wait (same idea):** not a fixed wall clock on total turn age.
+Host uses `PROMPT_IDLE_TIMEOUT_SECS` (1800s / **30 min silence** without
+`session/update`). Every inbound update re-arms the window, so a multi-image /
+multi-tool turn that keeps emitting progress can run past 4 hours. There is
+**no** absolute turn-age ceiling (that used to abort healthy batch image jobs).
+A wedged / silent RPC still dies after 30 minutes of no updates. User Stop
+still ends the turn.
 
 ### 4e. Host stream backpressure + long-tool heartbeat
 
