@@ -152,6 +152,18 @@ UI shows **remaining %** (100 − used), product tags, reset time — same seman
 
 Cache successes under `~/.grok-app/account_billing_cache.json`.
 
+### Auto-refresh (10 minutes)
+
+Official SuperGrok quota is re-probed **every 10 minutes** in the background (plus on boot, opening Settings → Account, opening the user menu, login / switch, and the manual **Refresh quota** button). The same `account` snapshot feeds:
+
+- Settings → Account
+- Sidebar footer + user-menu sheet (bottom-left)
+- Tray **Usage** line (`account_billing_cache.json` after `tray_refresh`)
+- Usage-limit modal (picks the newer `billing.fetchedAt`)
+
+Background ticks are **quiet** (no spinner) and **billing-only** (`include_local_usage=false` — skip the heatmap / call-log walk). Soft-fail keeps the last snapshot; never invent remaining %. Unmount / disable **disposes** the interval and `visibilitychange` listener and drops in-flight Host replies (`isCurrent`) so they cannot `setState` on a dead tree.
+
+
 ## Heatmap & call logs
 
 - Heatmap UI ported from grok-go `components/heatmap.tsx` (GitHub green levels, month labels, tooltip).

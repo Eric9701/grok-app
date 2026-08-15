@@ -11,6 +11,7 @@ import {
   isQuotaUsageKnown,
   resolveQuotaPercents,
 } from "@/lib/accountQuotaHonesty";
+import { pickFresherAccountStatus } from "@/lib/accountQuotaRefresh";
 import { tierLabel } from "@/lib/accountUi";
 import {
   formatApiDuration,
@@ -53,7 +54,7 @@ export function UsageLimitModal({
 }: Props) {
   const tr = useMemo(() => createT(locale), [locale]);
   const [liveAccount, setLiveAccount] = useState<AccountStatus | null>(null);
-  const effectiveAccount = liveAccount ?? account;
+  const effectiveAccount = pickFresherAccountStatus(liveAccount, account);
   const billing = effectiveAccount?.billing ?? null;
   const usageKnown = isQuotaUsageKnown(billing);
   const { usedPercent } = resolveQuotaPercents(billing);
@@ -70,7 +71,10 @@ export function UsageLimitModal({
   const cacheRate = sessionSpendCacheHitRate(spend);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setLiveAccount(null);
+      return;
+    }
     let cancelled = false;
     void api
       .accountStatus({ refreshBilling: true })

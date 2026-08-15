@@ -3,13 +3,19 @@
 #[tauri::command]
 pub async fn account_status(
     refresh_billing: Option<bool>,
+    include_local_usage: Option<bool>,
     manual_cli_path: Option<String>,
 ) -> Result<crate::account::AccountStatus, String> {
     let settings = store::load_settings();
     let manual = manual_cli_path
         .or(settings.manual_cli_path)
         .filter(|s| !s.is_empty());
-    Ok(crate::account::account_status(manual.as_deref(), refresh_billing.unwrap_or(true)).await)
+    Ok(crate::account::account_status_opts(
+        manual.as_deref(),
+        refresh_billing.unwrap_or(true),
+        include_local_usage.unwrap_or(true),
+    )
+    .await)
 }
 
 #[tauri::command]
@@ -85,7 +91,9 @@ pub fn accounts_list() -> crate::account_profiles::AccountsListResult {
 }
 
 #[tauri::command]
-pub fn account_save_current(label: Option<String>) -> Result<crate::account_profiles::SavedAccount, String> {
+pub fn account_save_current(
+    label: Option<String>,
+) -> Result<crate::account_profiles::SavedAccount, String> {
     crate::account_profiles::save_current_account(label)
 }
 

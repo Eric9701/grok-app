@@ -10,20 +10,56 @@ function attachmentsMatchForSubmit(
   return sent.every((item, i) => item.path === current[i]?.path);
 }
 
-/**
- * After a successful send, clear the composer only when the live draft is
- * still the payload that was submitted. New keystrokes / attachments during
- * a multi-second `executeSend` must not be wiped (#599: fail keeps draft;
- * success must not swallow follow-up input).
- */
-export function shouldClearComposerAfterSubmit(opts: {
+export type ComposerSubmitPayload = {
   sentText: string;
   sentAttachments: AttachmentPath[];
   currentText: string;
   currentAttachments: AttachmentPath[];
-}): boolean {
+};
+
+export type ComposerSubmitSettlement = "persist-clear" | "restore" | "leave";
+
+function isComposerEmptyAfterOptimisticClear(
+  text: string,
+  attachments: AttachmentPath[],
+): boolean {
+  return text === "" && attachments.length === 0;
+}
+
+function composerMatchesSentPayload(opts: ComposerSubmitPayload): boolean {
   return (
     opts.currentText === opts.sentText &&
     attachmentsMatchForSubmit(opts.sentAttachments, opts.currentAttachments)
   );
+}
+
+/**
+ * True when the visible composer is still the submitted payload. Used by the
+ * enqueue path (clear immediately) and as the "unchanged" half of settlement.
+ */
+export function shouldClearComposerAfterSubmit(
+  opts: ComposerSubmitPayload,
+): boolean {
+  return composerMatchesSentPayload(opts);
+}
+
+/**
+ * After the optimistic UI clear (user bubble already painted), decide how
+ * `executeSend` should settle the composer:
+ *
+ * - empty or still the sent payload + success → wipe persisted draft
+ * - empty or still the sent payload + failure → put the sent payload back
+ * - follow-up text / attachments typed during send → leave alone
+ *
+ * Fail keeps draft (#599 / P1-3). Success must not swallow follow-up input.
+ */
+export function nextComposerSubmitSettlement(
+  opts: ComposerSubmitPayload & { sendSucceeded: boolean },
+): ComposerSubmitSettlement {
+  const idle = isComposerEmptyAfterOptimisticClear(
+    opts.currentText,
+    opts.currentAttachments,
+  );
+  if (!idle && !composerMatchesSentPayload(opts)) return "leave";
+  return opts.sendSucceeded ? "persist-clear" : "restore";
 }

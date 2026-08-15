@@ -105,7 +105,12 @@ pub async fn dispatch(
                 .or_else(|| params.get("refresh_billing"))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
-            let status = crate::account::account_status(None, refresh).await;
+            let include_usage = params
+                .get("includeLocalUsage")
+                .or_else(|| params.get("include_local_usage"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            let status = crate::account::account_status_opts(None, refresh, include_usage).await;
             Ok(serde_json::to_value(status).map_err(|e| RpcError::host(e.to_string()))?)
         }
         "settings.get" => {

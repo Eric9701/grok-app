@@ -11,11 +11,21 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Changed
+- **Official SuperGrok quota auto-refresh**: Background probe every **10 minutes**. Settings → Account, the sidebar user-menu (remaining %), tray Usage, and the usage-limit modal all follow the same snapshot. Quiet billing-only ticks (no spinner, no heatmap walk); last good numbers stay on soft-fail.
+- **macOS Release signing / notarization**: When Apple Developer ID + App Store Connect API secrets are present, `release.yml` codesigns and notarizes the `.app` / `.dmg` (Hardened Runtime entitlements include microphone + camera). Forks without secrets stay unsigned.
+
+**中文 · 变更**
+- **官方 SuperGrok 额度自动刷新**：后台每 **10 分钟**拉一次。设置 → 账户、主页左下角用户面板（剩余 %）、托盘 Usage、用量限制弹层共用同一份快照。后台为静默、只刷新账单（不扫热力图）；失败时保留上次数字。
+- **macOS Release 签名 / 公证**：仓库配齐 Developer ID + App Store Connect API secrets 后，`release.yml` 会对 `.app` / `.dmg` 做 codesign 与公证（Hardened Runtime 含麦克风 / 摄像头 entitlements）。未配 secrets 的 fork 仍出未签名包。
+
 ### Fixed
+- **Composer clears as soon as the user bubble appears**: Send no longer waits for `ensureConnected` / `sessionSend` to wipe the input. A failed send puts the text back if the box is still empty; follow-up typed during a slow send is never wiped.
 - **Follow system language on first launch**: New installs default `settings.locale` to **System**. Host reads macOS AppleLanguages / Windows UI language (not just `LANG=C`), so a Chinese OS opens in 简体/繁體. Existing installs that still have the factory `en` lift once to System (explicit 简体/繁體 stays). Boot splash and tray follow the same probe.
 - **English token units (#613)**: Context-window chip, composer model menu, phone tools sheet, heatmap, and account call-log counts use **K / M / B** when locale is `en` (e.g. `500K`, `1M`) instead of Chinese 百/千/万. zh / zh-TW still use 万·萬 / 亿·億.
 
 **中文 · 修复**
+- **发送后输入框立刻清空**：用户气泡一出现就清 composer，不再等连接 / `sessionSend` 成功。发送失败且框仍空时回填原文；慢发送期间新打的字不会被清掉。
 - **首次安装跟随系统语言**：新安装默认「跟随系统」。Host 读取 macOS AppleLanguages / Windows 界面语言（不再只看经常为空的 `LANG`），中文系统会直接进入简体/繁体。旧安装里仍是出厂 `en` 的一次性改成跟随系统（用户已选的中文不变）。启动页与托盘同一套探测。
 - **英文 Token 单位 (#613)**：界面语言为英文时，上下文芯片、模型菜单、热力图与通话记录显示 **K / M / B**，不再混用「万 / 千 / 百」。简体/繁体仍用中文计数单位。
 

@@ -103,11 +103,14 @@ export interface LoginResult {
 
 export async function accountStatus(opts?: {
   refreshBilling?: boolean;
+  /** When false, Host skips the heatmap / call-log walk (billing-only). */
+  includeLocalUsage?: boolean;
   manualCliPath?: string | null;
 }) {
   if (isMirrorClient()) {
     return invoke<AccountStatus>("account_status", {
       refreshBilling: opts?.refreshBilling ?? false,
+      includeLocalUsage: opts?.includeLocalUsage ?? true,
       manualCliPath: opts?.manualCliPath ?? null,
     });
   }
@@ -164,6 +167,7 @@ export async function accountStatus(opts?: {
   }
   return invoke<AccountStatus>("account_status", {
     refreshBilling: opts?.refreshBilling ?? true,
+    includeLocalUsage: opts?.includeLocalUsage ?? true,
     manualCliPath: opts?.manualCliPath ?? null,
   });
 }

@@ -41,6 +41,10 @@ import {
   SIDEBAR_SHOW_RELATIVE_TIME_CHANGE_EVENT
 } from "@/lib/sidebarShowRelativeTimePref";
 import { formatRelativeTime } from "@/lib/accountUi";
+import {
+  canFetchOfficialQuota,
+  mergeAccountStatusPreservingLocalUsage,
+} from "@/lib/accountQuotaRefresh";
 import { loadConfirmExternalLinksPref } from "@/lib/externalLinkPref";
 import {
   chatcutHandoffToResourceOpenTarget,
@@ -669,7 +673,7 @@ import {
   loadComposerSessionDraft,
   saveComposerSessionDraft,
 } from "@/lib/composerSessionDraft";
-import { shouldClearComposerAfterSubmit } from "@/lib/composerSubmitClear";
+import { nextComposerSubmitSettlement } from "@/lib/composerSubmitClear";
 import {
   DEFERRED_RECONCILE_MS,
   WARM_CONNECT_DEBOUNCE_MS,
@@ -1088,6 +1092,7 @@ import { useAppDialogs } from "@/hooks/useAppDialogs";
 import { useSessionHostEvents } from "@/hooks/useSessionHostEvents";
 import { useSessionSpend } from "@/hooks/useSessionSpend";
 import { useGhostStreamingHeal } from "@/hooks/useGhostStreamingHeal";
+import { useAccountQuotaAutoRefresh } from "@/hooks/useAccountQuotaAutoRefresh";
 import { createDebouncedSkillsReload } from "@/lib/skillCatalogRefresh";
 
 /** App-local plan chrome state (session-scoped via planBySessionRef). */
@@ -7952,23 +7957,11 @@ export function AppWorkbench() {
     }
   };
 
-  const clearComposerAfterSubmit = (opts?: {
-    /** Drop the per-project new-chat buffer (only when leaving a draft send). */
+  const persistComposerSubmitClear = (opts?: {
     clearProjectDraft?: boolean;
-    /** Drop the per-session follow-up buffer (send / clear on a real thread). */
     clearSessionDraft?: boolean;
     sessionDraftId?: string | null;
   }) => {
-    setDraft("");
-    promptHistoryIndexRef.current = null;
-    setPromptHistoryIndex(null);
-    setPromptHistoryOpen(false);
-    setPromptHistoryFilter("");
-    setPromptHistoryActive(0);
-    setPromptHistoryFocusFilter(false);
-    setPromptHistoryScope("session");
-    setSlashQuery(null);
-    setAttachments([]);
     if (opts?.clearProjectDraft) {
       clearComposerProjectDraft(projectDraftKey(activeProject?.id ?? null));
     }
@@ -7980,10 +7973,35 @@ export function AppWorkbench() {
         null;
       if (sid) clearComposerSessionDraft(sid);
     }
+  };
+
+  /** Wipe the visible composer now. Persist is a separate call after send settles. */
+  const resetComposerUiAfterSubmit = () => {
+    setDraft("");
+    promptHistoryIndexRef.current = null;
+    setPromptHistoryIndex(null);
+    setPromptHistoryOpen(false);
+    setPromptHistoryFilter("");
+    setPromptHistoryActive(0);
+    setPromptHistoryFocusFilter(false);
+    setPromptHistoryScope("session");
+    setSlashQuery(null);
+    setAttachments([]);
     requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLElement>(".composer__input");
+      const el = composerInputRef.current;
       if (el) el.style.height = "auto";
     });
+  };
+
+  const clearComposerAfterSubmit = (opts?: {
+    /** Drop the per-project new-chat buffer (only when leaving a draft send). */
+    clearProjectDraft?: boolean;
+    /** Drop the per-session follow-up buffer (send / clear on a real thread). */
+    clearSessionDraft?: boolean;
+    sessionDraftId?: string | null;
+  }) => {
+    resetComposerUiAfterSubmit();
+    persistComposerSubmitClear(opts);
   };
 
   /**
@@ -8082,21 +8100,61 @@ export function AppWorkbench() {
       return;
     }
 
+    // Clear the box with the optimistic user bubble — do not wait for
+    // ensureConnected / sessionSend (that left the prompt sitting in the
+    // composer for seconds). Persist + fail-restore settle after executeSend.
+    const originView = currentViewFocus();
+    resetComposerUiAfterSubmit();
+
     const sent = await executeSend({
       storedDisplay,
       att,
       goalMode,
     });
-    if (
-      sent &&
-      shouldClearComposerAfterSubmit({
-        sentText: storedDisplay,
-        sentAttachments: att,
-        currentText: getDraft(),
-        currentAttachments: attachmentsRef.current,
-      })
+    const action = nextComposerSubmitSettlement({
+      sendSucceeded: sent,
+      sentText: storedDisplay,
+      sentAttachments: att,
+      currentText: getDraft(),
+      currentAttachments: attachmentsRef.current,
+    });
+    const sendTargetId = resolveComposerSendSessionId({
+      viewingSessionId: originView.sessionId,
+      shellSessionId: session.sessionId,
+    });
+    const stillHere = isViewingSendTarget(
+      originView,
+      currentViewFocus(),
+      sendTargetId,
+    );
+    if (stillHere) {
+      if (action === "persist-clear") persistComposerSubmitClear(clearDraftOpts);
+      else if (action === "restore") {
+        setDraft(storedDisplay);
+        setAttachments(att);
+      }
+      return;
+    }
+    // Navigated away: leaving already persisted the composer-at-leave
+    // (follow-up text stays). Only refill an empty origin buffer on fail.
+    if (sent) return;
+    if (clearDraftOpts.clearSessionDraft && clearDraftOpts.sessionDraftId) {
+      if (!loadComposerSessionDraft(clearDraftOpts.sessionDraftId)) {
+        saveComposerSessionDraft(clearDraftOpts.sessionDraftId, {
+          text: storedDisplay,
+          attachments: att,
+          goalMode,
+        });
+      }
+    } else if (
+      clearDraftOpts.clearProjectDraft &&
+      !loadComposerProjectDraft(projectDraftKey(activeProject?.id ?? null))
     ) {
-      clearComposerAfterSubmit(clearDraftOpts);
+      saveComposerProjectDraft(projectDraftKey(activeProject?.id ?? null), {
+        text: storedDisplay,
+        attachments: att,
+        goalMode,
+      });
     }
   };
   sendRef.current = send;
@@ -14565,7 +14623,15 @@ export function AppWorkbench() {
   );
 
   const refreshAccount = useCallback(
-    async (opts?: { refreshBilling?: boolean }) => {
+    async (opts?: {
+      refreshBilling?: boolean;
+      /** No spinner / error flash — background quota tick. */
+      quiet?: boolean;
+      /** Skip heatmap / call-log walk (billing-only). */
+      includeLocalUsage?: boolean;
+      /** Drop Host reply after unmount / superseded probe. */
+      isCurrent?: () => boolean;
+    }) => {
       if (!api.isTauri()) {
         // Browser preview: soft-fail host_only — never invent heatmap/quota.
         setAccountHeatmapError({ code: "host_only", message: "need tauri" });
@@ -14576,35 +14642,48 @@ export function AppWorkbench() {
         });
         return;
       }
-      setAccountLoading(true);
+      const quiet = opts?.quiet === true;
+      const includeLocalUsage = opts?.includeLocalUsage ?? true;
+      if (!quiet) setAccountLoading(true);
       try {
         const st = await api.accountStatus({
           refreshBilling: opts?.refreshBilling ?? true,
+          includeLocalUsage,
           manualCliPath: manualCliPath || null,
         });
-        setAccount(st);
-        setAccountHeatmapError(null);
+        if (opts?.isCurrent && !opts.isCurrent()) return;
+        setAccount((prev) =>
+          includeLocalUsage
+            ? st
+            : mergeAccountStatusPreservingLocalUsage(prev, st),
+        );
+        if (!quiet) setAccountHeatmapError(null);
         setAccountProbeError(null);
         setSetup((s) => ({
           ...s,
           auth: isAccountConnected(st),
           cli: st.cliFound || s.cli,
         }));
-        try {
-          const list = await api.accountsList();
-          setSavedAccounts(list.profiles ?? []);
-          setActiveAccountId(list.activeId ?? null);
-        } catch {
-          // multi-account list is best-effort
+        if (!quiet) {
+          try {
+            const list = await api.accountsList();
+            setSavedAccounts(list.profiles ?? []);
+            setActiveAccountId(list.activeId ?? null);
+          } catch {
+            // multi-account list is best-effort
+          }
         }
         // Usage line on tray menu (Codex-style)
         void api.trayRefresh();
       } catch (e) {
+        if (opts?.isCurrent && !opts.isCurrent()) return;
         console.warn("account status failed", e);
-        setAccountHeatmapError(e);
-        setAccountProbeError(e);
+        if (!quiet) {
+          setAccountHeatmapError(e);
+          setAccountProbeError(e);
+        }
       } finally {
-        setAccountLoading(false);
+        if (!quiet) setAccountLoading(false);
       }
     },
     [manualCliPath],
@@ -16462,9 +16541,10 @@ export function AppWorkbench() {
     if (!api.isTauri()) return;
     let cancelled = false;
     void (async () => {
-      await refreshAccount({ refreshBilling: false });
+      const isCurrent = () => !cancelled;
+      await refreshAccount({ refreshBilling: false, isCurrent });
       if (cancelled) return;
-      await refreshAccount({ refreshBilling: true });
+      await refreshAccount({ refreshBilling: true, isCurrent });
       if (cancelled) return;
       await refreshSavedAccounts();
     })();
@@ -16479,6 +16559,18 @@ export function AppWorkbench() {
       void refreshSavedAccounts();
     }
   }, [appView, settingsSection, refreshAccount, refreshSavedAccounts]);
+
+  useAccountQuotaAutoRefresh({
+    enabled: api.isTauri(),
+    canFetch: canFetchOfficialQuota(account),
+    refresh: (isCurrent) =>
+      refreshAccount({
+        refreshBilling: true,
+        quiet: true,
+        includeLocalUsage: false,
+        isCurrent,
+      }),
+  });
 
   const settingsLabels = useMemo(() => {
     const keys = [

@@ -1461,6 +1461,15 @@ fn urlencoding_decode(s: &str) -> Option<String> {
 }
 
 pub async fn account_status(manual_cli: Option<&str>, refresh_billing: bool) -> AccountStatus {
+    account_status_opts(manual_cli, refresh_billing, true).await
+}
+
+/// `include_local_usage = false` skips the heatmap / call-log walk (quota-only).
+pub async fn account_status_opts(
+    manual_cli: Option<&str>,
+    refresh_billing: bool,
+    include_local_usage: bool,
+) -> AccountStatus {
     let profile = read_auth_profile();
     let secrets = store::load_secrets();
     let has_official = secrets
@@ -1544,10 +1553,14 @@ pub async fn account_status(manual_cli: Option<&str>, refresh_billing: bool) -> 
     };
 
     // 371 days ≈ GitHub contribution year (matches grok-go heatmap).
-    // Blocking jsonl walk — never hold the async runtime.
-    let (heatmap, call_logs) = tauri::async_runtime::spawn_blocking(|| local_usage(371, 40))
-        .await
-        .unwrap_or_else(|_| (empty_heatmap(371), vec![]));
+    // Blocking jsonl walk — never hold the async runtime. Quota-only ticks skip it.
+    let (heatmap, call_logs) = if include_local_usage {
+        tauri::async_runtime::spawn_blocking(|| local_usage(371, 40))
+            .await
+            .unwrap_or_else(|_| (empty_heatmap(371), vec![]))
+    } else {
+        (Vec::new(), Vec::new())
+    };
 
     AccountStatus {
         profile,

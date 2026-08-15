@@ -202,7 +202,13 @@ cp src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/* dist-installer
 
 | Secret | 用途 |
 |--------|------|
-| `APPLE_CERTIFICATE` 等 | Apple 公证 / 签名（见 [Tauri macOS signing](https://v2.tauri.app/distribute/sign/macos/)） |
+| `APPLE_CERTIFICATE` | Developer ID Application `.p12` 的 base64（`openssl base64 -A -in cert.p12`） |
+| `APPLE_CERTIFICATE_PASSWORD` | 上述 `.p12` 的导出密码 |
+| `APPLE_SIGNING_IDENTITY` | `security find-identity -v -p codesigning` 引号内整串，如 `Developer ID Application: Name (TEAMID)` |
+| `APPLE_TEAM_ID` | 10 位 Team ID |
+| `APPLE_API_ISSUER` | App Store Connect Issuer ID（UUID） |
+| `APPLE_API_KEY` | App Store Connect Key ID |
+| `APPLE_API_KEY_P8` | `AuthKey_<id>.p8` 全文（CI 写成临时文件再设 `APPLE_API_KEY_PATH`） |
 | `WINDOWS_CERTIFICATE` | **Windows Authenticode** `.pfx` 的 base64（`certutil -encode` 或 `[Convert]::ToBase64String`） |
 | `WINDOWS_CERTIFICATE_PASSWORD` | 上述 `.pfx` 的导出密码 |
 | `GROK_UPDATER_PUBLIC_KEY` | 应用内自动更新公钥（与 endpoint 一起嵌入 release 构建） |

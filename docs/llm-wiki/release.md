@@ -153,7 +153,7 @@ Release job 关键：
 GitHub → **Settings → Actions → General → Workflow permissions**  
 → **Read and write permissions**（否则无法创建/更新 Release）。
 
-未配置 Apple 签名时 macOS 包**未公证**，属预期；Release 正文必须带 `xattr` 说明。
+未配置完整 `APPLE_CERTIFICATE` + App Store Connect API secrets 时 macOS 包**未公证**，属预期；README 保留 `xattr` 说明。Secrets 齐且 `release.yml` 已接线后，正式 tag 会 codesign + notarize；**第一个公证成功的 Release 之后**再改 README 的「未公证」段。
 
 ## macOS「已损坏 / 无法打开」
 
