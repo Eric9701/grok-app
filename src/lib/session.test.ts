@@ -48,6 +48,8 @@ import {
   canRewindToUserPrompt,
   userPromptIndexOf,
   countUserPrompts,
+  lastUserRowIndex,
+  lastUserMessageIndex,
   lastRegenerableAssistantId,
   canRegenerateAssistant,
   localRewindPoints,
@@ -384,6 +386,93 @@ describe("session projection", () => {
       "a-pending-steer-i1",
     ]);
     expect(messages[2]).toMatchObject({ streaming: true });
+  });
+
+  it("does not revive a frozen pre-steer assistant when the old stream id keeps ticking", () => {
+    // User report: mid-turn 引导 then the transcript flashes. Host may still
+    // emit thought/body/done on the pre-steer message id. Binding those
+    // chunks back onto a1 flips streaming and swaps the Worked-for rail
+    // between a one-line header and the full tool list.
+    let messages: ChatMessage[] = [
+      { id: "u1", role: "user", content: "set 死三條選擇題" },
+      {
+        id: "a1",
+        role: "assistant",
+        content: "得，就改成三條死選擇題。",
+        streaming: true,
+        segments: [
+          { kind: "thought", text: "plan" },
+          {
+            kind: "tool",
+            toolCallId: "t1",
+            title: "Read form",
+            toolKind: "read_file",
+            status: "completed",
+          },
+          {
+            kind: "tool",
+            toolCallId: "t2",
+            title: "Edit quiz",
+            toolKind: "search_replace",
+            status: "completed",
+          },
+          { kind: "content", text: "得，就改成三條死選擇題。" },
+        ],
+      },
+    ];
+    messages = applyInterjection(messages, {
+      id: "i1",
+      role: "user",
+      content: "A、B、C 只係例子",
+      marker: "interjection",
+    });
+    expect(messages.find((m) => m.id === "a1")?.streaming).toBe(false);
+
+    messages = applyStreamChunk(messages, {
+      sessionId: "s",
+      messageId: "a1",
+      text: " still thinking on the old segment",
+      done: false,
+      kind: "thought",
+    });
+    expect(messages.find((m) => m.id === "a1")?.streaming).toBe(false);
+    expect(messages.find((m) => m.id === "a1")?.thought ?? "").not.toContain(
+      "old segment",
+    );
+    const post = messages.find((m) => m.id === "a-pending-steer-i1");
+    expect(post?.streaming).toBe(true);
+    expect(post?.thought ?? "").toContain("old segment");
+
+    messages = applyStreamChunk(messages, {
+      sessionId: "s",
+      messageId: "a1",
+      text: " leftover body",
+      done: false,
+      kind: "assistant",
+    });
+    expect(messages.find((m) => m.id === "a1")?.streaming).toBe(false);
+    expect(messages.find((m) => m.id === "a1")?.content).toBe(
+      "得，就改成三條死選擇題。",
+    );
+    expect(messages.find((m) => m.id === "a-pending-steer-i1")?.content).toContain(
+      "leftover body",
+    );
+  });
+
+  it("lastUserRowIndex counts steer; lastUserMessageIndex skips it", () => {
+    const messages: ChatMessage[] = [
+      { id: "u1", role: "user", content: "q" },
+      { id: "a1", role: "assistant", content: "working" },
+      {
+        id: "i1",
+        role: "user",
+        content: "steer",
+        marker: "interjection",
+      },
+      { id: "a2", role: "assistant", content: "", streaming: true },
+    ];
+    expect(lastUserMessageIndex(messages)).toBe(0);
+    expect(lastUserRowIndex(messages)).toBe(2);
   });
 
     it("localRewindPoints lists one entry per user prompt", () => {

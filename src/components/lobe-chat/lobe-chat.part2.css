@@ -53,14 +53,14 @@
   padding: 0;
 }
 
-/* Long step lists: fixed max-height scroller for VirtualList windowing.
-   Row height must stay in sync with GROK_ACTIVITY_STEP_ROW_PX (30). */
+/* Long step lists: max-height scroller so expand / live cannot dump
+   dozens of rows into the transcript (stick-to-bottom flash). */
+.grok-act__steps--capped,
 .grok-act__steps--virtual {
   max-height: 360px; /* fallback; inline style sets min(12, n) * 30 */
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* VirtualList root is the only child; stretch full width */
   min-height: 0;
 }
 .grok-act__steps--virtual .grok-act__step {

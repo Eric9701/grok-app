@@ -45,6 +45,7 @@ import {
 } from "@/lib/toolDisplay";
 import {
   GROK_ACTIVITY_STEP_ROW_PX,
+  GROK_ACTIVITY_VIRTUALIZE_THRESHOLD,
   applyActivityStepExpandPolicy,
   applyActivityStepUserToggle,
   emptyActivityStepExpandState,
@@ -455,8 +456,21 @@ export function GrokActivitySteps({
   if (!total) return null;
 
   if (!virtualize) {
+    // Keep the same max-height scroller as the virtual path. Leaving the
+    // cap when a running step auto-expands used to dump 20–200 rows into
+    // the chat and fight stick-to-bottom (transcript flash).
+    const cap =
+      total > GROK_ACTIVITY_VIRTUALIZE_THRESHOLD
+        ? grokActivityVirtualMaxHeightPx(total)
+        : undefined;
     return (
-      <div className="grok-act__steps" role="list">
+      <div
+        className={
+          "grok-act__steps" + (cap ? " grok-act__steps--capped" : "")
+        }
+        role="list"
+        style={cap ? { maxHeight: cap } : undefined}
+      >
         {steps.map((step, idx) => (
           <GrokActivityStepRow
             key={step.key}
@@ -538,18 +552,24 @@ export const TimelinePhaseBlock = memo(function TimelinePhaseBlock({
   const phaseRunning =
     !!messageStreaming && (phase.live || phase.runningCount > 0);
   const wantOpen = toolStepDefaultOpen(phaseRunning, autoCollapse);
-  const [open, setOpen] = useState(wantOpen);
+  const [open, setOpen] = useState(() =>
+    // Live + autoCollapse starts collapsed — same as the effect. Using
+    // wantOpen here flashed the full step list for one paint.
+    phaseRunning ? !autoCollapse : wantOpen,
+  );
   const userToggled = useRef(false);
 
   useEffect(() => {
+    if (userToggled.current) return;
     if (phaseRunning) {
-      // Live phases auto-open by default, but a user-collapsed phase stays
-      // collapsed while it keeps working (manual choice wins).
-      if (!userToggled.current) setOpen(true);
+      // Respect auto-collapse while live. Auto-opening the full step list
+      // on every streaming=true flicker was the mid-steer transcript flash
+      // (collapsed “工作了” ↔ hundreds of tool rows).
+      setOpen(!autoCollapse);
       return;
     }
-    if (!userToggled.current) setOpen(wantOpen);
-  }, [phaseRunning, wantOpen, phase.id]);
+    setOpen(wantOpen);
+  }, [phaseRunning, wantOpen, autoCollapse, phase.id]);
 
   useEffect(() => {
     const onCollapseAll = () => {
@@ -637,31 +657,15 @@ export const TimelinePhaseBlock = memo(function TimelinePhaseBlock({
     formatDuration: (sec) => formatWorkDuration(sec, locale),
   });
 
-  if (phaseRunning) {
-    return (
-      <div
-        className="grok-act is-live"
-        data-testid="timeline-phase"
-        data-phase-id={phase.id}
-        data-live="1"
-      >
-        <GrokActivitySteps steps={stepsResolved} tr={tr} locale={locale} live />
-        <div className="grok-act__working" role="status" aria-live="polite">
-          <span className="grok-act__working-icon" aria-hidden>
-            <IconGridDots size={15} stroke={1.5} />
-          </span>
-          <span className="grok-act__working-label">{phaseChromeLabel}</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
-      className={"grok-act" + (open ? " is-open" : " is-collapsed")}
+      className={
+        "grok-act" +
+        (phaseRunning ? " is-live" : open ? " is-open" : " is-collapsed")
+      }
       data-testid="timeline-phase"
       data-phase-id={phase.id}
-      data-live="0"
+      data-live={phaseRunning ? "1" : "0"}
       data-expanded={open ? "1" : "0"}
     >
       <button
@@ -685,7 +689,14 @@ export const TimelinePhaseBlock = memo(function TimelinePhaseBlock({
           )}
         </span>
       </button>
-      {open ? <GrokActivitySteps steps={stepsResolved} tr={tr} locale={locale} /> : null}
+      {open ? (
+        <GrokActivitySteps
+          steps={stepsResolved}
+          tr={tr}
+          locale={locale}
+          live={phaseRunning}
+        />
+      ) : null}
     </div>
   );
 });

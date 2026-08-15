@@ -2602,6 +2602,21 @@ export function lastUserMessageIndex(messages: ChatMessage[]): number {
 }
 
 /**
+ * Last painted user row, including mid-turn steer / interjection.
+ *
+ * Turn-prompt helpers skip interjections so edit/rewind still treat the
+ * original question as the turn start. Stream binding must not: after 引导
+ * the pre-steer assistant is frozen, and leftover Host chunks on that id
+ * would revive it (Worked-for rail swaps collapsed ↔ full tool list).
+ */
+export function lastUserRowIndex(messages: ChatMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "user") return i;
+  }
+  return -1;
+}
+
+/**
  * Drop stuck streaming flags on assistants from previous turns (before last user).
  * Call when starting a new send so the next stream never binds to old bubbles.
  */
@@ -2809,11 +2824,7 @@ export function applyStreamChunk(
       const derived = deriveFieldsFromSegments(segs);
       return {
         ...prev,
-        id:
-          chunk.messageId &&
-          (prev.id.startsWith("a-pending-") || prev.id.startsWith("t-"))
-            ? chunk.messageId
-            : prev.id,
+        id: adoptHostStreamMessageId(messages, prev, chunk.messageId),
         ...derived,
         segments: segs,
         streaming: true,
@@ -2851,9 +2862,10 @@ export function applyStreamChunk(
     const fallback = findCurrentTurnStreamingAssistant(messages, undefined);
     idx = fallback ?? -1;
   } else {
-    // Refuse to append onto an assistant from a previous turn (stale id reuse).
-    const lastUser = lastUserMessageIndex(messages);
-    if (idx <= lastUser) {
+    // Refuse to append onto an assistant from a previous turn (stale id reuse)
+    // or a frozen pre-steer bubble (interjection sits after it).
+    const bindFloor = lastUserRowIndex(messages);
+    if (idx <= bindFloor) {
       const fallback = findCurrentTurnStreamingAssistant(messages, undefined);
       idx = fallback ?? -1;
     }
@@ -2883,12 +2895,9 @@ export function applyStreamChunk(
   const derived = deriveFieldsFromSegments(segs);
   next[idx] = {
     ...prev,
-    // Prefer host messageId so journal reload dedupes cleanly
-    id:
-      chunk.messageId &&
-      (prev.id.startsWith("a-pending-") || prev.id.startsWith("t-") || !prev.id)
-        ? chunk.messageId
-        : prev.id || chunk.messageId || prev.id,
+    // Prefer host messageId so journal reload dedupes cleanly — but never
+    // steal a frozen pre-steer row's id (that remounts two bubbles as one).
+    id: adoptHostStreamMessageId(messages, prev, chunk.messageId),
     ...derived,
     segments: segs,
     streaming: !chunk.done,
@@ -2897,22 +2906,47 @@ export function applyStreamChunk(
 }
 
 /**
- * Find the streaming assistant for the *current* turn only (after last user).
+ * Adopt Host's stream message id onto an optimistic pending/temp row.
+ * Skip when that id already belongs to another row (frozen pre-steer).
+ */
+function adoptHostStreamMessageId(
+  messages: ChatMessage[],
+  prev: ChatMessage,
+  hostId: string | undefined,
+): string {
+  const nextId = (hostId || "").trim();
+  if (!nextId) return prev.id;
+  const pending =
+    !prev.id ||
+    prev.id.startsWith("a-pending-") ||
+    prev.id.startsWith("t-");
+  if (!pending) return prev.id || nextId;
+  if (messages.some((m) => m.id === nextId && m.id !== prev.id)) {
+    return prev.id;
+  }
+  return nextId;
+}
+
+/**
+ * Find the streaming assistant for the *current* paint segment only
+ * (after the last user row, including mid-turn 引导).
  */
 function findCurrentTurnStreamingAssistant(
   messages: ChatMessage[],
   messageId: string | undefined,
 ): number | undefined {
-  const lastUser = lastUserMessageIndex(messages);
+  const bindFloor = lastUserRowIndex(messages);
   if (messageId) {
     const byId = messages.findIndex((m) => m.id === messageId);
-    if (byId > lastUser) return byId;
+    // Named id is only valid after the last user/steer row. A pre-steer
+    // match would revive the frozen bubble (chat flicker).
+    if (byId > bindFloor) return byId;
   }
-  for (let i = messages.length - 1; i > lastUser; i--) {
+  for (let i = messages.length - 1; i > bindFloor; i--) {
     const m = messages[i]!;
     if (m.role === "assistant" && m.streaming) return i;
   }
-  // No current-turn streaming bubble — do NOT fall back to older turns.
+  // No current-segment streaming bubble — do NOT fall back to older turns.
   return undefined;
 }
 
