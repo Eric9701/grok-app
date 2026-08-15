@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.19] - 2026-08-15
+
+> **Highlight:** SuperGrok quota auto-refresh every 10 minutes; macOS Release notarization when Apple secrets are present; first launch follows the OS language; mid-turn steer no longer flashes the transcript; composer clears as soon as the user bubble appears.
+>
+> **中文 · 亮点：** SuperGrok 额度每 10 分钟自动刷新；仓库配齐 Apple secrets 后 macOS Release 会公证；首次安装跟随系统语言；中途引导不再闪聊天；发送后输入框立刻清空。
+
 ### Changed
 - **Official SuperGrok quota auto-refresh**: Background probe every **10 minutes**. Settings → Account, the sidebar user-menu (remaining %), tray Usage, and the usage-limit modal all follow the same snapshot. Quiet billing-only ticks (no spinner, no heatmap walk); last good numbers stay on soft-fail.
 - **macOS Release signing / notarization**: When Apple Developer ID + App Store Connect API secrets are present, `release.yml` codesigns and notarizes the `.app` / `.dmg` (Hardened Runtime entitlements include microphone + camera). Forks without secrets stay unsigned.
