@@ -72,11 +72,16 @@ describe("resolveLocale", () => {
     expect(resolveLocale("EN-US")).toBe("en");
   });
 
-  it("falls back to the product default for unknown or empty ids", () => {
+  it("falls back to the product default for unknown ids", () => {
     expect(resolveLocale("fr")).toBe("en");
-    expect(resolveLocale("")).toBe("en");
-    expect(resolveLocale(undefined)).toBe("en");
-    expect(resolveLocale(null)).toBe("en");
+  });
+
+  it("treats empty or missing ids as follow-system", () => {
+    const system = resolveLocalePreference("system");
+    expect(resolveLocale("")).toBe(system);
+    expect(resolveLocale(undefined)).toBe(system);
+    expect(resolveLocale(null)).toBe(system);
+    expect(resolveLocale("system")).toBe(system);
   });
 });
 
