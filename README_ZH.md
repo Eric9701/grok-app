@@ -153,9 +153,9 @@
 
 ## macOS 无法打开 / 提示已损坏
 
-当前 Release **未做 Apple 公证**（需付费开发者账号）。从 GitHub 下载后，Gatekeeper 可能提示「已损坏」「无法验证开发者」等，属预期行为。
+官方 GitHub Release 从 **v0.2.19** 起已做 Developer ID 签名和 **Apple 公证**。打开 `.dmg`，把 Grok 拖进「应用程序」即可。
 
-**推荐处理：**
+若 Gatekeeper 仍拦截（fork / 旧的未签名包，或残留隔离标记）：
 
 ```bash
 # 将 App 拖到「应用程序」后执行

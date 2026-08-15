@@ -177,9 +177,9 @@ Grok backends (`auth.x.ai` / `grok.com` / `cli-chat-proxy.grok.com`) may be unre
 
 ## macOS “damaged” / Gatekeeper
 
-Release builds are **not Apple-notarized** (paid Developer ID required). Gatekeeper may block downloads — that is expected.
+Official GitHub Releases from **v0.2.19** are Developer ID signed and **Apple-notarized**. Open the `.dmg` and drag Grok to Applications as usual.
 
-**Recommended:**
+If Gatekeeper still blocks (fork / older unsigned builds, or a leftover quarantine flag):
 
 ```bash
 xattr -cr /Applications/Grok.app

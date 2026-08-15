@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Changed
+- **README Gatekeeper copy**: Official Releases from v0.2.19 are Developer ID signed and Apple-notarized. The `xattr` workaround stays for forks / older unsigned builds.
+
+**中文 · 变更**
+- **README Gatekeeper 说明**：官方 Release 从 v0.2.19 起已签名并公证。`xattr` 仅留给 fork / 旧的未签名包。
+
 ## [0.2.19] - 2026-08-15
 
 > **Highlight:** SuperGrok quota auto-refresh every 10 minutes; macOS Release notarization when Apple secrets are present; first launch follows the OS language; mid-turn steer no longer flashes the transcript; composer clears as soon as the user bubble appears.
