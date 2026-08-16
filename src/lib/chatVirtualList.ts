@@ -34,12 +34,6 @@ export const CHAT_VIRTUALIZE_HEIGHT_PX = 4000;
  */
 export const CHAT_VIRT_SPACER_CHUNK_PX = 4096;
 
-/**
- * CSS paint cap for a single message body (must match lobe-chat CSS).
- * Keeps one markdown article under typical GPU texture limits (~8k).
- */
-export const CHAT_MESSAGE_PAINT_CAP_PX = 4096;
-
 /** Fallback height before a row is measured (px). */
 export const CHAT_DEFAULT_ROW_ESTIMATE_PX = 120;
 

@@ -178,12 +178,6 @@
   gap: var(--chat-item-body-gap, 10px);
   max-width: 100%;
   min-width: 0;
-  /* Cap one mega-article so WebView/WebKit does not blank the layer
-   * (GPU texture limit; see CHAT_MESSAGE_PAINT_CAP_PX). */
-  max-height: 4096px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .lobe-chat__virt-spacer {
@@ -597,6 +591,7 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   margin: 0;
   padding: 10px 14px 14px;
   overflow-x: auto;
+  overflow-y: clip;
   font-family: var(--chat-mono);
   font-size: var(--code-fs, var(--chat-fs-sm));
   line-height: 1.55;
@@ -631,6 +626,7 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   display: flex;
   align-items: stretch;
   overflow-x: auto;
+  overflow-y: clip;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -677,7 +673,7 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   max-width: 100%;
   margin: 0.75em 0;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: clip;
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--chat-code-border);
   border-radius: var(--chat-r);
