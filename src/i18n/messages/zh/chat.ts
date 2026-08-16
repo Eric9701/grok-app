@@ -29,6 +29,8 @@ export const zhChat = {
   "main.retryingWithReason": "正在重新连接 {attempt}/{max}",
   "main.startTitle": "开始对话",
   "main.startHint": "输入消息后发送，将在后台静默连接 CLI。",
+  "main.loadingTitle": "正在加载会话内容",
+  "main.loadingHint": "正在读取本会话的消息…",
   "main.working": "工作中…",
   "main.reasoning": "推理",
   "main.you": "你",

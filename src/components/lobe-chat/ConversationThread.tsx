@@ -127,6 +127,8 @@ import {
   buildAssistantTimeline,
   shouldShowTrailingLiveThinking,
 } from "@/lib/timelinePhases";
+import { resolveChatTranscriptEmptyState } from "@/lib/chatTranscriptEmpty";
+import { Spinner } from "@/components/ui/spinner";
 import {
   BACK_BOTTOM_ALWAYS_CHANGE_EVENT,
   loadBackBottomAlwaysPref,
@@ -491,6 +493,12 @@ export interface ConversationThreadProps {
   projectPath?: string | null;
   /** When true, suppress generic empty copy (brand mark lives above composer). */
   suppressEmptyCopy?: boolean;
+  /** Selected session journal is still loading — not a fresh draft. */
+  journalLoading?: boolean;
+  /** Viewing an existing session (not a new draft). */
+  hasExistingSession?: boolean;
+  /** Viewing session journal has been read at least once this process. */
+  journalHydrated?: boolean;
   /** Only the latest user message may be edited (idle session). */
   canEditLastUser?: boolean;
   lastUserMessageId?: string | null;
@@ -1587,6 +1595,9 @@ export function ConversationThread({
   sessionKey,
   projectPath,
   suppressEmptyCopy = false,
+  journalLoading = false,
+  hasExistingSession = false,
+  journalHydrated,
   canEditLastUser = false,
   lastUserMessageId = null,
   editingUserMessageId = null,
@@ -2175,6 +2186,13 @@ export function ConversationThread({
     !showQuietThinking &&
     !liveTool &&
     !turnBusy;
+  const emptyCopy = resolveChatTranscriptEmptyState({
+    empty,
+    suppressEmptyCopy,
+    journalLoading,
+    journalHydrated,
+    hasSession: hasExistingSession,
+  });
 
   /**
    * Consecutive unwoven standalone tool_step rows merge into one collapsible
@@ -2381,10 +2399,17 @@ export function ConversationThread({
         onContextMenu={onTranscriptContextMenu}
       >
         <div ref={contentRef} className="lobe-chat__inner">
-          {empty && !suppressEmptyCopy ? (
-            <div className="lobe-chat-empty">
-              <h3 className="lobe-chat-empty__title">{tr("main.startTitle")}</h3>
-              <p className="lobe-chat-empty__desc">{tr("main.startHint")}</p>
+          {emptyCopy ? (
+            <div
+              className="lobe-chat-empty"
+              data-kind={emptyCopy.kind}
+              aria-busy={emptyCopy.kind === "loading" ? true : undefined}
+            >
+              {emptyCopy.kind === "loading" ? (
+                <Spinner className="lobe-chat-empty__spinner" size={22} />
+              ) : null}
+              <h3 className="lobe-chat-empty__title">{tr(emptyCopy.titleKey)}</h3>
+              <p className="lobe-chat-empty__desc">{tr(emptyCopy.hintKey)}</p>
             </div>
           ) : null}
 

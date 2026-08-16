@@ -29,6 +29,8 @@ export const zhTWChat = {
   "main.retryingWithReason": "正在重新連線 {attempt}/{max}",
   "main.startTitle": "開始對話",
   "main.startHint": "輸入訊息後傳送，將在背景靜默連線 CLI。",
+  "main.loadingTitle": "正在載入對話內容",
+  "main.loadingHint": "正在讀取此對話的訊息…",
   "main.working": "工作中…",
   "main.reasoning": "推理",
   "main.you": "你",

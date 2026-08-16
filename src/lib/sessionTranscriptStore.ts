@@ -30,13 +30,23 @@ export type TranscriptMeta = {
    * not on content growth of an existing streaming row.
    */
   structuralRev: number;
+  /**
+   * Viewing session journal has not finished its first disk load in this
+   * process. Distinguishes "start chatting" from "loading conversation".
+   */
+  journalLoading: boolean;
+  /**
+   * Viewing session journal has been read at least once this process
+   * (including a confirmed empty journal).
+   */
+  journalHydrated: boolean;
 };
 
 export type MessagesReducer = (prev: ChatMessage[]) => ChatMessage[];
 
 function computeMeta(messages: readonly ChatMessage[]): Omit<
   TranscriptMeta,
-  "structuralRev"
+  "structuralRev" | "journalLoading" | "journalHydrated"
 > {
   let lastUserId: string | null = null;
   let hasError = false;
@@ -58,8 +68,8 @@ function computeMeta(messages: readonly ChatMessage[]): Omit<
 }
 
 function metaStructuralEqual(
-  a: Omit<TranscriptMeta, "structuralRev">,
-  b: Omit<TranscriptMeta, "structuralRev">,
+  a: Omit<TranscriptMeta, "structuralRev" | "journalLoading" | "journalHydrated">,
+  b: Omit<TranscriptMeta, "structuralRev" | "journalLoading" | "journalHydrated">,
 ): boolean {
   return (
     a.length === b.length &&
@@ -86,8 +96,14 @@ class SessionTranscriptStore {
     hasStreamingAssistant: false,
     tailId: null,
     structuralRev: 0,
+    journalLoading: false,
+    journalHydrated: false,
   };
   private bySession = new Map<string, ChatMessage[]>();
+  /** Session ids whose App journal has been read at least once this process. */
+  private hydratedSessionIds = new Set<string>();
+  /** Session currently waiting on its first journal read. */
+  private loadingSessionId: string | null = null;
   private viewingSessionId: string | null = null;
   /** Prefer App's viewingSessionIdRef when set (ahead of React session state). */
   private viewingIdResolver: (() => string | null) | null = null;
@@ -140,6 +156,7 @@ class SessionTranscriptStore {
 
   setViewingSessionId(sessionId: string | null): void {
     this.viewingSessionId = sessionId;
+    this.syncJournalMeta();
   }
 
   /** App wires this to `() => viewingSessionIdRef.current`. */
@@ -239,6 +256,7 @@ class SessionTranscriptStore {
       this.meta = {
         ...nextCore,
         structuralRev: this.meta.structuralRev + 1,
+        ...this.journalFlags(),
       };
       this.notifyMeta();
     } else {
@@ -246,9 +264,75 @@ class SessionTranscriptStore {
       this.meta = {
         ...nextCore,
         structuralRev: this.meta.structuralRev,
+        ...this.journalFlags(),
       };
     }
     this.scheduleContentNotify(structural);
+  }
+
+  private journalLoadingNow(): boolean {
+    const viewing = this.getViewingSessionId();
+    return !!viewing && this.loadingSessionId === viewing;
+  }
+
+  private journalHydratedNow(): boolean {
+    const viewing = this.getViewingSessionId();
+    return !!viewing && this.hydratedSessionIds.has(viewing);
+  }
+
+  private journalFlags(): Pick<TranscriptMeta, "journalLoading" | "journalHydrated"> {
+    return {
+      journalLoading: this.journalLoadingNow(),
+      journalHydrated: this.journalHydratedNow(),
+    };
+  }
+
+  private syncJournalMeta(): void {
+    const next = this.journalFlags();
+    if (
+      this.meta.journalLoading === next.journalLoading &&
+      this.meta.journalHydrated === next.journalHydrated
+    ) {
+      return;
+    }
+    this.meta = { ...this.meta, ...next };
+    this.notifyMeta();
+  }
+
+  isJournalHydrated(sessionId: string): boolean {
+    return this.hydratedSessionIds.has(sessionId);
+  }
+
+  isJournalLoading(sessionId: string): boolean {
+    return this.loadingSessionId === sessionId;
+  }
+
+  /** Mark the viewing session as waiting on its first disk journal read. */
+  beginJournalLoad(sessionId: string): void {
+    this.loadingSessionId = sessionId;
+    this.syncJournalMeta();
+  }
+
+  /** Journal read finished (including a confirmed empty journal). */
+  finishJournalLoad(sessionId: string): void {
+    this.hydratedSessionIds.add(sessionId);
+    if (this.loadingSessionId === sessionId) {
+      this.loadingSessionId = null;
+    }
+    this.syncJournalMeta();
+  }
+
+  /** Load failed or was abandoned before any journal rows were known. */
+  abortJournalLoad(sessionId: string): void {
+    if (this.loadingSessionId !== sessionId) return;
+    this.loadingSessionId = null;
+    this.syncJournalMeta();
+  }
+
+  /** New draft — not a session journal load. */
+  clearJournalLoad(): void {
+    this.loadingSessionId = null;
+    this.syncJournalMeta();
   }
 
   /**
@@ -295,6 +379,11 @@ class SessionTranscriptStore {
 
   deleteSession(sessionId: string): void {
     this.bySession.delete(sessionId);
+    this.hydratedSessionIds.delete(sessionId);
+    if (this.loadingSessionId === sessionId) {
+      this.loadingSessionId = null;
+      this.syncJournalMeta();
+    }
     if (this.messagesOwnerSessionId === sessionId) {
       this.messagesOwnerSessionId = null;
     }
@@ -309,6 +398,8 @@ class SessionTranscriptStore {
     this.contentNotifyQueued = false;
     this.messages = [];
     this.messagesOwnerSessionId = null;
+    this.hydratedSessionIds.clear();
+    this.loadingSessionId = null;
     this.meta = {
       length: 0,
       lastUserId: null,
@@ -316,6 +407,8 @@ class SessionTranscriptStore {
       hasStreamingAssistant: false,
       tailId: null,
       structuralRev: 0,
+      journalLoading: false,
+      journalHydrated: false,
     };
     this.bySession.clear();
     this.viewingSessionId = null;

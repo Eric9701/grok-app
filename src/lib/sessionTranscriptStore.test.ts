@@ -190,4 +190,30 @@ describe("sessionTranscriptStore", () => {
         ?.streaming,
     ).toBe(true);
   });
+
+  it("tracks journal loading vs hydrated so empty is not a fresh chat", () => {
+    sessionTranscriptStore.setViewingSessionId("s2");
+    let metaTicks = 0;
+    const unsub = sessionTranscriptStore.subscribeMeta(() => {
+      metaTicks += 1;
+    });
+    sessionTranscriptStore.beginJournalLoad("s2");
+    expect(sessionTranscriptStore.getMetaSnapshot().journalLoading).toBe(true);
+    expect(sessionTranscriptStore.getMetaSnapshot().journalHydrated).toBe(false);
+    expect(sessionTranscriptStore.isJournalLoading("s2")).toBe(true);
+    expect(sessionTranscriptStore.isJournalHydrated("s2")).toBe(false);
+    expect(metaTicks).toBe(1);
+
+    sessionTranscriptStore.finishJournalLoad("s2");
+    expect(sessionTranscriptStore.getMetaSnapshot().journalLoading).toBe(false);
+    expect(sessionTranscriptStore.getMetaSnapshot().journalHydrated).toBe(true);
+    expect(sessionTranscriptStore.isJournalHydrated("s2")).toBe(true);
+    expect(sessionTranscriptStore.isJournalLoading("s2")).toBe(false);
+
+    sessionTranscriptStore.beginJournalLoad("s3");
+    expect(sessionTranscriptStore.getMetaSnapshot().journalLoading).toBe(false);
+    sessionTranscriptStore.abortJournalLoad("s3");
+    expect(sessionTranscriptStore.isJournalHydrated("s3")).toBe(false);
+    unsub();
+  });
 });

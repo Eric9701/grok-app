@@ -1078,6 +1078,10 @@
   overflow: hidden;
   pointer-events: none;
 }
+.lobe-chat-empty__spinner {
+  margin-bottom: 10px;
+  color: var(--chat-text-3);
+}
 .lobe-chat-empty__title {
   margin: 0;
   font-size: var(--chat-fs);
@@ -1090,6 +1094,20 @@
   font-size: var(--chat-fs-sm);
   color: var(--chat-text-3);
   line-height: var(--chat-lh-sm);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lobe-chat-empty[data-kind="loading"] .lobe-chat-empty__title {
+    animation: lobe-chat-empty-pulse 1.2s ease-in-out infinite;
+  }
+}
+@keyframes lobe-chat-empty-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 
 /* ── Back bottom ──

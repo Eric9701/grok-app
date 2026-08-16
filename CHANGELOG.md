@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.20] - 2026-08-17
+
+> **Highlight:** Grok Build-compatible custom relay; local session list/continue API; official-site installer aliases; opening a chat shows a real loading state instead of a fake empty session.
+>
+> **中文 · 亮点：** Grok Build 原生兼容中转；本机会话列表/续跑接口；官网安装包稳定别名；打开会话先显示加载而不是空会话。
+
 ### Added
 - **Grok Build-compatible custom relay (#634, supersedes #617)**: Settings → Account → Custom providers has **Provider mode**. Generic stays on `[model.<alias>]`. **Grok Build-compatible relay** is an explicit opt-in: Responses only, save reads live `/models` and requires `supports_backend_search=true` for every selected model, ACP launches the real model id with process-scoped catalog/proxy env (no hostname special case, no official-aux auto-enable). CC Switch `grokbuild` imports honor an explicit mode; otherwise they promote only when that live catalog claim is present. Attachments stay `@path` (same as #627).
 - **Composer `/workflow` and `/workflows`**: Slash palette matches Grok Build CLI. `/workflows` or bare `/workflow` opens Settings → Runtime → workflows (saved scripts + smoke/run). `/workflow <name|pause|resume|stop|save …>` is sent as a session turn so the agent/CLI host can run it. This App still has no TUI run dashboard.
@@ -38,6 +44,8 @@ See `docs/llm-wiki/release.md`.
 - **助手过程与结论分开**：中间穿插的话和折叠动作（探索 / 运行 / 编辑）收进同一条「工作了」（默认收起），结论始终在下面。日记 CoT 仍是单独的「思考了」，不灌进活动轨，也不和结论挤在一起。
 
 ### Fixed
+- **Opening a session no longer looks like a new empty chat**: While the journal is still on disk, the thread shows a spinner and “Loading conversation” instead of “Start chatting” plus the “agent failed to connect” banner. Journal text paints before relative-media / path-classify IPC. After HMR remount, a selected session re-opens instead of looking empty.
+- **Transcript wheel over message bodies**: The 4096px inner scroller from the long-chat fix ate vertical wheel in WebKit. Drop the nested scroller; the virtual list still windows long threads. Horizontal code/table scrollers use `overflow-y: clip`.
 - **Chat image previews**: Project-relative markdown images (`design-demos/shots/foo.png`) resolve from attachments instead of painting an empty alt card. A first-paint miss (file still being written, or path grant not ready) retries instead of locking the card as broken.
 - **Windows file / image drop into the composer**: WebView2 cannot use HTML5 `Files` while Tauri owns the drop target. Windows builds now set `dragDropEnabled: false` and handle Explorer drops in capture-phase HTML5 (temp-file attach when `File.path` is missing). Overlay + `@path` still work.
 - **Linux maximize / minimize**: Linux was decorated with no in-app caption buttons, and GTK/Wayland often no-ops `toggleMaximize`. Linux is now frameless with the same min/max/close chrome as Windows; maximize falls back to filling the monitor work area when the compositor ignores GTK.
@@ -48,6 +56,8 @@ See `docs/llm-wiki/release.md`.
 - **Custom Grok / vision relays can read image attachments (#618)**: Settings → Account → Custom providers has **This model can see images**. Grok / GPT-4o / Claude / Gemini names already count. Unknown relays stay text-only so DeepSeek-style APIs do not 400 on `image_url`. Vision mains keep `@path` pixels and no longer hit the `read_file` image hook.
 
 **中文 · 修复**
+- **打开会话不再先画成新空聊天**：日志还在读盘时，中间是转圈和「正在加载会话内容」，不再出现「开始对话」和「连接 Agent 失败」横幅。相对路径媒体和 path classify 不再挡住整段日志的第一帧。热更新后若会话还在、缓存没了，会重新打开而不是空会话。
+- **消息正文上滚轮被吃掉**：长对话修复里的 4096px 内层滚动在 WebKit 里会吞掉纵向滚轮。去掉嵌套滚动；长对话仍由虚拟列表窗口化。代码/表格横向滚动用 `overflow-y: clip`。
 - **聊天图片预览**：项目相对路径的 markdown 图（`design-demos/shots/foo.png`）会跟附件对上，不再画出一张空的 alt 卡。文件还没写完或授权还没落到的第一次失败会重试，不再把卡片锁死。
 - **Windows 无法把图片/文件拖进输入框**：Tauri 接管 WebView2 拖放后 HTML5 `Files` 是空的。Windows 现在关掉原生 drop handler，改用捕获阶段 HTML5（没有 `File.path` 就存临时文件再附加）。
 - **Linux 无法最大化/最小化**：以前走系统标题栏、应用内没有按钮，GTK/Wayland 上 `toggleMaximize` 经常没反应。Linux 改为与 Windows 一样的无边框自绘按钮；合成器忽略 GTK 最大化时，退化为铺满工作区。

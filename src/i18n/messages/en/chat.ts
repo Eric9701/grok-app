@@ -29,6 +29,8 @@ export const enChat = {
   "main.retryingWithReason": "Reconnecting {attempt}/{max}",
   "main.startTitle": "Start chatting",
   "main.startHint": "Type a message — CLI connects silently on send.",
+  "main.loadingTitle": "Loading conversation",
+  "main.loadingHint": "Reading this session's messages…",
   "main.working": "working…",
   "main.reasoning": "Reasoning",
   "main.you": "You",

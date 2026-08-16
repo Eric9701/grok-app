@@ -4,7 +4,10 @@
  */
 
 import { ConversationThread, type ConversationThreadProps } from "./ConversationThread";
-import { useViewingMessages } from "@/hooks/useSessionTranscript";
+import {
+  useTranscriptMeta,
+  useViewingMessages,
+} from "@/hooks/useSessionTranscript";
 
 export type ConversationThreadLiveProps = Omit<
   ConversationThreadProps,
@@ -13,5 +16,13 @@ export type ConversationThreadLiveProps = Omit<
 
 export function ConversationThreadLive(props: ConversationThreadLiveProps) {
   const messages = useViewingMessages();
-  return <ConversationThread {...props} messages={messages} />;
+  const meta = useTranscriptMeta();
+  const journalLoading = !!props.journalLoading || meta.journalLoading;
+  return (
+    <ConversationThread
+      {...props}
+      messages={messages}
+      journalLoading={journalLoading}
+    />
+  );
 }

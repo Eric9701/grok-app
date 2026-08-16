@@ -692,6 +692,7 @@ import {
   sessionJournalLooksUnchanged,
   shouldApplyOpenSessionResult,
 } from "@/lib/sessionOpenSwitch";
+import { shouldReopenUnhydratedSession } from "@/lib/chatTranscriptEmpty";
 import {
   PromptHistoryPanel,
   type PromptHistoryScope
@@ -4402,6 +4403,12 @@ export function AppWorkbench() {
     // Point viewing id immediately so late stream chunks land in the right cache.
     openingSessionIdRef.current = s.id;
     viewingSessionIdRef.current = s.id;
+    sessionTranscriptStore.setViewingSessionId(s.id);
+    if (!sessionTranscriptStore.isJournalHydrated(s.id)) {
+      sessionTranscriptStore.beginJournalLoad(s.id);
+    } else {
+      sessionTranscriptStore.clearJournalLoad();
+    }
     // Bind shell sessionId immediately too — otherwise send/stop still use the
     // previous chat id while the user is already composing on this thread
     // (sticky-thinking chat A + switch to B → send landed on A).
@@ -4516,46 +4523,21 @@ export function AppWorkbench() {
               mappedEarly,
             ),
           );
+          sessionTranscriptStore.finishJournalLoad(s.id);
         } catch {
-          /* ignore */
+          sessionTranscriptStore.abortJournalLoad(s.id);
         }
         if (openingSessionIdRef.current === s.id) {
           openingSessionIdRef.current = null;
         }
         return;
       }
-      let mapped: ChatMessage[] = mapStoredMessagesToChat(stored);
-      // Short paths like `images/1.jpg` → agent session dir → image cards
-      if (api.isTauri()) {
-        const rels = collectSessionRelativeMediaRefs(mapped);
-        if (rels.length) {
-          try {
-            const list = await api.sessionResolveRelativeMedia(s.id, rels);
-            if (!stillThisOpen()) {
-              if (openingSessionIdRef.current === s.id) {
-                openingSessionIdRef.current = null;
-              }
-              return;
-            }
-            if (list.length) {
-              mapped = applyResolvedSessionMedia(
-                mapped,
-                list.map((a) => ({
-                  path: a.path,
-                  name:
-                    a.name || a.path.split(/[/\\]/).pop() || a.path,
-                  isDir: !!a.isDir,
-                })),
-              );
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-      }
+      const mapped: ChatMessage[] = mapStoredMessagesToChat(stored);
       // Prefer in-memory cache (optimistic user msg + partial stream) over disk.
       // Weave journal tool_step rows into preceding assistant segments so reload
       // still shows tools on the message timeline (live already interleaves).
+      // Paint this immediately — relative-media resolve + pathsClassify are
+      // extra IPC and used to block the whole transcript behind an empty pane.
       let chosen = ensureBusyTurnStreaming(
         weaveToolsIntoAssistantSegments(
           preferSessionMessages(
@@ -4566,83 +4548,6 @@ export function AppWorkbench() {
         resumeStateForSession(s.id, liveHostRef.current, liveMapRef.current)
           .state,
       );
-      // Grant path_scope + refine isDir before first paint so history
-      // thumbnails (Desktop/Downloads drops, etc.) do not flash broken.
-      // Drop false extracts / missing local files so dead paperclip thumbs
-      // never paint (https media always kept).
-      const allPaths = chosen.flatMap(
-        (m) => m.attachments?.map((a) => a.path) ?? [],
-      );
-      if (allPaths.length && api.isTauri()) {
-        try {
-          const list = await api.pathsClassify(allPaths);
-          if (!stillThisOpen()) {
-            messagesBySessionRef.current.set(s.id, chosen);
-            if (openingSessionIdRef.current === s.id) {
-              openingSessionIdRef.current = null;
-            }
-            return;
-          }
-          if (list.length) {
-            const byPath = new Map(list.map((c) => [c.path, c]));
-            chosen = chosen.map((msg) => {
-              if (!msg.attachments?.length) return msg;
-              const nextAtts = msg.attachments
-                .map((a) => {
-                  if (!isDisplayableAttachmentPath(a.path)) return null;
-                  const remote = /^https?:\/\//i.test(a.path);
-                  const c = byPath.get(a.path);
-                  if (remote) {
-                    return c
-                      ? { path: c.path, name: c.name, isDir: c.isDir }
-                      : a;
-                  }
-                  // Local: require exists after classify (also grants path_scope).
-                  if (c && !c.exists) return null;
-                  return c
-                    ? { path: c.path, name: c.name, isDir: c.isDir }
-                    : a;
-                })
-                .filter((a): a is NonNullable<typeof a> => a != null);
-              return {
-                ...msg,
-                attachments: nextAtts.length ? nextAtts : undefined,
-              };
-            });
-          }
-        } catch {
-          /* classify is best-effort — still drop known false extracts */
-          chosen = chosen.map((msg) => {
-            if (!msg.attachments?.length) return msg;
-            const nextAtts = msg.attachments.filter((a) =>
-              isDisplayableAttachmentPath(a.path),
-            );
-            return {
-              ...msg,
-              attachments: nextAtts.length ? nextAtts : undefined,
-            };
-          });
-        }
-      } else if (allPaths.length) {
-        chosen = chosen.map((msg) => {
-          if (!msg.attachments?.length) return msg;
-          const nextAtts = msg.attachments.filter((a) =>
-            isDisplayableAttachmentPath(a.path),
-          );
-          return {
-            ...msg,
-            attachments: nextAtts.length ? nextAtts : undefined,
-          };
-        });
-      }
-      if (!stillThisOpen()) {
-        // User switched again while we were loading — keep cache warm, skip UI write.
-        messagesBySessionRef.current.set(s.id, chosen);
-        if (openingSessionIdRef.current === s.id) {
-          openingSessionIdRef.current = null;
-        }
-        return;
-      }
       // Cache raw journal (may include fences) so apply can read them.
       messagesBySessionRef.current.set(s.id, chosen);
       // Rebuild Changes list from tool_step history; preserve live before/after.
@@ -4674,7 +4579,106 @@ export function AppWorkbench() {
         return cleanText === m.content ? m : { ...m, content: cleanText };
       });
       setMessages(stripped);
+      sessionTranscriptStore.finishJournalLoad(s.id);
       setContextUsage(restoreContextUsageForSession(s.id, stripped));
+      // Refine thumbs after first paint so journal text is not blocked on IPC.
+      // Apply onto the latest cache so a deferred reconcile cannot be overwritten.
+      void (async () => {
+        const source = messagesBySessionRef.current.get(s.id) ?? chosen;
+        const rels = api.isTauri()
+          ? collectSessionRelativeMediaRefs(source)
+          : [];
+        let resolved: Array<{ path: string; name: string; isDir: boolean }> =
+          [];
+        if (rels.length) {
+          try {
+            const list = await api.sessionResolveRelativeMedia(s.id, rels);
+            resolved = list.map((a) => ({
+              path: a.path,
+              name: a.name || a.path.split(/[/\\]/).pop() || a.path,
+              isDir: !!a.isDir,
+            }));
+          } catch {
+            /* ignore */
+          }
+        }
+        const pathSource =
+          resolved.length ? applyResolvedSessionMedia(source, resolved) : source;
+        const allPaths = pathSource.flatMap(
+          (m) => m.attachments?.map((a) => a.path) ?? [],
+        );
+        let classifyByPath: Map<
+          string,
+          { path: string; name: string; isDir: boolean; exists?: boolean }
+        > | null = null;
+        let classifyFailed = false;
+        if (allPaths.length && api.isTauri()) {
+          try {
+            const list = await api.pathsClassify(allPaths);
+            if (list.length) {
+              classifyByPath = new Map(list.map((c) => [c.path, c]));
+            }
+          } catch {
+            classifyFailed = true;
+          }
+        } else if (allPaths.length) {
+          classifyFailed = true;
+        }
+        if (!resolved.length && !classifyByPath && !classifyFailed) return;
+        const applyRefine = (rows: ChatMessage[]): ChatMessage[] => {
+          let next = resolved.length
+            ? applyResolvedSessionMedia(rows, resolved)
+            : rows;
+          if (classifyByPath) {
+            const byPath = classifyByPath;
+            next = next.map((msg) => {
+              if (!msg.attachments?.length) return msg;
+              const nextAtts = msg.attachments
+                .map((a) => {
+                  if (!isDisplayableAttachmentPath(a.path)) return null;
+                  const remote = /^https?:\/\//i.test(a.path);
+                  const c = byPath.get(a.path);
+                  if (remote) {
+                    return c
+                      ? { path: c.path, name: c.name, isDir: c.isDir }
+                      : a;
+                  }
+                  if (c && !c.exists) return null;
+                  return c
+                    ? { path: c.path, name: c.name, isDir: c.isDir }
+                    : a;
+                })
+                .filter((a): a is NonNullable<typeof a> => a != null);
+              return {
+                ...msg,
+                attachments: nextAtts.length ? nextAtts : undefined,
+              };
+            });
+          } else if (classifyFailed) {
+            next = next.map((msg) => {
+              if (!msg.attachments?.length) return msg;
+              const nextAtts = msg.attachments.filter((a) =>
+                isDisplayableAttachmentPath(a.path),
+              );
+              return {
+                ...msg,
+                attachments: nextAtts.length ? nextAtts : undefined,
+              };
+            });
+          }
+          return next;
+        };
+        const latest = messagesBySessionRef.current.get(s.id) ?? source;
+        const next = applyRefine(latest);
+        messagesBySessionRef.current.set(s.id, next);
+        if (!stillThisOpen()) return;
+        const strippedNext = next.map((m) => {
+          if (m.role !== "assistant" || !m.content) return m;
+          const { cleanText } = extractAutomationPayload(m.content);
+          return cleanText === m.content ? m : { ...m, content: cleanText };
+        });
+        setMessages(strippedNext);
+      })();
       // Backfill create if assistant still has a fence in journal (failed chat-create).
       void tryApplyAutomationFromSession(s.id);
       // Backfill scheduled flag from journal (older automation sessions).
@@ -4755,6 +4759,7 @@ export function AppWorkbench() {
       }
     } catch {
       if (!stillThisOpen()) {
+        sessionTranscriptStore.abortJournalLoad(s.id);
         if (openingSessionIdRef.current === s.id) {
           openingSessionIdRef.current = null;
         }
@@ -4762,6 +4767,8 @@ export function AppWorkbench() {
       }
       const cached = messagesBySessionRef.current.get(s.id);
       setMessages(cached ?? []);
+      // Mark hydrated so remount recovery does not spin on a hard read failure.
+      sessionTranscriptStore.finishJournalLoad(s.id);
       setContextUsage(restoreContextUsageForSession(s.id, cached ?? []));
     }
     if (!stillThisOpen()) {
@@ -5109,6 +5116,36 @@ export function AppWorkbench() {
     isSecondaryWindow,
   ]);
 
+  // HMR / remount: shell may keep the selected session while the journal
+  // cache is empty. Re-open so the thread does not look like a failed empty chat.
+  useEffect(() => {
+    const id = session.sessionId;
+    if (
+      !shouldReopenUnhydratedSession({
+        sessionId: id,
+        mainPaneIsChat: mainPane === "chat",
+        journalHydrated: id
+          ? sessionTranscriptStore.isJournalHydrated(id)
+          : false,
+        journalLoading: id
+          ? sessionTranscriptStore.isJournalLoading(id)
+          : false,
+        messageCount: transcriptMeta.length,
+        rowExists: !!id && sessions.some((row) => row.id === id),
+      })
+    ) {
+      return;
+    }
+    const row = sessions.find((s) => s.id === id);
+    if (row) void openSessionRef.current(row);
+  }, [
+    session.sessionId,
+    mainPane,
+    sessions,
+    transcriptMeta.length,
+    transcriptMeta.journalLoading,
+  ]);
+
   /** Open (or focus) a chat in a secondary live-capable webview window. */
   const openSessionInNewWindow = useCallback(
     (s: SessionRow) => {
@@ -5262,6 +5299,8 @@ export function AppWorkbench() {
       planBySessionRef.current.set(leavingId, planRef.current);
     }
     viewingSessionIdRef.current = null;
+    sessionTranscriptStore.setViewingSessionId(null);
+    sessionTranscriptStore.clearJournalLoad();
     setMessages([]);
     setContextUsage(INITIAL_CONTEXT_USAGE);
 
@@ -5622,6 +5661,8 @@ export function AppWorkbench() {
         openingSessionIdRef.current = null;
         bumpViewEpoch();
         viewingSessionIdRef.current = null;
+        sessionTranscriptStore.setViewingSessionId(null);
+        sessionTranscriptStore.clearJournalLoad();
         setMessages([]);
         setAttachments([]);
         setPerm(null);
@@ -11887,10 +11928,15 @@ export function AppWorkbench() {
     !session.sessionId &&
     transcriptMeta.length === 0 &&
     session.state !== "streaming";
+  const journalPending =
+    !!session.sessionId &&
+    (transcriptMeta.journalLoading ||
+      !sessionTranscriptStore.isJournalHydrated(session.sessionId));
   const emptyExistingSession =
     mainPane === "chat" &&
     !!session.sessionId &&
     transcriptMeta.length === 0 &&
+    !journalPending &&
     session.state !== "streaming" &&
     session.state !== "connecting";
   // Live billing can take seconds (quota network). Cache last mark so the
@@ -19838,6 +19884,12 @@ export function AppWorkbench() {
             sessionKey={session.sessionId ?? `draft-${session.title ?? "new"}`}
             projectPath={effectiveProjectPath}
             suppressEmptyCopy={welcomeSession}
+            journalLoading={journalPending}
+            hasExistingSession={!!session.sessionId}
+            journalHydrated={
+              !!session.sessionId &&
+              sessionTranscriptStore.isJournalHydrated(session.sessionId)
+            }
             canEditLastUser={canEditLastUser}
             lastUserMessageId={lastUserMessageId}
             editingUserMessageId={editingUserMessageId}
