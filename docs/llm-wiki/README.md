@@ -17,6 +17,7 @@ Agent 与贡献者的**可执行知识库**。改产品行为或 UI 文案前，
 | [model-routing.md](./model-routing.md) | **模型分层**：识图 / 搜索 / 摘要 / 提示建议辅槽；省 Grok / 还原官方默认 |
 | [setup.md](./setup.md) | 首次初始化门禁：CLI 必装、账户可跳过、多镜像安装 |
 | [release.md](./release.md) | **发版 / Release 强制流程**：CHANGELOG、tag、三端 CI、macOS 损坏处理 |
+| [website-downloads.md](./website-downloads.md) | **官网下载对接**：grok-app.com 按钮、稳定别名、`downloads.json`、禁止反代 |
 | [maintain.md](./maintain.md) | **开源维护**：Issue 分拣、PR 审核、社区反馈入库、修复闭环；**已合并分支 / worktree 及时安全清理** |
 | [chatcut.md](./chatcut.md) | **ChatCut Codex 插件**：适配器、MCP surface、Resources 内嵌浏览器 handoff、re-pull 迁移 |
 

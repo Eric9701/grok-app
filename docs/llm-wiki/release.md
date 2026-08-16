@@ -158,31 +158,9 @@ GitHub → **Settings → Actions → General → Workflow permissions**
 
 ## 官网下载契约（grok-app.com）
 
-官网是**另仓静态站**，不托管安装包（避免下载流量费）。按钮必须 **302 / 直链** 到 GitHub Releases。
+对接细节（稳定 URL、`downloads.json` 字段、官网构建、短链、禁止事项）见 **[website-downloads.md](./website-downloads.md)**。
 
-每个正式 `vX.Y.Z` 在版本化文件之外，再上传一份**文件名不带版本号**的拷贝。从下一枚 tag 起，官网可写死：
-
-| 按钮 | 稳定 URL |
-|------|----------|
-| macOS Intel | `https://github.com/RongleCat/grok-app/releases/latest/download/Grok_mac_x64.dmg` |
-| macOS Apple Silicon | `…/latest/download/Grok_mac_aarch64.dmg` |
-| Windows 安装版 | `…/latest/download/Grok_windows_x64-setup.exe` |
-| Windows 绿色版 | `…/latest/download/Grok_windows_x64-portable.zip` |
-| Linux AppImage | `…/latest/download/Grok_linux_x64.AppImage` |
-| Linux .deb | `…/latest/download/Grok_linux_x64.deb` |
-| Linux .rpm | `…/latest/download/Grok_linux_x64.rpm` |
-| 清单 | `…/latest/download/downloads.json` |
-
-`downloads.json` 含 `version` / `tag` / `sha256` / `size` / `url`（稳定）/ `versionedUrl`（带 semver）。官网构建时拉这份 JSON 即可显示版本号并挂按钮；文件本体仍走 GitHub CDN。
-
-生成脚本：`scripts/publish-website-downloads.py`（`release.yml` checksums job 调用；`python3 scripts/publish-website-downloads.py --self-test`）。
-
-规则：
-
-- **禁止**把 `.dmg` / `.exe` 提交进官网仓或经官网主机反代。  
-- **不要**把用户下载指到 `grok-desktop-latest`（那是自动更新的 `.app.tar.gz` / `latest.json`）。  
-- `OFFICIAL_SKIN_CATALOG_URL` 仍保持空串，直到官网真上线 catalog。  
-- 域名 `grok-app.com` 由官网仓绑 Pages；本仓库不改 `package.json` homepage，避免指向空站。
+摘要：官网另仓静态站，按钮 **302 / 直链** 到 `/releases/latest/download/Grok_mac_*.dmg` 等稳定别名；不要托管或反代安装包；不要用 `grok-desktop-latest`。生成脚本 `scripts/publish-website-downloads.py`。
 
 ## macOS「已损坏 / 无法打开」
 
@@ -256,5 +234,6 @@ pnpm build:win   # tauri + cargo-xwin + makensis
 | `scripts/release-tag.sh` | bump + tag |
 | `.github/workflows/release.yml` | 三端构建与上传 |
 | `scripts/publish-website-downloads.py` | 官网稳定别名 + `downloads.json` |
+| [website-downloads.md](./website-downloads.md) | 官网下载对接契约（完整） |
 | `docs/BUILD.md` | 本地构建细节 |
 | `README.md` / `README_EN.md` | 用户安装与 Gatekeeper |
