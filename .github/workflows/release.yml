@@ -406,12 +406,12 @@ jobs:
   checksums:
     needs: [publish, assemble-updater]
     runs-on: ubuntu-22.04
-    name: Publish SHA256SUMS
+    name: Publish SHA256SUMS + website downloads
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Compute and upload SHA256SUMS
+      - name: Compute and upload SHA256SUMS + website download contract
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -427,6 +427,13 @@ jobs:
           # Download everything except a stale checksum file from a rebuild.
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*' || true
           rm -f SHA256SUMS
+          # Stable aliases (Grok_mac_x64.dmg, Grok_windows_x64-setup.exe, …)
+          # + downloads.json for grok-app.com. Files stay on GitHub Releases.
+          python3 "${GITHUB_WORKSPACE}/scripts/publish-website-downloads.py" \
+            --dir /tmp/release-assets \
+            --tag "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --write-aliases
           shopt -s nullglob
           files=(*)
           if [[ ${#files[@]} -eq 0 ]]; then
@@ -435,4 +442,11 @@ jobs:
           fi
           sha256sum "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
-          gh release upload "$TAG" SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+          extra=()
+          if [[ -f .website-upload.txt ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+              [[ -z "${line:-}" ]] && continue
+              extra+=("$line")
+            done < .website-upload.txt
+          fi
+          gh release upload "$TAG" SHA256SUMS "${extra[@]}" --repo "$GITHUB_REPOSITORY" --clobber

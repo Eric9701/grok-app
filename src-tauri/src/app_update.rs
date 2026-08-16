@@ -66,22 +66,58 @@ pub fn is_remote_newer(current: &str, remote: &str) -> bool {
     }
 }
 
-fn pick_platform_asset(assets: Option<&Vec<Value>>) -> (Option<String>, Option<String>) {
+fn current_os() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        "linux"
+    }
+}
+
+fn current_arch() -> &'static str {
+    if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else {
+        "x86_64"
+    }
+}
+
+fn is_skipped_release_asset(lower_name: &str) -> bool {
+    lower_name.ends_with(".sig")
+        || lower_name == "sha256sums"
+        || lower_name.contains("sha256")
+        || lower_name.ends_with(".json")
+        || lower_name.contains(".app.tar.gz")
+        || lower_name.contains("nsis.zip")
+}
+
+fn is_stable_installer_name(lower_name: &str) -> bool {
+    lower_name.starts_with("grok_mac_")
+        || lower_name.starts_with("grok_windows_")
+        || lower_name.starts_with("grok_linux_")
+}
+
+fn prefer_tokens(os: &str, arch: &str) -> &'static [&'static str] {
+    match (os, arch) {
+        ("macos", "aarch64") => &["aarch64", "arm64", "apple-silicon", ".dmg", "macos"],
+        ("macos", _) => &["x64", "x86_64", ".dmg", "macos"],
+        ("windows", _) => &["-setup.exe", "setup.exe", ".msi", "x64", "windows", ".exe"],
+        _ => &[".appimage", "appimage", ".deb", "linux"],
+    }
+}
+
+/// Pick a user-facing installer (DMG / setup.exe / AppImage), not updater archives.
+fn pick_platform_asset_for(
+    os: &str,
+    arch: &str,
+    assets: Option<&Vec<Value>>,
+) -> (Option<String>, Option<String>) {
     let Some(arr) = assets else {
         return (None, None);
     };
-    // Prefer exact installers first (setup.exe / dmg / AppImage), then arch tokens.
-    let prefer: &[&str] = if cfg!(target_os = "macos") {
-        if cfg!(target_arch = "aarch64") {
-            &["aarch64", "arm64", "apple-silicon", ".dmg", "macos"]
-        } else {
-            &["x64", "x86_64", ".dmg", "macos"]
-        }
-    } else if cfg!(target_os = "windows") {
-        &["-setup.exe", "setup.exe", ".msi", "x64", "windows", ".exe"]
-    } else {
-        &[".appimage", "appimage", ".deb", "linux"]
-    };
+    let prefer = prefer_tokens(os, arch);
     let mut best: Option<(usize, String, String)> = None; // score, name, url
     for a in arr {
         let name = match a.get("name").and_then(|n| n.as_str()) {
@@ -93,12 +129,7 @@ fn pick_platform_asset(assets: Option<&Vec<Value>>) -> (Option<String>, Option<S
             _ => continue,
         };
         let lower = name.to_ascii_lowercase();
-        // Skip checksum / signature sidecars.
-        if lower.ends_with(".sig")
-            || lower == "sha256sums"
-            || lower.contains("sha256")
-            || lower.ends_with(".json")
-        {
+        if is_skipped_release_asset(&lower) {
             continue;
         }
         let mut score = 0usize;
@@ -108,8 +139,12 @@ fn pick_platform_asset(assets: Option<&Vec<Value>>) -> (Option<String>, Option<S
             }
         }
         // Prefer non-portable on Windows when both match.
-        if cfg!(target_os = "windows") && lower.contains("portable") {
+        if os == "windows" && lower.contains("portable") {
             score = score.saturating_sub(30);
+        }
+        // Prefer grok-app.com stable aliases over versioned twins.
+        if is_stable_installer_name(&lower) {
+            score = score.saturating_add(20);
         }
         if score == 0 {
             continue;
@@ -124,6 +159,10 @@ fn pick_platform_asset(assets: Option<&Vec<Value>>) -> (Option<String>, Option<S
         Some((_, n, u)) => (Some(u), Some(n)),
         None => (None, None),
     }
+}
+
+fn pick_platform_asset(assets: Option<&Vec<Value>>) -> (Option<String>, Option<String>) {
+    pick_platform_asset_for(current_os(), current_arch(), assets)
 }
 
 /// Map GitHub `/releases/latest` JSON into [`AppUpdateCheck`].
@@ -469,6 +508,58 @@ mod tests {
 
         let same = parse_github_release("0.2.0", &sample).unwrap();
         assert!(!same.update_available);
+    }
+
+    fn gh_asset(name: &str) -> Value {
+        json!({
+            "name": name,
+            "browser_download_url": format!(
+                "https://github.com/RongleCat/grok-app/releases/download/v0.2.20/{name}"
+            )
+        })
+    }
+
+    #[test]
+    fn pick_macos_intel_prefers_stable_dmg_over_arm_and_updater() {
+        let assets = vec![
+            gh_asset("Grok_0.2.20_x64.app.tar.gz"),
+            gh_asset("Grok_0.2.20_aarch64.dmg"),
+            gh_asset("Grok_mac_aarch64.dmg"),
+            gh_asset("Grok_0.2.20_x64.dmg"),
+            gh_asset("Grok_mac_x64.dmg"),
+        ];
+        let (url, name) = pick_platform_asset_for("macos", "x86_64", Some(&assets));
+        assert_eq!(name.as_deref(), Some("Grok_mac_x64.dmg"));
+        assert!(url.unwrap().ends_with("/Grok_mac_x64.dmg"));
+    }
+
+    #[test]
+    fn pick_macos_arm_prefers_stable_dmg() {
+        let assets = vec![
+            gh_asset("Grok_0.2.20_aarch64.app.tar.gz"),
+            gh_asset("Grok_0.2.20_x64.dmg"),
+            gh_asset("Grok_mac_x64.dmg"),
+            gh_asset("Grok_0.2.20_aarch64.dmg"),
+            gh_asset("Grok_mac_aarch64.dmg"),
+        ];
+        let (url, name) = pick_platform_asset_for("macos", "aarch64", Some(&assets));
+        assert_eq!(name.as_deref(), Some("Grok_mac_aarch64.dmg"));
+        assert!(url.unwrap().ends_with("/Grok_mac_aarch64.dmg"));
+    }
+
+    #[test]
+    fn pick_windows_prefers_stable_setup_over_portable() {
+        let assets = vec![
+            gh_asset("Grok_0.2.20_x64-portable.zip"),
+            gh_asset("Grok_windows_x64-portable.zip"),
+            gh_asset("Grok_0.2.20_x64-setup.exe"),
+            gh_asset("Grok_windows_x64-setup.exe"),
+            gh_asset("latest.json"),
+            gh_asset("SHA256SUMS"),
+        ];
+        let (url, name) = pick_platform_asset_for("windows", "x86_64", Some(&assets));
+        assert_eq!(name.as_deref(), Some("Grok_windows_x64-setup.exe"));
+        assert!(url.unwrap().ends_with("/Grok_windows_x64-setup.exe"));
     }
 
     #[test]

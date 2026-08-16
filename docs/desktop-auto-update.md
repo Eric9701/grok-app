@@ -89,8 +89,10 @@ https://github.com/<owner>/grok-app/releases/download/grok-desktop-latest/latest
 
 Publish two GitHub releases per cut:
 
-1. **`vX.Y.Z`** — human installers + notes
+1. **`vX.Y.Z`** — human installers + notes + **stable aliases** (`Grok_mac_x64.dmg`, `Grok_windows_x64-setup.exe`, …) + `downloads.json` for grok-app.com
 2. **`grok-desktop-latest`** — updater archives + `latest.json` (clobber each release)
+
+Do **not** point website download buttons at `grok-desktop-latest`. That tag is the silent updater channel. First-time installs use `/releases/latest/download/<stable-alias>` (see `docs/llm-wiki/release.md`).
 
 ## Build steps (outline)
 

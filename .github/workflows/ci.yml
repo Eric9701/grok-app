@@ -34,6 +34,8 @@ jobs:
         run: pnpm lint
       - name: Code quality gates
         run: python3 scripts/check-code-quality-gates.py --mode final
+      - name: Website download contract self-test
+        run: python3 scripts/publish-website-downloads.py --self-test
       - run: pnpm build:ui
 
   rust:
