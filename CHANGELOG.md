@@ -12,6 +12,7 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- **Grok Build-compatible custom relay (#634, supersedes #617)**: Settings → Account → Custom providers has **Provider mode**. Generic stays on `[model.<alias>]`. **Grok Build-compatible relay** is an explicit opt-in: Responses only, save reads live `/models` and requires `supports_backend_search=true` for every selected model, ACP launches the real model id with process-scoped catalog/proxy env (no hostname special case, no official-aux auto-enable). CC Switch `grokbuild` imports honor an explicit mode; otherwise they promote only when that live catalog claim is present. Attachments stay `@path` (same as #627).
 - **Composer `/workflow` and `/workflows`**: Slash palette matches Grok Build CLI. `/workflows` or bare `/workflow` opens Settings → Runtime → workflows (saved scripts + smoke/run). `/workflow <name|pause|resume|stop|save …>` is sent as a session turn so the agent/CLI host can run it. This App still has no TUI run dashboard.
 - **User menu lists every saved official account (#621)**: Each row shows honest SuperGrok remaining % (never invents 0% / 100% on a failed probe). Click another account to `account_switch`; click the active row for Settings → Account. Custom-provider / signed-out cards stay as they are.
 - **Local session API (list + continue, #626 first slice)**: Other apps on this machine can list Grok App chats and continue one by session id + prompt. Loopback HTTP (`GET /v1/sessions`, `POST /v1/sessions/{id}/turns`) is token-gated; CLI `--sessions` / `--session-send` talks to the same Host path and does not steal window focus. List can read the on-disk index when the app is quit; sending requires the app (or tray) and never interrupts a running turn. Settings → Runtime → Connection shows status and the token-file location (never the token).
@@ -19,6 +20,7 @@ See `docs/llm-wiki/release.md`.
 - **Install a `grok-app` terminal command from Settings**: Runtime → Connection → Session API can symlink (or write a Windows `.cmd` shim) to `~/.local/bin/grok-app` pointing at the running binary. No sudo, no shell-rc edits, will not overwrite a foreign file. New terminals still need `~/.local/bin` on `PATH`.
 
 **中文 · 新增**
+- **Grok Build 原生兼容中转（#634，替代 #617）**：设置 → 账户 → 自定义提供商新增 **提供商模式**。通用模式仍写 `[model.<别名>]`。**Grok Build 原生兼容中转** 必须显式打开：只走 Responses，保存时读实时 `/models`，每个所选模型都要 `supports_backend_search=true`，ACP 用真实模型 id 和进程级目录/代理环境启动（不按主机名特判，也不自动打开 official-aux）。CC Switch `grokbuild` 导入尊重已写明的模式；否则只有实时目录声明了该能力才会提升。附件仍走 `@path`（与 #627 相同）。
 - **输入框 `/workflow` 与 `/workflows`**：斜杠菜单对齐 Grok Build CLI。`/workflows` 或单独的 `/workflow` 打开设置 → 运行时 → 工作流（已发现脚本 + 试跑）。`/workflow <名称|pause|resume|stop|save …>` 作为会话回合发出，由 agent / CLI 托管运行。本应用仍没有终端里的运行看板。
 - **头像菜单列出全部已保存官方账号（#621）**：每行显示诚实的 SuperGrok 剩余 %（探测失败不编造 0% / 100%）。点其他号走 `account_switch`；点当前号仍进设置 → 账户。自定义提供商 / 未登录卡片不变。
 - **本机会话接口（列表 + 续跑，#626 第一刀）**：同一台机器上的其他应用可以列出 Grok App 会话，再用会话 ID + 提示词续跑同一条。回环 HTTP（`GET /v1/sessions`、`POST /v1/sessions/{id}/turns`）用令牌鉴权；CLI `--sessions` / `--session-send` 走同一条 Host 路径，不会抢窗口焦点。列表在应用退出后仍可读磁盘索引；发送需要应用（或托盘）在跑，且不会打断正在进行的一轮。设置 → 运行时 → 连接 显示状态和令牌文件位置（不展示令牌）。
