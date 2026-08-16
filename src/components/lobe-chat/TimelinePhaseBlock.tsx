@@ -56,6 +56,7 @@ import {
 import { VirtualList } from "@/components/VirtualList";
 import { ToolExpandBody } from "./ToolExpandBody";
 import { MarkdownChat } from "./MarkdownChat";
+import { findMatchesBeforeVisible } from "@/lib/chatFind";
 import {
   IconBulb,
   IconChevronDown,
@@ -127,7 +128,12 @@ function StepIcon({ step }: { step: GrokActivityStep }) {
   // Official icons are ~15–16px, thin stroke, muted gray
   const size = 15;
   const stroke = 1.5;
+  if (step.type === "speech") return null;
   if (step.type === "thought") return <IconBulb size={size} stroke={stroke} />;
+  if (step.type === "bash-group")
+    return <IconTerminal size={size} stroke={stroke} />;
+  if (step.type === "edit-group")
+    return <IconEdit size={size} stroke={stroke} />;
   if (step.type === "search-group" || step.type === "explore-group")
     return <IconSearch size={size} stroke={stroke} />;
   if (step.type === "web-search")
@@ -174,10 +180,28 @@ function StepMainText({
   tr: ReturnType<typeof createT>;
 }) {
   switch (step.type) {
+    case "speech":
+      return null;
     case "thought":
       return (
         <span className="grok-act__label-text">
           {step.summary || tr("chat.thinkingLabel")}
+        </span>
+      );
+    case "bash-group":
+      return (
+        <span className="grok-act__label-text">
+          {step.count === 1
+            ? tr("chat.ranCommandsOne")
+            : tr("chat.ranCommands", { n: String(step.count) })}
+        </span>
+      );
+    case "edit-group":
+      return (
+        <span className="grok-act__label-text">
+          {step.count === 1
+            ? tr("chat.editedFilesOne")
+            : tr("chat.editedFiles", { n: String(step.count) })}
         </span>
       );
     case "search-group":
@@ -226,6 +250,10 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
   expanded,
   onUserToggle,
   onPolicySync,
+  findQuery,
+  findActiveOccurrence,
+  messageContent,
+  onOpenExternalLink,
 }: {
   step: GrokActivityStep;
   isLast: boolean;
@@ -244,15 +272,25 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
     key: string,
     opts: { hasBody: boolean; running: boolean; autoCollapse: boolean },
   ) => void;
+  findQuery?: string;
+  findActiveOccurrence?: number | null;
+  messageContent?: string;
+  onOpenExternalLink?: (url: string) => void;
 }) {
   const failed =
-    step.type !== "thought" && "failed" in step ? !!step.failed : false;
+    step.type !== "thought" &&
+    step.type !== "speech" &&
+    "failed" in step
+      ? !!step.failed
+      : false;
   const running =
     step.type === "thought"
       ? !!step.streaming
-      : "running" in step
-        ? !!step.running
-        : false;
+      : step.type === "speech"
+        ? false
+        : "running" in step
+          ? !!step.running
+          : false;
   const resultCount =
     step.type === "web-search" ? step.resultCount : undefined;
   const domains =
@@ -273,9 +311,13 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
   // A thought step is expandable when it has body text beyond the one-line
   // summary — otherwise the reasoning is unreadable inside the phase (only the
   // summary showed, with no way to open the full text like tools could).
+  const grouped =
+    step.type === "explore-group" ||
+    step.type === "bash-group" ||
+    step.type === "edit-group";
   const hasBody =
     expand.hasBody ||
-    (step.type === "explore-group" && step.children.length > 0) ||
+    (grouped && step.children.length > 0) ||
     (step.type === "thought" && step.text.trim().length > 0);
 
   const runningRef = useRef(running);
@@ -311,6 +353,35 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
 
   const open = hasBody && expanded;
   const showBody = open;
+
+  if (step.type === "speech") {
+    const speechFindBase = findMatchesBeforeVisible({
+      full: messageContent ?? "",
+      visible: step.text,
+      query: findQuery ?? "",
+    });
+    return (
+      <div
+        className={"grok-act__step grok-act__step--speech" + (isLast ? " is-last" : "")}
+        role="listitem"
+        data-step-type="speech"
+        data-testid="timeline-process-speech"
+      >
+        <div className="grok-act__speech">
+          <MarkdownChat
+            locale={locale}
+            pathCards={false}
+            findQuery={findQuery}
+            findActiveOccurrence={findActiveOccurrence}
+            findOccurrenceBase={speechFindBase}
+            onOpenExternalLink={onOpenExternalLink}
+          >
+            {step.text}
+          </MarkdownChat>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -371,9 +442,19 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
           ) : null}
         </div>
         {showBody ? (
-          step.type === "explore-group" ? (
+          step.type === "explore-group" ||
+          step.type === "bash-group" ||
+          step.type === "edit-group" ? (
             <div className="grok-act__explore-children">
-              <GrokActivitySteps steps={step.children} tr={tr} locale={locale} />
+              <GrokActivitySteps
+                steps={step.children}
+                tr={tr}
+                locale={locale}
+                findQuery={findQuery}
+                findActiveOccurrence={findActiveOccurrence}
+                messageContent={messageContent}
+                onOpenExternalLink={onOpenExternalLink}
+              />
             </div>
           ) : step.type === "thought" ? (
             <div className="grok-act__thought-body">
@@ -407,12 +488,20 @@ export function GrokActivitySteps({
   tr,
   locale,
   live = false,
+  findQuery,
+  findActiveOccurrence,
+  messageContent,
+  onOpenExternalLink,
 }: {
   steps: GrokActivityStep[];
   tr: ReturnType<typeof createT>;
   locale: Locale;
   /** When true, prefer showing the tail of a virtualized list. */
   live?: boolean;
+  findQuery?: string;
+  findActiveOccurrence?: number | null;
+  messageContent?: string;
+  onOpenExternalLink?: (url: string) => void;
 }) {
   const total = steps.length;
   const [expandState, setExpandState] = useState<ActivityStepExpandState>(() =>
@@ -431,10 +520,12 @@ export function GrokActivitySteps({
     },
     [],
   );
-  const virtualize = shouldVirtualizeActivityWithExpand(
-    total,
-    expandState.expandedKeys.size,
-  );
+  const virtualize =
+    !steps.some((s) => s.type === "speech") &&
+    shouldVirtualizeActivityWithExpand(
+      total,
+      expandState.expandedKeys.size,
+    );
   const lastKey = total > 0 ? steps[total - 1]!.key : null;
 
   const getKey = useCallback((step: GrokActivityStep) => step.key, []);
@@ -448,9 +539,24 @@ export function GrokActivitySteps({
         expanded={expandState.expandedKeys.has(step.key)}
         onUserToggle={onUserToggle}
         onPolicySync={onPolicySync}
+        findQuery={findQuery}
+        findActiveOccurrence={findActiveOccurrence}
+        messageContent={messageContent}
+        onOpenExternalLink={onOpenExternalLink}
       />
     ),
-    [total, tr, locale, expandState.expandedKeys, onUserToggle, onPolicySync],
+    [
+      total,
+      tr,
+      locale,
+      expandState.expandedKeys,
+      onUserToggle,
+      onPolicySync,
+      findQuery,
+      findActiveOccurrence,
+      messageContent,
+      onOpenExternalLink,
+    ],
   );
 
   if (!total) return null;
@@ -478,6 +584,10 @@ export function GrokActivitySteps({
             isLast={idx === total - 1}
             tr={tr}
             locale={locale}
+            findQuery={findQuery}
+            findActiveOccurrence={findActiveOccurrence}
+            messageContent={messageContent}
+            onOpenExternalLink={onOpenExternalLink}
             expanded={expandState.expandedKeys.has(step.key)}
             onUserToggle={onUserToggle}
             onPolicySync={onPolicySync}
@@ -513,6 +623,10 @@ export const TimelinePhaseBlock = memo(function TimelinePhaseBlock({
   autoCollapse: autoCollapseProp,
   durationSec: durationSecProp,
   historyTimestamps,
+  findQuery,
+  findActiveOccurrence,
+  messageContent,
+  onOpenExternalLink,
 }: {
   phase: TimelinePhase;
   locale: Locale;
@@ -520,6 +634,10 @@ export const TimelinePhaseBlock = memo(function TimelinePhaseBlock({
   autoCollapse?: boolean;
   durationSec?: number | null;
   historyTimestamps?: Array<string | undefined | null>;
+  findQuery?: string;
+  findActiveOccurrence?: number | null;
+  messageContent?: string;
+  onOpenExternalLink?: (url: string) => void;
 }) {
   const tr = useMemo(() => createT(locale), [locale]);
   const [autoCollapse, setAutoCollapse] = useState(
@@ -695,6 +813,10 @@ export const TimelinePhaseBlock = memo(function TimelinePhaseBlock({
           tr={tr}
           locale={locale}
           live={phaseRunning}
+          findQuery={findQuery}
+          findActiveOccurrence={findActiveOccurrence}
+          messageContent={messageContent}
+          onOpenExternalLink={onOpenExternalLink}
         />
       ) : null}
     </div>
