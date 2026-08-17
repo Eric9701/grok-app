@@ -12,9 +12,11 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- **Side workbench CodeMirror editor (#661 follow-up)**: Files edit mode uses CodeMirror 6 (Atom One palette + line numbers, Tab as two spaces, ⌘/Ctrl+S). Markdown still uses TipTap. Preview mode is unchanged.
 - **Discover Claude / Cursor skills toggle**: Settings → Extensions → Skills can turn external compat discovery off. Independent session mode also writes `[compat.claude] skills` / `[compat.cursor] skills` in agent-home `config.toml`. Shared mode only hides them in the App (does not rewrite `~/.grok`).
 
 **中文 · 新增**
+- **侧栏 CodeMirror 编辑器（#661 后续）**：Files 编辑模式改用 CodeMirror 6（Atom One 配色 + 行号，Tab 两个空格，⌘/Ctrl+S）。Markdown 仍用 TipTap。预览模式不变。
 - **探测 Claude / Cursor 技能开关**：设置 → 扩展 → 技能可关闭外源兼容探测。独立会话模式会写入 agent-home `config.toml`；共享模式只在应用内隐藏，不改写 `~/.grok`。
 
 ### Changed
