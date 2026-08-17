@@ -166,7 +166,7 @@ Background ticks are **quiet** (no spinner) and **billing-only** (`include_local
 
 ### Chat turn when included usage is exhausted
 
-Official `429` + `subscription:free-usage-exhausted` (CLI: “You've used all the included free usage…”) is **terminal**. Host must abort the provider retry loop immediately and emit `QUOTA_EXCEEDED` with that sentence family. Do **not** record it as `NETWORK_PROVIDER` / “Provider request failed after N attempts”. Transient 429 and relay flaps still retry. The error deck primary action is Account.
+Official `429` + `subscription:free-usage-exhausted` is **terminal**. Grok Build CLI shows **“You hit your free usage limit.”** (and the provider sentence “You've used all the included free usage…”). Host must abort the provider retry loop immediately and emit `QUOTA_EXCEEDED` with that sentence family. Do **not** record it as `NETWORK_PROVIDER` / “Provider request failed after N attempts”. A bare 429 without exhaustion text is a different CLI card: **“Rate limited”** / “The service is busy. Wait a minute and send again.” Transient relay flaps still retry. The free-usage deck primary action is Account.
 
 ## Heatmap & call logs
 

@@ -12,10 +12,10 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Fixed
-- **Included-usage exhaustion is no longer a generic provider error (#659)**: When Grok Build reports `subscription:free-usage-exhausted` (or the same “you've used all included free usage” sentence), Host stops the 15-retry loop immediately and emits `QUOTA_EXCEEDED` with that reason. The chat card says usage is used up and offers Account — same idea as the CLI — instead of “network / reconnect”. Transient 429 / relay flaps still retry.
+- **Included-usage exhaustion is no longer a generic provider error (#659)**: When Grok Build reports `subscription:free-usage-exhausted`, Host stops the 15-retry loop immediately and emits `QUOTA_EXCEEDED`. The chat card uses the CLI line “You hit your free usage limit.” (rolling 24-hour window + Account). A bare 429 / “rate limit, retry later” uses the CLI “Rate limited” / “Wait a minute” card, not the free-usage sentence.
 
 **中文 · 修复**
-- **额度用尽不再显示成普通提供商报错（#659）**：官方返回 `subscription:free-usage-exhausted`（或 “included free usage” 用尽）时，Host 立刻停转并记 `QUOTA_EXCEEDED`，气泡说明额度已用尽并指向账号，与 Grok Build CLI 一致。瞬时 429 / 中转抖动仍会重试。
+- **额度用尽不再显示成普通提供商报错（#659）**：官方返回 `subscription:free-usage-exhausted` 时，Host 立刻停转并记 `QUOTA_EXCEEDED`，气泡对齐 CLI 的 “You hit your free usage limit.”（滚动 24 小时窗口 + 账号）。普通 429 走 CLI 的 “Rate limited / 等一分钟再发”，不再和免费用量写成一句。
 
 ## [0.2.20] - 2026-08-17
 

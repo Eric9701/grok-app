@@ -1573,7 +1573,7 @@ describe("session projection", () => {
       },
       "zh",
     );
-    expect(zh).toMatch(/额度/);
+    expect(zh).toMatch(/免费用量|上限/);
   });
 
   it("formatTurnErrorBody maps connect / quota phrases", () => {
@@ -1588,7 +1588,7 @@ describe("session projection", () => {
     ).toMatch(/connect/i);
     expect(
       formatTurnErrorBody({ content: "rate limit exceeded (429)" }, "en"),
-    ).toMatch(/quota|rate/i);
+    ).toMatch(/rate limited|wait a minute|busy/i);
   });
 
   it("presentErrorBanner shows friendly deck without MCP dumps", () => {

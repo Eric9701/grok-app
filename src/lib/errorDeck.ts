@@ -52,6 +52,8 @@ export type ErrorDeckCode =
   | "NETWORK_PROVIDER"
   | "AGENT_CRASHED"
   | "QUOTA_EXCEEDED"
+  /** Transient 429 / “slow down” — not included-usage exhaustion. */
+  | "RATE_LIMITED"
   | "CONNECT_FAILED"
   | "PROCESS_LIMIT"
   | "CLI_TOO_OLD"
@@ -168,6 +170,12 @@ const DECK: Record<ErrorDeckCode, DeckSpec> = {
     primaryLabel: "error.action.openAccount",
     secondaryId: "dismiss",
     secondaryLabel: "error.action.dismiss",
+  },
+  RATE_LIMITED: {
+    problem: "error.deck.rateLimit.problem",
+    cause: "error.deck.rateLimit.cause",
+    primaryId: "dismiss",
+    primaryLabel: "error.action.dismiss",
   },
   CONNECT_FAILED: {
     problem: "error.deck.connect.problem",
@@ -305,6 +313,7 @@ const AGENT_DECK_CODES: ErrorDeckCode[] = [
   "NETWORK_PROVIDER",
   "AGENT_CRASHED",
   "QUOTA_EXCEEDED",
+  "RATE_LIMITED",
   "CONNECT_FAILED",
   "PROCESS_LIMIT",
   "CLI_TOO_OLD",
@@ -382,13 +391,38 @@ export function looksLikeTerminalQuota(
     s.includes("out of credits") ||
     s.includes("insufficient credit") ||
     s.includes("quota exceeded") ||
-    s.includes("quota_exceeded") ||
     s.includes("额度用尽") ||
     s.includes("额度已用尽") ||
     s.includes("额度已用完") ||
     s.includes("免費額度") ||
     s.includes("免费额度已")
   );
+}
+
+/** Transient throttle — HTTP 429 / “too many requests” without usage exhaustion. */
+export function looksLikeRateLimit(
+  raw: string | null | undefined,
+): boolean {
+  if (looksLikeTerminalQuota(raw)) return false;
+  const s = (raw ?? "").toLowerCase();
+  if (!s.trim()) return false;
+  return (
+    s.includes("rate limit") ||
+    s.includes("rate_limit") ||
+    s.includes("too many requests") ||
+    s.includes("429") ||
+    s.includes("retry later") ||
+    s.includes("slow down")
+  );
+}
+
+/** Host still emits QUOTA_EXCEEDED for some 429s — split the card from the message. */
+export function refineQuotaDeckCode(
+  message?: string | null,
+): ErrorDeckCode {
+  if (looksLikeTerminalQuota(message)) return "QUOTA_EXCEEDED";
+  if (looksLikeRateLimit(message)) return "RATE_LIMITED";
+  return "QUOTA_EXCEEDED";
 }
 
 /**
@@ -596,13 +630,14 @@ export function classifyErrorMessage(raw: string | null | undefined): ErrorDeckC
   ) {
     return "AUTH_FAILED";
   }
-  if (
-    s.includes("quota") ||
-    s.includes("rate limit") ||
-    s.includes("429") ||
-    s.includes("insufficient")
-  ) {
+  if (looksLikeTerminalQuota(raw) || s.includes("quota_exceeded")) {
     return "QUOTA_EXCEEDED";
+  }
+  if (s.includes("quota") || s.includes("insufficient credit") || s.includes("out of credits")) {
+    return "QUOTA_EXCEEDED";
+  }
+  if (looksLikeRateLimit(raw)) {
+    return "RATE_LIMITED";
   }
   if (
     s.includes("network_provider") ||
@@ -662,22 +697,29 @@ export function resolveErrorDeckCode(
     return "SANDBOX_BLOCKED";
   }
   // Host retry abort used to emit NETWORK_PROVIDER around free-usage-exhausted.
-  if (
-    looksLikeTerminalQuota(message) ||
-    looksLikeTerminalQuota(code) ||
-    code === "QUOTA_EXCEEDED"
-  ) {
+  // Do not pass the host *code* into these helpers — `QUOTA_EXCEEDED` contains
+  // `quota_exceeded` and would skip rate-limit refine.
+  if (looksLikeTerminalQuota(message)) {
     return "QUOTA_EXCEEDED";
+  }
+  if (looksLikeRateLimit(message)) {
+    return "RATE_LIMITED";
   }
   const fromCode = deckCodeFromAgent(code, opts);
   // Host often emits plain AUTH_FAILED — refine with message + active route.
   if (fromCode === "AUTH_FAILED") {
     return refineAuthDeckCode(message ?? code, opts);
   }
+  if (fromCode === "QUOTA_EXCEEDED") {
+    return refineQuotaDeckCode(message ?? code);
+  }
   if (fromCode !== "GENERIC") return fromCode;
   const classified = classifyErrorMessage(message ?? code);
   if (classified === "AUTH_FAILED") {
     return refineAuthDeckCode(message ?? code, opts);
+  }
+  if (classified === "QUOTA_EXCEEDED") {
+    return refineQuotaDeckCode(message ?? code);
   }
   return classified;
 }
