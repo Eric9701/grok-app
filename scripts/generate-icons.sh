@@ -72,7 +72,10 @@ done
 iconutil -c icns "$ICONSET" -o "$ICONS/icon.icns"
 rm -rf "$ICONSET"
 
-$IM "$MASTER" -define icon:auto-resize=256,128,64,48,32,24,16 "$ICONS/icon.ico"
+# Windows .ico: crop the macOS dock-grid margin so taskbar / Start glyphs
+# fill the frame. Do not rewrite icon-source.png or the .icns set.
+# PIL writes the multi-size ICO (no ImageMagick on this path).
+python3 "$ROOT/scripts/windows_ico_fill.py" "$MASTER" "$ICONS/icon.ico"
 
 # ── Tray / menu-bar from logo.svg ───────────────────────────────────────────
 # tray-icon crate sizes the NSImage to 18pt tall. Embed 36px (@2x) so retina
