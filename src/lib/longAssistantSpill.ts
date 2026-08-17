@@ -16,12 +16,41 @@ export const LONG_ASSISTANT_PREVIEW_CHARS = 800;
 
 const spillPathCache = new Map<string, string>();
 
-export function shouldSpillLongAssistant(
+/** Windows WebView only — huge plain text in the composer or one bubble. */
+export function shouldSpillHugePlainText(
   length: number,
   platform: AppPlatform,
 ): boolean {
   if (platform !== "win") return false;
   return length >= LONG_ASSISTANT_SPILL_CHARS;
+}
+
+export function shouldSpillLongAssistant(
+  length: number,
+  platform: AppPlatform,
+): boolean {
+  return shouldSpillHugePlainText(length, platform);
+}
+
+/** First-line preview filename, same idea as DeepSeek's paste chip. */
+export function hugePlainTextFileName(text: string): string {
+  const first = (text.trim().split(/\r?\n/, 1)[0] || "paste").trim();
+  const stem = first
+    .replace(/[<>:"/\\|?*\u0000-\u001f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 36)
+    .trim() || "paste";
+  return `${stem}.txt`;
+}
+
+/** Turn a huge clipboard string into a .txt File for the existing attach path. */
+export function hugePlainTextToFile(
+  text: string,
+  name = "paste.txt",
+): File {
+  return new File([text], name || hugePlainTextFileName(text), {
+    type: "text/plain",
+  });
 }
 
 /**

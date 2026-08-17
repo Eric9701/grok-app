@@ -34,6 +34,12 @@ import {
   readStoredEditorText,
   type DraftSegment,
 } from "@/lib/draftDoc";
+import { detectAppPlatform } from "@/lib/appPlatform";
+import {
+  hugePlainTextFileName,
+  hugePlainTextToFile,
+  shouldSpillHugePlainText,
+} from "@/lib/longAssistantSpill";
 
 /** Caret landing pad around non-editable skill chips (stripped on serialize). */
 const CARET_PAD = "\u200B";
@@ -960,6 +966,17 @@ export const ComposerEditor = memo(function ComposerEditor({
 
     if (!plain) return;
     if (files.length && isFileUrlOnlyText(plain)) return;
+    // Windows: a huge clipboard insert freezes the contenteditable + draft
+    // store. Attach as .txt instead — same path as image/file paste.
+    if (
+      onPasteFiles &&
+      shouldSpillHugePlainText(plain.length, detectAppPlatform())
+    ) {
+      onPasteFiles([
+        hugePlainTextToFile(plain, hugePlainTextFileName(plain)),
+      ]);
+      return;
+    }
     insertPlainTextAtSelection(plain);
     const el = elRef.current;
     if (el) commitFromDom(el);

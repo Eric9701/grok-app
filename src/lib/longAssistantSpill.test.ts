@@ -4,9 +4,12 @@ import {
   LONG_ASSISTANT_SPILL_CHARS,
   clearSpillPathCache,
   getCachedSpillPath,
+  hugePlainTextFileName,
+  hugePlainTextToFile,
   previewLongAssistant,
   safeSpillFileStem,
   setCachedSpillPath,
+  shouldSpillHugePlainText,
   shouldSpillLongAssistant,
   spillCacheKey,
   utf8ToBase64,
@@ -70,6 +73,25 @@ describe("longAssistantSpill", () => {
     expect(getCachedSpillPath(key)).toBeUndefined();
     setCachedSpillPath(key, "C:\\\\tmp\\\\assistant-abc.txt");
     expect(getCachedSpillPath(key)).toBe("C:\\\\tmp\\\\assistant-abc.txt");
+  });
+
+  it("names the paste file from the first line", () => {
+    expect(
+      hugePlainTextFileName("const Version = '2026-08-17'\nmore"),
+    ).toBe("const Version = '2026-08-17'.txt");
+  });
+
+  it("turns huge clipboard text into a text File", () => {
+    const f = hugePlainTextToFile("hello-world", "paste.txt");
+    expect(f.name).toBe("paste.txt");
+    expect(f.type).toBe("text/plain");
+    expect(f.size).toBeGreaterThan(0);
+    expect(shouldSpillHugePlainText(LONG_ASSISTANT_SPILL_CHARS, "win")).toBe(
+      true,
+    );
+    expect(shouldSpillHugePlainText(LONG_ASSISTANT_SPILL_CHARS, "mac")).toBe(
+      false,
+    );
   });
 
   it("sanitizes the file stem", () => {
