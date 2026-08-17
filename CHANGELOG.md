@@ -20,10 +20,12 @@ See `docs/llm-wiki/release.md`.
 ### Fixed
 - **Slash palette `/rc` and `/review-` select `review-commit` (#644)**: Treat `-` as a word boundary so kebab initials match, rank name prefix above description, and keep description as fallback only when no name hits. Peer skills that mention `review-commit` in YAML no longer steal the default highlight.
 - **Working rail overlap and leftover ANSI (#667)**: Long live **工作中** rows no longer paint tool bodies over the next line; leftover `[39m` / `[32m` SGR after a dropped ESC is stripped.
+- **Command-palette search scroll and keyboard (#657)**: ⌘K results sit in a real scrollport (wheel / trackpad work). Arrow keys move a highlight; Enter opens the row; ⌘/Ctrl 1–9 still jump to the numbered session.
 
 **中文 · 修复**
 - **斜杠菜单 `/rc`、`/review-` 会选中 `review-commit`（#644）**：把 `-` 当词界以匹配 kebab 首字母，名字前缀优先于描述，且只有名字全无命中时才用描述兜底。YAML 里互相点名 `review-commit` 的 skill 不再抢走默认高亮。
 - **工作轨叠字和残留 ANSI（#667）**：长「工作中」不再把工具正文盖到下一行；ESC 丢掉后残留的 `[39m` / `[32m` 会被剥掉。
+- **命令面板搜索可滚动、可用键盘（#657）**：⌘K 结果有独立滚动区。方向键高亮，Enter 打开，⌘/Ctrl 1–9 仍跳到编号会话。
 
 ## [0.2.20] - 2026-08-17
 

@@ -428,6 +428,11 @@ import {
   type PaletteActionDef
 } from "@/lib/paletteActions";
 import {
+  flattenSearchPanelItems,
+  type SearchPanelItem,
+} from "@/lib/searchPanelNav";
+import { useSearchPanelNav } from "@/hooks/useSearchPanelNav";
+import {
   canOfferContinueCwd,
   classifyContinueCwdEmptyResult,
   continueCwdSoftFailMessageKey,
@@ -7264,6 +7269,16 @@ export function AppWorkbench() {
     [searchQuery, tr],
   );
 
+  const searchPaletteItems = useMemo(
+    () =>
+      flattenSearchPanelItems({
+        actions: paletteActionHits,
+        projects: searchHits.matchedProjects,
+        sessions: mergedSessionHits,
+      }),
+    [paletteActionHits, searchHits.matchedProjects, mergedSessionHits],
+  );
+
   const searchEmptyState = useMemo(
     () =>
       resolveSessionSearchEmptyState({
@@ -14074,6 +14089,59 @@ export function AppWorkbench() {
         break;
     }
   };
+
+  const activateSearchPanelItem = (item: SearchPanelItem) => {
+    if (item.kind === "action") {
+      const action = paletteActionHits.find((a) => a.id === item.id);
+      if (action) runPaletteAction(action);
+      return;
+    }
+    if (item.kind === "project") {
+      const p = searchHits.matchedProjects.find((x) => x.id === item.id);
+      if (!p) return;
+      setShowSearch(false);
+      // Project is a folder: expand only; selection is for sessions.
+      setProjectsOpen(true);
+      setExpandedProjects((e) => ({ ...e, [p.id]: true }));
+      return;
+    }
+    const hit = mergedSessionHits.find((h) => h.id === item.id);
+    if (!hit) return;
+    const s = sessions.find((x) => x.id === hit.id);
+    const row: SessionRow =
+      s ??
+      normalizeSessionRow({
+        id: hit.id,
+        title: hit.title,
+        projectId: hit.projectId ?? null,
+        updatedAt: "",
+        archived: hit.archived,
+      });
+    const proj = projects.find(
+      (p) => p.id === (row.projectId ?? hit.projectId),
+    );
+    setShowSearch(false);
+    void openSession(row, proj ?? null);
+  };
+
+  const { activeIndex: searchActiveIndex, setActiveIndex: setSearchActiveIndex } =
+    useSearchPanelNav({
+      open: showSearch,
+      items: searchPaletteItems,
+      sessionCount: mergedSessionHits.length,
+      resetKey: [
+        searchQuery,
+        searchMode,
+        searchRankMode,
+        String(searchIncludeArchived),
+      ].join("\0"),
+      getRoot: () => searchPanelRef.current,
+      onActivate: activateSearchPanelItem,
+      onActivateSessionIndex: (sessionIndex) => {
+        const hit = mergedSessionHits[sessionIndex];
+        if (hit) activateSearchPanelItem({ kind: "session", id: hit.id });
+      },
+    });
 
   // Keep tray menu actions on latest closures (listeners registered once).
   const trayHandlersRef = useRef({
@@ -24054,6 +24122,15 @@ export function AppWorkbench() {
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="true"
+                aria-controls="search-panel-listbox"
+                aria-activedescendant={
+                  searchPaletteItems.length > 0
+                    ? `search-opt-${searchActiveIndex}`
+                    : undefined
+                }
               />
               <button
                 type="button"
@@ -24137,16 +24214,33 @@ export function AppWorkbench() {
                   : tr("search.rankKeywordHint")}
               </span>
             </div>
+            <OverlayScroll className="search-panel__results">
+            <div
+              id="search-panel-listbox"
+              role="listbox"
+              aria-label={tr("search.title")}
+            >
             {paletteActionHits.length > 0 && (
               <>
                 <div className="search-panel__section">
                   {tr("search.actions")}
                 </div>
-                {paletteActionHits.map((action) => (
+                {paletteActionHits.map((action, i) => {
+                  const idx = i;
+                  const active = idx === searchActiveIndex;
+                  return (
                   <button
                     key={action.id}
                     type="button"
-                    className="search-panel__row"
+                    id={`search-opt-${idx}`}
+                    data-search-idx={idx}
+                    role="option"
+                    aria-selected={active}
+                    tabIndex={-1}
+                    className={
+                      "search-panel__row" + (active ? " is-active" : "")
+                    }
+                    onMouseEnter={() => setSearchActiveIndex(idx)}
                     onClick={() => runPaletteAction(action)}
                   >
                     {paletteActionIcon(action.id)}
@@ -24154,7 +24248,8 @@ export function AppWorkbench() {
                       {tr(action.labelKey)}
                     </span>
                   </button>
-                ))}
+                  );
+                })}
               </>
             )}
             {searchHits.matchedProjects.length > 0 && (
@@ -24162,11 +24257,22 @@ export function AppWorkbench() {
                 <div className="search-panel__section">
                   {tr("sidebar.projects")}
                 </div>
-                {searchHits.matchedProjects.map((p) => (
+                {searchHits.matchedProjects.map((p, i) => {
+                  const idx = paletteActionHits.length + i;
+                  const active = idx === searchActiveIndex;
+                  return (
                   <button
                     key={p.id}
                     type="button"
-                    className="search-panel__row"
+                    id={`search-opt-${idx}`}
+                    data-search-idx={idx}
+                    role="option"
+                    aria-selected={active}
+                    tabIndex={-1}
+                    className={
+                      "search-panel__row" + (active ? " is-active" : "")
+                    }
+                    onMouseEnter={() => setSearchActiveIndex(idx)}
                     onClick={() => {
                       setShowSearch(false);
                       // Project is a folder: expand only; selection is for sessions.
@@ -24178,7 +24284,8 @@ export function AppWorkbench() {
                     <span className="search-panel__title">{p.name}</span>
                     <span className="search-panel__meta">{p.path}</span>
                   </button>
-                ))}
+                  );
+                })}
               </>
             )}
             <div className="search-panel__section">
@@ -24233,11 +24340,24 @@ export function AppWorkbench() {
                 );
               }
               if (i < 9) metaParts.push(`⌘${i + 1}`);
+              const idx =
+                paletteActionHits.length +
+                searchHits.matchedProjects.length +
+                i;
+              const active = idx === searchActiveIndex;
               return (
                 <button
                   key={hit.id}
                   type="button"
-                  className="search-panel__row"
+                  id={`search-opt-${idx}`}
+                  data-search-idx={idx}
+                  role="option"
+                  aria-selected={active}
+                  tabIndex={-1}
+                  className={
+                    "search-panel__row" + (active ? " is-active" : "")
+                  }
+                  onMouseEnter={() => setSearchActiveIndex(idx)}
                   onClick={() => {
                     setShowSearch(false);
                     void openSession(row, proj ?? null);
@@ -24276,6 +24396,8 @@ export function AppWorkbench() {
                 </button>
               );
             })}
+            </div>
+            </OverlayScroll>
           </div>
         </div>
       )}
