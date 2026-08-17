@@ -5,6 +5,7 @@ import {
   deckCodeFromAgent,
   isAuthDeckCode,
   isReconnectAction,
+  looksLikeTerminalQuota,
   refineAuthDeckCode,
   resolveErrorDeckCode,
 } from "./errorDeck";
@@ -100,6 +101,24 @@ describe("buildErrorDeck", () => {
       "NETWORK_PROVIDER",
     );
     expect(classifyErrorMessage("agent process exited")).toBe("AGENT_CRASHED");
+  });
+
+  it("classifies official free-usage-exhausted as QUOTA even when host said NETWORK_PROVIDER", () => {
+    const msg =
+      "API error (status 429 Too Many Requests): subscription:free-usage-exhausted: You've used all the included free usage for model grok-4.6 for now. Usage resets over a rolling 24-hour window";
+    expect(looksLikeTerminalQuota(msg)).toBe(true);
+    expect(
+      looksLikeTerminalQuota(
+        "API error (status 429 Too Many Requests): rate limit, retry later",
+      ),
+    ).toBe(false);
+    expect(resolveErrorDeckCode("NETWORK_PROVIDER", msg)).toBe("QUOTA_EXCEEDED");
+    expect(resolveErrorDeckCode("QUOTA_EXCEEDED", msg)).toBe("QUOTA_EXCEEDED");
+    const deck = buildErrorDeck("QUOTA_EXCEEDED", "en");
+    expect(deck.problem.toLowerCase()).toMatch(/usage|quota|limit/);
+    expect(deck.primary.id).toBe("open_account");
+    const zh = buildErrorDeck("QUOTA_EXCEEDED", "zh");
+    expect(zh.problem).toMatch(/额度/);
   });
 
   it("classifies Linux bwrap / userns denial as SANDBOX_BLOCKED (#541)", () => {

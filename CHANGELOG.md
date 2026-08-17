@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Fixed
+- **Included-usage exhaustion is no longer a generic provider error (#659)**: When Grok Build reports `subscription:free-usage-exhausted` (or the same “you've used all included free usage” sentence), Host stops the 15-retry loop immediately and emits `QUOTA_EXCEEDED` with that reason. The chat card says usage is used up and offers Account — same idea as the CLI — instead of “network / reconnect”. Transient 429 / relay flaps still retry.
+
+**中文 · 修复**
+- **额度用尽不再显示成普通提供商报错（#659）**：官方返回 `subscription:free-usage-exhausted`（或 “included free usage” 用尽）时，Host 立刻停转并记 `QUOTA_EXCEEDED`，气泡说明额度已用尽并指向账号，与 Grok Build CLI 一致。瞬时 429 / 中转抖动仍会重试。
+
 ## [0.2.20] - 2026-08-17
 
 > **Highlight:** Grok Build-compatible custom relay; local session list/continue API; official-site installer aliases; opening a chat shows a real loading state instead of a fake empty session.

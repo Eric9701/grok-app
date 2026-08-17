@@ -164,6 +164,9 @@ Official SuperGrok quota is re-probed **every 10 minutes** in the background (pl
 
 Background ticks are **quiet** (no spinner) and **billing-only** (`include_local_usage=false` — skip the heatmap / call-log walk). Soft-fail keeps the last snapshot; never invent remaining %. Unmount / disable **disposes** the interval and `visibilitychange` listener and drops in-flight Host replies (`isCurrent`) so they cannot `setState` on a dead tree.
 
+### Chat turn when included usage is exhausted
+
+Official `429` + `subscription:free-usage-exhausted` (CLI: “You've used all the included free usage…”) is **terminal**. Host must abort the provider retry loop immediately and emit `QUOTA_EXCEEDED` with that sentence family. Do **not** record it as `NETWORK_PROVIDER` / “Provider request failed after N attempts”. Transient 429 and relay flaps still retry. The error deck primary action is Account.
 
 ## Heatmap & call logs
 

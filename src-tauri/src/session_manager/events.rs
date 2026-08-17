@@ -6,10 +6,9 @@ use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
 use crate::acp_client::{
-    should_abort_provider_retry_ex, AcpEvent, PermissionOutcome, StreamKind,
-    HOST_PROVIDER_MAX_RETRIES,
+    provider_retry_abort_error, provider_retry_abort_rpc_message, should_abort_provider_retry_ex,
+    AcpEvent, PermissionOutcome, StreamKind, HOST_PROVIDER_MAX_RETRIES,
 };
-use crate::error::{AgentError, AgentErrorCode};
 use crate::journal_throttle::is_paragraph_break;
 use crate::permission::{
     coerce_wire_option_id_for_tool, extract_path_target, extract_shell_command, may_auto_allow,
@@ -1046,16 +1045,8 @@ impl SessionManager {
                                 // is the agent/host budget — do not claim we ran
                                 // the full budget when hard-transport fail-fast
                                 // aborts early (e.g. attempt 3 of 12).
-                                let msg = if reason.trim().is_empty() {
-                                    format!(
-                                        "Provider request failed after {attempt} attempts (budget {cap})"
-                                    )
-                                } else {
-                                    format!(
-                                        "Provider request failed after {attempt} attempts (budget {cap}): {reason}"
-                                    )
-                                };
-                                let err = AgentError::new(AgentErrorCode::NetworkProvider, msg);
+                                // Terminal quota uses QuotaExceeded + the CLI sentence.
+                                let err = provider_retry_abort_error(attempt, cap, &reason);
                                 // Chat-visible error row (must happen before clearing stream ids)
                                 Self::record_turn_error(s, app, &err);
                                 let _ = s.fsm.fail_with(err);
@@ -1066,9 +1057,7 @@ impl SessionManager {
                         }
                     };
                     if let Some(acp) = acp {
-                        let abort_msg = format!(
-                            "provider retries exhausted (host cap {HOST_PROVIDER_MAX_RETRIES})"
-                        );
+                        let abort_msg = provider_retry_abort_rpc_message(&reason);
                         acp.abort_pending_prompts(&abort_msg);
                         // Target the session explicitly (shared process safety).
                         let _ = match agent_sid {

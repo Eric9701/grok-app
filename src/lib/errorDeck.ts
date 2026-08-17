@@ -361,6 +361,37 @@ export function looksLikeLinuxSandboxBlock(
 }
 
 /**
+ * Official included-usage / credit exhaustion (same family as Grok Build CLI).
+ * Do not treat a bare 429 / "rate limit, retry later" as terminal.
+ */
+export function looksLikeTerminalQuota(
+  raw: string | null | undefined,
+): boolean {
+  const s = (raw ?? "").toLowerCase();
+  if (!s.trim()) return false;
+  return (
+    s.includes("free-usage-exhausted") ||
+    s.includes("free_usage_exhausted") ||
+    s.includes("usage-exhausted") ||
+    s.includes("usage_exhausted") ||
+    s.includes("included free usage") ||
+    s.includes("included usage exhausted") ||
+    s.includes("you've used all") ||
+    s.includes("you have used all") ||
+    s.includes("used all the included") ||
+    s.includes("out of credits") ||
+    s.includes("insufficient credit") ||
+    s.includes("quota exceeded") ||
+    s.includes("quota_exceeded") ||
+    s.includes("额度用尽") ||
+    s.includes("额度已用尽") ||
+    s.includes("额度已用完") ||
+    s.includes("免費額度") ||
+    s.includes("免费额度已")
+  );
+}
+
+/**
  * Split host `AUTH_FAILED` / free-form auth strings into actionable subtypes.
  * Host still emits AUTH_FAILED; UI refines with message + active route.
  *
@@ -629,6 +660,14 @@ export function resolveErrorDeckCode(
     code === "SANDBOX_BLOCKED"
   ) {
     return "SANDBOX_BLOCKED";
+  }
+  // Host retry abort used to emit NETWORK_PROVIDER around free-usage-exhausted.
+  if (
+    looksLikeTerminalQuota(message) ||
+    looksLikeTerminalQuota(code) ||
+    code === "QUOTA_EXCEEDED"
+  ) {
+    return "QUOTA_EXCEEDED";
   }
   const fromCode = deckCodeFromAgent(code, opts);
   // Host often emits plain AUTH_FAILED — refine with message + active route.

@@ -5159,6 +5159,11 @@ fn classify_rpc_error(e: &str) -> AgentError {
     if crate::error::looks_like_linux_sandbox_block(e) {
         return AgentError::new(AgentErrorCode::SandboxBlocked, e);
     }
+    // Terminal included-usage / credit exhaustion first — keep the CLI sentence,
+    // not a generic 429 / "provider retries exhausted" wrapper.
+    if is_terminal_quota_reason(e) {
+        return AgentError::new(AgentErrorCode::QuotaExceeded, humanize_quota_reason(e));
+    }
     let lower = e.to_lowercase();
     if lower.contains("quota")
         || lower.contains("rate limit")
@@ -5298,11 +5303,152 @@ mod classify_rpc_error_tests {
             AgentErrorCode::NetworkProvider
         );
     }
+
+    #[test]
+    fn free_usage_exhausted_429_is_quota_not_network() {
+        let msg = "API error (status 429 Too Many Requests): subscription:free-usage-exhausted: You've used all the included free usage for model grok-4.6 for now. Usage resets over a rolling 24-hour window — tokens (actual/limit): 561857/500000. Upgrade to a Grok subscription for higher limits: https://grok.com/supergrok";
+        let err = classify_rpc_error(msg);
+        assert_eq!(err.code, AgentErrorCode::QuotaExceeded, "msg={msg}");
+        assert!(
+            err.message.contains("You've used all the included free usage"),
+            "message={}",
+            err.message
+        );
+        assert!(
+            !err.message.contains("Provider request failed"),
+            "message={}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn host_quota_abort_rpc_message_classifies_as_quota() {
+        let reason = "API error (status 429 Too Many Requests): subscription:free-usage-exhausted: You've used all the included free usage for model grok-4.6 for now.";
+        let abort = provider_retry_abort_rpc_message(reason);
+        assert_eq!(
+            classify_rpc_error(&abort).code,
+            AgentErrorCode::QuotaExceeded,
+            "abort={abort}"
+        );
+    }
 }
 
 /// Hard transport failures (no HTTP response) — fail after a few attempts so
 /// a broken proxy / DNS outage cannot pin the UI as "thinking" for minutes.
 const HARD_TRANSPORT_ABORT_ATTEMPTS: u32 = 3;
+
+/// Terminal official/credit exhaustion — not a flaky 429 the host should ride out.
+///
+/// Real CLI/provider text looks like:
+/// `API error (status 429 …): subscription:free-usage-exhausted: You've used all the included free usage…`
+pub fn is_terminal_quota_reason(reason: &str) -> bool {
+    let r = reason.to_ascii_lowercase();
+    if r.is_empty() {
+        return false;
+    }
+    r.contains("free-usage-exhausted")
+        || r.contains("free_usage_exhausted")
+        || r.contains("usage-exhausted")
+        || r.contains("usage_exhausted")
+        || r.contains("included free usage")
+        || r.contains("included usage exhausted")
+        || r.contains("you've used all")
+        || r.contains("you have used all")
+        || r.contains("used all the included")
+        || r.contains("out of credits")
+        || r.contains("insufficient credit")
+        || r.contains("quota exceeded")
+        || r.contains("quota_exceeded")
+        || r.contains("额度用尽")
+        || r.contains("额度已用尽")
+        || r.contains("额度已用完")
+        || r.contains("免費額度")
+        || r.contains("免费额度已")
+}
+
+/// Prefer the CLI/provider sentence; drop HTTP / retry wrappers and billing CTA.
+pub fn humanize_quota_reason(reason: &str) -> String {
+    let trimmed = reason.trim();
+    if trimmed.is_empty() {
+        return "Included usage is exhausted".to_string();
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    for needle in [
+        "free-usage-exhausted:",
+        "free_usage_exhausted:",
+        "usage-exhausted:",
+        "usage_exhausted:",
+        "quota_exceeded:",
+        "quota exceeded:",
+    ] {
+        if let Some(idx) = lower.find(needle) {
+            let rest = trimmed[idx + needle.len()..].trim();
+            if !rest.is_empty() {
+                return truncate_quota_sentence(rest);
+            }
+        }
+    }
+    for needle in [
+        "you've used all",
+        "you have used all",
+        "used all the included",
+    ] {
+        if let Some(idx) = lower.find(needle) {
+            return truncate_quota_sentence(trimmed[idx..].trim());
+        }
+    }
+    truncate_quota_sentence(trimmed)
+}
+
+fn truncate_quota_sentence(s: &str) -> String {
+    let mut out = s;
+    if let Some(idx) = out.find("tokens (actual") {
+        out = out[..idx].trim_end_matches([' ', '—', '–', '-']);
+    }
+    let out = out.trim();
+    if out.chars().count() > 280 {
+        let end = out
+            .char_indices()
+            .nth(280)
+            .map(|(i, _)| i)
+            .unwrap_or(out.len());
+        format!("{}…", &out[..end])
+    } else {
+        out.to_string()
+    }
+}
+
+/// Chat-visible error when host stops waiting on `retry_state`.
+pub fn provider_retry_abort_error(attempt: u32, cap: u32, reason: &str) -> AgentError {
+    if is_terminal_quota_reason(reason) {
+        AgentError::new(
+            AgentErrorCode::QuotaExceeded,
+            humanize_quota_reason(reason),
+        )
+    } else {
+        let msg = if reason.trim().is_empty() {
+            format!("Provider request failed after {attempt} attempts (budget {cap})")
+        } else {
+            format!(
+                "Provider request failed after {attempt} attempts (budget {cap}): {reason}"
+            )
+        };
+        AgentError::new(AgentErrorCode::NetworkProvider, msg)
+    }
+}
+
+/// Unblock `session/prompt` after a host circuit-break. Must classify as quota
+/// when the reason is terminal, so a late RPC error cannot overwrite the deck.
+pub fn provider_retry_abort_rpc_message(reason: &str) -> String {
+    if is_terminal_quota_reason(reason) {
+        format!(
+            "included usage exhausted: {}",
+            humanize_quota_reason(reason)
+        )
+    } else {
+        format!("provider retries exhausted (host cap {HOST_PROVIDER_MAX_RETRIES})")
+    }
+}
 
 /// True when the retry reason looks like a hard transport failure (not a flaky 5xx).
 pub fn is_hard_transport_retry_reason(reason: &str) -> bool {
@@ -5325,6 +5471,8 @@ pub fn is_hard_transport_retry_reason(reason: &str) -> bool {
 /// Whether host should stop waiting and fail the turn.
 ///
 /// - Terminal statuses (`exhausted` / `gave_up`) always abort.
+/// - Terminal quota reasons (see [`is_terminal_quota_reason`]) abort immediately
+///   so included-usage exhaustion is not ridden out as a flaky 429.
 /// - Hard transport reasons (see [`is_hard_transport_retry_reason`]) abort after
 ///   a few attempts so the chat does not stay busy for the full 15-retry budget.
 /// - Bare `failed` / `error` only abort once we have used most of the budget —
@@ -5335,7 +5483,7 @@ pub fn should_abort_provider_retry(attempt: u32, max_retries: u32, status: &str)
 }
 
 /// Like [`should_abort_provider_retry`] but consults the human-readable reason
-/// for hard-transport fail-fast.
+/// for hard-transport fail-fast and terminal quota.
 pub fn should_abort_provider_retry_ex(
     attempt: u32,
     max_retries: u32,
@@ -5348,6 +5496,9 @@ pub fn should_abort_provider_retry_ex(
         || status.contains("give_up")
         || status.contains("abort")
     {
+        return true;
+    }
+    if is_terminal_quota_reason(reason) {
         return true;
     }
     if is_hard_transport_retry_reason(reason) && attempt >= HARD_TRANSPORT_ABORT_ATTEMPTS {
@@ -5694,6 +5845,30 @@ mod retry_tests {
         assert!(!is_hard_transport_retry_reason(
             "HTTP 503 Service Unavailable"
         ));
+    }
+
+    #[test]
+    fn terminal_quota_fails_fast_and_is_not_a_bare_429() {
+        let reason = "API error (status 429 Too Many Requests): subscription:free-usage-exhausted: You've used all the included free usage for model grok-4.6 for now. Usage resets over a rolling 24-hour window";
+        assert!(is_terminal_quota_reason(reason));
+        assert!(!is_terminal_quota_reason(
+            "API error (status 429 Too Many Requests): rate limit, retry later"
+        ));
+        assert!(!is_terminal_quota_reason("HTTP 503 Service Unavailable"));
+        assert!(should_abort_provider_retry_ex(1, 15, "retrying", reason));
+        assert!(!should_abort_provider_retry_ex(
+            1,
+            15,
+            "retrying",
+            "API error (status 429 Too Many Requests): rate limit, retry later"
+        ));
+        let err = provider_retry_abort_error(1, 15, reason);
+        assert_eq!(err.code, AgentErrorCode::QuotaExceeded);
+        assert!(err.message.contains("You've used all the included free usage"));
+        assert!(!err.message.contains("Provider request failed"));
+        let net = provider_retry_abort_error(15, 15, "HTTP 503 Service Unavailable");
+        assert_eq!(net.code, AgentErrorCode::NetworkProvider);
+        assert!(net.message.contains("Provider request failed after 15"));
     }
 }
 
