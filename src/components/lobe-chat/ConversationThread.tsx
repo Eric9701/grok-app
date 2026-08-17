@@ -96,6 +96,12 @@ import {
 } from "./MessageAction";
 import { ChatItem } from "./ChatItem";
 import { MarkdownChat } from "./MarkdownChat";
+import { LongAssistantSpillNote } from "./LongAssistantSpillNote";
+import {
+  previewLongAssistant,
+  shouldSpillLongAssistant,
+} from "@/lib/longAssistantSpill";
+import { detectAppPlatform } from "@/lib/appPlatform";
 import { Thinking } from "./Thinking";
 import { LeadFragmentsStrip } from "./LeadFragmentsStrip";
 import { BackBottom } from "./BackBottom";
@@ -191,6 +197,7 @@ function useStableSessionPathMap(
  */
 const AssistantMessageBody = memo(function AssistantMessageBody({
   content,
+  messageId,
   attachments,
   /**
    * When false, still resolve pathMap from attachments for inline ImageUi,
@@ -217,6 +224,8 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
   findOccurrenceBase = 0,
 }: {
   content: string;
+  /** Session message id — used to cache the spilled .txt path. */
+  messageId?: string;
   attachments?: Attachment[];
   showBottomAttachments?: boolean;
   fullContentForInlineFilter?: string;
@@ -274,12 +283,24 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
       galleryPaths: images.map((x) => x.path),
     };
   }, [bottomAtts]);
+  const [showFullReply, setShowFullReply] = useState(false);
   if (
     !(displayContent || "").trim() &&
     !(bottomImages.length || bottomFiles.length)
   ) {
     return null;
   }
+
+  const findActiveHere = !!findQuery?.trim();
+  const canSpill =
+    shouldSpillLongAssistant(
+      (displayContent || "").length,
+      detectAppPlatform(),
+    ) && !findActiveHere;
+  const spill = canSpill && !showFullReply;
+  const markdownSource = spill
+    ? previewLongAssistant(displayContent || "")
+    : displayContent;
 
   const body = (displayContent || "").trim() ? (
     <MarkdownChat
@@ -295,13 +316,26 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
       findActiveOccurrence={findActiveOccurrence}
       findOccurrenceBase={findOccurrenceBase}
     >
-      {displayContent}
+      {markdownSource}
     </MarkdownChat>
   ) : null;
 
   return (
     <>
       {body}
+      {canSpill ? (
+        <LongAssistantSpillNote
+          fullText={displayContent || ""}
+          streaming={!!streaming}
+          locale={locale}
+          messageId={messageId}
+          projectPath={projectPath}
+          expanded={showFullReply}
+          onToggleExpanded={() => setShowFullReply((v) => !v)}
+          onOpenResource={onOpenResource}
+          onOpenError={onOpenError}
+        />
+      ) : null}
       {bottomImages.length > 0 ? (
         <div className="lobe-chat-atts lobe-chat-atts--images">
           {bottomImages.map((a) => (
@@ -1415,6 +1449,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
               return (
                 <AssistantMessageBody
                   key={`${m.id}-c-${unit.si}`}
+                  messageId={m.id}
                   content={unit.text}
                   // Always pass attachments so every content segment can
                   // resolve `images/N.jpg` → ImageUi at stream position.
@@ -1461,6 +1496,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
           {!contentSegCount && m.attachments?.length ? (
             <AssistantMessageBody
               content=""
+              messageId={m.id}
               attachments={m.attachments}
               showBottomAttachments
               fullContentForInlineFilter={m.content}

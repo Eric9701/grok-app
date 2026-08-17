@@ -154,4 +154,11 @@ export const zhChat = {
   "message.copyLink": "复制链接",
   "message.linkCopied": "链接已复制",
   "message.deepLinkMissing": "此对话中未找到该消息",
+  "chat.longReplyPreview": "仅显示预览，避免对话卡死",
+  "chat.longReplySaving": "回复较长 — 本轮结束后会保存为文本文件",
+  "chat.longReplySaved": "全文已保存为文本文件",
+  "chat.longReplyDownload": "将全文另存为 .txt",
+  "chat.longReplyShowFull": "显示全文",
+  "chat.longReplyCollapse": "只显示预览",
+  "chat.longReplyShowingFull": "正在显示全文",
 };
