@@ -872,6 +872,7 @@ import {
   IconChevronRight,
   IconMore,
   IconPlus,
+  IconQueue,
   IconSkills,
   IconSearch,
   IconAttach,
@@ -1028,6 +1029,10 @@ const OpsEntryModal = lazy(async () => {
   const m = await import("@/components/OpsEntryModal");
   return { default: m.OpsEntryModal };
 });
+const KanbanBoardPage = lazy(async () => {
+  const m = await import("@/components/KanbanBoardPage");
+  return { default: m.KanbanBoardPage };
+});
 const ReliabilityCenterModal = lazy(async () => {
   const m = await import("@/components/ReliabilityCenterModal");
   return { default: m.ReliabilityCenterModal };
@@ -1122,6 +1127,16 @@ import {
 } from "@/lib/app/projectOrder";
 import { useSidebarProjectReorder } from "@/hooks/useSidebarProjectReorder";
 import { useSideWorkbenchProjectIsolation } from "@/hooks/useSideWorkbenchProjectIsolation";
+import { useProjectSpaces } from "@/hooks/useProjectSpaces";
+import { SpaceSwitcher } from "@/components/SpaceSwitcher";
+import {
+  findSpace,
+  spaceDisplayName,
+  spaceOfProject,
+  type CreateSpaceError,
+  type DeleteSpaceError,
+  type SpaceNameError,
+} from "@/lib/projectSpaces";
 import type { ContextMenuState } from "@/lib/app/appDialogTypes";
 import { useSessionRuntime } from "@/hooks/useSessionRuntime";
 import { sessionTranscriptStore } from "@/lib/sessionTranscriptStore";
@@ -1136,6 +1151,27 @@ import { createDebouncedSkillsReload } from "@/lib/skillCatalogRefresh";
 
 /** App-local plan chrome state (session-scoped via planBySessionRef). */
 type PlanState = SessionPlanState;
+
+function spaceErrorKey(
+  err: SpaceNameError | CreateSpaceError | DeleteSpaceError,
+): MessageKey {
+  switch (err) {
+    case "empty":
+      return "sidebar.spaces.err.empty";
+    case "duplicate":
+      return "sidebar.spaces.err.duplicate";
+    case "too_long":
+      return "sidebar.spaces.err.tooLong";
+    case "limit":
+      return "sidebar.spaces.err.limit";
+    case "last":
+      return "sidebar.spaces.err.last";
+    case "default":
+      return "sidebar.spaces.err.default";
+    case "not_found":
+      return "sidebar.spaces.err.notFound";
+  }
+}
 
 
 export function AppWorkbench() {
@@ -1280,6 +1316,8 @@ export function AppWorkbench() {
     dismissDialog,
     dialogInput,
     setDialogInput,
+    dialogError,
+    setDialogError,
     dialogInputRef,
     confirmBtnRef,
     appDialogPanelRef,
@@ -1652,6 +1690,8 @@ export function AppWorkbench() {
   const [projects, setProjects] = useState<Project[]>([]);
   const projectsRef = useRef(projects);
   projectsRef.current = projects;
+  const projectSpaces = useProjectSpaces();
+  const visibleProjects = projectSpaces.visibleProjects(projects);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
@@ -1762,8 +1802,10 @@ export function AppWorkbench() {
   const [phoneAccountOpen, setPhoneAccountOpen] = useState(false);
   /** Hash route: workbench | settings/:section | automations */
   const [appView, setAppView] = useState<"workbench" | "settings">("workbench");
-  /** Inside workbench: chat thread vs scheduled tasks list. */
-  const [mainPane, setMainPane] = useState<"chat" | "automations">("chat");
+  /** Inside workbench: chat thread vs scheduled tasks vs agent kanban. */
+  const [mainPane, setMainPane] = useState<"chat" | "automations" | "kanban">(
+    "chat",
+  );
   const [settingsSection, setSettingsSection] =
     useState<SettingsSectionId>("general");
   const [settingsTab, setSettingsTab] = useState<SettingsTabId | null>(
@@ -2587,7 +2629,8 @@ export function AppWorkbench() {
       tasksPanelOpen ||
       opsEntryOpen ||
       streamStall != null ||
-      liveVoiceOpen,
+      liveVoiceOpen ||
+      mainPane === "kanban",
   );
   /** Queue item currently being steered into the live turn. */
   const [guidingQueueItemId, setGuidingQueueItemId] = useState<string | null>(null);
@@ -4221,6 +4264,9 @@ export function AppWorkbench() {
     navigateWorkbench: () => {
       setAppView("workbench");
       setMainPane("chat");
+      if (typeof window !== "undefined" && window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
     },
     pendingAskUserBySessionRef,
     pendingPermBySessionRef,
@@ -4251,6 +4297,15 @@ export function AppWorkbench() {
     setShowUserMenu(false);
     if (typeof window !== "undefined") {
       window.location.hash = "#/automations";
+    }
+  }, []);
+
+  const navigateKanban = useCallback(() => {
+    setAppView("workbench");
+    setMainPane("kanban");
+    setShowUserMenu(false);
+    if (typeof window !== "undefined") {
+      window.location.hash = "#/kanban";
     }
   }, []);
 
@@ -4304,7 +4359,7 @@ export function AppWorkbench() {
     setSettingsFocusAnchor("settings-anchor-workflows");
   }, [navigateSettings]);
 
-  // Hash route: #/settings[/section[/tab]][?pr=N] | #/automations | #/workbench
+  // Hash route: #/settings[/section[/tab]][?pr=N] | #/automations | #/kanban | #/workbench
   // Explicit #/settings/{section}… deep links always win; bare #/settings uses last.
   useEffect(() => {
     const syncFromHash = () => {
@@ -4345,6 +4400,9 @@ export function AppWorkbench() {
       } else if (raw === "automations" || raw.startsWith("automations")) {
         setAppView("workbench");
         setMainPane("automations");
+      } else if (raw === "kanban" || raw.startsWith("kanban")) {
+        setAppView("workbench");
+        setMainPane("kanban");
       } else if (raw === "" || raw === "workbench" || raw === "home") {
         setAppView("workbench");
         setMainPane("chat");
@@ -4370,6 +4428,9 @@ export function AppWorkbench() {
       null;
     setMainPane("chat");
     setAppView("workbench");
+    if (typeof window !== "undefined" && window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
     // Phone drawer: selecting a session closes the overlay (does not push layout).
     if (phoneLayout) closePhoneDrawer();
 
@@ -5315,6 +5376,9 @@ export function AppWorkbench() {
     if (opts?.switchToChat !== false) {
       setMainPane("chat");
       setAppView("workbench");
+      if (typeof window !== "undefined" && window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
     }
     if (phoneLayout) closePhoneDrawer();
     setActiveProject(proj);
@@ -6032,23 +6096,31 @@ export function AppWorkbench() {
   );
 
   const projectReorder = useSidebarProjectReorder({
-    projects,
+    projects: visibleProjects,
     enabled:
       !sessionSelectMode &&
       !isMirrorClient() &&
-      projects.length > 1,
+      visibleProjects.length > 1,
     onReorder: (next) => {
-      void applyProjectsOrder(next);
+      void applyProjectsOrder(
+        projectSpaces.spliceOrder(projectsOrderRef.current, next),
+      );
     },
   });
 
   const moveProjectByMenu = useCallback(
     (projId: string, direction: "up" | "down") => {
-      const next = moveProjectInPinGroup(projects, projId, direction);
-      if (next === projects) return;
-      void applyProjectsOrder(next);
+      const nextVisible = moveProjectInPinGroup(
+        visibleProjects,
+        projId,
+        direction,
+      );
+      if (nextVisible === visibleProjects) return;
+      void applyProjectsOrder(
+        projectSpaces.spliceOrder(projects, nextVisible),
+      );
     },
-    [projects, applyProjectsOrder],
+    [visibleProjects, projects, applyProjectsOrder, projectSpaces],
   );
 
   const applySessionTitle = useCallback(
@@ -6388,6 +6460,7 @@ export function AppWorkbench() {
             return;
           }
           await api.projectRemove(proj.id);
+          projectSpaces.forgetProject(proj.id);
           if (activeProject?.id === proj.id) {
             // Unbound — sessions for this folder show under "其他会话".
             setActiveProject(null);
@@ -8754,11 +8827,14 @@ export function AppWorkbench() {
           return;
         }
         let last: Project | null = null;
+        const addedIds: string[] = [];
         for (const d of dirs) {
           last = (await api.projectAdd(d.path, false)) as Project;
+          addedIds.push(last.id);
         }
         const list = mapProjectsList((await api.projectsList()) as Project[]);
         setProjects(list);
+        projectSpaces.assignNewProjects(addedIds);
         if (last) {
           setActiveProject(list.find((p) => p.id === last!.id) ?? last);
           setExpandedProjects((e) => ({ ...e, [last!.id]: true }));
@@ -9718,6 +9794,77 @@ export function AppWorkbench() {
       setToast((cur) => (cur === msg ? null : cur));
     }, ms);
   }, []);
+
+  const promptCreateSpace = useCallback(
+    (afterCreate?: (id: string) => void) => {
+      setAppDialog({
+        kind: "prompt",
+        title: tr("sidebar.spaces.newTitle"),
+        initial: "",
+        placeholder: tr("sidebar.spaces.namePlaceholder"),
+        onSubmit: (value) => {
+          const result = projectSpaces.create(value);
+          if (!result.ok) {
+            return tr(spaceErrorKey(result.error));
+          }
+          showToast(
+            tr("sidebar.spaces.created", { name: value.trim() }),
+            2400,
+          );
+          afterCreate?.(result.id);
+        },
+      });
+    },
+    [projectSpaces, setAppDialog, showToast, tr],
+  );
+
+  const promptRenameSpace = useCallback(
+    (id: string) => {
+      const space = findSpace(projectSpaces.state, id);
+      if (!space) return;
+      setAppDialog({
+        kind: "prompt",
+        title: tr("sidebar.spaces.renameTitle"),
+        initial: space.name || tr("sidebar.spaces.default"),
+        placeholder: tr("sidebar.spaces.namePlaceholder"),
+        onSubmit: (value) => {
+          const result = projectSpaces.rename(id, value);
+          if (!result.ok) {
+            return tr(spaceErrorKey(result.error));
+          }
+          showToast(
+            tr("sidebar.spaces.renamed", { name: value.trim() }),
+            2400,
+          );
+        },
+      });
+    },
+    [projectSpaces, setAppDialog, showToast, tr],
+  );
+
+  const confirmDeleteSpace = useCallback(
+    (id: string) => {
+      const space = findSpace(projectSpaces.state, id);
+      if (!space) return;
+      const name = spaceDisplayName(space, tr("sidebar.spaces.default"));
+      setAppDialog({
+        kind: "confirm",
+        title: tr("sidebar.spaces.deleteTitle"),
+        message: tr("sidebar.spaces.deleteConfirm", { name }),
+        confirmLabel: tr("sidebar.spaces.delete"),
+        danger: true,
+        onConfirm: () => {
+          const result = projectSpaces.remove(id);
+          if (!result.ok) {
+            showToast(tr(spaceErrorKey(result.error)), 2800);
+            return;
+          }
+          showToast(tr("sidebar.spaces.deleted", { name }), 2400);
+        },
+      });
+    },
+    [projectSpaces, setAppDialog, showToast, tr],
+  );
 
   const onLiveVoiceClassifiedNotice = useCallback(
     (message: string) => {
@@ -11027,6 +11174,7 @@ export function AppWorkbench() {
               (await api.projectsList()) as Project[],
             );
             setProjects(list);
+            projectSpaces.assignNewProjects([added.id]);
             bindProject =
               list.find((p) => p.id === added.id) ??
               list.find((p) => pathsEqual(p.path, created!.path)) ??
@@ -11267,6 +11415,7 @@ export function AppWorkbench() {
             (await api.projectsList()) as Project[],
           );
           setProjects(list);
+          projectSpaces.assignNewProjects([added.id]);
           bindProject =
             list.find((p) => p.id === added.id) ??
             list.find((p) => pathsEqual(p.path, created!.path)) ??
@@ -13027,6 +13176,7 @@ export function AppWorkbench() {
     async (p: Project, opts: { bindSession: boolean }) => {
       const list = mapProjectsList((await api.projectsList()) as Project[]);
         setProjects(list);
+      projectSpaces.assignNewProjects([p.id]);
       setSetup((s) => ({ ...s, project: true }));
 
       const apply = async (proj: Project) => {
@@ -13065,7 +13215,14 @@ export function AppWorkbench() {
       }
       await apply(p);
     },
-    [bindSessionProject, maybeOfferSandboxWizardAfterTrust, showToast, tr],
+    [
+      bindSessionProject,
+      maybeOfferSandboxWizardAfterTrust,
+      projectSpaces,
+      setAppDialog,
+      showToast,
+      tr,
+    ],
   );
 
   /** Open gc dialog and run dry-run preview. */
@@ -13308,6 +13465,7 @@ export function AppWorkbench() {
         const added = (await api.projectAdd(path, trust)) as Project;
         const list = mapProjectsList((await api.projectsList()) as Project[]);
         setProjects(list);
+        projectSpaces.assignNewProjects([added.id]);
         const proj = list.find((p) => p.id === added.id) ?? added;
         if (!proj.trusted) {
           await finalizeAddedProject(proj, { bindSession: true });
@@ -13615,6 +13773,7 @@ export function AppWorkbench() {
         const added = (await api.projectAdd(path, trust)) as Project;
         const list = mapProjectsList((await api.projectsList()) as Project[]);
         setProjects(list);
+        projectSpaces.assignNewProjects([added.id]);
         target = list.find((p) => p.id === added.id) ?? added;
       }
 
@@ -13993,6 +14152,9 @@ export function AppWorkbench() {
       case "add-project":
         void addProject(false);
         break;
+      case "new-space":
+        promptCreateSpace();
+        break;
       case "open-automations":
         navigateAutomations();
         break;
@@ -14037,6 +14199,9 @@ export function AppWorkbench() {
         ) {
           window.location.hash = "#/workbench";
         }
+        break;
+      case "open-kanban":
+        navigateKanban();
         break;
       case "open-batch-agents":
         openBatchAgents();
@@ -18416,6 +18581,19 @@ export function AppWorkbench() {
               </span>
               {tr("sidebar.scheduled")}
             </button>
+            <button
+              type="button"
+              className={
+                "nav-item" +
+                (mainPane === "kanban" ? " nav-item--active" : "")
+              }
+              onClick={() => navigateKanban()}
+            >
+              <span className="nav-item__icon">
+                <IconList size={16} />
+              </span>
+              {tr("sidebar.kanban")}
+            </button>
             {api.isDesktopHost() ? (
               <button
                 type="button"
@@ -18436,18 +18614,34 @@ export function AppWorkbench() {
             <div className="tree-l1">
               <button
                 type="button"
-                className="tree-l1__head"
+                className="tree-l1__head tree-l1__head--toggle"
                 onClick={() => setProjectsOpen((v) => !v)}
+                aria-expanded={projectsOpen}
+                aria-label={tr("sidebar.projects")}
               >
                 {projectsOpen ? (
                   <IconChevronDown size={14} />
                 ) : (
                   <IconChevronRight size={14} />
                 )}
-                <span className="tree-l1__label">
-                  {tr("sidebar.projects")}
-                </span>
               </button>
+              <SpaceSwitcher
+                state={projectSpaces.state}
+                projectIds={projects.map((p) => p.id)}
+                labels={{
+                  projects: tr("sidebar.projects"),
+                  all: tr("sidebar.spaces.all"),
+                  default: tr("sidebar.spaces.default"),
+                  switch: tr("sidebar.spaces.switch"),
+                  new: tr("sidebar.spaces.new"),
+                  rename: tr("sidebar.spaces.rename"),
+                  delete: tr("sidebar.spaces.delete"),
+                }}
+                onSelect={(id) => projectSpaces.switchTo(id)}
+                onNew={() => promptCreateSpace()}
+                onRename={(id) => promptRenameSpace(id)}
+                onDelete={(id) => confirmDeleteSpace(id)}
+              />
               <div className="tree-l1__actions">
                 {sessionSelectMode ? (
                   <Tip label={tr("common.cancel")}>
@@ -18556,7 +18750,18 @@ export function AppWorkbench() {
             )}
 
             {projectsOpen &&
-              projects.map((proj) => {
+              projects.length > 0 &&
+              visibleProjects.length === 0 && (
+              <div className="sidebar-empty sidebar-empty--space">
+                {tr("sidebar.spaces.empty")}
+                <div className="sidebar-empty__hint">
+                  {tr("sidebar.spaces.emptyHint")}
+                </div>
+              </div>
+            )}
+
+            {projectsOpen &&
+              visibleProjects.map((proj) => {
                 const open = expandedProjects[proj.id] !== false;
                 const projSessions = sessionsForProject(proj.id);
                 const projSessionIds = projSessions.map((s) => s.id);
@@ -19257,6 +19462,17 @@ export function AppWorkbench() {
                     {tr("automations.title")}
                   </h1>
                 </>
+              ) : mainPane === "kanban" ? (
+                <>
+                  {!phoneLayout ? (
+                    <span className="main__title-icon">
+                      <IconList size={16} />
+                    </span>
+                  ) : null}
+                  <h1 className="main__title" data-tauri-drag-region>
+                    {tr("kanban.title")}
+                  </h1>
+                </>
               ) : (
                 (() => {
                   const cur = sessions.find((s) => s.id === session.sessionId);
@@ -19483,7 +19699,25 @@ export function AppWorkbench() {
             </div>
           </div>
 
-          {mainPane === "automations" ? (
+          {mainPane === "kanban" ? (
+            <Suspense fallback={null}>
+              <KanbanBoardPage
+                locale={locale}
+                sessions={sessions}
+                projects={projects.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  path: p.path,
+                }))}
+                liveMap={liveMap}
+                currentSessionId={session.sessionId}
+                untitledLabel={tr("session.untitled")}
+                generalWorkspacePath={generalWorkspacePath}
+                unboundProjectLabel={tr("sidebar.otherSessions")}
+                onSelectSession={openSessionByIdHandler}
+              />
+            </Suspense>
+          ) : mainPane === "automations" ? (
                         <Suspense fallback={null}>
               <AutomationsPage
               t={(k, vars) =>
@@ -24417,6 +24651,7 @@ export function AppWorkbench() {
                     onClick={() => {
                       setShowSearch(false);
                       // Project is a folder: expand only; selection is for sessions.
+                      projectSpaces.revealProject(p.id);
                       setProjectsOpen(true);
                       setExpandedProjects((e) => ({ ...e, [p.id]: true }));
                     }}
@@ -24707,8 +24942,22 @@ export function AppWorkbench() {
                     e.preventDefault();
                     const value = dialogInput;
                     const submit = appDialog.onSubmit;
-                    setAppDialog(null);
-                    void submit(value);
+                    void (async () => {
+                      const ok = await submit(value);
+                      if (typeof ok === "string") {
+                        setDialogError(ok);
+                        return;
+                      }
+                      if (ok === false) return;
+                      setDialogError("");
+                      setAppDialog((cur) =>
+                        cur &&
+                        cur.kind === "prompt" &&
+                        cur.onSubmit === submit
+                          ? null
+                          : cur,
+                      );
+                    })();
                   }}
                 >
                   {appDialog.message ? (
@@ -24719,10 +24968,26 @@ export function AppWorkbench() {
                     className="app-dialog__input"
                     value={dialogInput}
                     placeholder={appDialog.placeholder}
-                    onChange={(e) => setDialogInput(e.target.value)}
+                    onChange={(e) => {
+                      setDialogInput(e.target.value);
+                      if (dialogError) setDialogError("");
+                    }}
                     autoComplete="off"
+                    aria-invalid={dialogError ? true : undefined}
+                    aria-describedby={
+                      dialogError ? "app-dialog-error" : undefined
+                    }
                   />
                   <div className="app-dialog__actions modal-actions">
+                    {dialogError ? (
+                      <p
+                        id="app-dialog-error"
+                        className="app-dialog__error"
+                        role="alert"
+                      >
+                        {dialogError}
+                      </p>
+                    ) : null}
                     <button
                       type="button"
                       className="btn btn--ghost"
@@ -24765,9 +25030,9 @@ export function AppWorkbench() {
         } else if (ctxMenu?.kind === "project") {
           const proj = projects.find((p) => p.id === ctxMenu.id);
           if (proj) {
-            const canUp = canMoveProjectInPinGroup(projects, proj.id, "up");
+            const canUp = canMoveProjectInPinGroup(visibleProjects, proj.id, "up");
             const canDown = canMoveProjectInPinGroup(
-              projects,
+              visibleProjects,
               proj.id,
               "down",
             );
@@ -24829,6 +25094,70 @@ export function AppWorkbench() {
                     y: ctxMenu.y,
                   });
                 },
+              },
+              {
+                id: "move-space",
+                label: tr("sidebar.spaces.moveTo"),
+                icon: <IconQueue size={16} />,
+                children: [
+                  ...projectSpaces.state.spaces.map((space) => {
+                    const current =
+                      spaceOfProject(projectSpaces.state, proj.id) ===
+                      space.id;
+                    return {
+                      id: `move-space-${space.id}`,
+                      label: spaceDisplayName(
+                        space,
+                        tr("sidebar.spaces.default"),
+                      ),
+                      icon: current ? <IconCheck size={16} /> : undefined,
+                      onClick: () => {
+                        if (current) return;
+                        projectSpaces.moveProject(proj.id, space.id);
+                        showToast(
+                          tr("sidebar.spaces.moved", {
+                            name: projectDisplayName(proj, tr),
+                            space: spaceDisplayName(
+                              space,
+                              tr("sidebar.spaces.default"),
+                            ),
+                          }),
+                          2400,
+                        );
+                      },
+                    } satisfies ContextMenuItem;
+                  }),
+                  { id: "move-space-sep", separator: true },
+                  {
+                    id: "move-space-new",
+                    label: tr("sidebar.spaces.new"),
+                    icon: <IconPlus size={16} />,
+                    onClick: () => {
+                      setAppDialog({
+                        kind: "prompt",
+                        title: tr("sidebar.spaces.newTitle"),
+                        initial: "",
+                        placeholder: tr("sidebar.spaces.namePlaceholder"),
+                        onSubmit: (value) => {
+                          const result = projectSpaces.createAndMove(
+                            proj.id,
+                            value,
+                          );
+                          if (!result.ok) {
+                            return tr(spaceErrorKey(result.error));
+                          }
+                          showToast(
+                            tr("sidebar.spaces.moved", {
+                              name: projectDisplayName(proj, tr),
+                              space: value.trim(),
+                            }),
+                            2400,
+                          );
+                        },
+                      });
+                    },
+                  },
+                ],
               },
               {
                 id: "reveal",

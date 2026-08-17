@@ -14,10 +14,14 @@ See `docs/llm-wiki/release.md`.
 ### Added
 - **Side workbench CodeMirror editor (#661 follow-up)**: Files edit mode uses CodeMirror 6 (Atom One palette + line numbers, Tab as two spaces, ⌘/Ctrl+S). Markdown still uses TipTap. Preview mode is unchanged.
 - **Discover Claude / Cursor skills toggle**: Settings → Extensions → Skills can turn external compat discovery off. Independent session mode also writes `[compat.claude] skills` / `[compat.cursor] skills` in agent-home `config.toml`. Shared mode only hides them in the App (does not rewrite `~/.grok`).
+- **Agent Kanban**: Sidebar / palette / `#/kanban` shows live sessions in Needs you / Working / Done. A finished turn stays in Done across pane remounts (not a personal to-do list). Opening a card does not hide it.
+- **Project Spaces**: Sidebar groups projects into named spaces (All / Default / custom). Membership survives restart; search from All does not force a space switch. Name errors stay inline in the prompt (red), not a toast.
 
 **中文 · 新增**
 - **侧栏 CodeMirror 编辑器（#661 后续）**：Files 编辑模式改用 CodeMirror 6（Atom One 配色 + 行号，Tab 两个空格，⌘/Ctrl+S）。Markdown 仍用 TipTap。预览模式不变。
 - **探测 Claude / Cursor 技能开关**：设置 → 扩展 → 技能可关闭外源兼容探测。独立会话模式会写入 agent-home `config.toml`；共享模式只在应用内隐藏，不改写 `~/.grok`。
+- **智能体看板**：侧栏 / 命令面板 / `#/kanban` 按「需要你 / 工作中 / 已完成」展示运行中的会话。回合结束后切走再回来仍留在已完成（不是个人待办）。打开卡片不会把它藏掉。
+- **项目空间**：侧栏项目可分到命名空间（全部 / 默认 / 自定义）。成员关系重启后仍在；「全部」里搜索不会误切空间。重名等错误在对话框里用红字提示，不再用顶部 toast。
 
 ### Changed
 - **Composer workspace chip on every desktop chat (#662)**: The project / default-workspace control above the input is no longer limited to a brand-new draft that already has a folder. Pick, add, or return to the default workspace from the existing `ComposerProjectMenu`. Chinese copy uses 默认工作区 (was 通用). Sidebar `+` stays. Phone still uses the tools sheet.
