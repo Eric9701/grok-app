@@ -545,6 +545,7 @@ html[data-sidebar-density="compact"] .tree-date-group__head {
   border-radius: var(--modal-radius, 16px);
   display: flex;
   flex-direction: column;
+  /* Clip to radius; hits scroll in .search-panel__results (not here). */
   overflow: hidden;
   color: var(--text-primary);
   box-sizing: border-box;
@@ -557,6 +558,7 @@ html[data-sidebar-density="compact"] .tree-date-group__head {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-tertiary);
+  flex-shrink: 0;
 }
 
 .search-panel__input {
@@ -584,6 +586,24 @@ html[data-sidebar-density="compact"] .tree-date-group__head {
   gap: 8px;
   padding: 8px 14px 10px;
   border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+/*
+ * Sole vertical scrollport for palette hits. Without this, max-height +
+ * overflow:hidden on .search-panel clips rows and wheel/trackpad do nothing
+ * (same trap as automations #543).
+ */
+.search-panel__results {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.search-panel__results .overlay-scroll__viewport {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 6px;
 }
 
 .search-panel__modes {
@@ -644,6 +664,7 @@ html[data-sidebar-density="compact"] .tree-date-group__head {
   gap: 8px 12px;
   padding: 8px 14px;
   border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
 .search-panel__modes {
@@ -776,7 +797,8 @@ html[data-sidebar-density="compact"] .tree-date-group__head {
   box-sizing: border-box;
 }
 
-.search-panel__row:hover {
+.search-panel__row:hover,
+.search-panel__row.is-active {
   background: var(--menu-hover);
   color: var(--text-primary);
 }
