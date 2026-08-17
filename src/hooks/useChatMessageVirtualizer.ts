@@ -39,6 +39,12 @@ import {
   type ChatVirtualWindow,
 } from "@/lib/chatVirtualList";
 import { resolveStreamOverscanScale } from "@/lib/streamRenderPolicy";
+import {
+  cancelFrameSchedule,
+  emptyFrameSchedule,
+  scheduleOnFrame,
+  type FrameSchedule,
+} from "@/lib/frameSchedule";
 
 export type UseChatMessageVirtualizerArgs = {
   itemCount: number;
@@ -121,8 +127,8 @@ export function useChatMessageVirtualizer(
   const ignoreScrollAdjustRef = useRef(false);
   /** Per-index ResizeObserver so image/video decode updates height after mount. */
   const rowObserversRef = useRef<Map<number, ResizeObserver>>(new Map());
-  /** Coalesce scroll-driven recomputes to one per animation frame. */
-  const scrollRafRef = useRef<number | null>(null);
+  /** Coalesce scroll-driven recomputes to one paint (rAF + mixed-Hz fallback). */
+  const scrollFrameRef = useRef<FrameSchedule>(emptyFrameSchedule());
   /**
    * True while the user is actively scrolling. Height remeasures that rebuild
    * the virtual window mid-fling were the main "everything jitters on scroll"
@@ -289,11 +295,7 @@ export function useChatMessageVirtualizer(
       // them as a user fling buffers height commits for 140ms, then flushes
       // a spacer jump that stick snaps back — bounce at the locked bottom.
       if (isPinnedRef.current) {
-        if (scrollRafRef.current != null) return;
-        scrollRafRef.current = requestAnimationFrame(() => {
-          scrollRafRef.current = null;
-          recomputeNow();
-        });
+        scheduleOnFrame(scrollFrameRef.current, recomputeNow);
         return;
       }
       scrollingRef.current = true;
@@ -319,12 +321,9 @@ export function useChatMessageVirtualizer(
           recomputeNow();
         }
       }, 140);
-      // One window update per frame while the user is flinging through history.
-      if (scrollRafRef.current != null) return;
-      scrollRafRef.current = requestAnimationFrame(() => {
-        scrollRafRef.current = null;
-        recomputeNow();
-      });
+      // One window update per paint while flinging. Timeout fallback covers
+      // mixed 120Hz/75Hz displays where rAF can skip a 75Hz vsync.
+      scheduleOnFrame(scrollFrameRef.current, recomputeNow);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     // Viewport chrome resize only — not content (content RO was thrashy).
@@ -340,10 +339,7 @@ export function useChatMessageVirtualizer(
     return () => {
       el.removeEventListener("scroll", onScroll);
       ro.disconnect();
-      if (scrollRafRef.current != null) {
-        cancelAnimationFrame(scrollRafRef.current);
-        scrollRafRef.current = null;
-      }
+      cancelFrameSchedule(scrollFrameRef.current);
       if (recomputeTimerRef.current != null) {
         clearTimeout(recomputeTimerRef.current);
         recomputeTimerRef.current = null;
