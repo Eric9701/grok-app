@@ -31,6 +31,9 @@ pub const APP_UPSTREAM_BASE_URL_KEY: &str = "app_upstream_base_url";
 static LISTEN_PORT: AtomicU16 = AtomicU16::new(0);
 static START_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
+const RELAY_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+const RELAY_STREAM_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
 fn start_lock() -> &'static Mutex<()> {
     START_LOCK.get_or_init(|| Mutex::new(()))
 }
@@ -180,13 +183,22 @@ pub async fn ensure_started() -> Result<u16, String> {
     let bound = addr.port();
 
     let app = Router::new().fallback(any(proxy_fallback));
+    // Publish the port only after the listener has been bound, but before the
+    // serve task is spawned. If `axum::serve` fails immediately, its cleanup
+    // compare-exchange below can reliably clear this exact generation; doing
+    // the store after `spawn` left a race where a fast failure was overwritten
+    // by the stale port value.
+    LISTEN_PORT.store(bound, Ordering::SeqCst);
     tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, app).await {
             tracing::error!(target: "relay_stream_proxy", "serve error: {e}");
         }
+        // A bound port is not useful after the serving task exits, whether it
+        // returns an error or a graceful `Ok(())`. Clear only this generation
+        // so a newer listener cannot be invalidated by an old task.
+        let _ = LISTEN_PORT.compare_exchange(bound, 0, Ordering::SeqCst, Ordering::SeqCst);
     });
 
-    LISTEN_PORT.store(bound, Ordering::SeqCst);
     tracing::info!(
         target: "relay_stream_proxy",
         port = bound,
@@ -396,7 +408,12 @@ async fn proxy_request(req: Request) -> Result<Response, String> {
         .map_err(|e| format!("read body: {e}"))?;
 
     let client = {
-        let b = reqwest::Client::builder().timeout(std::time::Duration::from_secs(600));
+        // Do not install a total request deadline: a healthy SSE response may
+        // legitimately run for hours. Bound only connection setup and idle
+        // reads; the latter resets whenever an upstream chunk arrives.
+        let b = reqwest::Client::builder()
+            .connect_timeout(RELAY_CONNECT_TIMEOUT)
+            .read_timeout(RELAY_STREAM_IDLE_TIMEOUT);
         crate::proxy::apply_to_reqwest(b)
             .build()
             .map_err(|e| e.to_string())?
@@ -445,13 +462,24 @@ async fn proxy_request(req: Request) -> Result<Response, String> {
         let mut stream = byte_stream;
         let mut utf8_pending: Vec<u8> = Vec::new();
         let mut line_buf = String::new();
-        while let Some(item) = stream.next().await {
+        loop {
+            let item = match tokio::time::timeout(RELAY_STREAM_IDLE_TIMEOUT, stream.next()).await {
+                Ok(item) => item,
+                Err(_) => {
+                    let msg = "upstream SSE idle timeout";
+                    tracing::warn!(target: "relay_stream_proxy", "{msg}");
+                    yield Ok::<Bytes, Infallible>(Bytes::from(format_sse_error(msg)));
+                    break;
+                }
+            };
+            let Some(item) = item else { break };
             match item {
                 Ok(chunk) => {
                     push_utf8_stream(&mut utf8_pending, &chunk, &mut line_buf);
-                    while let Some(pos) = line_buf.find("\n\n") {
-                        let event = line_buf[..pos + 2].to_string();
-                        line_buf = line_buf[pos + 2..].to_string();
+                    while let Some((pos, delimiter_len)) = find_sse_event_end(&line_buf) {
+                        let end = pos + delimiter_len;
+                        let event = line_buf[..end].to_string();
+                        line_buf = line_buf[end..].to_string();
                         let kept = filter_sse_event(&event);
                         if !kept.is_empty() {
                             yield Ok::<Bytes, Infallible>(Bytes::from(kept));
@@ -460,6 +488,7 @@ async fn proxy_request(req: Request) -> Result<Response, String> {
                 }
                 Err(e) => {
                     tracing::warn!(target: "relay_stream_proxy", "upstream stream: {e}");
+                    yield Ok::<Bytes, Infallible>(Bytes::from(format_sse_error(&format!("upstream SSE read failed: {e}"))));
                     break;
                 }
             }
@@ -483,6 +512,29 @@ async fn proxy_request(req: Request) -> Result<Response, String> {
         .header(header::CACHE_CONTROL, "no-cache")
         .body(Body::from_stream(filtered))
         .map_err(|e| e.to_string())
+}
+
+/// Return the first complete SSE event boundary, accepting both the LF form
+/// emitted by most providers and the strict CRLF form required by the SSE spec.
+fn find_sse_event_end(input: &str) -> Option<(usize, usize)> {
+    let lf = input.find("\n\n").map(|pos| (pos, 2));
+    let crlf = input.find("\r\n\r\n").map(|pos| (pos, 4));
+    match (lf, crlf) {
+        (Some(a), Some(b)) => Some(if a.0 <= b.0 { a } else { b }),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
+    }
+}
+
+fn format_sse_error(message: &str) -> String {
+    let payload = serde_json::json!({
+        "error": {
+            "message": message,
+            "type": "upstream_stream_error"
+        }
+    });
+    format!("event: error\ndata: {payload}\n\n")
 }
 
 fn filter_request_headers(src: &HeaderMap) -> HeaderMap {
@@ -567,6 +619,21 @@ mod tests {
         let ev = "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"choices\":[]}\n\n";
         let out = filter_sse_event(ev);
         assert!(out.contains("chat.completion.chunk"));
+    }
+
+    #[test]
+    fn finds_lf_and_crlf_event_boundaries() {
+        assert_eq!(find_sse_event_end("data: x\n\nrest"), Some((7, 2)));
+        assert_eq!(find_sse_event_end("data: x\r\n\r\nrest"), Some((7, 4)));
+        assert_eq!(find_sse_event_end("data: x\nrest"), None);
+    }
+
+    #[test]
+    fn structured_stream_error_is_sse() {
+        let out = format_sse_error("upstream broke");
+        assert!(out.starts_with("event: error\n"));
+        assert!(out.contains("upstream broke"));
+        assert!(out.ends_with("\n\n"));
     }
 
     #[test]

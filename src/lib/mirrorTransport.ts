@@ -205,8 +205,13 @@ export function mirrorEnsureTransport(): Promise<void> {
         ws.close();
         return;
       }
+      const resumed = state.hello !== null;
       state.connectPromise = null;
       resolve();
+      // A reconnect can follow a server-side lag reset. The event ring is not
+      // replayable, so let the host-event hook rehydrate state/journal after
+      // the transport is live again.
+      dispatchEvent("mirror://reconnected", { resumed });
     };
 
     ws.onmessage = (ev) => {

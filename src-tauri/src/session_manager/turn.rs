@@ -146,10 +146,10 @@ impl SessionManager {
                 agent_prompt = format!("{hint}\n{agent_prompt}");
             }
 
-            // persist user message (display form for skill chips on reload)
-            // Journal stores the user-facing turn only — not the bootstrap wrapper.
-            // Attachments are structured so history reloads image/file cards.
-            let _ = store::append_message(
+            // Persist the user-facing turn before dispatching the prompt. A
+            // failed journal write must not leave the runtime in Streaming
+            // with a prompt that cannot be reconstructed after reload.
+            if let Err(e) = store::append_message(
                 &s.app_session_id,
                 ChatMessageStored {
                     id: Uuid::new_v4().to_string(),
@@ -161,7 +161,24 @@ impl SessionManager {
                     attachments: journal_attachments.clone(),
                     marker: None,
                 },
-            );
+            ) {
+                let _ = s.fsm.end_stream();
+                s.prompt_in_flight = false;
+                s.sent_prompt_this_visit = false;
+                s.active_turn_id = None;
+                s.streaming_message_id = None;
+                s.stream_buf.clear();
+                s.stream_thought.clear();
+                s.stream_last_was_assistant = false;
+                s.stream_attachments.clear();
+                s.journal_throttle.reset();
+                s.open_tool_ids.clear();
+                s.open_tool_seen_at.clear();
+                s.terminal_tool_ids.clear();
+                s.deferred_prompt_complete = None;
+                s.saw_model_output = false;
+                return Err(format!("JOURNAL_WRITE_FAILED: {e}"));
+            }
             Ok((
                 s.backend.clone(),
                 s.app_session_id.clone(),
@@ -175,7 +192,10 @@ impl SessionManager {
         drop(journal_guard);
         let (backend, app_sid, acp, agent_sid, agent_prompt, message_id, turn_id) = match open {
             Some(Ok(v)) => v,
-            Some(Err(e)) => return Err(e),
+            Some(Err(e)) => {
+                self.emit_for_session(&app, &app_sid);
+                return Err(e);
+            }
             None => {
                 return Err(format!(
                     "{}: chat {app_sid} has no live agent process — reconnect and retry",
@@ -183,6 +203,12 @@ impl SessionManager {
                 ));
             }
         };
+        // The session slot is now in `Streaming` and owns its ACP client. Do
+        // not hold the global connect/park lock while host vision or another
+        // side-channel performs network/CLI work (official vision can take
+        // minutes). Keeping the guard here used to block every other chat's
+        // connect/send path until that preparation completed.
+        drop(_focus_guard);
         // Host side-channels before main model (vision first, then X). Emit tool
         // chips immediately so the UI shows waiting state instead of freezing.
         // Copy is non-technical (no `grok -p` / command lines in chip detail).
@@ -454,6 +480,10 @@ impl SessionManager {
                     if record_error {
                         mgr.emit_for_session(&app2, &turn_sid);
                     }
+                    // A policy/effort change queued during this turn must be
+                    // applied once the prompt RPC is terminal; otherwise the
+                    // next ready fast-path promotes the stale ACP forever.
+                    mgr.flush_pending_soft_respawn(&app2, &turn_sid).await;
                 }
                 Ok(()) => {
                     // #522: even if PromptComplete events were dropped/raced,
@@ -541,6 +571,10 @@ impl SessionManager {
                             }),
                         );
                     }
+                    // Apply deferred process-level settings only after the
+                    // final journal reconcile has had a chance to read the
+                    // completed turn from the agent's disk log.
+                    mgr.flush_pending_soft_respawn(&app2, &turn_sid).await;
                 }
             }
         });

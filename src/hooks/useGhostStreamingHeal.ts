@@ -14,6 +14,7 @@ import {
 } from "@/lib/ghostStreamingHeal";
 import type { SessionLiveMap } from "@/lib/sessionLiveStore";
 import { settleStoppedSessionInLiveMap } from "@/lib/sessionLiveStore";
+import { queueSessionKey } from "@/lib/sendQueue";
 import type {
   ChatMessage,
   SessionSnapshot,
@@ -32,6 +33,9 @@ export type GhostStreamingHealDeps = {
   /** Bumped on heal so a hung sessionSend cannot re-dirty UI after return. */
   sendEpochRef: MutableRefObject<number>;
   sendInFlightRef: MutableRefObject<boolean>;
+  /** Optional session-keyed claims/epochs (legacy refs remain supported). */
+  sendInFlightBySessionRef?: MutableRefObject<Set<string>>;
+  sendEpochBySessionRef?: MutableRefObject<Map<string, number>>;
   messagesBySessionRef: MutableRefObject<Map<string, ChatMessage[]>>;
   patchSessionMessages: (
     sessionId: string,
@@ -113,7 +117,11 @@ export function useGhostStreamingHeal(deps: GhostStreamingHealDeps): void {
           turnStartedAt: d.turnStartedAt,
           nowMs: Date.now(),
           hostStateForSession: hostState,
-          sendInFlight: d.sendInFlightRef.current,
+          sendInFlight: d.sendInFlightBySessionRef
+            ? d.sendInFlightBySessionRef.current.has(
+                queueSessionKey(d.sessionId),
+              )
+            : d.sendInFlightRef.current,
         })
       ) {
         return;
@@ -125,8 +133,20 @@ export function useGhostStreamingHeal(deps: GhostStreamingHealDeps): void {
       healingRef.current = true;
       try {
         // Invalidate any hung executeSend still awaiting sessionSend.
+        const sessionKey = queueSessionKey(d.sessionId);
         d.sendEpochRef.current += 1;
-        d.sendInFlightRef.current = false;
+        if (d.sendEpochBySessionRef) {
+          const next =
+            (d.sendEpochBySessionRef.current.get(sessionKey) ?? 0) + 1;
+          d.sendEpochBySessionRef.current.set(sessionKey, next);
+        }
+        if (d.sendInFlightBySessionRef) {
+          d.sendInFlightBySessionRef.current.delete(sessionKey);
+          d.sendInFlightRef.current =
+            d.sendInFlightBySessionRef.current.size > 0;
+        } else {
+          d.sendInFlightRef.current = false;
+        }
 
         const drop = new Set(turn.dropIds);
         const strip = (prev: ChatMessage[]) =>

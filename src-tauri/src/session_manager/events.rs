@@ -44,20 +44,27 @@ impl SessionManager {
                 .map(|(id, _)| id.clone())
                 .collect();
             for bg_id in bg_ids {
+                self.pending_soft_respawn.lock().remove(&bg_id);
                 self.handle_acp_event_on_background(
                     app,
                     &bg_id,
+                    process_id,
+                    None,
                     AcpEvent::ProcessExited { code: exit_code },
                 )
                 .await;
             }
-            let is_live = self
+            let live_sid = self
                 .inner
                 .lock()
                 .as_ref()
-                .is_some_and(|s| s.process_id == process_id);
-            if !is_live {
+                .filter(|s| s.process_id == process_id)
+                .map(|s| s.app_session_id.clone());
+            if live_sid.is_none() {
                 return;
+            }
+            if let Some(sid) = live_sid {
+                self.pending_soft_respawn.lock().remove(&sid);
             }
             // Fall through to live ProcessExited handling below.
         } else {
@@ -100,7 +107,8 @@ impl SessionManager {
                 &parked_hints,
             ) {
                 TurnEventRoute::Background(bg_sid) => {
-                    self.handle_acp_event_on_background(app, &bg_sid, ev).await;
+                    self.handle_acp_event_on_background(app, &bg_sid, process_id, session_id, ev)
+                        .await;
                     return;
                 }
                 TurnEventRoute::Drop => {
@@ -116,6 +124,31 @@ impl SessionManager {
                     // Fall through to live match below.
                 }
             }
+        }
+
+        // The route snapshot above is advisory. Re-check the live slot before
+        // applying the event so a concurrent focus/park transition cannot
+        // deliver a late process event to the next chat occupying the slot.
+        let live_route_matches = self.inner.lock().as_ref().is_some_and(|s| {
+            s.process_id == process_id
+                && session_id.is_none_or(|sid| {
+                    // Once the wire event carries a session id, require an
+                    // exact owner match. Treating an unbound live hint as a
+                    // wildcard lets late events from a co-tenant land in the
+                    // newly focused session during connect/park races.
+                    s.meta.agent_session_id.as_deref() == Some(sid)
+                })
+        });
+        if !live_route_matches {
+            if Self::event_carries_turn_output(&ev) {
+                tracing::debug!(
+                    process = %process_id,
+                    agent = ?session_id,
+                    ev = Self::event_kind_name(&ev),
+                    "live ACP event dropped after route changed"
+                );
+            }
+            return;
         }
 
         match ev {
@@ -739,10 +772,16 @@ impl SessionManager {
                         if tool_journal_richer(&slot.content, &content) {
                             slot.content = content.clone();
                             slot.marker = Some("tool_step".into());
-                            let _ = store::save_messages(&app_sid, &msgs);
+                            if let Err(e) = store::save_messages(&app_sid, &msgs) {
+                                tracing::error!(
+                                    session = %app_sid,
+                                    tool = %tool_call_id,
+                                    "tool journal update failed: {e}"
+                                );
+                            }
                         }
                     } else {
-                        let _ = store::append_message(
+                        if let Err(e) = store::append_message(
                             &app_sid,
                             ChatMessageStored {
                                 id: mid,
@@ -754,7 +793,13 @@ impl SessionManager {
                                 attachments: None,
                                 marker: Some("tool_step".into()),
                             },
-                        );
+                        ) {
+                            tracing::error!(
+                                session = %app_sid,
+                                tool = %tool_call_id,
+                                "tool journal append failed: {e}"
+                            );
+                        }
                     }
                 }
             }
@@ -871,7 +916,7 @@ impl SessionManager {
                 }
                 Self::emit_state(app, &self.snapshot());
             }
-            AcpEvent::ProcessExited { .. } => {
+            AcpEvent::ProcessExited { code } => {
                 let mut gate_invalidations: Vec<serde_json::Value> = Vec::new();
                 {
                     let mut guard = self.inner.lock();
@@ -908,7 +953,11 @@ impl SessionManager {
                                     | SessionState::AwaitingPermission
                             )
                         {
-                            let _ = s.fsm.crash("Agent process exited");
+                            let detail = match code {
+                                Some(status) => format!("Agent process exited (code {status})"),
+                                None => "Agent process exited (EOF/unknown status)".into(),
+                            };
+                            let _ = s.fsm.crash(detail);
                         }
                         s.acp = None;
                         s.open_tool_ids.clear();
@@ -1138,7 +1187,7 @@ impl SessionManager {
                     (s.app_session_id.clone(), content)
                 };
                 let mid = Uuid::new_v4().to_string();
-                let _ = store::append_message(
+                if let Err(e) = store::append_message(
                     &app_sid,
                     ChatMessageStored {
                         id: mid.clone(),
@@ -1150,7 +1199,9 @@ impl SessionManager {
                         attachments: None,
                         marker: Some("context_compact".into()),
                     },
-                );
+                ) {
+                    tracing::error!(session = %app_sid, "context compact journal append failed: {e}");
+                }
                 let _ = app.emit(
                     "session://context_compact",
                     serde_json::json!({

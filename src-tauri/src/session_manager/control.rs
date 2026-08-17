@@ -1,7 +1,7 @@
 //! Policy, model, disconnect, recycle, permission resolution.
 
 #![allow(dead_code)] // residual-clippy: set_permission_policy / tracked counts
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use tauri::{AppHandle, Emitter};
@@ -12,7 +12,6 @@ use crate::process_limits::{normalize_idle_minutes, normalize_max_concurrent};
 use crate::session_fsm::SessionState;
 use crate::store::{self};
 
-use super::connect::should_kill_parked_after_flag_mismatch;
 use super::*;
 
 impl SessionManager {
@@ -35,38 +34,58 @@ impl SessionManager {
 
     /// Soft-respawn and tell the UI why the agent process was reloaded.
     pub async fn soft_respawn_with_reason(&self, app: &AppHandle, reason: &str) {
-        let (acp, sid) = {
+        let (acp, sid, process_id, deferred) = {
             let mut guard = self.inner.lock();
             if let Some(s) = guard.as_mut() {
                 if s.acp.is_none() {
-                    return;
-                }
-                if Self::live_session_is_busy(s) {
+                    (None, Some(s.app_session_id.clone()), String::new(), false)
+                } else if Self::live_session_is_busy(s) {
                     tracing::warn!(
                         "soft_respawn deferred: live session mid-turn sid={} state={:?} reason={}",
                         s.app_session_id,
                         s.fsm.state(),
                         reason
                     );
-                    self.pending_soft_respawn
-                        .lock()
-                        .insert(s.app_session_id.clone(), reason.to_string());
-                    return;
+                    (None, Some(s.app_session_id.clone()), String::new(), true)
+                } else {
+                    let sid = s.app_session_id.clone();
+                    let process_id = s.process_id.clone();
+                    let acp = s.acp.take();
+                    // Prefer resume on next connect; bootstrap only if load fails.
+                    s.needs_history_bootstrap = false;
+                    s.fsm.soft_disconnect();
+                    // New process gets a new id on next connect.
+                    s.process_id = String::new();
+                    (acp, Some(sid), process_id, false)
                 }
-                let sid = s.app_session_id.clone();
-                let acp = s.acp.take();
-                // Prefer resume on next connect; bootstrap only if load fails.
-                s.needs_history_bootstrap = false;
-                s.fsm.soft_disconnect();
-                // New process gets a new id on next connect.
-                s.process_id = String::new();
-                (acp, Some(sid))
             } else {
-                (None, None)
+                (None, None, String::new(), false)
             }
         };
+        if let Some(sid) = sid.as_deref() {
+            if deferred {
+                self.pending_soft_respawn
+                    .lock()
+                    .insert(sid.to_string(), reason.to_string());
+                return;
+            }
+            if acp.is_none() {
+                self.pending_soft_respawn.lock().remove(sid);
+                return;
+            }
+        }
         if let Some(acp) = acp {
-            acp.kill().await;
+            let kill_allowed = sid
+                .as_deref()
+                .is_none_or(|session_id| !self.has_other_process_tenant(&process_id, session_id));
+            if kill_allowed {
+                acp.kill().await;
+            } else {
+                tracing::info!(
+                    reason = %reason,
+                    "soft-respawn detached shared ACP without killing co-tenant"
+                );
+            }
             if let Some(sid) = sid {
                 self.pending_soft_respawn.lock().remove(&sid);
             }
@@ -99,13 +118,38 @@ impl SessionManager {
             self.soft_respawn_with_reason(app, &reason).await;
             return;
         }
+        // A background session can be idle after its turn completed. Pending
+        // respawn flags still belong to that session; leaving its old ACP in
+        // `background` lets connect promote it and silently ignore the new
+        // process-level settings.
+        let background = self.background.lock().remove(session_id);
+        if let Some(mut s) = background {
+            let process_id = s.process_id.clone();
+            if let Some(acp) = s.acp.take() {
+                if self.has_other_process_tenant(&process_id, session_id) {
+                    tracing::info!(
+                        session = %session_id,
+                        process = %process_id,
+                        reason = %reason,
+                        "pending soft-respawn detached shared background ACP without killing co-tenant"
+                    );
+                } else {
+                    acp.kill().await;
+                    tracing::info!(
+                        session = %session_id,
+                        reason = %reason,
+                        "dropped background agent for pending soft-respawn"
+                    );
+                }
+            }
+            return;
+        }
         // Parked: drop the warm entry so the next connect respawns.
         // Take the entry first — parking_lot guards are !Send across await.
         // Do not kill a process that still hosts a mid-turn cohabitant.
         let parked = self.parked.lock().remove(session_id);
         if let Some(p) = parked {
-            let busy = self.busy_process_ids_for_warm_reuse();
-            if should_kill_parked_after_flag_mismatch(&p.process_id, &busy) {
+            if !self.has_other_process_tenant(&p.process_id, session_id) {
                 p.acp.kill().await;
                 tracing::info!(
                     session = %session_id,
@@ -140,6 +184,17 @@ impl SessionManager {
         let settings = store::load_settings();
         let max = normalize_max_concurrent(settings.max_concurrent_agents);
         let idle = normalize_idle_minutes(settings.agent_idle_minutes);
+        // Diagnostics must use the same process-level accounting as capacity;
+        // a warm-reused ACP can appear in more than one session map entry.
+        let mut seen_processes: HashSet<String> = HashSet::new();
+        let mut claim_process = |process_id: &str| {
+            if process_id.trim().is_empty() {
+                // Unknown ids are transitional; count them conservatively.
+                true
+            } else {
+                seen_processes.insert(process_id.to_string())
+            }
+        };
 
         let mut live_ids: Vec<String> = Vec::new();
         let live = {
@@ -147,7 +202,7 @@ impl SessionManager {
             match guard.as_ref() {
                 Some(s) if s.acp.as_ref().is_some_and(|c| c.is_alive()) => {
                     live_ids.push(s.app_session_id.clone());
-                    1u32
+                    claim_process(&s.process_id) as u32
                 }
                 _ => 0u32,
             }
@@ -161,7 +216,11 @@ impl SessionManager {
                     background_ids.push(id.clone());
                 }
             }
-            background_ids.len() as u32
+            bg.iter()
+                .filter(|(_, s)| {
+                    s.acp.as_ref().is_some_and(|c| c.is_alive()) && claim_process(&s.process_id)
+                })
+                .count() as u32
         };
 
         let mut parked_ids: Vec<String> = Vec::new();
@@ -172,7 +231,9 @@ impl SessionManager {
                     parked_ids.push(id.clone());
                 }
             }
-            parked_ids.len() as u32
+            p.iter()
+                .filter(|(_, agent)| agent.acp.is_alive() && claim_process(&agent.process_id))
+                .count() as u32
         };
 
         crate::process_limits::ProcessBudgetSnapshot::from_counts(
@@ -404,6 +465,7 @@ impl SessionManager {
 
         // New-chat prewarm (spawn+init+auth, no session). Connect prefers this
         // slot — leaving it alive after auth rebind reuses stale credentials.
+        self.invalidate_prewarm_epoch();
         let prewarm_count = {
             let mut pw = self.prewarm.lock();
             match std::mem::replace(&mut *pw, PrewarmState::None) {
@@ -454,46 +516,52 @@ impl SessionManager {
             }
         };
         // Background turns keep using s.policy for auto-allow (P1-19).
-        {
+        let background_respawn_ids: Vec<String> = {
             let mut bg = self.background.lock();
-            for s in bg.values_mut() {
-                s.policy = policy;
-                s.meta.permission_policy = Some(policy.as_str().into());
-                let _ = store::update_session_meta(&s.meta);
-                if s.acp.is_some() {
-                    self.pending_soft_respawn
-                        .lock()
-                        .insert(s.app_session_id.clone(), "permission_policy".into());
-                }
-            }
+            bg.values_mut()
+                .filter_map(|s| {
+                    s.policy = policy;
+                    s.meta.permission_policy = Some(policy.as_str().into());
+                    let _ = store::update_session_meta(&s.meta);
+                    s.acp.as_ref().map(|_| s.app_session_id.clone())
+                })
+                .collect()
+        };
+        for sid in background_respawn_ids {
+            self.pending_soft_respawn
+                .lock()
+                .insert(sid, "permission_policy".into());
         }
         {
-            // Snapshot busy pids before locking parked (distinct locks).
-            let busy = self.busy_process_ids_for_warm_reuse();
-            let to_kill: Vec<Arc<AcpClient>> = {
+            let removed: Vec<(String, ParkedAgent)> = {
                 let mut parked = self.parked.lock();
                 let stale: Vec<String> = parked
                     .iter()
                     .filter(|(_, p)| p.policy != policy)
                     .map(|(id, _)| id.clone())
                     .collect();
-                let mut kill = Vec::new();
+                let mut removed = Vec::with_capacity(stale.len());
                 for id in stale {
-                    if let Some(p) = parked.remove(&id) {
-                        if should_kill_parked_after_flag_mismatch(&p.process_id, &busy) {
-                            kill.push(p.acp);
-                        } else {
-                            tracing::info!(
-                                session = %id,
-                                process = %p.process_id,
-                                "permission policy: removed parked entry, skip kill (mid-turn cohabitant)"
-                            );
-                        }
-                    }
+                    // Remove while holding the map lock; process ownership is
+                    // checked after the guard drops so the helper can inspect
+                    // all tenant maps without self-deadlocking.
+                    let Some(p) = parked.remove(&id) else {
+                        continue;
+                    };
+                    removed.push((id, p));
                 }
-                kill
+                removed
             };
-            for acp in to_kill {
+            for (id, p) in removed {
+                if self.has_other_process_tenant(&p.process_id, &id) {
+                    tracing::info!(
+                        session = %id,
+                        process = %p.process_id,
+                        "permission policy: removed parked entry, skip kill (co-tenant)"
+                    );
+                    continue;
+                }
+                let acp = p.acp;
                 // Kill after drop to avoid holding the map lock across await.
                 tokio::spawn(async move {
                     acp.kill().await;
@@ -668,24 +736,26 @@ impl SessionManager {
         // Parked / background chats own their process — updating only the live
         // slot left them running the previous `--reasoning-effort` (#598).
         if let Some(sid) = session_id {
-            if let Some(s) = self.background.lock().get_mut(sid) {
+            let background_needs_respawn = if let Some(s) = self.background.lock().get_mut(sid) {
                 let same = s.effort.as_deref() == Some(effort.as_str());
                 s.effort = Some(effort.clone());
                 s.meta.effort = Some(effort.clone());
                 let _ = store::update_session_meta(&s.meta);
-                if !same && s.acp.is_some() {
-                    self.pending_soft_respawn
-                        .lock()
-                        .insert(sid.to_string(), "effort".into());
-                }
+                !same && s.acp.is_some()
+            } else {
+                false
+            };
+            if background_needs_respawn {
+                self.pending_soft_respawn
+                    .lock()
+                    .insert(sid.to_string(), "effort".into());
             }
             // Let-binding so the parking_lot guard drops before the if-let body
             // (edition 2021 keeps if-let temps alive through else — re-lock deadlock).
             let removed = self.parked.lock().remove(sid);
             if let Some(p) = removed {
                 if p.effort.as_deref() != Some(effort.as_str()) {
-                    let busy = self.busy_process_ids_for_warm_reuse();
-                    if should_kill_parked_after_flag_mismatch(&p.process_id, &busy) {
+                    if !self.has_other_process_tenant(&p.process_id, sid) {
                         tokio::spawn(async move {
                             p.acp.kill().await;
                         });

@@ -119,7 +119,12 @@ pub async fn handle_socket(
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!(skipped = n, "mirror ws client lagged; dropped events");
+                        // A lagged receiver cannot reconstruct ordering from
+                        // the broadcast ring. Close this socket so the client
+                        // transport's normal reconnect path can rehydrate its
+                        // listeners/snapshot instead of silently staying stale.
+                        tracing::warn!(skipped = n, "mirror ws client lagged; forcing resync reconnect");
+                        break;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
                 }

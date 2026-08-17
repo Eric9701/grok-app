@@ -137,11 +137,12 @@ impl SessionManager {
                             );
                             return Ok(self.snapshot());
                         }
+                        let process_id = s.process_id.clone();
                         let acp = s.acp.take();
                         s.needs_history_bootstrap = false;
                         s.fsm.soft_disconnect();
                         s.process_id = String::new();
-                        acp
+                        acp.map(|client| (client, process_id))
                     } else {
                         None
                     }
@@ -153,15 +154,41 @@ impl SessionManager {
                 .background
                 .lock()
                 .remove(&meta.id)
-                .and_then(|mut bg| bg.acp.take());
-            let parked_acp = self.parked.lock().remove(&meta.id).map(|p| p.acp);
-            if let Some(acp) = acp_to_kill {
-                acp.kill().await;
+                .and_then(|mut bg| bg.acp.take().map(|acp| (acp, bg.process_id)));
+            let parked_acp = self
+                .parked
+                .lock()
+                .remove(&meta.id)
+                .map(|p| (p.acp, p.process_id));
+            for (acp, process_id) in acp_to_kill.into_iter().chain(bg_acp).chain(parked_acp) {
+                if self.has_other_process_tenant(&process_id, &meta.id) {
+                    tracing::info!(
+                        session = %meta.id,
+                        process = %process_id,
+                        "pending fork detached shared ACP without killing co-tenant"
+                    );
+                } else {
+                    acp.kill().await;
+                }
             }
-            if let Some(acp) = bg_acp {
-                acp.kill().await;
-            }
-            if let Some(acp) = parked_acp {
+            // Invalidate only after the busy early-return above. A deferred
+            // fork must leave an in-flight prewarm producer valid; otherwise
+            // its completion is rejected by the epoch check while the slot
+            // remains stuck in `Spawning` forever.
+            self.invalidate_prewarm_epoch();
+            // Fork must not leave an ownerless prewarm child alongside the
+            // forced cold-spawn process. If a prewarm is still Spawning, set
+            // the slot to None; the producer checks the state before publish
+            // and will kill the just-initialized child instead of resurrecting
+            // a stale Ready slot.
+            let prewarm_to_kill = {
+                let mut pw = self.prewarm.lock();
+                match std::mem::replace(&mut *pw, PrewarmState::None) {
+                    PrewarmState::Ready(p) => Some(p.acp),
+                    PrewarmState::Spawning { .. } | PrewarmState::None => None,
+                }
+            };
+            if let Some(acp) = prewarm_to_kill {
                 acp.kill().await;
             }
             tracing::info!(
@@ -235,8 +262,9 @@ impl SessionManager {
                         "unpark spawn-flag mismatch — cold spawn"
                     );
                     if let Some(acp) = live.acp {
-                        let busy = self.busy_process_ids_for_warm_reuse();
-                        if should_kill_parked_after_flag_mismatch(&live.process_id, &busy) {
+                        let shared_with_other =
+                            self.has_other_process_tenant(&live.process_id, &meta.id);
+                        if !shared_with_other {
                             acp.kill().await;
                         } else {
                             tracing::info!(
@@ -417,17 +445,12 @@ impl SessionManager {
         });
 
         // ── Warm-process reuse (per-route pool) ────────────────────────────
-        // A Ready parked (or idle background) process with identical
-        // process-level spawn flags (permission / effort / sandbox / route)
-        // can host this App session: no CLI spawn, just session/load or
-        // session/new. The parked shell stays — switch-back is an unpark.
-        //
-        // Never reuse a process that still has a mid-turn live/background
-        // co-tenant. CLI 1.0.3 load-replay is often unstamped; unique-busy-
-        // background routing would then write B's history into A's journal
-        // (00f647cd diagnostic: 009ea8c2 / 407d65e2 load on the Streaming
-        // process). Idle Ready reuse is unchanged. Unstamped routing is
-        // unchanged so A's own chunks still land after demote.
+        // Only an ownerless prewarm process with identical process-level
+        // spawn flags (permission / effort / sandbox / route) may cross an
+        // App-session boundary. Session-bound parked/background ACPs stay
+        // attached to their owner; sharing an Arc across sessions lets
+        // unstamped load replay and process-level kill paths corrupt or abort
+        // a co-tenant.
         if !pending_fork {
             let eff_sandbox = {
                 let project_sandbox = meta.project_id.as_deref().and_then(|pid| {
@@ -441,8 +464,9 @@ impl SessionManager {
                     project_sandbox.as_deref(),
                 )
             };
+            let mut stale_prewarm: Vec<Arc<AcpClient>> = Vec::new();
             let reused = {
-                // Reuse candidates = idle parked + idle background only.
+                // Only an ownerless prewarm process may cross a session boundary.
                 // Mid-turn background keeps exclusive ownership of its process
                 // so session/load on a peer cannot poison that journal.
                 // Route class must follow active_route(), not prefs.model_id.
@@ -450,7 +474,8 @@ impl SessionManager {
                 // (e.g. deepseek-v4-flash), which is_custom_provider_id rejects
                 // — processes were mis-labeled official and reused after
                 // auth.json was stripped (#528 intermittent re-login).
-                let busy_process_ids = self.busy_process_ids_for_warm_reuse();
+                // Only the ownerless prewarm process is eligible for reuse.
+                // Session-bound ACP processes stay with their App session.
                 let target_custom = matches!(
                     crate::providers::active_route(),
                     crate::providers::ActiveRoute::Custom { .. }
@@ -531,6 +556,13 @@ impl SessionManager {
                                 ) {
                                     Some((p.acp, p.process_id, p.created_at))
                                 } else {
+                                    // `PrewarmState::Ready` is ownerless, so
+                                    // a gate mismatch cannot be handed back to
+                                    // another session. Drop and explicitly
+                                    // kill it after leaving the map lock; an
+                                    // Arc/Child drop alone does not terminate
+                                    // the CLI process.
+                                    stale_prewarm.push(p.acp.clone());
                                     rejected.push(format!(
                                         "prewarm: {}",
                                         reject_reason(
@@ -569,80 +601,13 @@ impl SessionManager {
                     // outside connect_lock, so this cannot deadlock).
                     tokio::time::sleep(std::time::Duration::from_millis(120)).await;
                 }
-                if best.is_none() {
-                    let parked = self.parked.lock();
-                    for p in parked.values() {
-                        if process_blocked_for_warm_reuse(&p.process_id, &busy_process_ids) {
-                            rejected.push(format!(
-                                "parked {}: mid-turn co-tenant on process",
-                                p.app_session_id
-                            ));
-                            continue;
-                        }
-                        if !gate(
-                            p.acp.is_alive(),
-                            p.policy,
-                            p.effort.as_deref(),
-                            p.acp.sandbox_profile().as_deref(),
-                            p.acp.is_custom_route(),
-                        ) {
-                            rejected.push(format!(
-                                "parked {}: {}",
-                                p.app_session_id,
-                                reject_reason(
-                                    p.acp.is_alive(),
-                                    p.policy,
-                                    p.effort.as_deref(),
-                                    p.acp.sandbox_profile().as_deref(),
-                                    p.acp.is_custom_route(),
-                                )
-                            ));
-                            continue;
-                        }
-                        let cand = (p.acp.clone(), p.process_id.clone(), p.last_activity);
-                        if best.as_ref().is_none_or(|b| cand.2 > b.2) {
-                            best = Some(cand);
-                        }
-                    }
-                }
-                if best.is_none() {
-                    let bg = self.background.lock();
-                    for s in bg.values() {
-                        let s_custom = s.acp.as_ref().is_some_and(|c| c.is_custom_route());
-                        if process_blocked_for_warm_reuse(&s.process_id, &busy_process_ids) {
-                            rejected.push(format!("background {}: mid-turn", s.app_session_id));
-                            continue;
-                        }
-                        if !gate(
-                            s.acp.as_ref().is_some_and(|c| c.is_alive()),
-                            s.policy,
-                            s.effort.as_deref(),
-                            s.acp.as_ref().and_then(|c| c.sandbox_profile()).as_deref(),
-                            s_custom,
-                        ) {
-                            rejected.push(format!(
-                                "background {}: {}",
-                                s.app_session_id,
-                                reject_reason(
-                                    s.acp.as_ref().is_some_and(|c| c.is_alive()),
-                                    s.policy,
-                                    s.effort.as_deref(),
-                                    s.acp.as_ref().and_then(|c| c.sandbox_profile()).as_deref(),
-                                    s_custom,
-                                )
-                            ));
-                            continue;
-                        }
-                        let cand = (
-                            s.acp.clone().unwrap(),
-                            s.process_id.clone(),
-                            s.last_activity,
-                        );
-                        if best.as_ref().is_none_or(|b| cand.2 > b.2) {
-                            best = Some(cand);
-                        }
-                    }
-                }
+                // A session-bound ACP process is never transferred to another
+                // App session. The old parked/background reuse path shared an
+                // `Arc<AcpClient>` while leaving the original owner registered;
+                // capacity and event routing could then kill or apply events to
+                // the wrong tenant. Only the ownerless prewarm process above is
+                // eligible for reuse. The target session is opened on a fresh
+                // process once its own parked entry is no longer focused.
                 if best.is_none() && !rejected.is_empty() {
                     tracing::warn!(
                         target: "session",
@@ -657,26 +622,15 @@ impl SessionManager {
                 }
                 best.map(|(acp, pid, _)| (acp, pid))
             };
+            for acp in stale_prewarm {
+                acp.kill().await;
+            }
             if let Some((acp, reused_process)) = reused {
-                let reused_from = self
-                    .parked
-                    .lock()
-                    .values()
-                    .find(|p| p.process_id == reused_process)
-                    .map(|p| p.app_session_id.clone())
-                    .or_else(|| {
-                        self.background
-                            .lock()
-                            .values()
-                            .find(|s| s.process_id == reused_process)
-                            .map(|s| s.app_session_id.clone())
-                    });
                 tracing::info!(
                     target: "session",
                     session = %meta.id,
                     reused_process = %reused_process,
-                    reused_from = ?reused_from,
-                    "connect warm-process reuse (shared, no spawn)"
+                    "connect prewarm reuse (ownerless process, no cross-session sharing)"
                 );
                 // #528: warm reuse skips cold spawn (no prepare_route_auth).
                 // Re-apply route auth so official OIDC is on disk after any
@@ -883,36 +837,37 @@ impl SessionManager {
             empty_mcp_servers: false,
         };
 
-        let (client, mut events) = match AcpClient::spawn_with_options(cli_path, cwd, spawn_opts) {
-            Ok(v) => {
-                tracing::info!(
-                    target: "session",
-                    session = %meta.id,
-                    process = %process_id,
-                    fork_session = fork_agent,
-                    "connect spawn_ok"
-                );
-                v
-            }
-            Err(e) => {
-                tracing::warn!(
-                    target: "session",
-                    session = %meta.id,
-                    code = e.code.as_str(),
-                    error = %e.message,
-                    "connect spawn_fail"
-                );
-                {
-                    let mut guard = self.inner.lock();
-                    if let Some(s) = guard.as_mut() {
-                        let _ = s.fsm.connect_failed(e);
-                    }
+        let (client, mut events) =
+            match AcpClient::spawn_with_options(cli_path, cwd, spawn_opts).await {
+                Ok(v) => {
+                    tracing::info!(
+                        target: "session",
+                        session = %meta.id,
+                        process = %process_id,
+                        fork_session = fork_agent,
+                        "connect spawn_ok"
+                    );
+                    v
                 }
-                let snap = self.snapshot();
-                Self::emit_state(&app, &snap);
-                return Ok(snap);
-            }
-        };
+                Err(e) => {
+                    tracing::warn!(
+                        target: "session",
+                        session = %meta.id,
+                        code = e.code.as_str(),
+                        error = %e.message,
+                        "connect spawn_fail"
+                    );
+                    {
+                        let mut guard = self.inner.lock();
+                        if let Some(s) = guard.as_mut() {
+                            let _ = s.fsm.connect_failed(e);
+                        }
+                    }
+                    let snap = self.snapshot();
+                    Self::emit_state(&app, &snap);
+                    return Ok(snap);
+                }
+            };
 
         // Event pump tagged with process_id (multi-process routing). Events
         // carry the CLI's owning sessionId when known so a reused process
@@ -1181,17 +1136,30 @@ impl SessionManager {
         self.prewarm_inner(app, true).await;
     }
 
+    fn clear_prewarm_if_current(&self, epoch: u64) {
+        let mut pw = self.prewarm.lock();
+        if self.prewarm_epoch.load(std::sync::atomic::Ordering::SeqCst) == epoch
+            && matches!(*pw, PrewarmState::Spawning { .. })
+        {
+            *pw = PrewarmState::None;
+        }
+    }
+
     async fn prewarm_inner(self: &Arc<Self>, app: AppHandle, force: bool) {
         // Quick gate (no connect_lock — connect may be awaiting a Spawning
         // prewarm; grabbing the lock here would deadlock it). The prewarm
         // Mutex serializes concurrent prewarm calls.
-        {
+        let epoch = {
             let mut pw = self.prewarm.lock();
             match &*pw {
                 PrewarmState::Spawning { .. } => return,
                 PrewarmState::Ready(p) if p.acp.is_alive() && !force => return,
                 _ => {}
             }
+            let epoch = self
+                .prewarm_epoch
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                .saturating_add(1);
             if force {
                 // Retire the old prewarm process (async kill) — otherwise
                 // every refresh leaks a CLI process.
@@ -1225,7 +1193,8 @@ impl SessionManager {
                     since: Instant::now(),
                 };
             }
-        }
+            epoch
+        };
 
         let settings = store::load_settings();
         // WSL backend probes inside the distro (a WSL-only install has no native grok.exe).
@@ -1234,7 +1203,7 @@ impl SessionManager {
             settings.manual_cli_path.as_deref(),
         );
         let Some(cli_path) = probe.path else {
-            *self.prewarm.lock() = PrewarmState::None;
+            self.clear_prewarm_if_current(epoch);
             return;
         };
         let cli_path = std::path::PathBuf::from(cli_path);
@@ -1265,11 +1234,13 @@ impl SessionManager {
             sandbox_profile: Some(effective_sandbox.clone()),
             ..Default::default()
         };
-        let (client, mut events) = match AcpClient::spawn_with_options(cli_path, cwd, spawn_opts) {
+        let (client, mut events) = match AcpClient::spawn_with_options(cli_path, cwd, spawn_opts)
+            .await
+        {
             Ok(v) => v,
             Err(e) => {
                 tracing::warn!(code = e.code.as_str(), error = %e.message, "prewarm spawn failed");
-                *self.prewarm.lock() = PrewarmState::None;
+                self.clear_prewarm_if_current(epoch);
                 return;
             }
         };
@@ -1288,19 +1259,35 @@ impl SessionManager {
         if let Err(e) = client.initialize_and_auth().await {
             tracing::warn!(code = e.code.as_str(), error = %e.message, "prewarm init failed");
             client.kill().await;
-            *self.prewarm.lock() = PrewarmState::None;
+            self.clear_prewarm_if_current(epoch);
             return;
         }
-        *self.prewarm.lock() = PrewarmState::Ready(PrewarmedProcess {
-            acp: client,
-            process_id,
-            policy,
-            effort: Some(prefs.effort),
-            sandbox_profile: Some(effective_sandbox),
-            model_id: Some(prefs.model_id),
-            created_at: Instant::now(),
-            backend: "grok_agent_stdio".into(),
-        });
+        let published = {
+            let mut pw = self.prewarm.lock();
+            if self.prewarm_epoch.load(std::sync::atomic::Ordering::SeqCst) == epoch
+                && matches!(*pw, PrewarmState::Spawning { .. })
+            {
+                *pw = PrewarmState::Ready(PrewarmedProcess {
+                    acp: client.clone(),
+                    process_id,
+                    policy,
+                    effort: Some(prefs.effort),
+                    sandbox_profile: Some(effective_sandbox),
+                    model_id: Some(prefs.model_id),
+                    created_at: Instant::now(),
+                    backend: "grok_agent_stdio".into(),
+                });
+                true
+            } else {
+                false
+            }
+        };
+        if !published {
+            // A pending fork or route reset cancelled this prewarm while it
+            // was starting. Do not leak the initialized child.
+            client.kill().await;
+            return;
+        }
         tracing::info!(target: "session", "prewarm ready (spawn+init+auth, no session)");
     }
 

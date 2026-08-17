@@ -24,8 +24,32 @@ impl SessionManager {
         self: &Arc<Self>,
         app: &AppHandle,
         app_session_id: &str,
+        process_id: &str,
+        agent_session_id: Option<&str>,
         ev: AcpEvent,
     ) {
+        // Routing is decided from a snapshot, but focus/park transitions can
+        // move the map before this async handler is polled. Re-check the
+        // process and (when stamped) ACP session identity at the application
+        // boundary so a late event cannot write into a newly reused slot.
+        let route_matches = self.background.lock().get(app_session_id).is_some_and(|s| {
+            s.process_id == process_id
+                && agent_session_id.is_none_or(|sid| {
+                    // Stamped events must name this background session
+                    // exactly; an unset owner is not a safe wildcard while a
+                    // focus/park transition is moving the same process.
+                    s.meta.agent_session_id.as_deref() == Some(sid)
+                })
+        });
+        if !route_matches {
+            tracing::debug!(
+                session = %app_session_id,
+                process = %process_id,
+                agent = ?agent_session_id,
+                "background ACP event dropped after route changed"
+            );
+            return;
+        }
         match ev {
             AcpEvent::Stream {
                 kind,
@@ -413,10 +437,16 @@ impl SessionManager {
                                 if tool_journal_richer(&slot.content, &content) {
                                     slot.content = content.clone();
                                     slot.marker = Some("tool_step".into());
-                                    let _ = store::save_messages(&s.app_session_id, &msgs);
+                                    if let Err(e) = store::save_messages(&s.app_session_id, &msgs) {
+                                        tracing::error!(
+                                            session = %s.app_session_id,
+                                            tool = %tool_call_id,
+                                            "background tool journal update failed: {e}"
+                                        );
+                                    }
                                 }
                             } else {
-                                let _ = store::append_message(
+                                if let Err(e) = store::append_message(
                                     &s.app_session_id,
                                     ChatMessageStored {
                                         id: mid,
@@ -428,7 +458,13 @@ impl SessionManager {
                                         attachments: None,
                                         marker: Some("tool_step".into()),
                                     },
-                                );
+                                ) {
+                                    tracing::error!(
+                                        session = %s.app_session_id,
+                                        tool = %tool_call_id,
+                                        "background tool journal append failed: {e}"
+                                    );
+                                }
                             }
                         }
                         (
@@ -525,7 +561,8 @@ impl SessionManager {
                     );
                 }
             }
-            AcpEvent::ProcessExited { .. } => {
+            AcpEvent::ProcessExited { code } => {
+                self.pending_soft_respawn.lock().remove(app_session_id);
                 let mut gate_invalidations: Vec<serde_json::Value> = Vec::new();
                 let mut bg = self.background.lock();
                 if let Some(mut s) = bg.remove(app_session_id) {
@@ -549,7 +586,13 @@ impl SessionManager {
                         crate::plan_chrome::mark_gate_stale(&s.app_session_id);
                         gate_invalidations.push(row);
                     }
-                    let _ = s.fsm.crash("Agent process exited (background)");
+                    let detail = match code {
+                        Some(status) => {
+                            format!("Agent process exited (background, code {status})")
+                        }
+                        None => "Agent process exited (background, EOF/unknown status)".into(),
+                    };
+                    let _ = s.fsm.crash(detail);
                     s.acp = None;
                     s.open_tool_ids.clear();
                     s.terminal_tool_ids.clear();
