@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Fixed
+- **Desktop notification click restores the session (#654)**: Clicking a native toast now unminimizes / focuses the main window and opens the chat that fired it (permission, ask-user, or turn-done). Windows uses a WinRT `on_activated` toast instead of the fire-and-forget plugin path; packaged macOS waits for the UN default action. Missing `sessionId` still focuses the app. `tauri dev` osascript toasts (Script Editor) still cannot deep-link.
+
+**中文 · 修复**
+- **点击桌面通知回到对应会话（#654）**：点原生通知会还原/聚焦主窗口并打开发出该通知的会话。Windows 走带点击回调的 WinRT toast；已打包的 macOS 等 UN 默认点击。没有 `sessionId` 时仍只聚焦应用。`tauri dev` 的 osascript（脚本编辑器）通知仍无法回跳。
+
 ## [0.2.20] - 2026-08-17
 
 > **Highlight:** Grok Build-compatible custom relay; local session list/continue API; official-site installer aliases; opening a chat shows a real loading state instead of a fake empty session.

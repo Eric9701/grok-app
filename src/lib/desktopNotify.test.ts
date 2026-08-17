@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  applyNativeNotifyClick,
   ensureNotifyPermission,
   focusAppFromNotification,
   notificationSupport,
@@ -367,6 +368,64 @@ describe("desktopNotify", () => {
 
   it("focusAppFromNotification does not throw without Tauri", () => {
     expect(() => focusAppFromNotification()).not.toThrow();
+  });
+
+  it("applyNativeNotifyClick focuses the app and opens sessionId", () => {
+    const focus = vi.fn();
+    const onSession = vi.fn();
+    const prevWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      value: { focus },
+      configurable: true,
+      writable: true,
+    });
+    setDesktopNotifySessionFocusHandler(onSession);
+    try {
+      applyNativeNotifyClick({ sessionId: "  sess-host  " });
+      expect(focus).toHaveBeenCalled();
+      expect(onSession).toHaveBeenCalledWith("sess-host");
+    } finally {
+      if (prevWindow === undefined) {
+        // @ts-expect-error cleanup stub
+        delete globalThis.window;
+      } else {
+        Object.defineProperty(globalThis, "window", {
+          value: prevWindow,
+          configurable: true,
+          writable: true,
+        });
+      }
+    }
+  });
+
+  it("applyNativeNotifyClick focuses without session handler when id is missing", () => {
+    const focus = vi.fn();
+    const onSession = vi.fn();
+    const prevWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      value: { focus },
+      configurable: true,
+      writable: true,
+    });
+    setDesktopNotifySessionFocusHandler(onSession);
+    try {
+      applyNativeNotifyClick({});
+      applyNativeNotifyClick({ sessionId: "   " });
+      applyNativeNotifyClick(null);
+      expect(focus).toHaveBeenCalled();
+      expect(onSession).not.toHaveBeenCalled();
+    } finally {
+      if (prevWindow === undefined) {
+        // @ts-expect-error cleanup stub
+        delete globalThis.window;
+      } else {
+        Object.defineProperty(globalThis, "window", {
+          value: prevWindow,
+          configurable: true,
+          writable: true,
+        });
+      }
+    }
   });
 });
 

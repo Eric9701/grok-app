@@ -85,6 +85,8 @@ tauri-plugin-notification = "2"
 
 # Windows system proxy (WinINET registry) for child-process env injection — NEW-02.
 # `windows` — shell integration (AUMID, Show Desktop / taskbar styles) in win_shell.rs.
+# `tauri-winrt-notification` — toast click (`on_activated`); the notification
+# plugin's desktop path is fire-and-forget and drops `extra`.
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
 windows = { version = "0.61", features = [
@@ -93,6 +95,10 @@ windows = { version = "0.61", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
+tauri-winrt-notification = "0.7"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+notify-rust = "4"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-window-state = "2"

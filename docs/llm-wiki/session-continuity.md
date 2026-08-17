@@ -337,6 +337,15 @@ draft's composer. Answers route to the requesting chat's process. A waiting
 background chat emits its own `session://runtime`, so the sidebar shows which
 chat is blocked.
 
+**Desktop notification click (#654):** Host `desktop_notify_show` is no longer
+fire-and-forget on the live path. A native click restores the main window
+(`tray::show_main_window`) and emits `notify://clicked` with `sessionId`. The
+WebView handler opens that chat (same as Web `Notification.onclick` from #228).
+Unknown / missing id still focuses the app. Packaged macOS uses UN default
+action; Windows uses WinRT `on_activated`. Bare `tauri dev` osascript toasts
+cannot deep-link (they belong to Script Editor). Do **not** fold Windows
+taskbar overlay / message-bubble work into this click path.
+
 ## Who does `/compact`?
 
 | Layer | Behavior |
