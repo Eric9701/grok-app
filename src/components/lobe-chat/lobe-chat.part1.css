@@ -151,6 +151,8 @@
   max-width: 100%;
   padding-block: var(--chat-item-pad-block, 10px);
   gap: var(--chat-item-gap, 8px);
+  /* Inner is a column flex; shrinking rows stacked answer text on tool stdout. */
+  flex-shrink: 0;
   /* Isolate layout so stream growth on the tail row dirties less of the
    * surrounding tree during markdown reflow (Intel Retina). Avoid
    * content-visibility here — the list is already virtualized.
@@ -178,6 +180,7 @@
   gap: var(--chat-item-body-gap, 10px);
   max-width: 100%;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .lobe-chat__virt-spacer {
@@ -419,6 +422,7 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
 
 .chat-md p {
   margin: 0 0 0.85em;
+  line-height: var(--chat-lh);
 }
 .chat-md p:last-child {
   margin-bottom: 0;
@@ -742,6 +746,9 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   gap: 2px;
   min-width: 0;
   width: 100%;
+}
+.lobe-chat-assistant-timeline > * {
+  flex-shrink: 0;
 }
 
 .lobe-timeline-rail {

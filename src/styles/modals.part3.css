@@ -493,14 +493,30 @@
 /* Compact confirm */
 .compact-modal {
   width: min(var(--modal-width-md, 480px), 100%);
-  gap: var(--modal-gap, 16px);
+  gap: 12px;
 }
 
-.compact-modal__msg {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.5;
+.compact-modal__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.compact-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.compact-modal__field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .compact-modal__presets {
@@ -559,7 +575,7 @@
 .compact-modal__cli-fields {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .compact-modal__usage {
@@ -618,12 +634,8 @@
   color: var(--text-tertiary, var(--text-secondary));
 }
 
-.compact-modal__hint--presets {
-  margin-top: -6px;
-}
-
 .compact-modal__field-label {
-  margin: 0 0 -8px;
+  margin: 0;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);

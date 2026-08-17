@@ -397,9 +397,11 @@
 .lobe-timeline-tool__cmd + .lobe-timeline-tool__output {
   border-radius: 0 0 8px 8px;
 }
-/* Inside a phase rail the outer body already scrolls — let the output grow to
-   its own cap and keep a single scroller (nested scrollbars trap the wheel). */
-.grok-act__expand-body {
+/* Inside a capped / virtual rail the outer list already scrolls — let the
+   output grow and keep a single scroller (nested bars trap the wheel).
+   Unscoped overflow:visible painted bash stdout over the conclusion. */
+.grok-act__steps--capped .grok-act__expand-body,
+.grok-act__steps--virtual .grok-act__expand-body {
   max-height: none;
   overflow: visible;
 }
@@ -413,7 +415,7 @@
 /* User-facing mid-turn speech inside 工作了 — body text, not a 30px rail row. */
 .grok-act__step--speech {
   display: block;
-  min-height: 0;
+  min-height: min-content;
   padding: 4px 0 10px;
   align-items: stretch;
 }
@@ -619,6 +621,9 @@
 /* Conclusion sits below the 工作了 fold (or a thought row), with one beat. */
 .chat-md--answer {
   margin-top: 10px;
+  flex-shrink: 0;
+  min-height: min-content;
+  position: relative;
 }
 .lobe-chat-assistant-timeline > .grok-act + .chat-md--answer,
 .lobe-chat-assistant-timeline > .lobe-timeline-rail + .chat-md--answer {

@@ -925,7 +925,8 @@ import {
   IconFileText,
   IconSettings,
   IconAppearance,
-  IconPuzzle
+  IconPuzzle,
+  IconHelp,
 } from "@/components/icons";
 import { PhoneAccountSheet } from "@/components/PhoneAccountSheet";
 import { PhoneComposerToolsSheet } from "@/components/PhoneComposerToolsSheet";
@@ -1654,10 +1655,6 @@ export function AppWorkbench() {
     sendInFlightRef.current = set.size > 0;
     return true;
   };
-  const releaseSendForSession = (sessionId: string | null | undefined) => {
-    sendInFlightBySessionRef.current.delete(queueSessionKey(sessionId));
-    sendInFlightRef.current = sendInFlightBySessionRef.current.size > 0;
-  };
   /**
    * Bumped when a send is superseded (ghost heal / new attempt) so a hung
    * `sessionSend` await cannot re-apply liveMap busy after UI already healed.
@@ -1878,7 +1875,7 @@ export function AppWorkbench() {
         setCompactPreset(DEFAULT_COMPACT_PRESET);
       },
       capture: true,
-      initialFocus: "first",
+      initialFocus: () => compactNoteRef.current,
       restoreFocus: true,
     });
   }, [showCompactModal]);
@@ -7950,14 +7947,6 @@ export function AppWorkbench() {
       [...heldSendKeys].every(
         (key) => sendEpochBySessionRef.current.get(key) === sendEpoch,
       );
-    const segments = parseStoredContent(storedDisplay);
-    if (isDraftEmpty(segments) && !att.length) {
-      releaseSendForSession(sendTargetId);
-      if (sendEpochBySessionRef.current.get(sendKey) === sendEpoch) {
-        sendEpochBySessionRef.current.delete(sendKey);
-      }
-      return false;
-    }
     // Prefer viewing id over shell sessionId — openSession points viewing at
     // the new chat before journal load finishes setSession; using only shell
     // mis-routed sends into the previous (often stuck) chat.
@@ -24291,7 +24280,10 @@ export function AppWorkbench() {
                 const cmd = buildCompactSlashCommand(note, { preset });
                 try {
                   const sid = await ensureConnected();
-                  if (!sid) return;
+                  if (!sid) {
+                    setLocalError(tr("slash.compactConnectFailed"));
+                    return;
+                  }
                   pendingCompactBeforeRef.current = {
                     sessionId: sid,
                     tokensBefore:
@@ -24309,9 +24301,29 @@ export function AppWorkbench() {
             }}
           >
             <header className="modal-head">
-              <h2 id="compact-modal-title" className="modal-title">
-                {tr("slash.compact")}
-              </h2>
+              <div className="compact-modal__title-row">
+                <h2 id="compact-modal-title" className="modal-title">
+                  {tr("slash.compact")}
+                </h2>
+                <Tip
+                  label={tr("slash.compactHelpTip")}
+                  placement="bottom"
+                  delayMs={280}
+                  className="ui-tip--wrap ui-tip--modal"
+                >
+                  <button
+                    type="button"
+                    className="settings-label-help"
+                    aria-label={tr("slash.compactHelp")}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                  >
+                    <IconHelp size={14} stroke={1.75} />
+                  </button>
+                </Tip>
+              </div>
               <button
                 type="button"
                 className="icon-btn modal-close"
@@ -24325,9 +24337,7 @@ export function AppWorkbench() {
                 <IconClose size={16} />
               </button>
             </header>
-            <p className="compact-modal__msg">
-              {tr("slash.compactExplain")}
-            </p>
+            <div className="compact-modal__body">
             <div
               className="compact-modal__presets"
               role="radiogroup"
@@ -24356,7 +24366,6 @@ export function AppWorkbench() {
                     className={
                       "compact-modal__preset" + (active ? " is-active" : "")
                     }
-                    title={tr(hintKey)}
                     onClick={() => selectCompactPreset(id)}
                   >
                     <span className="compact-modal__preset-label">
@@ -24369,67 +24378,62 @@ export function AppWorkbench() {
                 );
               })}
             </div>
-            <p className="compact-modal__hint compact-modal__hint--presets">
-              {tr("slash.compactPresetCliNote")}
-            </p>
             <div className="compact-modal__cli-fields">
-              <div className="compact-modal__field-label">
-                {tr("slash.compactMode")}
+              <div className="compact-modal__field-group">
+                <div className="compact-modal__field-label">
+                  {tr("slash.compactMode")}
+                </div>
+                <Select
+                  value={compactionMode}
+                  aria-label={tr("slash.compactMode")}
+                  onChange={(v) => {
+                    const next = normalizeCompactionMode(v);
+                    setCompactionMode(next);
+                    void api.settingsGet().then((s) =>
+                      api.settingsSet({ ...s, compactionMode: next }),
+                    );
+                  }}
+                  options={COMPACTION_MODES.map((id) => ({
+                    value: id,
+                    label: tr(
+                      id === "transcript"
+                        ? "settings.compactionMode.transcript"
+                        : id === "segments"
+                          ? "settings.compactionMode.segments"
+                          : "settings.compactionMode.summary",
+                    ),
+                  }))}
+                />
               </div>
-              <Select
-                value={compactionMode}
-                aria-label={tr("slash.compactMode")}
-                title={tr("slash.compactModeHint")}
-                onChange={(v) => {
-                  const next = normalizeCompactionMode(v);
-                  setCompactionMode(next);
-                  void api.settingsGet().then((s) =>
-                    api.settingsSet({ ...s, compactionMode: next }),
-                  );
-                }}
-                options={COMPACTION_MODES.map((id) => ({
-                  value: id,
-                  label: tr(
-                    id === "transcript"
-                      ? "settings.compactionMode.transcript"
-                      : id === "segments"
-                        ? "settings.compactionMode.segments"
-                        : "settings.compactionMode.summary",
-                  ),
-                }))}
-              />
-              <p className="compact-modal__hint">{tr("slash.compactModeHint")}</p>
-              <div className="compact-modal__field-label">
-                {tr("slash.compactDetail")}
+              <div className="compact-modal__field-group">
+                <div className="compact-modal__field-label">
+                  {tr("slash.compactDetail")}
+                </div>
+                <Select
+                  value={compactionDetail}
+                  aria-label={tr("slash.compactDetail")}
+                  disabled={!compactionDetailApplies(compactionMode)}
+                  onChange={(v) => {
+                    const next = normalizeCompactionDetail(v);
+                    setCompactionDetail(next);
+                    void api.settingsGet().then((s) =>
+                      api.settingsSet({ ...s, compactionDetail: next }),
+                    );
+                  }}
+                  options={COMPACTION_DETAILS.map((id) => ({
+                    value: id,
+                    label: tr(
+                      id === "none"
+                        ? "settings.compactionDetail.none"
+                        : id === "minimal"
+                          ? "settings.compactionDetail.minimal"
+                          : id === "balanced"
+                            ? "settings.compactionDetail.balanced"
+                            : "settings.compactionDetail.verbose",
+                    ),
+                  }))}
+                />
               </div>
-              <Select
-                value={compactionDetail}
-                aria-label={tr("slash.compactDetail")}
-                title={tr("slash.compactDetailHint")}
-                disabled={!compactionDetailApplies(compactionMode)}
-                onChange={(v) => {
-                  const next = normalizeCompactionDetail(v);
-                  setCompactionDetail(next);
-                  void api.settingsGet().then((s) =>
-                    api.settingsSet({ ...s, compactionDetail: next }),
-                  );
-                }}
-                options={COMPACTION_DETAILS.map((id) => ({
-                  value: id,
-                  label: tr(
-                    id === "none"
-                      ? "settings.compactionDetail.none"
-                      : id === "minimal"
-                        ? "settings.compactionDetail.minimal"
-                        : id === "balanced"
-                          ? "settings.compactionDetail.balanced"
-                          : "settings.compactionDetail.verbose",
-                  ),
-                }))}
-              />
-              <p className="compact-modal__hint">
-                {tr("slash.compactDetailHint")}
-              </p>
             </div>
             <div className="compact-modal__usage" aria-live="polite">
               <div className="compact-modal__usage-row">
@@ -24510,9 +24514,7 @@ export function AppWorkbench() {
                 </div>
               ) : null}
             </div>
-            <p className="compact-modal__hint">
-              {tr("slash.compactEstimateHint")}
-            </p>
+            <div className="compact-modal__field-group">
             <label className="compact-modal__field-label" htmlFor="compact-note">
               {tr("slash.compactNote")}
             </label>
@@ -24560,12 +24562,14 @@ export function AppWorkbench() {
                 );
               })}
             </div>
+            </div>
             {(session.state === "streaming" ||
               session.state === "awaiting_permission") && (
               <p className="compact-modal__busy" role="status">
                 {tr("slash.compactBusy")}
               </p>
             )}
+            </div>
             <div className="modal-actions">
               <button
                 type="button"

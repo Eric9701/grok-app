@@ -118,6 +118,11 @@ button:disabled {
   font-weight: 400;
 }
 
+/* Tips opened from a .overlay modal (z-index 12000) */
+.ui-tip--modal {
+  z-index: 13050;
+}
+
 /* JSON Schema full text on active chip tip */
 .ui-tip--mono {
   max-width: min(420px, calc(100vw - 16px));

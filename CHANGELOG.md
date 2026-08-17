@@ -32,6 +32,8 @@ See `docs/llm-wiki/release.md`.
 - **桌面输入框上方始终显示工作区（#662）**：不再只在「已选项目的全新空草稿」才出现。沿用现有 `ComposerProjectMenu` 选择、添加或回到默认工作区。中文不再用「通用」。侧栏 `+` 保留。手机仍走工具页。
 
 ### Fixed
+- **Assistant body text no longer stacks on itself**: Conclusion markdown and work-fold tool stdout could occupy the same box when a parent flex column crushed their height (`overflow: visible` expand bodies then painted over the answer). Transcript rows, timeline children, and `.chat-md--answer` no longer shrink; expand-body `overflow: visible` is only used inside a capped/virtual scroller.
+- **Compact dialog overflow + help**: Long inline help on Compact context could exceed `.modal` max-height (`overflow: hidden`, no scroll body) and clip the Compact button. Descriptions move into a title `?` tip; the body scrolls and the footer stays pinned. Connect failure after confirm no longer fails silently.
 - **Pathless「文件」tab no longer stays beside an opened file**: Opening a file from the tree replaces the picker Files chip. Picking Files again focuses the open file instead of minting a second dead tab (which did nothing and could stall the pane).
 - **Slash palette `/rc` and `/review-` select `review-commit` (#644)**: Treat `-` as a word boundary so kebab initials match, rank name prefix above description, and keep description as fallback only when no name hits. Peer skills that mention `review-commit` in YAML no longer steal the default highlight.
 - **Working rail overlap and leftover ANSI (#667, #672)**: Long live **工作中** rows no longer paint tool bodies over the next line; leftover `[39m` / `[32m` SGR after a dropped ESC is stripped. Mapped lists no longer flex-shrink into a 360px box that crushes expanded rows.
@@ -53,6 +55,8 @@ See `docs/llm-wiki/release.md`.
 - **Transcript selection quotes**: Selecting text in a bubble shows a floating bar (copy, optional comment, add to chat). Quotes sit **beside** the draft as a compact “N notes / N 条注释” chip — they are not pasted into the input. They persist on project/session drafts and the send queue. The agent sees `Quoted excerpt` / `Comment` blocks; the journal stores `[[quote]]` / `[[note]]` fences so reload rebuilds the cards. Queue **Guide** serializes quotes (and re-queues them on failure). Send settlement compares quotes so a quote added during an in-flight send is not overwritten on failure. Switching sessions closes the selection bar.
 
 **中文 · 修复**
+- **助手正文不再叠字**：结论 Markdown 和工作轨里的工具输出会被父级 flex 压扁到同一块区域（展开体 `overflow: visible` 再盖到答案上）。消息行、时间线子项和 `.chat-md--answer` 不再被压缩；只有带滚动条的工作列表才允许展开体溢出。
+- **压缩弹窗过长、按钮被裁切**：原先说明全铺在弹窗里，超出 `.modal` 最大高度后底部「压缩」被裁掉（容器 `overflow: hidden`、没有可滚 body）。说明收到标题旁 `?`，正文可滚、底部按钮固定。确认后连不上 Agent 也不再静默失败。
 - **斜杠菜单 `/rc`、`/review-` 会选中 `review-commit`（#644）**：把 `-` 当词界以匹配 kebab 首字母，名字前缀优先于描述，且只有名字全无命中时才用描述兜底。YAML 里互相点名 `review-commit` 的 skill 不再抢走默认高亮。
 - **工作轨叠字和残留 ANSI（#667、#672）**：长「工作中」不再把工具正文盖到下一行；ESC 丢掉后残留的 `[39m` / `[32m` 会被剥掉。展开后的列表不再被压进 360px 盒子里叠字。
 - **75Hz 外接屏聊天滑动（#651）**：虚拟列表窗口更新在 rAF 之外加 8ms 兜底，混用 120Hz/75Hz 时漏一帧不会掉成肉眼 37.5Hz。
