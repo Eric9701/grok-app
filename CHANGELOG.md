@@ -42,6 +42,9 @@ See `docs/llm-wiki/release.md`.
 
 - **Side workbench file tabs and per-project isolation (#661 slice)**: Inactive file chips show a filename (and a short parent path on collisions). Switching projects stashes that project's tabs. Opening Files shows the tree and adopts the placeholder chip instead of minting a second pathless tab. The CodeMirror editor from the same PR is **not** in this slice.
 
+### Added
+- **Transcript selection quotes**: Selecting text in a bubble shows a floating bar (copy, optional comment, add to chat). Quotes sit **beside** the draft as a compact “N notes / N 条注释” chip — they are not pasted into the input. They persist on project/session drafts and the send queue. The agent sees `Quoted excerpt` / `Comment` blocks; the journal stores `[[quote]]` / `[[note]]` fences so reload rebuilds the cards. Queue **Guide** serializes quotes (and re-queues them on failure). Send settlement compares quotes so a quote added during an in-flight send is not overwritten on failure. Switching sessions closes the selection bar.
+
 **中文 · 修复**
 - **斜杠菜单 `/rc`、`/review-` 会选中 `review-commit`（#644）**：把 `-` 当词界以匹配 kebab 首字母，名字前缀优先于描述，且只有名字全无命中时才用描述兜底。YAML 里互相点名 `review-commit` 的 skill 不再抢走默认高亮。
 - **工作轨叠字和残留 ANSI（#667、#672）**：长「工作中」不再把工具正文盖到下一行；ESC 丢掉后残留的 `[39m` / `[32m` 会被剥掉。展开后的列表不再被压进 360px 盒子里叠字。
@@ -59,6 +62,9 @@ See `docs/llm-wiki/release.md`.
 
 **中文 · 修复**
 - **空的「文件」tab 不再和已打开文件并排**：从树里打开文件会替换选择器里的「文件」占位。再点「文件」只会聚焦已打开的文件，不会再多出一个点了没反应、还会卡住侧栏的死标签。
+
+**中文 · 新增**
+- **正文选中批注**：在气泡里选中文字后出现浮层（复制、可选评论、添加到对话）。注释作为紧凑的「N 条注释」贴在输入框旁，**不粘进正文**。会跟项目/会话草稿和发送队列一起保存。发给模型的是 `Quoted excerpt` / `Comment`；日记里写 `[[quote]]` / `[[note]]`，重载后还能还原成卡片。队列「引导」会带上注释（失败重新入队也保留）。发送结算会比较注释，发送过程中新加的注释在失败时不会被旧快照盖掉。切换会话会关掉选择浮层。
 
 ## [0.2.20] - 2026-08-17
 
