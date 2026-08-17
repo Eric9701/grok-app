@@ -78,9 +78,21 @@ export function allowCursorDiscover(flags: SkillDiscoverFlags): boolean {
   return flags.appPref !== false && flags.cursorSkills !== false;
 }
 
-/** Both vendors allowed — the Settings master toggle is on. */
+/** Both vendors allowed — catalog discovery is live. */
 export function effectiveDiscoverExternal(flags: SkillDiscoverFlags): boolean {
   return allowClaudeDiscover(flags) && allowCursorDiscover(flags);
+}
+
+/**
+ * Optimistic App-overlay flip. Keeps config.toml vendor flags and recomputes
+ * `effective` so the honesty line does not flicker.
+ */
+export function withDiscoverAppPref<T extends SkillDiscoverFlags>(
+  flags: T,
+  appPref: boolean,
+): T & { appPref: boolean; effective: boolean } {
+  const next = { ...flags, appPref };
+  return { ...next, effective: effectiveDiscoverExternal(next) };
 }
 
 export function shouldIncludeDiscoveredSkill(

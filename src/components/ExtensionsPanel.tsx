@@ -63,6 +63,7 @@ import {
   resolveSkillMdPath,
 } from "@/lib/skillEditPath";
 import { sanitizeSkillFolderName } from "@/lib/skillScaffold";
+import { withDiscoverAppPref } from "@/lib/skillCompat";
 import {
   buildSkillHostErrorPresentation,
   buildSkillSaveOkPresentation,
@@ -792,7 +793,7 @@ export function ExtensionsPanel({
     if (!api.isTauri() || busyKey) return;
     setBusyKey("skill:discover");
     setSkillsDiscover((prev) =>
-      prev ? { ...prev, appPref: next, effective: next } : prev,
+      prev ? withDiscoverAppPref(prev, next) : prev,
     );
     try {
       await api.skillsCompatSet(next);
@@ -2316,7 +2317,7 @@ export function ExtensionsPanel({
             </div>
             <div className="ext-ref-row__end">
               <ExtensionToggle
-                checked={skillsDiscover?.effective !== false}
+                checked={skillsDiscover?.appPref !== false}
                 disabled={!!busyKey || !api.isTauri()}
                 label={tr("ext.skills.discoverExternal")}
                 onChange={(next) => void toggleDiscoverExternal(next)}

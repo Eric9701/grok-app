@@ -10,6 +10,7 @@ import {
   isCompatExternalSkill,
   isCursorCompatSkill,
   shouldIncludeDiscoveredSkill,
+  withDiscoverAppPref,
 } from "./skillCompat";
 
 describe("compat skill path / source", () => {
@@ -118,5 +119,30 @@ describe("discover flags", () => {
     expect(
       allowClaudeDiscover({ appPref: true, claudeSkills: false }),
     ).toBe(false);
+  });
+
+  it("optimistic appPref flip keeps vendor flags and recomputes effective", () => {
+    const onButConfigOff = withDiscoverAppPref(
+      { appPref: false, claudeSkills: false, cursorSkills: true },
+      true,
+    );
+    expect(onButConfigOff.appPref).toBe(true);
+    expect(onButConfigOff.claudeSkills).toBe(false);
+    expect(onButConfigOff.cursorSkills).toBe(true);
+    expect(onButConfigOff.effective).toBe(false);
+
+    const off = withDiscoverAppPref(
+      { appPref: true, claudeSkills: true, cursorSkills: true },
+      false,
+    );
+    expect(off.appPref).toBe(false);
+    expect(off.effective).toBe(false);
+
+    const on = withDiscoverAppPref(
+      { appPref: false, claudeSkills: null, cursorSkills: null },
+      true,
+    );
+    expect(on.appPref).toBe(true);
+    expect(on.effective).toBe(true);
   });
 });
