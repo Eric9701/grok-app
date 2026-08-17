@@ -7,7 +7,9 @@ import {
   applySkillAtSlash,
   detectSlashRangeOnStored,
   insertNewlineAt,
+  joinEditorBlockLines,
   parseStoredContent,
+  shouldKeepTrailingEmptyLine,
   serializeEditorLineContent,
   serializeStored,
 } from "./draftDoc";
@@ -55,6 +57,50 @@ describe("serializeEditorLineContent (pure line box)", () => {
 });
 
 /** Block-line join pure model — empty line between content. */
+describe("shouldKeepTrailingEmptyLine", () => {
+  it("keeps an empty last line when the caret is on it", () => {
+    expect(
+      shouldKeepTrailingEmptyLine({
+        lastLineEmpty: true,
+        markedIntentional: false,
+        caretInLastLine: true,
+        lineCount: 2,
+      }),
+    ).toBe(true);
+  });
+
+  it("drops a sentinel empty line when the caret is not on it", () => {
+    expect(
+      shouldKeepTrailingEmptyLine({
+        lastLineEmpty: true,
+        markedIntentional: false,
+        caretInLastLine: false,
+        lineCount: 3,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("joinEditorBlockLines", () => {
+  it("drops a WebKit sentinel empty line", () => {
+    expect(joinEditorBlockLines(["hello", ""], false)).toBe("hello");
+    expect(joinEditorBlockLines(["hello", "world", ""], false)).toBe(
+      "hello\nworld",
+    );
+  });
+
+  it("keeps an intentional trailing newline", () => {
+    expect(joinEditorBlockLines(["hello", ""], true)).toBe("hello\n");
+    expect(joinEditorBlockLines(["hello", "", ""], true)).toBe("hello\n\n");
+  });
+
+  it("undo of a trailing newline is the previous string", () => {
+    const after = insertNewlineAt("测试", 2);
+    expect(after).toBe("测试\n");
+    expect(after.slice(0, 2)).toBe("测试");
+  });
+});
+
 describe("block line join model", () => {
   function joinLines(bodies: string[]): string {
     const lines = [...bodies];

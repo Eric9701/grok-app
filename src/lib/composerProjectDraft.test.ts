@@ -8,7 +8,10 @@ import {
   loadComposerProjectDraft,
   ORPHAN_PROJECT_DRAFT_KEY,
   projectDraftKey,
+  resolveComposerProjectDraftToApply,
   saveComposerProjectDraft,
+  composerProjectDraftLooksSent,
+  shouldRestoreComposerProjectDraft,
   type ComposerProjectDraftStorage,
 } from "./composerProjectDraft";
 
@@ -50,7 +53,7 @@ describe("isComposerProjectDraftEmpty", () => {
     ).toBe(true);
   });
 
-  it("keeps skill-only or attachment drafts", () => {
+  it("keeps skill-only, attachment, or quote drafts", () => {
     expect(
       isComposerProjectDraftEmpty({
         text: "[[skill:foo]]",
@@ -62,6 +65,14 @@ describe("isComposerProjectDraftEmpty", () => {
       isComposerProjectDraftEmpty({
         text: "",
         attachments: [{ path: "/a.png", name: "a.png", isDir: false }],
+        updatedAt: 1,
+      }),
+    ).toBe(false);
+    expect(
+      isComposerProjectDraftEmpty({
+        text: "",
+        attachments: [],
+        quotes: [{ id: "q1", text: "excerpt", comment: "" }],
         updatedAt: 1,
       }),
     ).toBe(false);
@@ -118,5 +129,105 @@ describe("save / load / clear", () => {
     expect(isComposerProjectDraftEmpty(emptyComposerProjectDraft())).toBe(
       true,
     );
+  });
+});
+
+describe("shouldRestoreComposerProjectDraft", () => {
+  it("restores a half-typed prompt that was never sent", () => {
+    expect(
+      shouldRestoreComposerProjectDraft(
+        { text: "unsent task", attachments: [], updatedAt: 1 },
+        ["something else"],
+      ),
+    ).toBe(true);
+  });
+
+  it("drops a buffer that matches a recently sent prompt", () => {
+    const sent = "为什么我的内存占用这么多啊？";
+    expect(
+      shouldRestoreComposerProjectDraft(
+        { text: sent, attachments: [], updatedAt: 1 },
+        [sent, "older"],
+      ),
+    ).toBe(false);
+  });
+
+  it("does not restore empty / whitespace drafts", () => {
+    expect(shouldRestoreComposerProjectDraft(null, ["x"])).toBe(false);
+    expect(
+      shouldRestoreComposerProjectDraft(
+        { text: "  \n", attachments: [], updatedAt: 1 },
+        [],
+      ),
+    ).toBe(false);
+  });
+
+  it("restores attachment-only and quote-only drafts", () => {
+    expect(
+      shouldRestoreComposerProjectDraft(
+        {
+          text: "",
+          attachments: [{ path: "/a.png", name: "a.png", isDir: false }],
+          updatedAt: 1,
+        },
+        ["hello"],
+      ),
+    ).toBe(true);
+    expect(
+      shouldRestoreComposerProjectDraft(
+        {
+          text: "",
+          attachments: [],
+          quotes: [{ id: "q1", text: "excerpt", comment: "note" }],
+          updatedAt: 1,
+        },
+        [],
+      ),
+    ).toBe(true);
+  });
+
+  it("resolveComposerProjectDraftToApply wipes sent leftovers", () => {
+    const leftover = {
+      text: "hello",
+      attachments: [] as [],
+      updatedAt: 1,
+    };
+    expect(resolveComposerProjectDraftToApply(leftover, ["hello"])).toBeNull();
+    expect(resolveComposerProjectDraftToApply(leftover, ["other"])).toEqual(
+      leftover,
+    );
+  });
+
+  it("drops a mid-type prefix of a later send", () => {
+    expect(
+      composerProjectDraftLooksSent("好的\n", ["好的\n你看好了吗？"]),
+    ).toBe(true);
+    expect(
+      shouldRestoreComposerProjectDraft(
+        { text: "好的\n", attachments: [], updatedAt: 1 },
+        ["好的\n你看好了吗？"],
+      ),
+    ).toBe(false);
+  });
+
+  it("drops a short first-line fragment of a later send (Software leftover)", () => {
+    expect(
+      composerProjectDraftLooksSent("好的\nd", ["好的\n你看好了吗？"]),
+    ).toBe(true);
+    expect(
+      shouldRestoreComposerProjectDraft(
+        { text: "好的\nd", attachments: [], updatedAt: 1 },
+        ["好的\n你看好了吗？", "已经退出了，那你测试一下？"],
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps a different unsent new-task prompt", () => {
+    expect(
+      shouldRestoreComposerProjectDraft(
+        { text: "帮我看一下这个目录的依赖", attachments: [], updatedAt: 1 },
+        ["好的\n你看好了吗？", "继续"],
+      ),
+    ).toBe(true);
   });
 });

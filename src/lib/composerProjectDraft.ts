@@ -7,6 +7,10 @@
  */
 
 import type { Attachment } from "@/lib/attachments";
+import {
+  normalizeComposerQuotes,
+  type ComposerQuote,
+} from "@/lib/composerQuotes";
 import { isDraftEmpty, parseStoredContent } from "@/lib/draftDoc";
 
 export const COMPOSER_PROJECT_DRAFTS_STORAGE_KEY = "grok.composerProjectDrafts";
@@ -17,6 +21,7 @@ export const ORPHAN_PROJECT_DRAFT_KEY = "__orphan__";
 export type ComposerProjectDraft = {
   text: string;
   attachments: Attachment[];
+  quotes?: ComposerQuote[];
   goalMode?: boolean;
   updatedAt: number;
 };
@@ -54,6 +59,7 @@ export function isComposerProjectDraftEmpty(
 ): boolean {
   if (!draft) return true;
   if (draft.attachments?.length) return false;
+  if (draft.quotes?.length) return false;
   return isDraftEmpty(parseStoredContent(draft.text || ""));
 }
 
@@ -82,7 +88,8 @@ function normalizeDraft(raw: unknown): ComposerProjectDraft | null {
       ? o.updatedAt
       : 0;
   const goalMode = o.goalMode === true;
-  return { text, attachments, goalMode, updatedAt };
+  const quotes = normalizeComposerQuotes(o.quotes);
+  return { text, attachments, quotes, goalMode, updatedAt };
 }
 
 /** Load full map (invalid JSON → {}). */
@@ -125,6 +132,7 @@ export function saveComposerProjectDraft(
   draft: {
     text: string;
     attachments?: Attachment[];
+    quotes?: ComposerQuote[];
     goalMode?: boolean;
   },
   storage: ComposerProjectDraftStorage = defaultStorage(),
@@ -135,6 +143,7 @@ export function saveComposerProjectDraft(
     attachments: (draft.attachments ?? [])
       .map((a) => normalizeAttachment(a))
       .filter((a): a is Attachment => !!a),
+    quotes: normalizeComposerQuotes(draft.quotes),
     goalMode: !!draft.goalMode,
     updatedAt: Date.now(),
   };
@@ -168,4 +177,74 @@ export function clearComposerProjectDraft(
   storage: ComposerProjectDraftStorage = defaultStorage(),
 ): void {
   saveComposerProjectDraft(key, { text: "", attachments: [] }, storage);
+}
+
+function normalizeDraftCompareText(s: string): string {
+  return (s ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function firstNonEmptyLine(s: string): string {
+  for (const line of normalizeDraftCompareText(s).split("\n")) {
+    const t = line.trim();
+    if (t) return t;
+  }
+  return "";
+}
+
+/**
+ * True when a per-project new-chat buffer is leftover from a send, not a
+ * new unsent task. Exact match is not enough: mid-type persist often saves a
+ * prefix, and short fragments share the first line of the message they became
+ * ("好的\\nd" vs sent "好的\\n你看好了吗？").
+ */
+export function composerProjectDraftLooksSent(
+  draftText: string,
+  recentlySentTexts: readonly string[],
+): boolean {
+  const text = normalizeDraftCompareText(draftText);
+  if (!text.trim()) return false;
+  const first = firstNonEmptyLine(text);
+  const shortLimit = Math.max(24, first.length + 10);
+  for (const raw of recentlySentTexts) {
+    const sent = normalizeDraftCompareText(raw ?? "");
+    if (!sent.trim()) continue;
+    if (text === sent) return true;
+    // Saved while they were still typing the prompt they later sent.
+    if (sent.startsWith(text)) return true;
+    if (
+      first &&
+      first === firstNonEmptyLine(sent) &&
+      text.trim().length <= shortLimit
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * New-session restore must only bring back a half-typed unsent prompt.
+ * A buffer whose text is already in recent-send history is leftover from a
+ * send that never wiped the project draft (#620 / stale upgrade).
+ */
+export function shouldRestoreComposerProjectDraft(
+  draft: ComposerProjectDraft | null | undefined,
+  recentlySentTexts: readonly string[],
+): boolean {
+  if (!draft || isComposerProjectDraftEmpty(draft)) return false;
+  const text = draft.text ?? "";
+  // Attachment-only / quote-only drafts are valid — do not require text.
+  // The leftover-send filter only applies to a non-empty prompt string.
+  if (!text.trim()) return true;
+  return !composerProjectDraftLooksSent(text, recentlySentTexts);
+}
+
+/** Apply-or-drop: null means start empty and the saved buffer should be wiped. */
+export function resolveComposerProjectDraftToApply(
+  draft: ComposerProjectDraft | null | undefined,
+  recentlySentTexts: readonly string[],
+): ComposerProjectDraft | null {
+  return shouldRestoreComposerProjectDraft(draft, recentlySentTexts)
+    ? draft!
+    : null;
 }
