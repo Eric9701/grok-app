@@ -25,8 +25,8 @@ export type DesktopNotifyOptions = {
    * On click, after focusing the app, the registered session focus handler is
    * invoked when this is a non-empty string. Missing id still focuses the app.
    *
-   * Click deep-link only works when the WebView returns a real Notification
-   * instance (browser / non-polyfill). Native polyfill is fire-and-forget.
+   * Web `Notification.onclick` covers the browser constructor. The live Tauri
+   * path is Host `desktop_notify_show` → native click → `notify://clicked`.
    */
   sessionId?: string | null;
   /**
@@ -49,6 +49,49 @@ export function setDesktopNotifySessionFocusHandler(
   handler: DesktopNotifySessionFocusHandler | null,
 ): void {
   sessionFocusHandler = handler;
+}
+
+/** Host emits this when a native desktop notification is clicked. */
+export const NATIVE_NOTIFY_CLICK_EVENT = "notify://clicked";
+
+export type NativeNotifyClickPayload = {
+  sessionId?: string | null;
+};
+
+/**
+ * Focus the app, then open `sessionId` when the Host (or a test) reports a
+ * native notification click. Missing / blank id still focuses the window.
+ */
+export function applyNativeNotifyClick(
+  payload?: NativeNotifyClickPayload | null,
+): void {
+  focusAppFromNotification();
+  const focusSessionId =
+    typeof payload?.sessionId === "string" && payload.sessionId.trim()
+      ? payload.sessionId.trim()
+      : null;
+  if (!focusSessionId || !sessionFocusHandler) return;
+  try {
+    sessionFocusHandler(focusSessionId);
+  } catch {
+    /* fail closed — window already focused */
+  }
+}
+
+/** Subscribe to Host `notify://clicked`. No-op outside Tauri. */
+export async function listenForNativeNotifyClicks(): Promise<() => void> {
+  if (!isTauriHost()) return () => {};
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    return await listen<NativeNotifyClickPayload>(
+      NATIVE_NOTIFY_CLICK_EVENT,
+      (ev) => {
+        applyNativeNotifyClick(ev.payload);
+      },
+    );
+  } catch {
+    return () => {};
+  }
 }
 
 export type NotifyPermission = "granted" | "denied" | "default" | "unsupported";

@@ -538,6 +538,7 @@ import {
 } from "@/lib/voiceHotkeyPref";
 import {
   ensureNotifyPermission,
+  listenForNativeNotifyClicks,
   setDesktopNotifySessionFocusHandler
 } from "@/lib/desktopNotify";
 import {
@@ -14261,14 +14262,27 @@ export function AppWorkbench() {
   };
 
   // Desktop notification click → open the session that fired the notify.
+  // Web Notification.onclick and Host notify://clicked share this handler.
+  // Wait for window role: secondary `session-*` windows must not subscribe
+  // (Host already restores main; a second listener would steal focus).
   useEffect(() => {
+    if (!windowRoleReady) return;
+    if (isSecondaryWindow) return;
     setDesktopNotifySessionFocusHandler((sessionId) => {
       trayHandlersRef.current.openSessionById(sessionId);
     });
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    void listenForNativeNotifyClicks().then((stop) => {
+      if (cancelled) stop();
+      else unlisten = stop;
+    });
     return () => {
+      cancelled = true;
+      unlisten?.();
       setDesktopNotifySessionFocusHandler(null);
     };
-  }, []);
+  }, [windowRoleReady, isSecondaryWindow]);
 
   // System tray / menu-bar (Codex-style): Recent · More · Usage · New Chat · Open · Quit
   // Secondary windows ignore tray navigation — main owns app chrome.

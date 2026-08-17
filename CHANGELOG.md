@@ -11,6 +11,7 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+<<<<<<< HEAD
 ### Changed
 - **Composer workspace chip on every desktop chat (#662)**: The project / default-workspace control above the input is no longer limited to a brand-new draft that already has a folder. Pick, add, or return to the default workspace from the existing `ComposerProjectMenu`. Chinese copy uses 默认工作区 (was 通用). Sidebar `+` stays. Phone still uses the tools sheet.
 
@@ -22,12 +23,14 @@ See `docs/llm-wiki/release.md`.
 - **Working rail overlap and leftover ANSI (#667)**: Long live **工作中** rows no longer paint tool bodies over the next line; leftover `[39m` / `[32m` SGR after a dropped ESC is stripped.
 - **Command-palette search scroll and keyboard (#657)**: ⌘K results sit in a real scrollport (wheel / trackpad work). Arrow keys move a highlight; Enter opens the row; ⌘/Ctrl 1–9 still jump to the numbered session.
 - **Included-usage exhaustion is no longer a generic provider error (#659)**: When Grok Build reports `subscription:free-usage-exhausted`, Host stops the 15-retry loop immediately and emits `QUOTA_EXCEEDED`. The chat card uses the CLI line “You hit your free usage limit.” (rolling 24-hour window + Account). A bare 429 / “rate limit, retry later” uses the CLI “Rate limited” / “Wait a minute” card, not the free-usage sentence.
+- **Desktop notification click restores the session (#654)**: Clicking a native toast now unminimizes / focuses the main window and opens the chat that fired it (permission, ask-user, or turn-done). Windows uses a WinRT `on_activated` toast instead of the fire-and-forget plugin path; packaged macOS waits for the UN default action. Missing `sessionId` still focuses the app. `tauri dev` osascript toasts (Script Editor) still cannot deep-link.
 
 **中文 · 修复**
 - **斜杠菜单 `/rc`、`/review-` 会选中 `review-commit`（#644）**：把 `-` 当词界以匹配 kebab 首字母，名字前缀优先于描述，且只有名字全无命中时才用描述兜底。YAML 里互相点名 `review-commit` 的 skill 不再抢走默认高亮。
 - **工作轨叠字和残留 ANSI（#667）**：长「工作中」不再把工具正文盖到下一行；ESC 丢掉后残留的 `[39m` / `[32m` 会被剥掉。
 - **命令面板搜索可滚动、可用键盘（#657）**：⌘K 结果有独立滚动区。方向键高亮，Enter 打开，⌘/Ctrl 1–9 仍跳到编号会话。
 - **额度用尽不再显示成普通提供商报错（#659）**：官方返回 `subscription:free-usage-exhausted` 时，Host 立刻停转并记 `QUOTA_EXCEEDED`，气泡对齐 CLI 的 “You hit your free usage limit.”（滚动 24 小时窗口 + 账号）。普通 429 走 CLI 的 “Rate limited / 等一分钟再发”，不再和免费用量写成一句。
+- **点击桌面通知回到对应会话（#654）**：点原生通知会还原/聚焦主窗口并打开发出该通知的会话。Windows 走带点击回调的 WinRT toast；已打包的 macOS 等 UN 默认点击。没有 `sessionId` 时仍只聚焦应用。`tauri dev` 的 osascript（脚本编辑器）通知仍无法回跳。
 
 ## [0.2.20] - 2026-08-17
 
