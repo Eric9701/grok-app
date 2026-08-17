@@ -6,7 +6,7 @@
   max-width: none;
 }
 
-/* New-session only: semi-rounded project / local / branch bar above input */
+/* Desktop composer: project / default workspace / branch bar above input */
 .composer__context-bar {
   pointer-events: auto;
   display: flex;

@@ -20120,8 +20120,9 @@ export function AppWorkbench() {
               </div>
             ) : null}
             {(() => {
-              const showWelcomeProjectRow =
-                welcomeSession && !phoneLayout && !!activeProject;
+              // Desktop composer always shows the workspace chip (including
+              // unbound / default workspace). Phone uses PhoneComposerToolsSheet.
+              const showComposerProjectRow = !phoneLayout;
               // Env menu (chat chrome) already shows change stats — hide
               // the duplicate composer context chips to avoid two "N 变更".
               const envOwnsChangeSummary =
@@ -20131,7 +20132,7 @@ export function AppWorkbench() {
                 !envOwnsChangeSummary &&
                 (!!sessionChangesSummary || !!gitDirtySummary);
               const showContextBar =
-                showWelcomeProjectRow || showChangesChips;
+                showComposerProjectRow || showChangesChips;
               return (
             <div
               className={
@@ -20139,18 +20140,18 @@ export function AppWorkbench() {
                 (showContextBar ? " composer-stack--with-context" : "")
               }
             >
-            {/* Project/branch (new session) + session/workspace change chips.
+            {/* Workspace / branch + session/workspace change chips.
                 Hidden entirely when the bar would be empty. */}
             {showContextBar ? (
               <div
                 className="composer__context-bar"
                 aria-label={
-                  showWelcomeProjectRow
+                  showComposerProjectRow
                     ? tr("composer.pickProject")
                     : tr("changes.chipAria")
                 }
               >
-                {showWelcomeProjectRow && activeProject ? (
+                {showComposerProjectRow ? (
                   <>
                 <ComposerProjectMenu
                   variant="context"
@@ -20176,8 +20177,8 @@ export function AppWorkbench() {
                     session.state === "streaming" ||
                     session.state === "awaiting_permission"
                   }
-                  onSelect={(proj) => {
-                    // Menu "general" row still passes null; bind resolves it.
+                    onSelect={(proj) => {
+                    // Menu default-workspace row still passes null; bind resolves it.
                     const full = proj
                       ? projects.find((p) => p.id === proj.id) ?? null
                       : null;
@@ -20187,7 +20188,7 @@ export function AppWorkbench() {
                     void addProjectFromPicker({ bindSession: true });
                   }}
                 />
-                {gitWorktreesAvailable === true ? (
+                {activeProject && gitWorktreesAvailable === true ? (
                   <ComposerWorktreeMenu
                     variant="context"
                     activePath={activeProject.path}
