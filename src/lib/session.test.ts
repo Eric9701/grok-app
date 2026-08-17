@@ -1554,6 +1554,28 @@ describe("session projection", () => {
     expect(body.toLowerCase()).toMatch(/sandbox|namespace|sysctl|ubuntu/);
   });
 
+  it("formatTurnErrorBody maps host NETWORK_PROVIDER + free-usage-exhausted to quota deck", () => {
+    const body = formatTurnErrorBody(
+      {
+        code: "NETWORK_PROVIDER",
+        message:
+          "Provider request failed after 15 attempts (budget 15): API error (status 429 Too Many Requests): subscription:free-usage-exhausted: You've used all the included free usage for model grok-4.6 for now.",
+      },
+      "en",
+    );
+    expect(body.toLowerCase()).toMatch(/usage|quota|limit/);
+    expect(body.toLowerCase()).not.toMatch(/network or model provider/);
+    const zh = formatTurnErrorBody(
+      {
+        code: "QUOTA_EXCEEDED",
+        message:
+          "You've used all the included free usage for model grok-4.6 for now.",
+      },
+      "zh",
+    );
+    expect(zh).toMatch(/免费用量|上限/);
+  });
+
   it("formatTurnErrorBody maps connect / quota phrases", () => {
     expect(
       formatTurnErrorBody(
@@ -1566,7 +1588,7 @@ describe("session projection", () => {
     ).toMatch(/connect/i);
     expect(
       formatTurnErrorBody({ content: "rate limit exceeded (429)" }, "en"),
-    ).toMatch(/quota|rate/i);
+    ).toMatch(/rate limited|wait a minute|busy/i);
   });
 
   it("presentErrorBanner shows friendly deck without MCP dumps", () => {

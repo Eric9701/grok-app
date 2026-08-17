@@ -5,7 +5,10 @@ import {
   deckCodeFromAgent,
   isAuthDeckCode,
   isReconnectAction,
+  looksLikeRateLimit,
+  looksLikeTerminalQuota,
   refineAuthDeckCode,
+  refineQuotaDeckCode,
   resolveErrorDeckCode,
 } from "./errorDeck";
 
@@ -100,6 +103,41 @@ describe("buildErrorDeck", () => {
       "NETWORK_PROVIDER",
     );
     expect(classifyErrorMessage("agent process exited")).toBe("AGENT_CRASHED");
+  });
+
+  it("classifies official free-usage-exhausted as QUOTA even when host said NETWORK_PROVIDER", () => {
+    const msg =
+      "API error (status 429 Too Many Requests): subscription:free-usage-exhausted: You've used all the included free usage for model grok-4.6 for now. Usage resets over a rolling 24-hour window";
+    expect(looksLikeTerminalQuota(msg)).toBe(true);
+    expect(
+      looksLikeTerminalQuota(
+        "API error (status 429 Too Many Requests): rate limit, retry later",
+      ),
+    ).toBe(false);
+    expect(resolveErrorDeckCode("NETWORK_PROVIDER", msg)).toBe("QUOTA_EXCEEDED");
+    expect(resolveErrorDeckCode("QUOTA_EXCEEDED", msg)).toBe("QUOTA_EXCEEDED");
+    const deck = buildErrorDeck("QUOTA_EXCEEDED", "en");
+    expect(deck.problem).toMatch(/free usage limit/i);
+    expect(deck.cause).toMatch(/24-hour|rolling/i);
+    expect(deck.primary.id).toBe("open_account");
+    const zh = buildErrorDeck("QUOTA_EXCEEDED", "zh");
+    expect(zh.problem).toMatch(/免费用量|上限/);
+  });
+
+  it("keeps a bare 429 as Rate limited, not free-usage copy", () => {
+    const msg = "API error (status 429 Too Many Requests): rate limit, retry later";
+    expect(looksLikeRateLimit(msg)).toBe(true);
+    expect(refineQuotaDeckCode(msg)).toBe("RATE_LIMITED");
+    expect(resolveErrorDeckCode("QUOTA_EXCEEDED", msg)).toBe("RATE_LIMITED");
+    expect(resolveErrorDeckCode("NETWORK_PROVIDER", msg)).toBe("RATE_LIMITED");
+    expect(classifyErrorMessage(msg)).toBe("RATE_LIMITED");
+    const deck = buildErrorDeck("RATE_LIMITED", "en");
+    expect(deck.problem).toMatch(/rate limited/i);
+    expect(deck.cause.toLowerCase()).toMatch(/wait a minute|busy/);
+    expect(deck.primary.id).toBe("dismiss");
+    const zh = buildErrorDeck("RATE_LIMITED", "zh");
+    expect(zh.problem).toMatch(/限速/);
+    expect(zh.cause).toMatch(/一分钟|正忙/);
   });
 
   it("classifies Linux bwrap / userns denial as SANDBOX_BLOCKED (#541)", () => {

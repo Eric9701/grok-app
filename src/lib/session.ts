@@ -3074,18 +3074,17 @@ export function formatTurnErrorBody(
   // custom route) get honest bubble copy instead of the generic 401 line.
   // Pass rawCombined so bwrap/userns in "; stderr: …" survives stripErrorNoise.
   const deckish = resolveErrorDeckCode(code, `${rawCombined}\n${rest}\n${cleaned}`, opts);
-  if (isAuthDeckCode(deckish) || deckish === "PERMISSION_DENIED" || deckish === "MCP_AUTH_FAILED" || deckish === "OAUTH_EXPIRED" || deckish === "WORKSPACE_UNTRUSTED" || deckish === "PROJECT_MISSING" || deckish === "SANDBOX_BLOCKED") {
+  if (isAuthDeckCode(deckish) || deckish === "PERMISSION_DENIED" || deckish === "MCP_AUTH_FAILED" || deckish === "OAUTH_EXPIRED" || deckish === "WORKSPACE_UNTRUSTED" || deckish === "PROJECT_MISSING" || deckish === "SANDBOX_BLOCKED" || deckish === "QUOTA_EXCEEDED" || deckish === "RATE_LIMITED") {
     return errorCopyFromDeck(deckish, locale);
   }
 
   // Infer codes from common agent/host phrases when payload lacks a code.
   // Map only host AgentErrorCode values into the typed bubble path below.
-  // SANDBOX_BLOCKED is already returned above via errorCopyFromDeck — do not
-  // re-list it here (TS narrows it out of the deckish union after the return).
+  // SANDBOX_BLOCKED / QUOTA_EXCEEDED / RATE_LIMITED already returned above
+  // via errorCopyFromDeck — do not re-list them here (TS narrows them out).
   if (!code) {
     if (
       deckish === "CONNECT_FAILED" ||
-      deckish === "QUOTA_EXCEEDED" ||
       deckish === "CLI_NOT_FOUND" ||
       deckish === "NETWORK_PROVIDER" ||
       deckish === "AGENT_CRASHED" ||
