@@ -169,3 +169,73 @@ export function clearComposerProjectDraft(
 ): void {
   saveComposerProjectDraft(key, { text: "", attachments: [] }, storage);
 }
+
+function normalizeDraftCompareText(s: string): string {
+  return (s ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function firstNonEmptyLine(s: string): string {
+  for (const line of normalizeDraftCompareText(s).split("\n")) {
+    const t = line.trim();
+    if (t) return t;
+  }
+  return "";
+}
+
+/**
+ * True when a per-project new-chat buffer is leftover from a send, not a
+ * new unsent task. Exact match is not enough: mid-type persist often saves a
+ * prefix, and short fragments share the first line of the message they became
+ * ("好的\\nd" vs sent "好的\\n你看好了吗？").
+ */
+export function composerProjectDraftLooksSent(
+  draftText: string,
+  recentlySentTexts: readonly string[],
+): boolean {
+  const text = normalizeDraftCompareText(draftText);
+  if (!text.trim()) return false;
+  const first = firstNonEmptyLine(text);
+  const shortLimit = Math.max(24, first.length + 10);
+  for (const raw of recentlySentTexts) {
+    const sent = normalizeDraftCompareText(raw ?? "");
+    if (!sent.trim()) continue;
+    if (text === sent) return true;
+    // Saved while they were still typing the prompt they later sent.
+    if (sent.startsWith(text)) return true;
+    if (
+      first &&
+      first === firstNonEmptyLine(sent) &&
+      text.trim().length <= shortLimit
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * New-session restore must only bring back a half-typed unsent prompt.
+ * A buffer whose text is already in recent-send history is leftover from a
+ * send that never wiped the project draft (#620 / stale upgrade).
+ */
+export function shouldRestoreComposerProjectDraft(
+  draft: ComposerProjectDraft | null | undefined,
+  recentlySentTexts: readonly string[],
+): boolean {
+  if (!draft || isComposerProjectDraftEmpty(draft)) return false;
+  const text = draft.text ?? "";
+  // Attachment-only drafts are valid — do not require text.
+  // The leftover-send filter only applies to a non-empty prompt string.
+  if (!text.trim()) return true;
+  return !composerProjectDraftLooksSent(text, recentlySentTexts);
+}
+
+/** Apply-or-drop: null means start empty and the saved buffer should be wiped. */
+export function resolveComposerProjectDraftToApply(
+  draft: ComposerProjectDraft | null | undefined,
+  recentlySentTexts: readonly string[],
+): ComposerProjectDraft | null {
+  return shouldRestoreComposerProjectDraft(draft, recentlySentTexts)
+    ? draft!
+    : null;
+}

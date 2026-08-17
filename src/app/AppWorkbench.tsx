@@ -680,6 +680,7 @@ import {
   clearComposerProjectDraft,
   loadComposerProjectDraft,
   projectDraftKey,
+  resolveComposerProjectDraftToApply,
   saveComposerProjectDraft,
   type ComposerProjectDraft
 } from "@/lib/composerProjectDraft";
@@ -690,6 +691,7 @@ import {
 } from "@/lib/composerSessionDraft";
 import {
   nextComposerSubmitSettlement,
+  shouldClearMatchingProjectDraft,
   shouldClearProjectDraftAfterNewChatSend,
 } from "@/lib/composerSubmitClear";
 import {
@@ -4976,6 +4978,25 @@ export function AppWorkbench() {
   );
 
   /**
+   * Load the per-project new-session buffer, but drop leftovers that match a
+   * recently sent prompt so New session does not revive the last first message.
+   */
+  const restoreComposerProjectDraft = useCallback(
+    (key: string) => {
+      const saved = loadComposerProjectDraft(key);
+      const resolved = resolveComposerProjectDraftToApply(
+        saved,
+        loadRecentPromptHistory().map((e) => e.text),
+      );
+      if (saved && !resolved) {
+        clearComposerProjectDraft(key);
+      }
+      applyComposerProjectDraft(resolved);
+    },
+    [applyComposerProjectDraft],
+  );
+
+  /**
    * While on a new-chat page, keep the per-project buffer in sync so a crash
    * or hard switch mid-type still restores on next newChat.
    * Subscribes to the external draft store so AppWorkbench does not re-render on type.
@@ -5076,9 +5097,7 @@ export function AppWorkbench() {
       didRestoreLastRef.current = true;
       // Browser / non-host: still restore orphan new-chat draft if any.
       if (session.sessionId == null && viewingSessionIdRef.current == null) {
-        applyComposerProjectDraft(
-          loadComposerProjectDraft(projectDraftKey(activeProject?.id ?? null)),
-        );
+        restoreComposerProjectDraft(projectDraftKey(activeProject?.id ?? null));
       }
       return;
     }
@@ -5104,9 +5123,7 @@ export function AppWorkbench() {
     }
     // Default launch = new chat: restore per-project (or orphan) buffer.
     if (session.sessionId == null && viewingSessionIdRef.current == null) {
-      applyComposerProjectDraft(
-        loadComposerProjectDraft(projectDraftKey(activeProject?.id ?? null)),
-      );
+      restoreComposerProjectDraft(projectDraftKey(activeProject?.id ?? null));
     }
   }, [
     appGate,
@@ -5117,6 +5134,7 @@ export function AppWorkbench() {
     session.sessionId,
     activeProject?.id,
     applyComposerProjectDraft,
+    restoreComposerProjectDraft,
     tr,
     secondaryFocusSessionId,
     isSecondaryWindow,
@@ -5320,7 +5338,7 @@ export function AppWorkbench() {
         goalMode,
       });
     } else {
-      applyComposerProjectDraft(loadComposerProjectDraft(nextKey));
+      restoreComposerProjectDraft(nextKey);
     }
 
     sendQueue.clearDraftQueue();
@@ -8054,9 +8072,22 @@ export function AppWorkbench() {
     clearProjectDraft?: boolean;
     clearSessionDraft?: boolean;
     sessionDraftId?: string | null;
+    sentText?: string;
+    sentAttachments?: Attachment[];
   }) => {
+    const projectKey = projectDraftKey(activeProject?.id ?? null);
+    const savedProjectDraft = loadComposerProjectDraft(projectKey);
     if (opts?.clearProjectDraft) {
-      clearComposerProjectDraft(projectDraftKey(activeProject?.id ?? null));
+      clearComposerProjectDraft(projectKey);
+    } else if (
+      shouldClearMatchingProjectDraft({
+        projectDraftText: savedProjectDraft?.text,
+        projectDraftAttachments: savedProjectDraft?.attachments,
+        sentText: opts?.sentText ?? "",
+        sentAttachments: opts?.sentAttachments,
+      })
+    ) {
+      clearComposerProjectDraft(projectKey);
     }
     if (opts?.clearSessionDraft) {
       const sid =
@@ -8192,6 +8223,8 @@ export function AppWorkbench() {
       clearProjectDraft: fromNewChatPage,
       clearSessionDraft: !fromNewChatPage,
       sessionDraftId: viewingSessionIdRef.current ?? session.sessionId,
+      sentText: storedDisplay,
+      sentAttachments: att,
     };
 
     // Enqueue only when *this viewed chat* FSM is busy (streaming/connecting).
@@ -8251,14 +8284,14 @@ export function AppWorkbench() {
     // still wipe the per-project new-session buffer or the next "New session"
     // restores the just-sent prompt (#620).
     if (sent) {
-      if (
-        shouldClearProjectDraftAfterNewChatSend({
+      persistComposerSubmitClear({
+        clearProjectDraft: shouldClearProjectDraftAfterNewChatSend({
           fromNewChatPage: clearDraftOpts.clearProjectDraft,
           sendSucceeded: true,
-        })
-      ) {
-        persistComposerSubmitClear({ clearProjectDraft: true });
-      }
+        }),
+        sentText: storedDisplay,
+        sentAttachments: att,
+      });
       return;
     }
     if (clearDraftOpts.clearSessionDraft && clearDraftOpts.sessionDraftId) {

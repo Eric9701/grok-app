@@ -78,3 +78,26 @@ export function shouldClearProjectDraftAfterNewChatSend(opts: {
 }): boolean {
   return opts.fromNewChatPage && opts.sendSucceeded;
 }
+
+/**
+ * Follow-up send on a real thread must still drop a project buffer that is
+ * exactly the prompt we just sent. Otherwise New session keeps restoring it
+ * (pre-#620 leftovers, or a send that materialized the session first).
+ */
+export function shouldClearMatchingProjectDraft(opts: {
+  projectDraftText: string | null | undefined;
+  sentText: string;
+  projectDraftAttachments?: readonly AttachmentPath[];
+  sentAttachments?: readonly AttachmentPath[];
+}): boolean {
+  const saved = opts.projectDraftText ?? "";
+  const sent = opts.sentText ?? "";
+  if (!(sent.length > 0 && saved === sent)) return false;
+  // An existing-thread send that happens to reuse the same words must not
+  // wipe an unsent new-task buffer that still has extra files.
+  const sentAtt = new Set((opts.sentAttachments ?? []).map((a) => a.path));
+  if ((opts.projectDraftAttachments ?? []).some((a) => !sentAtt.has(a.path))) {
+    return false;
+  }
+  return true;
+}

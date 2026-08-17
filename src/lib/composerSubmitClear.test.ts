@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   nextComposerSubmitSettlement,
   shouldClearComposerAfterSubmit,
+  shouldClearMatchingProjectDraft,
   shouldClearProjectDraftAfterNewChatSend,
 } from "./composerSubmitClear";
 
@@ -158,5 +159,56 @@ describe("shouldClearProjectDraftAfterNewChatSend", () => {
         sendSucceeded: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe("shouldClearMatchingProjectDraft", () => {
+  it("clears when the project buffer is exactly the prompt we just sent", () => {
+    expect(
+      shouldClearMatchingProjectDraft({
+        projectDraftText: "hello",
+        sentText: "hello",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps a different unsent new-task buffer", () => {
+    expect(
+      shouldClearMatchingProjectDraft({
+        projectDraftText: "next task",
+        sentText: "hello",
+      }),
+    ).toBe(false);
+  });
+
+  it("ignores empty sent text", () => {
+    expect(
+      shouldClearMatchingProjectDraft({
+        projectDraftText: "hello",
+        sentText: "",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps a same-text new-task buffer that still has extra attachments", () => {
+    expect(
+      shouldClearMatchingProjectDraft({
+        projectDraftText: "hello",
+        sentText: "hello",
+        projectDraftAttachments: [{ path: "/keep.png" }],
+        sentAttachments: [],
+      }),
+    ).toBe(false);
+  });
+
+  it("clears when the leftover payload matches this send including attachments", () => {
+    expect(
+      shouldClearMatchingProjectDraft({
+        projectDraftText: "hello",
+        sentText: "hello",
+        projectDraftAttachments: [file],
+        sentAttachments: [file],
+      }),
+    ).toBe(true);
   });
 });

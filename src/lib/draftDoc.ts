@@ -367,12 +367,23 @@ export function serializeEditorDomWalk(root: HTMLElement): string {
       // Other wrappers (e.g. pad spans): fold as a line fragment.
       lines.push(serializeEditorLineContent(he));
     }
-    // Drop a single trailing empty line from the caret block only.
-    // (…content, "") → …content; (…content, "", "") → (…content, "") one blank.
-    if (lines.length >= 2 && lines[lines.length - 1] === "") {
-      lines.pop();
-    }
-    t = lines.join("\n");
+    // WebKit inserts a caret sentinel empty block. Drop it — unless the last
+    // block is an intentional trailing newline (`data-composer-nl`).
+    const lastBlock = [...kids]
+      .reverse()
+      .find(
+        (n) =>
+          n.nodeType === Node.ELEMENT_NODE &&
+          isEditorBlockTag((n as Element).tagName),
+      ) as HTMLElement | undefined;
+    const lastEmpty = lines.length > 0 && lines[lines.length - 1] === "";
+    const keepTrailingEmpty = shouldKeepTrailingEmptyLine({
+      lastLineEmpty: lastEmpty,
+      markedIntentional: lastBlock?.getAttribute("data-composer-nl") === "1",
+      caretInLastLine: false,
+      lineCount: lines.length,
+    });
+    t = joinEditorBlockLines(lines, keepTrailingEmpty);
   } else {
     // Flat model (insertText \n / appendTextWithBreaks).
     const parts: string[] = [];
@@ -405,6 +416,29 @@ export function serializeEditorDomWalk(root: HTMLElement): string {
     return "";
   }
   return t;
+}
+
+/** True when the last empty block is a real trailing newline, not a caret sentinel. */
+export function shouldKeepTrailingEmptyLine(opts: {
+  lastLineEmpty: boolean;
+  markedIntentional: boolean;
+  caretInLastLine: boolean;
+  lineCount: number;
+}): boolean {
+  if (opts.lineCount < 2 || !opts.lastLineEmpty) return false;
+  return opts.markedIntentional || opts.caretInLastLine;
+}
+
+/** Join block-line bodies. Keep a last empty line only when it is intentional. */
+export function joinEditorBlockLines(
+  lines: string[],
+  keepTrailingEmpty: boolean,
+): string {
+  const out = [...lines];
+  if (!keepTrailingEmpty && out.length >= 2 && out[out.length - 1] === "") {
+    out.pop();
+  }
+  return out.join("\n");
 }
 
 /**

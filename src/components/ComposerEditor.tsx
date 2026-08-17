@@ -30,8 +30,11 @@ import {
 import {
   detectSlashRangeOnStored,
   insertNewlineAt,
+  joinEditorBlockLines,
   parseStoredContent,
   readStoredEditorText,
+  serializeEditorLineContent,
+  shouldKeepTrailingEmptyLine,
   type DraftSegment,
 } from "@/lib/draftDoc";
 import { detectAppPlatform } from "@/lib/appPlatform";
@@ -48,13 +51,74 @@ function clearNode(el: HTMLElement) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }
 
-function appendTextWithBreaks(el: HTMLElement, text: string) {
+/** DOM projection of stored text. A trailing `\n` must keep an editable pad
+ *  after the last `<br>` — a lone trailing break is WebKit's empty-editor
+ *  sentinel, so the first Shift+Enter would not show a new line. */
+export type ComposerEditorNodeSpec =
+  | { type: "text"; value: string }
+  | { type: "br" };
+
+export function storedTextToEditorNodes(
+  text: string,
+  caretPad = CARET_PAD,
+): ComposerEditorNodeSpec[] {
+  const nodes: ComposerEditorNodeSpec[] = [];
   const parts = text.split("\n");
   parts.forEach((part, i) => {
-    // Keep empty parts only as break boundaries (blank lines).
-    if (part) el.appendChild(document.createTextNode(part));
-    if (i < parts.length - 1) el.appendChild(document.createElement("br"));
+    if (part) nodes.push({ type: "text", value: part });
+    if (i < parts.length - 1) nodes.push({ type: "br" });
   });
+  if (text.endsWith("\n")) nodes.push({ type: "text", value: caretPad });
+  return nodes;
+}
+
+const CARET_PAD_RE = /[\u200B-\u200D\uFEFF\u2060]/g;
+
+/**
+ * ZWSP pads hold the caret on a trailing newline, but IME types *into* that
+ * node and splits Chinese glyphs (caret in the middle, odd fallback font).
+ * Strip pads before composition / after landing the caret on a new line.
+ */
+export function stripCaretPadsInEditor(el: HTMLElement) {
+  const sel = window.getSelection();
+  const caretNode = sel?.anchorNode ?? null;
+  const caretOff = sel?.anchorOffset ?? 0;
+  let nextNode: Node | null = caretNode;
+  let nextOff = caretOff;
+
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const texts: Text[] = [];
+  let n: Node | null;
+  while ((n = walker.nextNode())) texts.push(n as Text);
+
+  for (const t of texts) {
+    if (!CARET_PAD_RE.test(t.data)) continue;
+    CARET_PAD_RE.lastIndex = 0;
+    const before =
+      t === caretNode ? t.data.slice(0, caretOff).replace(CARET_PAD_RE, "") : "";
+    const cleaned = t.data.replace(CARET_PAD_RE, "");
+    t.data = cleaned;
+    if (t === caretNode) {
+      nextNode = t;
+      nextOff = before.length;
+    }
+  }
+
+  if (sel && nextNode && el.contains(nextNode)) {
+    const max =
+      nextNode.nodeType === Node.TEXT_NODE
+        ? (nextNode.textContent ?? "").length
+        : 0;
+    try {
+      const range = document.createRange();
+      range.setStart(nextNode, Math.max(0, Math.min(nextOff, max)));
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 function isSkillChipEl(node: Node | null | undefined): node is HTMLElement {
@@ -91,32 +155,60 @@ function appendCaretPad(el: HTMLElement) {
   el.appendChild(document.createTextNode(CARET_PAD));
 }
 
+const COMPOSER_NL_ATTR = "data-composer-nl";
+
+type LineInline =
+  | { type: "text"; value: string }
+  | { type: "skill"; name: string };
+
+function segmentsToLines(segments: DraftSegment[]): LineInline[][] {
+  const lines: LineInline[][] = [[]];
+  for (const seg of segments) {
+    if (seg.type === "skill") {
+      lines[lines.length - 1]!.push({ type: "skill", name: seg.name });
+      continue;
+    }
+    const parts = (seg.text ?? "").split("\n");
+    parts.forEach((part, i) => {
+      if (part) lines[lines.length - 1]!.push({ type: "text", value: part });
+      if (i < parts.length - 1) lines.push([]);
+    });
+  }
+  return lines;
+}
+
+function fillLineDiv(div: HTMLElement, items: LineInline[]) {
+  if (items.length === 0) {
+    div.appendChild(document.createElement("br"));
+    return;
+  }
+  for (const item of items) {
+    if (item.type === "text") {
+      div.appendChild(document.createTextNode(item.value));
+    } else {
+      appendCaretPad(div);
+      div.appendChild(makeSkillChipEl(item.name));
+      appendCaretPad(div);
+    }
+  }
+}
+
+/** One DIV per line. Trailing empty line is marked so serialize keeps the \n. */
 function renderSegmentsInto(el: HTMLElement, segments: DraftSegment[]) {
   clearNode(el);
-  for (const seg of segments) {
-    if (seg.type === "text") {
-      appendTextWithBreaks(el, seg.text);
-    } else {
-      // Pads on both sides: click/type after chip, Backspace removes chip cleanly.
-      appendCaretPad(el);
-      el.appendChild(makeSkillChipEl(seg.name));
-      appendCaretPad(el);
+  if (segments.length === 0) return;
+  const lines = segmentsToLines(segments);
+  const stored = segments
+    .map((s) => (s.type === "text" ? s.text : ""))
+    .join("");
+  lines.forEach((items, i) => {
+    const div = document.createElement("div");
+    fillLineDiv(div, items);
+    if (items.length === 0 && i === lines.length - 1 && stored.endsWith("\n")) {
+      div.setAttribute(COMPOSER_NL_ATTR, "1");
     }
-  }
-  // Always leave a trailing pad so end-of-editor caret is not stuck on the chip.
-  if (segments.some((s) => s.type === "skill")) {
-    const last = el.lastChild;
-    if (
-      !last ||
-      isSkillChipEl(last) ||
-      (last.nodeType === Node.TEXT_NODE &&
-        (last.textContent === "" || last.textContent === CARET_PAD))
-    ) {
-      // Already have a pad after last chip from the loop; ensure at least one
-      // editable text node at the end for click targeting.
-      if (!last || isSkillChipEl(last)) appendCaretPad(el);
-    }
-  }
+    el.appendChild(div);
+  });
 }
 
 /** True when the collapsed caret is immediately after a skill chip (ignoring ZWSP). */
@@ -287,6 +379,29 @@ export function serializeDom(el: HTMLElement): string {
   return readStoredEditorText(el);
 }
 
+/** Line-div draft: keep a trailing \n when the caret is on that empty line. */
+function serializeComposerDraft(el: HTMLElement): string {
+  const lines = lineDivsOf(el);
+  if (lines.length === 0) return serializeDom(el);
+  const bodies = lines.map((d) => serializeEditorLineContent(d));
+  const last = lines[lines.length - 1]!;
+  const sel = window.getSelection();
+  const caretInLast = !!(
+    sel &&
+    sel.anchorNode &&
+    (last === sel.anchorNode || last.contains(sel.anchorNode))
+  );
+  const keep = shouldKeepTrailingEmptyLine({
+    lastLineEmpty: (bodies[bodies.length - 1] ?? "") === "",
+    markedIntentional: last.getAttribute("data-composer-nl") === "1",
+    caretInLastLine: caretInLast,
+    lineCount: lines.length,
+  });
+  const t = joinEditorBlockLines(bodies, keep);
+  if (!t.replace(/\n/g, "").trim() && !/\[\[skill:/.test(t)) return "";
+  return t;
+}
+
 function getTextBeforeCaret(el: HTMLElement): string | null {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return null;
@@ -324,12 +439,50 @@ export function getComposerCaretIndex(
   return Math.max(0, Math.min(off, draft.length));
 }
 
-function placeCaretAtEnd(el: HTMLElement) {
-  el.focus();
+function lineDivsOf(el: HTMLElement): HTMLElement[] {
+  return Array.from(el.children).filter(
+    (c): c is HTMLElement =>
+      c instanceof HTMLElement &&
+      c.tagName === "DIV" &&
+      !c.dataset?.skill &&
+      !c.hasAttribute("data-skill"),
+  );
+}
+
+function placeCaretInLine(div: HTMLElement, atStart: boolean) {
   const sel = window.getSelection();
   if (!sel) return;
-  // Prefer the last text node (incl. ZWSP pad after a chip) so the caret is not
-  // stuck "on" a contentEditable=false skill chip.
+  const range = document.createRange();
+  const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+  let text: Text | null = null;
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    if (atStart) {
+      text = n as Text;
+      break;
+    }
+    text = n as Text;
+  }
+  if (text && (text.textContent ?? "").length > 0) {
+    range.setStart(text, atStart ? 0 : text.textContent!.length);
+    range.collapse(true);
+  } else {
+    range.selectNodeContents(div);
+    range.collapse(true);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function placeCaretAtEnd(el: HTMLElement) {
+  el.focus();
+  const lines = lineDivsOf(el);
+  if (lines.length > 0) {
+    placeCaretInLine(lines[lines.length - 1]!, false);
+    return;
+  }
+  const sel = window.getSelection();
+  if (!sel) return;
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   let lastText: Text | null = null;
   let n: Node | null;
@@ -338,8 +491,7 @@ function placeCaretAtEnd(el: HTMLElement) {
   }
   const range = document.createRange();
   if (lastText) {
-    const len = lastText.textContent?.length ?? 0;
-    range.setStart(lastText, len);
+    range.setStart(lastText, lastText.textContent?.length ?? 0);
     range.collapse(true);
   } else {
     range.selectNodeContents(el);
@@ -353,11 +505,103 @@ function placeCaretAtEnd(el: HTMLElement) {
  * Place caret at a stored-draft offset (same coordinate space as serializeDom:
  * ZWSP pads ignored, BR = 1, skill chip = `[[skill:name]]` length).
  */
+function placeCaretInLineAt(div: HTMLElement, offset: number) {
+  if (offset <= 0) {
+    placeCaretInLine(div, true);
+    return;
+  }
+  const sel = window.getSelection();
+  if (!sel) return;
+  let seen = 0;
+  const kids = Array.from(div.childNodes);
+  for (const child of kids) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      const raw = child.textContent ?? "";
+      let local = 0;
+      for (let i = 0; i < raw.length; i++) {
+        const ch = raw.charCodeAt(i);
+        if (
+          ch === 0x200b ||
+          ch === 0x200c ||
+          ch === 0x200d ||
+          ch === 0xfeff ||
+          ch === 0x2060 ||
+          ch === 0xfffc
+        ) {
+          continue;
+        }
+        if (seen === offset) {
+          const range = document.createRange();
+          range.setStart(child, i);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          return;
+        }
+        seen++;
+        local++;
+      }
+      if (seen === offset) {
+        const range = document.createRange();
+        range.setStart(child, raw.length);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return;
+      }
+      continue;
+    }
+    if (child.nodeType === Node.ELEMENT_NODE && isSkillChipEl(child)) {
+      const name =
+        (child as HTMLElement).dataset?.skill ||
+        (child as HTMLElement).getAttribute("data-skill") ||
+        "";
+      const tokenLen = `[[skill:${name}]]`.length;
+      if (seen + tokenLen >= offset) {
+        const after = child.nextSibling;
+        const range = document.createRange();
+        if (after?.nodeType === Node.TEXT_NODE) {
+          range.setStart(after, 0);
+        } else {
+          range.setStartAfter(child);
+        }
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return;
+      }
+      seen += tokenLen;
+    }
+  }
+  placeCaretInLine(div, false);
+}
+
 function placeCaretAtStoredOffset(el: HTMLElement, target: number) {
   el.focus();
   const sel = window.getSelection();
   if (!sel) return;
   const want = Math.max(0, target);
+  const lines = lineDivsOf(el);
+  if (lines.length > 0) {
+    let remaining = want;
+    for (let i = 0; i < lines.length; i++) {
+      if (i > 0) {
+        if (remaining === 0) {
+          placeCaretInLine(lines[i]!, true);
+          return;
+        }
+        remaining -= 1;
+      }
+      const lineLen = serializeEditorLineContent(lines[i]!).length;
+      if (remaining <= lineLen) {
+        placeCaretInLineAt(lines[i]!, remaining);
+        return;
+      }
+      remaining -= lineLen;
+    }
+    placeCaretAtEnd(el);
+    return;
+  }
   let count = 0;
 
   const setCaret = (node: Node, offset: number) => {
@@ -431,11 +675,18 @@ function placeCaretAtStoredOffset(el: HTMLElement, target: number) {
         return true;
       }
       if (count + 1 === want) {
-        const range = document.createRange();
-        range.setStartAfter(he);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
+        // Land at the end of the pad node; IME must not insert at offset 0
+        // inside a ZWSP (that splits the next Chinese glyph).
+        const after = he.nextSibling;
+        if (after?.nodeType === Node.TEXT_NODE) {
+          setCaret(after, after.textContent?.length ?? 0);
+        } else {
+          const range = document.createRange();
+          range.setStartAfter(he);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
         return true;
       }
       count += 1;
@@ -835,7 +1086,7 @@ export const ComposerEditor = memo(function ComposerEditor({
 
   const commitFromDom = useCallback(
     (el: HTMLElement) => {
-      let stored = serializeDom(el);
+      let stored = serializeComposerDraft(el);
       if (
         /\[\[skill:[a-zA-Z0-9_.:-]+\]\]/.test(stored) &&
         !el.querySelector("[data-skill]")
@@ -985,8 +1236,8 @@ export const ComposerEditor = memo(function ComposerEditor({
   const flushAfterIme = useCallback(
     (el: HTMLElement) => {
       composing.current = false;
+      stripCaretPadsInEditor(el);
       commitFromDom(el);
-      // WebKit may finalize the text node after compositionend.
       requestAnimationFrame(() => {
         commitFromDom(el);
         requestAnimationFrame(() => commitFromDom(el));
@@ -1100,6 +1351,8 @@ export const ComposerEditor = memo(function ComposerEditor({
         onClick={() => emitSlash()}
         onCompositionStart={() => {
           composing.current = true;
+          const node = elRef.current;
+          if (node) stripCaretPadsInEditor(node);
         }}
         onCompositionUpdate={() => {
           emitSlash();
@@ -1109,11 +1362,11 @@ export const ComposerEditor = memo(function ComposerEditor({
         }}
         onContextMenu={onContextMenu}
         onKeyDown={(e) => {
+          const el = elRef.current;
           const ne = e.nativeEvent;
           if (ne.isComposing || ne.keyCode === 229 || composing.current) {
             return;
           }
-          const el = elRef.current;
           // WebKit: ArrowRight past the last glyph can inject U+FFFC (□) /
           // ZWSP ghosts that serialize as real characters and show as boxes.
           if (
@@ -1170,9 +1423,8 @@ export const ComposerEditor = memo(function ComposerEditor({
           }
 
           // Newline path (Shift+Enter, or plain Enter when send-key is mod-enter).
-          // Draft string is SoT: insert "\n" into lastValue and re-project DOM.
-          // Do NOT commitFromDom/serialize here — that path has repeatedly eaten
-          // blank lines on WebKit. User bubble must match what we store.
+          // Draft is SoT. Each line is a DIV; a trailing empty line is marked
+          // so serialize keeps the \n and the caret stays on that line.
           if (e.key === "Enter" && !e.altKey && !e.metaKey && !e.ctrlKey) {
             try {
               e.preventDefault();

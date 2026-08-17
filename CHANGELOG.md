@@ -32,6 +32,8 @@ See `docs/llm-wiki/release.md`.
 - **Skills catalog matches CLI discovery (#653)**: Settings → Extensions → Skills no longer keeps listing Claude/Cursor compat skills after Grok Build has them turned off. `skills_list` now runs `grok inspect` with the session `GROK_HOME` and drops `~/.claude` / `~/.cursor` rows when `[compat.claude] skills` or `[compat.cursor] skills` is false (or the new App overlay is off). Slash / + pickers share the same list.
 - **Premature 工作了 + copy/retry while the turn is still running (#670)**: Host no longer emits stream `done` while the prompt or tools are still open. A later finished fragment folds into the live sibling without duplicating answer text. Copy/MD/retry stay hidden until Ready.
 - **Windows huge assistant replies / paste become a .txt card (#647)**: On Windows only, a single reply or clipboard paste ≥ 8000 characters is shown as a short preview plus a file card (or attached as `.txt`). macOS / Linux keep full markdown and normal paste. Find-in-chat still shows the full body.
+- **New chat no longer restores a leftover first prompt**: Each project keeps a new-session composer buffer. After send, that buffer was often left on disk (`#620` leftovers, or a mid-type snapshot that is not byte-identical to the sent text). Restore now drops buffers that match a recent send **exactly**, as a **prefix** of that send, or as a **short first-line fragment** (e.g. saved `好的` / `d` vs sent `好的` / `你看好了吗？`). Attachment-only unsent drafts still restore. A follow-up send on an existing thread does not wipe a new-task buffer that still has extra files.
+- **Shift+Enter first press starts a new line**: The composer stored `\n` but re-projected a trailing `<br>`, which WebKit treats as an empty-editor sentinel (first Shift+Enter looked like a no-op). Each line is now a `div`; a trailing empty line is marked `data-composer-nl="1"` so serialize keeps the newline and the caret stays on that line. ZWSP caret pads are not used for this path (they split IME 汉字).
 
 **中文 · 修复**
 - **斜杠菜单 `/rc`、`/review-` 会选中 `review-commit`（#644）**：把 `-` 当词界以匹配 kebab 首字母，名字前缀优先于描述，且只有名字全无命中时才用描述兜底。YAML 里互相点名 `review-commit` 的 skill 不再抢走默认高亮。
@@ -42,6 +44,8 @@ See `docs/llm-wiki/release.md`.
 - **技能目录与 CLI 探测一致（#653）**：在 Grok Build 关掉兼容探测后，设置 → 扩展 → 技能不再继续列出 Claude/Cursor 技能。`skills_list` 用当前会话的 `GROK_HOME` 跑 `grok inspect`，并在 config.toml / 应用开关关闭时丢掉 `~/.claude`、`~/.cursor` 条目。斜杠 / + 选择器共用这份列表。
 - **回合还在跑就出现「工作了」和复制/重试（#670）**：Host 在 prompt / 工具未结束时不再发 stream done。后到的完成片段并进仍在工作的那条，正文不重复。Ready 之前不显示复制 / MD / 重试。
 - **Windows 超长回复/粘贴改为 txt 卡片（#647）**：仅 Windows，单条回复或粘贴 ≥ 8000 字改成预览 + 文件卡。macOS / Linux 仍是完整 Markdown / 正常粘贴。对话内查找仍显示全文。
+- **新建对话不再带回已发送的残留**：每个项目有一份新会话输入缓冲。发送后这份缓冲常留在磁盘上（`#620` 残留，或和发出去的原文不完全相同的半截）。恢复时会丢掉与最近发送**完全相同**、作为其**前缀**、或**短且首行相同**的碎片（例如存的是 `好的` / `d`，发出去的是 `好的` / `你看好了吗？`）。只有附件的未发送草稿仍会恢复。在已有会话里跟进发送时，如果新任务缓冲还带着这份发送里没有的附件，不会整份清掉。
+- **第一次 Shift+Enter 就会换行**：原先存的是 `\n`，重绘却是尾部 `<br>`，WebKit 把它当成空编辑器哨兵，第一次换行看起来没反应。现在一行一个 `div`，末尾空行标 `data-composer-nl="1"`，序列化会保留换行，光标留在新行。这条路径不再用 ZWSP 占位（会拆开输入中的汉字）。
 
 ## [0.2.20] - 2026-08-17
 
