@@ -17,6 +17,7 @@ import {
   applyTurnMarker,
   isSessionBusy,
   isSessionLiveStreaming,
+  pickRunningTurnTool,
   upgradeMessagesFromJournal,
   weaveToolsIntoAssistantSegments,
   ensureBusyTurnStreaming,
@@ -100,7 +101,10 @@ import {
   resolveStreamFlushMs,
   toolEventNeedsImmediateFlush,
 } from "@/lib/streamCoalesce";
-import { shouldApplyLateStreamText } from "@/lib/streamLateToken";
+import {
+  shouldApplyLateStreamText,
+  shouldIgnorePrematureStreamDone,
+} from "@/lib/streamLateToken";
 import {
   chatcutHandoffToResourceOpenTarget,
   resolveChatcutHandoffFromToolEvent,
@@ -757,6 +761,26 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
           // Anti-replay vs late answer after early ready (see streamLateToken).
           // Busy/liveMap re-promotion stays gated via mayPromoteStreamingFromStreamChunk.
           const host = c.liveHostRef.current;
+          const sidForChunk = chunk.sessionId || "";
+          const cachedForChunk = sidForChunk
+            ? (c.messagesBySessionRef.current.get(sidForChunk) ?? [])
+            : [];
+          const hostLive =
+            !!sidForChunk &&
+            ((host.sessionId === sidForChunk &&
+              isSessionLiveStreaming(host.state)) ||
+              isSessionLiveStreaming(
+                c.liveMapRef.current[sidForChunk]?.state,
+              ));
+          const ignoreDone =
+            !!chunk.done &&
+            shouldIgnorePrematureStreamDone({
+              hostLiveStreaming: hostLive,
+              hasRunningTool: !!pickRunningTurnTool(cachedForChunk),
+            });
+          const effective: StreamPayload = ignoreDone
+            ? { ...chunk, done: false }
+            : chunk;
           if (chunk.text && chunk.sessionId) {
             const msgs =
               c.messagesBySessionRef.current.get(chunk.sessionId) ?? [];
@@ -781,12 +805,12 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
           // Multi-session busy projection for in-progress streams only.
           // Never re-promote a turn already settled to ready/idle (late/coalesced
           // tokens after host ready — issue #225 stuck sidebar spinner).
-          if (chunk.sessionId && !chunk.done) {
+          if (chunk.sessionId && !effective.done) {
             c.setLiveMap((prev) => {
               const sid = chunk.sessionId!;
               if (
                 !mayPromoteStreamingFromStreamChunk(prev[sid], {
-                  done: chunk.done,
+                  done: effective.done,
                 })
               ) {
                 return prev;
@@ -798,7 +822,7 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
               });
             });
           }
-          if (chunk.done && chunk.sessionId) {
+          if (effective.done && chunk.sessionId) {
             c.setLiveMap((prev) =>
               projectHostIntoLiveMap(prev, {
                 sessionId: chunk.sessionId!,
@@ -817,7 +841,7 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             }
           }
           c.patchSessionMessages(chunk.sessionId, (prev) => {
-            const next = applyStreamChunk(prev, chunk);
+            const next = applyStreamChunk(prev, effective);
             // Keep cache in sync immediately so post-turn apply sees final text.
             if (chunk.sessionId) {
               c.messagesBySessionRef.current.set(chunk.sessionId, next);
@@ -830,7 +854,7 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             );
           }
           // After a completed assistant stream, try silent automation create.
-          if (chunk.done && chunk.sessionId) {
+          if (effective.done && chunk.sessionId) {
             void c.tryApplyAutomationFromSession(chunk.sessionId);
           }
         };

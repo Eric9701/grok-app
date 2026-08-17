@@ -40,6 +40,28 @@ pub fn should_defer_prompt_complete(
     awaiting_permission || pending_plan || pending_ask_user || open_tool_count > 0
 }
 
+/// Whether a `session://stream` `done:true` tick may close the UI turn.
+///
+/// `session/prompt` often resolves (or the 3s `prompt_complete` fallback
+/// fires) while tools are still open. Forwarding that empty done tick makes
+/// the transcript show 工作了 + copy/retry while the Host FSM is still
+/// Streaming — the frozen-tail / stuck-composer bug.
+pub fn should_emit_stream_done(
+    prompt_in_flight: bool,
+    awaiting_permission: bool,
+    pending_plan: bool,
+    pending_ask_user: bool,
+    open_tool_count: usize,
+) -> bool {
+    !prompt_in_flight
+        && !should_defer_prompt_complete(
+            awaiting_permission,
+            pending_plan,
+            pending_ask_user,
+            open_tool_count,
+        )
+}
+
 /// Update open-tool tracking for one tool_call / tool_call_update.
 ///
 /// **Monotonic terminal:** once a tool id is terminal this turn, later
@@ -112,6 +134,14 @@ mod tests {
         assert!(should_defer_prompt_complete(false, true, false, 0));
         assert!(should_defer_prompt_complete(false, false, true, 0));
         assert!(should_defer_prompt_complete(false, false, false, 2));
+    }
+
+    #[test]
+    fn stream_done_suppressed_while_prompt_or_tools_live() {
+        assert!(should_emit_stream_done(false, false, false, false, 0));
+        assert!(!should_emit_stream_done(true, false, false, false, 0));
+        assert!(!should_emit_stream_done(false, false, false, false, 1));
+        assert!(!should_emit_stream_done(false, true, false, false, 0));
     }
 
     #[test]

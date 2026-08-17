@@ -62,3 +62,16 @@ export function shouldApplyLateStreamText(opts: {
   // Settled with body already present, or tool-only empty final → drop replays.
   return false;
 }
+
+/**
+ * Early `session://stream` `done:true` (prompt_complete / prompt RPC
+ * fallback) must not freeze the bubble while Host is still mid-turn.
+ * A later fragment would then render as 工作了 + copy/MD/retry under a
+ * still-live 工作中 rail.
+ */
+export function shouldIgnorePrematureStreamDone(opts: {
+  hostLiveStreaming: boolean;
+  hasRunningTool: boolean;
+}): boolean {
+  return opts.hostLiveStreaming || opts.hasRunningTool;
+}

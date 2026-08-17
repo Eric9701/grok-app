@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { shouldApplyLateStreamText } from "./streamLateToken";
+import {
+  shouldApplyLateStreamText,
+  shouldIgnorePrematureStreamDone,
+} from "./streamLateToken";
 
 describe("shouldApplyLateStreamText", () => {
   it("always applies when host is still live-streaming", () => {
@@ -88,6 +91,27 @@ describe("shouldApplyLateStreamText", () => {
             thought: "",
           },
         ],
+      }),
+    ).toBe(false);
+  });
+
+  it("ignores stream-done while host or tools are still live", () => {
+    expect(
+      shouldIgnorePrematureStreamDone({
+        hostLiveStreaming: true,
+        hasRunningTool: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldIgnorePrematureStreamDone({
+        hostLiveStreaming: false,
+        hasRunningTool: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldIgnorePrematureStreamDone({
+        hostLiveStreaming: false,
+        hasRunningTool: false,
       }),
     ).toBe(false);
   });

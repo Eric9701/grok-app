@@ -1017,6 +1017,67 @@ describe("session projection", () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
+  it("mergeAssistantFragments folds a later finished fragment into a live sibling", () => {
+    const rows: ChatMessage[] = [
+      { id: "u1", role: "user", content: "pack it" },
+      {
+        id: "a-live",
+        role: "assistant",
+        content: "still working on the increment",
+        streaming: true,
+      },
+      {
+        id: "a-done",
+        role: "assistant",
+        content: "kernel rebuild failed; switching runtime",
+        streaming: false,
+      },
+    ];
+    const merged = mergeAssistantFragments(rows);
+    const asst = merged.filter((m) => m.role === "assistant");
+    expect(asst).toHaveLength(1);
+    expect(asst[0]!.id).toBe("a-live");
+    expect(asst[0]!.streaming).toBe(true);
+    expect(asst[0]!.content).toContain("still working on the increment");
+    expect(asst[0]!.content).toContain("kernel rebuild failed");
+  });
+
+  it("mergeAssistantFragments does not duplicate multi-segment finished bodies", () => {
+    const rows: ChatMessage[] = [
+      { id: "u1", role: "user", content: "go" },
+      {
+        id: "a-live",
+        role: "assistant",
+        content: "looking",
+        streaming: true,
+      },
+      {
+        id: "a-done",
+        role: "assistant",
+        content: "part one\n\npart two",
+        streaming: false,
+        segments: [
+          { kind: "content", text: "part one" },
+          { kind: "thought", text: "hmm" },
+          { kind: "content", text: "part two" },
+        ],
+      },
+    ];
+    const merged = mergeAssistantFragments(rows);
+    const asst = merged.filter((m) => m.role === "assistant");
+    expect(asst).toHaveLength(1);
+    const body = asst[0]!.content ?? "";
+    expect(body.match(/part one/g)?.length).toBe(1);
+    expect(body.match(/part two/g)?.length).toBe(1);
+    const contentSegs = (asst[0]!.segments ?? []).filter((s) => s.kind === "content");
+    const joined = contentSegs.map((s) => s.text).join("\n");
+    expect(joined.match(/part one/g)?.length).toBe(1);
+    expect(joined.match(/part two/g)?.length).toBe(1);
+    expect(asst[0]!.segments?.some((s) => s.kind === "thought" && s.text === "hmm")).toBe(
+      true,
+    );
+  });
+
   it("mergeAssistantFragments leaves live / single-row turns untouched", () => {
     const rows: ChatMessage[] = [
       { id: "u1", role: "user", content: "hi" },
