@@ -11,6 +11,7 @@ import type {
   ErrorDeckCode,
   ErrorDeckResolveOpts,
 } from "./errorDeck";
+import { stripAnsi } from "./ansi";
 import { bashArgFromToolTitle, inferKindFromToolCallId } from "./toolDisplay";
 
 export type SessionState =
@@ -822,12 +823,11 @@ export function mergeAssistantFragments(messages: ChatMessage[]): ChatMessage[] 
             ? f.segments
             : buildSegmentsFromLegacy(f.content, f.thought, f.thoughtPhases);
         for (const s of fsegs) {
-          if (s.kind === "content") {
-            if (s.text.trim() && !(m.content ?? "").includes(s.text.trim())) {
-              segs = appendContentToSegments(segs, `\n\n${s.text.trim()}`);
-            }
-            continue;
-          }
+          // Answer text is merged once via extraBlock / f.content below.
+          // Appending each content segment here AND extraBlock doubled
+          // mid-turn prose when a finished fragment had several content
+          // parts (thought/tools interleaved).
+          if (s.kind === "content") continue;
           segs.push(s.kind === "tool" ? { ...s } : { kind: "thought", text: s.text });
         }
       }
@@ -3070,10 +3070,7 @@ const AGENT_ERROR_CODE_RE =
 const MARKDOWN_CODE_RE =
   /^\*\*(CLI_NOT_FOUND|AUTH_FAILED|NETWORK_PROVIDER|AGENT_CRASHED|QUOTA_EXCEEDED|CONNECT_FAILED|PROCESS_LIMIT|CLI_TOO_OLD|SANDBOX_BLOCKED)\*\*(?:\s*[\r\n]+([\s\S]*))?$/;
 
-/** Strip ANSI SGR sequences from CLI/MCP stderr dumps. */
-export function stripAnsi(text: string): string {
-  return text.replace(/\u001b\[[0-9;]*m/g, "").replace(/\x1b\[[0-9;]*m/g, "");
-}
+export { stripAnsi };
 
 /** Drop stderr tails and other bulky transport noise from error strings. */
 export function stripErrorNoise(text: string): string {

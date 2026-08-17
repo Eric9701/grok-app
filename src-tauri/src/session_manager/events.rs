@@ -573,8 +573,7 @@ impl SessionManager {
                         };
                         s.tools_this_turn = s.tools_this_turn.saturating_add(1);
                         // Tools settled → apply deferred prompt_complete if any (#52).
-                        let finished =
-                            Self::try_finish_deferred_prompt_complete(s, Some(app));
+                        let finished = Self::try_finish_deferred_prompt_complete(s, Some(app));
                         (
                             s.app_session_id.clone(),
                             s.project_path.clone(),
