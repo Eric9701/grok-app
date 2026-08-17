@@ -17,18 +17,27 @@ describe("longAssistantSpill", () => {
     clearSpillPathCache();
   });
 
-  it("does not spill short replies", () => {
-    expect(shouldSpillLongAssistant(0)).toBe(false);
-    expect(shouldSpillLongAssistant(LONG_ASSISTANT_SPILL_CHARS - 1)).toBe(
-      false,
-    );
+  it("does not spill short replies on Windows", () => {
+    expect(shouldSpillLongAssistant(0, "win")).toBe(false);
+    expect(
+      shouldSpillLongAssistant(LONG_ASSISTANT_SPILL_CHARS - 1, "win"),
+    ).toBe(false);
   });
 
-  it("spills at the character threshold", () => {
-    expect(shouldSpillLongAssistant(LONG_ASSISTANT_SPILL_CHARS)).toBe(true);
-    expect(shouldSpillLongAssistant(LONG_ASSISTANT_SPILL_CHARS + 50_000)).toBe(
+  it("never auto-spills macOS or Linux (keep existing full markdown)", () => {
+    const huge = LONG_ASSISTANT_SPILL_CHARS + 50_000;
+    expect(shouldSpillLongAssistant(huge, "mac")).toBe(false);
+    expect(shouldSpillLongAssistant(huge, "linux")).toBe(false);
+    expect(shouldSpillLongAssistant(huge, "other")).toBe(false);
+  });
+
+  it("spills at the character threshold only on Windows", () => {
+    expect(shouldSpillLongAssistant(LONG_ASSISTANT_SPILL_CHARS, "win")).toBe(
       true,
     );
+    expect(
+      shouldSpillLongAssistant(LONG_ASSISTANT_SPILL_CHARS + 50_000, "win"),
+    ).toBe(true);
   });
 
   it("preview is shorter than a spilling body and snaps to a newline", () => {

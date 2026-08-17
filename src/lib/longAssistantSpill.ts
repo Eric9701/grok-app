@@ -1,12 +1,14 @@
 /**
  * Spill oversized assistant bubbles to a .txt file card.
  *
- * Virtualizing the transcript by *row count* does not help a single huge
- * reply: ReactMarkdown still re-parses the whole string. Preview the head
- * in-chat and persist the full body via save_temp_attachment.
+ * Only Windows WebView2 is known to freeze on a single huge markdown tree.
+ * macOS / Linux keep the existing full-body render. Callers must also skip
+ * spilling while in-chat find is active so matches in the tail stay visible.
  */
 
-/** Paint a file card / preview instead of the full markdown tree. */
+import type { AppPlatform } from "@/lib/appPlatform";
+
+/** Paint a file card / preview instead of the full markdown tree (Windows). */
 export const LONG_ASSISTANT_SPILL_CHARS = 8000;
 
 /** Characters kept in the live/preview markdown parse. */
@@ -14,7 +16,11 @@ export const LONG_ASSISTANT_PREVIEW_CHARS = 800;
 
 const spillPathCache = new Map<string, string>();
 
-export function shouldSpillLongAssistant(length: number): boolean {
+export function shouldSpillLongAssistant(
+  length: number,
+  platform: AppPlatform,
+): boolean {
+  if (platform !== "win") return false;
   return length >= LONG_ASSISTANT_SPILL_CHARS;
 }
 

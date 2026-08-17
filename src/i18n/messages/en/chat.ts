@@ -158,4 +158,7 @@ export const enChat = {
   "chat.longReplySaving": "Long reply — full text will be saved as a file when this turn finishes",
   "chat.longReplySaved": "Full reply saved as a text file",
   "chat.longReplyDownload": "Save full reply as .txt",
+  "chat.longReplyShowFull": "Show full reply",
+  "chat.longReplyCollapse": "Show preview only",
+  "chat.longReplyShowingFull": "Showing the full reply",
 } as const;

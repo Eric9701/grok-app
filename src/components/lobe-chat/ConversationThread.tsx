@@ -101,6 +101,7 @@ import {
   previewLongAssistant,
   shouldSpillLongAssistant,
 } from "@/lib/longAssistantSpill";
+import { detectAppPlatform } from "@/lib/appPlatform";
 import { Thinking } from "./Thinking";
 import { LeadFragmentsStrip } from "./LeadFragmentsStrip";
 import { BackBottom } from "./BackBottom";
@@ -282,6 +283,7 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
       galleryPaths: images.map((x) => x.path),
     };
   }, [bottomAtts]);
+  const [showFullReply, setShowFullReply] = useState(false);
   if (
     !(displayContent || "").trim() &&
     !(bottomImages.length || bottomFiles.length)
@@ -289,7 +291,13 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
     return null;
   }
 
-  const spill = shouldSpillLongAssistant((displayContent || "").length);
+  const findActiveHere = !!findQuery?.trim();
+  const canSpill =
+    shouldSpillLongAssistant(
+      (displayContent || "").length,
+      detectAppPlatform(),
+    ) && !findActiveHere;
+  const spill = canSpill && !showFullReply;
   const markdownSource = spill
     ? previewLongAssistant(displayContent || "")
     : displayContent;
@@ -315,13 +323,15 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
   return (
     <>
       {body}
-      {spill ? (
+      {canSpill ? (
         <LongAssistantSpillNote
           fullText={displayContent || ""}
           streaming={!!streaming}
           locale={locale}
           messageId={messageId}
           projectPath={projectPath}
+          expanded={showFullReply}
+          onToggleExpanded={() => setShowFullReply((v) => !v)}
           onOpenResource={onOpenResource}
           onOpenError={onOpenError}
         />

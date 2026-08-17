@@ -25,6 +25,8 @@ export function LongAssistantSpillNote({
   locale,
   messageId,
   projectPath,
+  expanded,
+  onToggleExpanded,
   onOpenResource,
   onOpenError,
 }: {
@@ -33,6 +35,8 @@ export function LongAssistantSpillNote({
   locale: Locale;
   messageId?: string;
   projectPath?: string | null;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
   onOpenResource?: (target: ResourceOpenTarget) => void;
   onOpenError?: (message: string) => void;
 }) {
@@ -115,14 +119,26 @@ export function LongAssistantSpillNote({
   return (
     <div className="lobe-chat-long-reply" data-testid="long-assistant-spill">
       <div className="lobe-chat-reply-length">
-        {tr("chat.longReplyPreview")}
-        {" · "}
-        {streaming
-          ? tr("chat.longReplySaving")
-          : path
-            ? tr("chat.longReplySaved")
-            : tr("chat.longReplyDownload")}
+        {expanded
+          ? tr("chat.longReplyShowingFull")
+          : tr("chat.longReplyPreview")}
+        {expanded
+          ? null
+          : streaming
+            ? ` · ${tr("chat.longReplySaving")}`
+            : path
+              ? ` · ${tr("chat.longReplySaved")}`
+              : null}
       </div>
+      {onToggleExpanded && !streaming ? (
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={onToggleExpanded}
+        >
+          {expanded ? tr("chat.longReplyCollapse") : tr("chat.longReplyShowFull")}
+        </button>
+      ) : null}
       {path ? (
         <div className="lobe-chat-atts">
           <FilePathCard
