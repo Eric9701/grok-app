@@ -14258,7 +14258,6 @@ export function AppWorkbench() {
           isGitProject: sideIsGitProject,
         });
         if (!("created" in next)) return s;
-        // File tree stays closed unless the user opens it.
         return next;
       });
       openAsidePane();
@@ -19385,7 +19384,7 @@ export function AppWorkbench() {
                               ? projectDisplayName(activeProject, tr)
                               : undefined,
                           });
-                          setSideWorkbench(next);
+                          setSideWorkbench({ ...next, treeVisible: true });
                           openAsidePane();
                         }
                         // branch / push / pr: display-only in Phase 3 (no write ops).
