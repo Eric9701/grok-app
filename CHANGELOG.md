@@ -20,6 +20,9 @@ See `docs/llm-wiki/release.md`.
 ### Changed
 - **Composer workspace chip on every desktop chat (#662)**: The project / default-workspace control above the input is no longer limited to a brand-new draft that already has a folder. Pick, add, or return to the default workspace from the existing `ComposerProjectMenu`. Chinese copy uses 默认工作区 (was 通用). Sidebar `+` stays. Phone still uses the tools sheet.
 
+### Fixed
+- **Pathless「文件」tab no longer stays beside an opened file**: Opening a file from the tree replaces the picker Files chip. Picking Files again focuses the open file instead of minting a second dead tab (which did nothing and could stall the pane).
+
 **中文 · 变更**
 - **桌面输入框上方始终显示工作区（#662）**：不再只在「已选项目的全新空草稿」才出现。沿用现有 `ComposerProjectMenu` 选择、添加或回到默认工作区。中文不再用「通用」。侧栏 `+` 保留。手机仍走工具页。
 
@@ -46,6 +49,9 @@ See `docs/llm-wiki/release.md`.
 - **Windows 超长回复/粘贴改为 txt 卡片（#647）**：仅 Windows，单条回复或粘贴 ≥ 8000 字改成预览 + 文件卡。macOS / Linux 仍是完整 Markdown / 正常粘贴。对话内查找仍显示全文。
 - **新建对话不再带回已发送的残留**：每个项目有一份新会话输入缓冲。发送后这份缓冲常留在磁盘上（`#620` 残留，或和发出去的原文不完全相同的半截）。恢复时会丢掉与最近发送**完全相同**、作为其**前缀**、或**短且首行相同**的碎片（例如存的是 `好的` / `d`，发出去的是 `好的` / `你看好了吗？`）。只有附件的未发送草稿仍会恢复。在已有会话里跟进发送时，如果新任务缓冲还带着这份发送里没有的附件，不会整份清掉。
 - **第一次 Shift+Enter 就会换行**：原先存的是 `\n`，重绘却是尾部 `<br>`，WebKit 把它当成空编辑器哨兵，第一次换行看起来没反应。现在一行一个 `div`，末尾空行标 `data-composer-nl="1"`，序列化会保留换行，光标留在新行。这条路径不再用 ZWSP 占位（会拆开输入中的汉字）。
+
+**中文 · 修复**
+- **空的「文件」tab 不再和已打开文件并排**：从树里打开文件会替换选择器里的「文件」占位。再点「文件」只会聚焦已打开的文件，不会再多出一个点了没反应、还会卡住侧栏的死标签。
 
 ## [0.2.20] - 2026-08-17
 
