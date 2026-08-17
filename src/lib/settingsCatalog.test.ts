@@ -219,6 +219,14 @@ describe("settingsCatalog", () => {
     expect(extras.some((h) => h.entry.id === "account.extras")).toBe(true);
     const mcp = searchSettingsEntries("mcp", tZh, tEn);
     expect(mcp.some((h) => h.entry.id === "ext.mcp")).toBe(true);
+    const claudeSkills = searchSettingsEntries("claude", tZh, tEn);
+    expect(
+      claudeSkills.some((h) => h.entry.id === "ext.skills.discoverExternal"),
+    ).toBe(true);
+    const discoverZh = searchSettingsEntries("探测", tZh, tEn);
+    expect(
+      discoverZh.some((h) => h.entry.id === "ext.skills.discoverExternal"),
+    ).toBe(true);
     const wallpaper = searchSettingsEntries("壁纸", tZh, tEn);
     // zh copy may use 背景图 — also try English
     const wallpaperHits =

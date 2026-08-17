@@ -233,6 +233,8 @@ export function ExtensionsPanel({
 
   const [skills, setSkills] = useState<api.SkillDto[]>([]);
   const [skillRoots, setSkillRoots] = useState<string[]>([]);
+  const [skillsDiscover, setSkillsDiscover] =
+    useState<api.SkillsCompatSnapshot | null>(null);
   const [servers, setServers] = useState<api.McpDto[]>([]);
   const [plugins, setPlugins] = useState<api.PluginDto[]>([]);
   const [skillsError, setSkillsError] = useState<string | null>(null);
@@ -627,6 +629,7 @@ export function ExtensionsPanel({
     if (!api.isTauri()) {
       setSkills([]);
       setSkillRoots([]);
+      setSkillsDiscover(null);
       setServers([]);
       setPlugins([]);
       setPluginCards([]);
@@ -647,6 +650,7 @@ export function ExtensionsPanel({
       api.skillsList(cwd).catch((e) => ({
         skills: [] as api.SkillDto[],
         skillRoots: [] as string[],
+        discoverExternal: undefined,
         error: String(e),
       })),
       api.inspectMcp(cwd).catch((e) => ({
@@ -674,6 +678,7 @@ export function ExtensionsPanel({
         ? skillsRes.skillRoots.filter((r) => typeof r === "string" && r.trim())
         : [],
     );
+    setSkillsDiscover(skillsRes.discoverExternal ?? null);
     setServers(sortMcpByName(mcpRes.servers ?? []));
     const list = sortPluginsByName(pluginsRes.plugins ?? []);
     setPlugins(list);
@@ -718,6 +723,18 @@ export function ExtensionsPanel({
     () => skills.filter((s) => !isExtensionEnabled(s.enabled)).length,
     [skills],
   );
+  const skillsDiscoverHonesty = useMemo(() => {
+    if (!skillsDiscover || skillsDiscover.effective) return null;
+    if (skillsDiscover.claudeSkills === false || skillsDiscover.cursorSkills === false) {
+      return tr("ext.skills.discoverExternalHonesty.configOff");
+    }
+    if (skillsDiscover.appPref === false) {
+      return skillsDiscover.writable
+        ? tr("ext.skills.discoverExternalHonesty.appOff")
+        : tr("ext.skills.discoverExternalHonesty.sharedHint");
+    }
+    return null;
+  }, [skillsDiscover, tr]);
 
   const toggleMcp = async (name: string, next: boolean) => {
     if (!api.isTauri() || busyKey) return;
@@ -763,6 +780,24 @@ export function ExtensionsPanel({
     setServers((prev) => prev.map((s) => ({ ...s, enabled: true })));
     try {
       await api.extensionsEnableAllMcp(names);
+    } catch (e) {
+      setPathHint(String(e));
+      await refresh();
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const toggleDiscoverExternal = async (next: boolean) => {
+    if (!api.isTauri() || busyKey) return;
+    setBusyKey("skill:discover");
+    setSkillsDiscover((prev) =>
+      prev ? { ...prev, appPref: next, effective: next } : prev,
+    );
+    try {
+      await api.skillsCompatSet(next);
+      onSkillsPrefsChanged?.();
+      await refresh();
     } catch (e) {
       setPathHint(String(e));
       await refresh();
@@ -2251,6 +2286,45 @@ export function ExtensionsPanel({
           ) : null}
         </span>
       </h2>
+      <div
+        className="settings-card ext-card"
+        id="settings-anchor-ext-skills-discover"
+      >
+        <div className="ext-ref-row ext-ref-row--dense">
+          <div className="ext-ref-row__main">
+            <div className="ext-ref-row__body">
+              <div className="ext-ref-row__title">
+                <span className="ext-ref-row__title-text">
+                  {tr("ext.skills.discoverExternal")}
+                </span>
+              </div>
+              <div className="ext-ref-row__desc">
+                {tr("ext.skills.discoverExternalDesc")}
+              </div>
+              {skillsDiscoverHonesty ? (
+                <div className="ext-ref-row__meta">{skillsDiscoverHonesty}</div>
+              ) : null}
+              {!loading &&
+              skillsDiscover &&
+              skillsDiscover.hiddenCount > 0 ? (
+                <div className="ext-ref-row__meta">
+                  {tr("ext.skills.discoverExternalHidden", {
+                    n: skillsDiscover.hiddenCount,
+                  })}
+                </div>
+              ) : null}
+            </div>
+            <div className="ext-ref-row__end">
+              <ExtensionToggle
+                checked={skillsDiscover?.effective !== false}
+                disabled={!!busyKey || !api.isTauri()}
+                label={tr("ext.skills.discoverExternal")}
+                onChange={(next) => void toggleDiscoverExternal(next)}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="settings-card ext-card">
         {loading && (
           <p className="ext-empty">{tr("ext.skills.loading")}</p>

@@ -44,6 +44,26 @@ export const EXTENSIONS_ENTRIES: readonly SettingsEntry[] = [
     ],
   },
   {
+    id: "ext.skills.discoverExternal",
+    section: "extensions",
+    tab: "skills",
+    anchorId: "settings-anchor-ext-skills-discover",
+    labelKey: "ext.skills.discoverExternal",
+    descKeys: [
+      "ext.skills.discoverExternalDesc",
+      "ext.skills.discoverExternalHonesty.configOff",
+    ],
+    keywords: [
+      "claude",
+      "cursor",
+      "compat",
+      "discover",
+      "external skills",
+      "探测",
+      "探測",
+    ],
+  },
+  {
     id: "ext.mcp",
     section: "extensions",
     tab: "mcp",

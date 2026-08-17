@@ -244,6 +244,12 @@ export const enExtensions = {
   "ext.skills.loading": "Loading skills…",
   "ext.skills.empty": "No skills discovered",
   "ext.skills.emptyCli": "Skills are unavailable until the CLI is installed.",
+  "ext.skills.discoverExternal": "Discover Claude / Cursor skills",
+  "ext.skills.discoverExternalDesc": "When off, Settings and the slash picker hide skills from ~/.claude and ~/.cursor. Independent mode also writes [compat.claude] / [compat.cursor] skills in agent-home config.toml.",
+  "ext.skills.discoverExternalHonesty.configOff": "Hidden because Grok Build config.toml has [compat.claude] or [compat.cursor] skills = false.",
+  "ext.skills.discoverExternalHonesty.appOff": "Hidden in the App. Shared mode does not rewrite ~/.grok — set those keys in config.toml if the CLI should stop loading them too.",
+  "ext.skills.discoverExternalHonesty.sharedHint": "Shared mode: this switch only hides them in the App. Edit ~/.grok/config.toml or use independent session data to change CLI discovery.",
+  "ext.skills.discoverExternalHidden": "{n} Claude/Cursor skills hidden",
   /** Compact name tag for project-local skills only (global untagged). */
   "ext.skills.badge.project": "Project",
   "ext.skills.invocable": "Slash",

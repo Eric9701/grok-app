@@ -11,6 +11,18 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Fixed
+- **Skills catalog matches CLI discovery (#653)**: Settings → Extensions → Skills no longer keeps listing Claude/Cursor compat skills after Grok Build has them turned off. `skills_list` now runs `grok inspect` with the session `GROK_HOME` and drops `~/.claude` / `~/.cursor` rows when `[compat.claude] skills` or `[compat.cursor] skills` is false (or the new App overlay is off). Slash / + pickers share the same list.
+
+**中文 · 修复**
+- **技能目录与 CLI 探测一致（#653）**：在 Grok Build 关掉兼容探测后，设置 → 扩展 → 技能不再继续列出 Claude/Cursor 技能。`skills_list` 用当前会话的 `GROK_HOME` 跑 `grok inspect`，并在 config.toml / 应用开关关闭时丢掉 `~/.claude`、`~/.cursor` 条目。斜杠 / + 选择器共用这份列表。
+
+### Added
+- **Discover Claude / Cursor skills toggle**: Settings → Extensions → Skills can turn external compat discovery off. Independent session mode also writes `[compat.claude] skills` / `[compat.cursor] skills` in agent-home `config.toml`. Shared mode only hides them in the App (does not rewrite `~/.grok`).
+
+**中文 · 新增**
+- **探测 Claude / Cursor 技能开关**：设置 → 扩展 → 技能可关闭外源兼容探测。独立会话模式会写入 agent-home `config.toml`；共享模式只在应用内隐藏，不改写 `~/.grok`。
+
 ## [0.2.20] - 2026-08-17
 
 > **Highlight:** Grok Build-compatible custom relay; local session list/continue API; official-site installer aliases; opening a chat shows a real loading state instead of a fake empty session.

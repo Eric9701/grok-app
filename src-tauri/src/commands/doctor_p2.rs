@@ -230,6 +230,7 @@ fn run_grok_inspect(project_path: Option<&str>) -> (Option<serde_json::Value>, O
     std::thread::spawn(move || {
         let mut cmd = std::process::Command::new(&cli_path);
         cmd.arg("inspect").arg("--json");
+        cmd.env("GROK_HOME", crate::skill_compat::inspect_grok_home());
         if let Some(dir) = cwd {
             cmd.current_dir(dir);
         }

@@ -155,6 +155,8 @@ mod session_manager;
 
 mod session_title;
 
+mod skill_compat;
+
 mod skill_edit;
 
 mod store;
@@ -1060,6 +1062,8 @@ pub fn run() {
             commands::reset_app_data,
 
             commands::skills_list,
+
+            commands::skills_compat_set,
 
             commands::skill_read,
 
