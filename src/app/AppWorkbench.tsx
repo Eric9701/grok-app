@@ -14100,7 +14100,7 @@ export function AppWorkbench() {
       const p = searchHits.matchedProjects.find((x) => x.id === item.id);
       if (!p) return;
       setShowSearch(false);
-      projectSpaces.revealProject(p.id);
+      // Project is a folder: expand only; selection is for sessions.
       setProjectsOpen(true);
       setExpandedProjects((e) => ({ ...e, [p.id]: true }));
       return;
