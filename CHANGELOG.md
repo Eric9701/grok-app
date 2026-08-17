@@ -11,7 +11,6 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
-<<<<<<< HEAD
 ### Changed
 - **Composer workspace chip on every desktop chat (#662)**: The project / default-workspace control above the input is no longer limited to a brand-new draft that already has a folder. Pick, add, or return to the default workspace from the existing `ComposerProjectMenu`. Chinese copy uses 默认工作区 (was 通用). Sidebar `+` stays. Phone still uses the tools sheet.
 
