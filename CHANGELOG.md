@@ -11,11 +11,19 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Changed
+- **Composer workspace chip on every desktop chat (#662)**: The project / default-workspace control above the input is no longer limited to a brand-new draft that already has a folder. Pick, add, or return to the default workspace from the existing `ComposerProjectMenu`. Chinese copy uses 默认工作区 (was 通用). Sidebar `+` stays. Phone still uses the tools sheet.
+
+**中文 · 变更**
+- **桌面输入框上方始终显示工作区（#662）**：不再只在「已选项目的全新空草稿」才出现。沿用现有 `ComposerProjectMenu` 选择、添加或回到默认工作区。中文不再用「通用」。侧栏 `+` 保留。手机仍走工具页。
+
 ### Fixed
 - **Slash palette `/rc` and `/review-` select `review-commit` (#644)**: Treat `-` as a word boundary so kebab initials match, rank name prefix above description, and keep description as fallback only when no name hits. Peer skills that mention `review-commit` in YAML no longer steal the default highlight.
+- **Working rail overlap and leftover ANSI (#667)**: Long live **工作中** rows no longer paint tool bodies over the next line; leftover `[39m` / `[32m` SGR after a dropped ESC is stripped.
 
 **中文 · 修复**
 - **斜杠菜单 `/rc`、`/review-` 会选中 `review-commit`（#644）**：把 `-` 当词界以匹配 kebab 首字母，名字前缀优先于描述，且只有名字全无命中时才用描述兜底。YAML 里互相点名 `review-commit` 的 skill 不再抢走默认高亮。
+- **工作轨叠字和残留 ANSI（#667）**：长「工作中」不再把工具正文盖到下一行；ESC 丢掉后残留的 `[39m` / `[32m` 会被剥掉。
 
 ## [0.2.20] - 2026-08-17
 
