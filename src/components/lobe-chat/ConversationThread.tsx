@@ -59,12 +59,6 @@ import { AttachmentCard } from "@/components/AttachmentCard";
 import { ImageUi, imageUiLabels } from "@/components/ImageUi";
 import { ContextMenu, type ContextMenuItem } from "@/components/ContextMenu";
 import { UserAttachments } from "@/components/lobe-chat/UserAttachments";
-import { TranscriptSelectionToolbar } from "@/components/TranscriptSelectionToolbar";
-import { UserQuoteCards } from "@/components/ComposerQuoteCards";
-import {
-  parseQuotesFromContent,
-  type ComposerQuote,
-} from "@/lib/composerQuotes";
 import type { ResourceOpenTarget } from "@/components/ResourceViewer";
 import {
   IconArrowsMinimize,
@@ -340,7 +334,8 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
   );
 });
 
-function UserBodyText({
+/** Render skill chips / plain text for the user bubble body. */
+function UserPlainOrSkills({
   content,
   findQuery,
   findActiveOccurrence,
@@ -351,6 +346,7 @@ function UserBodyText({
 }) {
   const hydrated = hydrateDisplayContent(content);
   const segs = parseStoredContent(hydrated);
+  // Always use a pre-wrap host so input newlines / blank lines match the bubble.
   if (!segs.some((s) => s.type === "skill")) {
     if (findQuery?.trim()) {
       return (
@@ -384,39 +380,6 @@ function UserBodyText({
         ),
       )}
     </span>
-  );
-}
-
-/** Render skill chips / plain text for the user bubble body. */
-function UserPlainOrSkills({
-  content,
-  findQuery,
-  findActiveOccurrence,
-  locale,
-}: {
-  content: string;
-  findQuery?: string;
-  findActiveOccurrence?: number | null;
-  locale: Locale;
-}) {
-  const parsed = parseQuotesFromContent(content);
-  const body = parsed.text;
-  const quotes: ComposerQuote[] = parsed.quotes;
-  const tr = createT(locale);
-  return (
-    <>
-      <UserQuoteCards
-        quotes={quotes}
-        countLabel={tr("composer.quoteCount", { n: String(quotes.length) })}
-      />
-      {body.trim() || !quotes.length ? (
-        <UserBodyText
-          content={body || (quotes.length ? "" : content)}
-          findQuery={findQuery}
-          findActiveOccurrence={findActiveOccurrence}
-        />
-      ) : null}
-    </>
   );
 }
 
@@ -467,7 +430,6 @@ function UserMessageBody({
           <div className="lobe-chat-user-msg__body">
             <UserPlainOrSkills
               content={scheduled.body}
-              locale={locale}
               findQuery={findQuery}
               findActiveOccurrence={findActiveOccurrence}
             />
@@ -505,7 +467,6 @@ function UserMessageBody({
           <div className="lobe-chat-user-msg__body">
             <UserPlainOrSkills
               content={remoteIm.body}
-              locale={locale}
               findQuery={findQuery}
               findActiveOccurrence={findActiveOccurrence}
             />
@@ -518,7 +479,6 @@ function UserMessageBody({
   return (
     <UserPlainOrSkills
       content={content}
-      locale={locale}
       findQuery={findQuery}
       findActiveOccurrence={findActiveOccurrence}
     />
@@ -578,12 +538,6 @@ export interface ConversationThreadProps {
   /** Open external http(s) chat links (desktop shell + optional confirm). */
   onOpenExternalLink?: (url: string) => void;
   onAddAttachmentToComposer?: (att: Attachment) => void;
-  /** Add a selected transcript excerpt as its own composer quote card. */
-  onAddQuote?: (quote: {
-    text: string;
-    comment: string;
-    sourceMessageId?: string;
-  }) => void;
   attachLabels: {
     open: string;
     reveal: string;
@@ -1664,7 +1618,6 @@ export function ConversationThread({
   onOpenError,
   onOpenExternalLink,
   onAddAttachmentToComposer,
-  onAddQuote,
   attachLabels,
   findQuery = "",
   findHitMessageIds,
@@ -1820,17 +1773,6 @@ export function ConversationThread({
     y: number;
     text: string;
   } | null>(null);
-  const [selectionBar, setSelectionBar] = useState<{
-    x: number;
-    y: number;
-    text: string;
-    sourceMessageId?: string;
-  } | null>(null);
-  const [selectionComment, setSelectionComment] = useState("");
-  const selectionBarText = selectionBar?.text;
-  useEffect(() => {
-    setSelectionComment("");
-  }, [selectionBarText]);
 
   const copyText = useCallback((text: string) => {
     void (async () => {
@@ -1853,38 +1795,29 @@ export function ConversationThread({
     })();
   }, []);
 
-  const closeSelectionUi = useCallback(() => {
-    setSelectionBar(null);
-    setSelectionMenu(null);
-    setSelectionComment("");
-  }, []);
-
-  useEffect(() => {
-    closeSelectionUi();
-  }, [sessionId, closeSelectionUi]);
-
-  const addQuoteFromSelection = useCallback(
-    (text: string, comment: string, sourceMessageId?: string) => {
-      const excerpt = text.trim();
-      if (!excerpt) return;
-      if (onAddQuote) {
-        onAddQuote({ text: excerpt, comment: comment.trim(), sourceMessageId });
-      } else {
-        setDraft((prev) => {
-          if (!prev) return excerpt;
-          return /\s$/.test(prev) ? prev + excerpt : prev + "\n\n" + excerpt;
-        });
+  /** Append text to the composer draft (keeps skill-chip tokens intact). */
+  const appendToComposer = useCallback((text: string) => {
+    if (!text) return;
+    setDraft((prev) => {
+      if (!prev) return text;
+      return /\s$/.test(prev) ? prev + text : prev + "\n\n" + text;
+    });
+    // Bring the composer into view with the caret at the end (stable
+    // selector, same as AppWorkbench focus helpers).
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(".composer__input");
+      if (!el || el.getAttribute("contenteditable") === "false") return;
+      el.focus({ preventScroll: false });
+      const sel = window.getSelection();
+      if (sel) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
       }
-      closeSelectionUi();
-      window.getSelection()?.removeAllRanges();
-      requestAnimationFrame(() => {
-        const el = document.querySelector<HTMLElement>(".composer__input");
-        if (!el || el.getAttribute("contenteditable") === "false") return;
-        el.focus({ preventScroll: false });
-      });
-    },
-    [onAddQuote, closeSelectionUi],
-  );
+    });
+  }, []);
 
   const onTranscriptContextMenu = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -1922,90 +1855,10 @@ export function ConversationThread({
         id: "sel-add-input",
         label: tr("chat.selectionAddToInput"),
         icon: <IconPaperclip size={16} />,
-        onClick: () => addQuoteFromSelection(selText, ""),
+        onClick: () => appendToComposer(selText),
       },
     ];
-  }, [selectionMenu, tr, copyText, addQuoteFromSelection]);
-
-  const readTranscriptSelection = useCallback(() => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return null;
-    const text = sel.toString().replace(/\u00a0/g, " ").trim();
-    if (!text) return null;
-    const scrollEl = scrollRef.current;
-    if (!scrollEl) return null;
-    const anchor = sel.anchorNode;
-    const focus = sel.focusNode;
-    const inside =
-      (anchor != null && scrollEl.contains(anchor)) ||
-      (focus != null && scrollEl.contains(focus));
-    if (!inside) return null;
-    let sourceMessageId: string | undefined;
-    let node: Node | null = anchor;
-    while (node && node !== scrollEl) {
-      if (node instanceof HTMLElement) {
-        const id = node.getAttribute("data-message-id");
-        if (id) {
-          sourceMessageId = id;
-          break;
-        }
-      }
-      node = node.parentNode;
-    }
-    let rect: DOMRect | null = null;
-    if (sel.rangeCount > 0) {
-      const r = sel.getRangeAt(0).getBoundingClientRect();
-      if (r.width || r.height) rect = r;
-    }
-    return { text, sourceMessageId, rect };
-  }, []);
-
-  useEffect(() => {
-    const showBar = (next: {
-      text: string;
-      sourceMessageId?: string;
-      rect: DOMRect | null;
-    }) => {
-      const x = next.rect
-        ? next.rect.left + next.rect.width / 2 - 140
-        : 24;
-      const y = next.rect ? next.rect.bottom + 8 : 24;
-      setSelectionBar({
-        x,
-        y,
-        text: next.text,
-        sourceMessageId: next.sourceMessageId,
-      });
-    };
-    const onSel = () => {
-      const next = readTranscriptSelection();
-      // Focusing the comment box collapses the native selection — keep the bar.
-      if (!next) return;
-      showBar(next);
-    };
-    const onUp = (e: MouseEvent) => {
-      if (e.button !== 0) return;
-      const next = readTranscriptSelection();
-      if (next) showBar(next);
-    };
-    document.addEventListener("selectionchange", onSel);
-    document.addEventListener("mouseup", onUp);
-    return () => {
-      document.removeEventListener("selectionchange", onSel);
-      document.removeEventListener("mouseup", onUp);
-    };
-  }, [readTranscriptSelection]);
-
-  useEffect(() => {
-    if (!selectionBar) return;
-    const onDoc = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t?.closest(".sel-toolbar")) return;
-      closeSelectionUi();
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [selectionBar, closeSelectionUi]);
+  }, [selectionMenu, tr, copyText, appendToComposer]);
 
   const messageNodes = useMemo(
     () => buildSessionMessageNodes(messages),
@@ -2701,33 +2554,6 @@ export function ConversationThread({
         onClose={() => setSelectionMenu(null)}
         items={selectionMenuItems}
       />
-      {selectionBar ? (
-        <TranscriptSelectionToolbar
-          x={selectionBar.x}
-          y={selectionBar.y}
-          text={selectionBar.text}
-          comment={selectionComment}
-          onCommentChange={setSelectionComment}
-          onCopy={() => {
-            copyText(selectionBar.text);
-            closeSelectionUi();
-          }}
-          onAddQuote={() =>
-            addQuoteFromSelection(
-              selectionBar.text,
-              selectionComment,
-              selectionBar.sourceMessageId,
-            )
-          }
-          onClose={closeSelectionUi}
-          labels={{
-            copy: tr("chat.selectionCopy"),
-            addQuote: tr("chat.selectionAddToInput"),
-            commentPlaceholder: tr("chat.selectionCommentPlaceholder"),
-            commentSubmit: tr("chat.selectionCommentSubmit"),
-          }}
-        />
-      ) : null}
     </div>
   );
 }

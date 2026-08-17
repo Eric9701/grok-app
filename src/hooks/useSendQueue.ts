@@ -41,7 +41,6 @@ import {
 export type ExecuteSendFromQueue = (opts: {
   storedDisplay: string;
   att: Attachment[];
-  quotes?: import("@/lib/composerQuotes").ComposerQuote[];
   goalMode: boolean;
   fromQueue: true;
   targetSessionId: string | null;
@@ -167,7 +166,6 @@ export function useSendQueue({
     (input: {
       storedDisplay: string;
       attachments: Attachment[];
-      quotes?: import("@/lib/composerQuotes").ComposerQuote[];
       goalMode: boolean;
     }) => {
       // Prefer viewing ref so a mid-render session switch cannot mis-key the item.
@@ -307,7 +305,6 @@ export function useSendQueue({
       const ok = await executeSendRef.current({
         storedDisplay: head.storedDisplay,
         att: head.attachments,
-        quotes: head.quotes,
         goalMode: head.goalMode,
         fromQueue: true,
         targetSessionId,

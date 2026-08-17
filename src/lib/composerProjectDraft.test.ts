@@ -53,7 +53,7 @@ describe("isComposerProjectDraftEmpty", () => {
     ).toBe(true);
   });
 
-  it("keeps skill-only, attachment, or quote drafts", () => {
+  it("keeps skill-only and attachment drafts", () => {
     expect(
       isComposerProjectDraftEmpty({
         text: "[[skill:foo]]",
@@ -65,14 +65,6 @@ describe("isComposerProjectDraftEmpty", () => {
       isComposerProjectDraftEmpty({
         text: "",
         attachments: [{ path: "/a.png", name: "a.png", isDir: false }],
-        updatedAt: 1,
-      }),
-    ).toBe(false);
-    expect(
-      isComposerProjectDraftEmpty({
-        text: "",
-        attachments: [],
-        quotes: [{ id: "q1", text: "excerpt", comment: "" }],
         updatedAt: 1,
       }),
     ).toBe(false);
@@ -162,7 +154,7 @@ describe("shouldRestoreComposerProjectDraft", () => {
     ).toBe(false);
   });
 
-  it("restores attachment-only and quote-only drafts", () => {
+  it("restores attachment-only drafts", () => {
     expect(
       shouldRestoreComposerProjectDraft(
         {
@@ -171,17 +163,6 @@ describe("shouldRestoreComposerProjectDraft", () => {
           updatedAt: 1,
         },
         ["hello"],
-      ),
-    ).toBe(true);
-    expect(
-      shouldRestoreComposerProjectDraft(
-        {
-          text: "",
-          attachments: [],
-          quotes: [{ id: "q1", text: "excerpt", comment: "note" }],
-          updatedAt: 1,
-        },
-        [],
       ),
     ).toBe(true);
   });
