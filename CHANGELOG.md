@@ -37,6 +37,7 @@ See `docs/llm-wiki/release.md`.
 - **Windows huge assistant replies / paste become a .txt card (#647)**: On Windows only, a single reply or clipboard paste ≥ 8000 characters is shown as a short preview plus a file card (or attached as `.txt`). macOS / Linux keep full markdown and normal paste. Find-in-chat still shows the full body.
 - **New chat no longer restores a leftover first prompt**: Each project keeps a new-session composer buffer. After send, that buffer was often left on disk (`#620` leftovers, or a mid-type snapshot that is not byte-identical to the sent text). Restore now drops buffers that match a recent send **exactly**, as a **prefix** of that send, or as a **short first-line fragment** (e.g. saved `好的` / `d` vs sent `好的` / `你看好了吗？`). Attachment-only unsent drafts still restore. A follow-up send on an existing thread does not wipe a new-task buffer that still has extra files.
 - **Shift+Enter first press starts a new line**: The composer stored `\n` but re-projected a trailing `<br>`, which WebKit treats as an empty-editor sentinel (first Shift+Enter looked like a no-op). Each line is now a `div`; a trailing empty line is marked `data-composer-nl="1"` so serialize keeps the newline and the caret stays on that line. ZWSP caret pads are not used for this path (they split IME 汉字).
+- **Side-browser Design Mode (#636)**: Browser toolbar toggle to hover/click a same-origin element and send tag, CSS path, computed styles, and an optional snapshot into the composer.
 - **Side workbench file tabs and per-project isolation (#661 slice)**: Inactive file chips show a filename (and a short parent path on collisions). Switching projects stashes that project's tabs. Opening Files shows the tree and adopts the placeholder chip instead of minting a second pathless tab. The CodeMirror editor from the same PR is **not** in this slice.
 
 **中文 · 修复**
@@ -50,6 +51,7 @@ See `docs/llm-wiki/release.md`.
 - **Windows 超长回复/粘贴改为 txt 卡片（#647）**：仅 Windows，单条回复或粘贴 ≥ 8000 字改成预览 + 文件卡。macOS / Linux 仍是完整 Markdown / 正常粘贴。对话内查找仍显示全文。
 - **新建对话不再带回已发送的残留**：每个项目有一份新会话输入缓冲。发送后这份缓冲常留在磁盘上（`#620` 残留，或和发出去的原文不完全相同的半截）。恢复时会丢掉与最近发送**完全相同**、作为其**前缀**、或**短且首行相同**的碎片（例如存的是 `好的` / `d`，发出去的是 `好的` / `你看好了吗？`）。只有附件的未发送草稿仍会恢复。在已有会话里跟进发送时，如果新任务缓冲还带着这份发送里没有的附件，不会整份清掉。
 - **第一次 Shift+Enter 就会换行**：原先存的是 `\n`，重绘却是尾部 `<br>`，WebKit 把它当成空编辑器哨兵，第一次换行看起来没反应。现在一行一个 `div`，末尾空行标 `data-composer-nl="1"`，序列化会保留换行，光标留在新行。这条路径不再用 ZWSP 占位（会拆开输入中的汉字）。
+- **侧栏浏览器 Design Mode（#636）**：工具栏开关，点选同源元素后把标签、CSS 路径、计算样式和可选截图送进输入框。
 - **侧栏文件 tab 名 + 按项目隔离（#661 切片）**：未激活的文件芯片显示文件名（重名时带上一级路径）。切换项目会收起该项目的 tab。打开 Files 显示树，并用占位芯片承接真实文件，不再并排多一个无路径 tab。同一 PR 里的 CodeMirror 编辑器不在本切片。
 
 **中文 · 修复**
