@@ -659,6 +659,8 @@ type TranscriptMessageRowProps = {
   editAttachments: Attachment[];
   canEditLastUser: boolean;
   canRegenerate: boolean;
+  /** Host still mid-turn — hide copy/MD/retry even if this row already settled. */
+  turnLive: boolean;
   canRewindSession: boolean;
   regenerableAssistantId: string | null;
   regenerateModels: ModelOption[];
@@ -726,6 +728,7 @@ function transcriptRowPropsEqual(
   if (a.editAttachments !== b.editAttachments) return false;
   if (a.canEditLastUser !== b.canEditLastUser) return false;
   if (a.canRegenerate !== b.canRegenerate) return false;
+  if (a.turnLive !== b.turnLive) return false;
   if (a.canRewindSession !== b.canRewindSession) return false;
   if (a.regenerableAssistantId !== b.regenerableAssistantId) return false;
   if (a.regenerateModels !== b.regenerateModels) return false;
@@ -770,6 +773,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   editAttachments,
   canEditLastUser,
   canRegenerate,
+  turnLive,
   canRewindSession,
   regenerableAssistantId,
   regenerateModels,
@@ -1518,7 +1522,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
         ) : null
       }
       actions={(() => {
-        if (m.streaming) return null;
+        if (m.streaming || turnLive) return null;
         const showCopy = !!m.content.trim();
         const showRegen =
           !!onRegenerateAssistant && regenerableAssistantId === m.id;
@@ -2449,6 +2453,10 @@ export function ConversationThread({
               editAttachments={editAttachments}
               canEditLastUser={canEditLastUser}
               canRegenerate={canRegenerate}
+              turnLive={
+                sessionState === "streaming" ||
+                sessionState === "awaiting_permission"
+              }
               canRewindSession={canRewindSession}
               regenerableAssistantId={regenerableAssistantId}
               regenerateModels={regenerateModels}

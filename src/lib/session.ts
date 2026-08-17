@@ -792,6 +792,68 @@ export function mergeAssistantFragments(messages: ChatMessage[]): ChatMessage[] 
   let i = 0;
   while (i < messages.length) {
     const m = messages[i]!;
+    if (m.role === "assistant" && !m.isError && m.streaming) {
+      // Live row + a later finished fragment in the same turn (early
+      // stream-done) painted 工作中 above a frozen 工作了 + copy/retry.
+      let j = i + 1;
+      const finishedIdx: number[] = [];
+      while (j < messages.length && messages[j]!.role !== "user") {
+        const mm = messages[j]!;
+        if (mm.role === "assistant" && !mm.isError && !mm.streaming) {
+          finishedIdx.push(j);
+        }
+        j += 1;
+      }
+      if (finishedIdx.length === 0) {
+        out.push(m);
+        i += 1;
+        continue;
+      }
+      const extraBodies: string[] = [];
+      const extraThoughts: string[] = [];
+      let segs = ensureSegments(m);
+      for (const idx of finishedIdx) {
+        const f = messages[idx]!;
+        const body = (f.content ?? "").trim();
+        if (body && !(m.content ?? "").includes(body)) extraBodies.push(body);
+        if (f.thought?.trim()) extraThoughts.push(f.thought.trim());
+        const fsegs =
+          f.segments?.length
+            ? f.segments
+            : buildSegmentsFromLegacy(f.content, f.thought, f.thoughtPhases);
+        for (const s of fsegs) {
+          if (s.kind === "content") {
+            if (s.text.trim() && !(m.content ?? "").includes(s.text.trim())) {
+              segs = appendContentToSegments(segs, `\n\n${s.text.trim()}`);
+            }
+            continue;
+          }
+          segs.push(s.kind === "tool" ? { ...s } : { kind: "thought", text: s.text });
+        }
+      }
+      const extraBlock = extraBodies.join("\n\n");
+      const content = extraBlock
+        ? `${m.content || ""}${m.content?.trim() ? "\n\n" : ""}${extraBlock}`
+        : m.content;
+      if (extraBlock && extraBodies.every((b) => !segs.some((s) => s.kind === "content" && s.text.includes(b)))) {
+        segs = appendContentToSegments(segs, extraBlock);
+      }
+      const thoughts = [m.thought?.trim(), ...extraThoughts].filter(Boolean);
+      out.push({
+        ...m,
+        content,
+        thought: thoughts.length ? thoughts.join("\n\n⟪phase⟫\n\n") : m.thought,
+        segments: compactMessageSegments(segs),
+        streaming: true,
+      });
+      for (let k = i + 1; k < j; k++) {
+        const row = messages[k]!;
+        if (row.role === "assistant" && !row.isError && !row.streaming) continue;
+        out.push(row);
+      }
+      i = j;
+      continue;
+    }
     if (m.role !== "assistant" || m.isError || m.streaming) {
       out.push(m);
       i += 1;

@@ -192,10 +192,28 @@ impl SessionManager {
                         };
                         // I04: throttled mid-stream journal (force on terminal done chunk).
                         let para = is_paragraph_break(&text);
-                        Self::maybe_flush_stream_journal(s, done, para);
+                        // prompt_for emits an empty done tick when the RPC
+                        // returns — often while tools are still open. Do not
+                        // paint 工作了 / copy-retry until the turn can finish.
+                        let emit_done = done
+                            && crate::turn_complete::should_emit_stream_done(
+                                s.prompt_in_flight,
+                                s.fsm.state() == SessionState::AwaitingPermission,
+                                s.pending_plan_rpc_id.is_some(),
+                                s.pending_ask_user_rpc_id.is_some(),
+                                s.open_tool_ids.len(),
+                            );
+                        Self::maybe_flush_stream_journal(s, emit_done, para);
                         let mid = s.streaming_message_id.clone().unwrap_or_default();
-                        let need =
-                            Self::queue_stream_emit(s, app, kind, mid, text, thought_phase, done);
+                        let need = Self::queue_stream_emit(
+                            s,
+                            app,
+                            kind,
+                            mid,
+                            text,
+                            thought_phase,
+                            emit_done,
+                        );
                         if need {
                             s.stream_emit_flush_gen = s.stream_emit_flush_gen.wrapping_add(1);
                             Some((s.app_session_id.clone(), s.stream_emit_flush_gen))
@@ -555,12 +573,12 @@ impl SessionManager {
                         };
                         s.tools_this_turn = s.tools_this_turn.saturating_add(1);
                         // Tools settled → apply deferred prompt_complete if any (#52).
-                        let empty =
-                            Self::try_finish_deferred_prompt_complete(s, Some(app)).flatten();
+                        let finished =
+                            Self::try_finish_deferred_prompt_complete(s, Some(app));
                         (
                             s.app_session_id.clone(),
                             s.project_path.clone(),
-                            empty,
+                            finished,
                             open_changed,
                             already_terminal,
                         )
@@ -568,7 +586,12 @@ impl SessionManager {
                         (String::new(), None, None, false, false)
                     }
                 };
-                Self::emit_empty_run_if_any(app, empty_run);
+                Self::emit_empty_run_if_any(app, empty_run.clone().flatten());
+                // Live ToolCall used to flatten away Some(None)=finished, so
+                // Ready never reached the UI and the composer stayed on Stop.
+                if empty_run.is_some() {
+                    Self::emit_state(app, &self.snapshot());
+                }
 
                 // Live tool activity for UI — recover identity when completed
                 // updates omit title/kind (sparse status-only payloads).

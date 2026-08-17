@@ -1017,6 +1017,31 @@ describe("session projection", () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
+  it("mergeAssistantFragments folds a later finished fragment into a live sibling", () => {
+    const rows: ChatMessage[] = [
+      { id: "u1", role: "user", content: "pack it" },
+      {
+        id: "a-live",
+        role: "assistant",
+        content: "still working on the increment",
+        streaming: true,
+      },
+      {
+        id: "a-done",
+        role: "assistant",
+        content: "kernel rebuild failed; switching runtime",
+        streaming: false,
+      },
+    ];
+    const merged = mergeAssistantFragments(rows);
+    const asst = merged.filter((m) => m.role === "assistant");
+    expect(asst).toHaveLength(1);
+    expect(asst[0]!.id).toBe("a-live");
+    expect(asst[0]!.streaming).toBe(true);
+    expect(asst[0]!.content).toContain("still working on the increment");
+    expect(asst[0]!.content).toContain("kernel rebuild failed");
+  });
+
   it("mergeAssistantFragments leaves live / single-row turns untouched", () => {
     const rows: ChatMessage[] = [
       { id: "u1", role: "user", content: "hi" },
