@@ -175,23 +175,28 @@ pub fn sync_turn_to_app(
             }
         }
     } else if let Some(ref id) = app_id {
-        // Touch meta + keep agent id in sync
-        let mut list = store::load_sessions_index();
-        if let Some(s) = list.iter_mut().find(|s| s.id == *id) {
-            if let Some(aid) = agent_id {
-                s.agent_session_id = Some(aid.to_string());
+        // Touch meta + keep agent id in sync under one sessions-index
+        // transaction. A load/modify/update sequence here could overwrite a
+        // stream's newer agent-session binding from another process.
+        let id_for_update = id.clone();
+        let project_id = binding.project_id.clone();
+        let title = title_from_prompt(user_prompt, channel);
+        let _ = store::update_sessions_index(move |list| {
+            if let Some(s) = list.iter_mut().find(|s| s.id == id_for_update) {
+                if let Some(aid) = agent_id {
+                    s.agent_session_id = Some(aid.to_string());
+                }
+                if s.project_id.is_none() {
+                    s.project_id = project_id;
+                }
+                // First meaningful title: replace default "New chat" / placeholder
+                if is_placeholder_title(&s.title) {
+                    s.title = title;
+                }
+                s.updated_at = Utc::now();
             }
-            if s.project_id.is_none() {
-                s.project_id = binding.project_id.clone();
-            }
-            // First meaningful title: replace default "New chat" / placeholder
-            if is_placeholder_title(&s.title) {
-                s.title = title_from_prompt(user_prompt, channel);
-            }
-            s.updated_at = Utc::now();
-            let clone = s.clone();
-            let _ = store::update_session_meta(&clone);
-        }
+            Ok(())
+        });
         next.local_session_id = id.clone();
     }
 

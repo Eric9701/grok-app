@@ -111,7 +111,7 @@ impl SessionManager {
             }
         }
         let kept: Vec<_> = msgs.into_iter().take(cut).collect();
-        store::save_messages(&app_sid, &kept)?;
+        store::replace_messages(&app_sid, &kept)?;
 
         {
             let mut guard = self.inner.lock();
@@ -264,15 +264,17 @@ impl SessionManager {
 
         let kept = store::truncate_through_user_prompt(&msgs, target_prompt_index)?;
         let kept_count = kept.len();
-        store::save_messages(&app_sid, &kept)?;
+        store::replace_messages(&app_sid, &kept)?;
 
         // Touch meta updated_at for index sort.
-        if let Some(mut meta) = store::load_sessions_index()
-            .into_iter()
-            .find(|s| s.id == app_sid)
-        {
-            meta.updated_at = chrono::Utc::now();
-            let _ = store::update_session_meta(&meta);
+        let updated_at = chrono::Utc::now();
+        if let Ok(Some(meta)) = store::update_sessions_index(|list| {
+            let Some(meta) = list.iter_mut().find(|s| s.id == app_sid) else {
+                return Ok(None);
+            };
+            meta.updated_at = updated_at;
+            Ok(Some(meta.clone()))
+        }) {
             if live_match {
                 let mut guard = self.inner.lock();
                 if let Some(s) = guard.as_mut() {

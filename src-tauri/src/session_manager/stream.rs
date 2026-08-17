@@ -66,6 +66,11 @@ pub(crate) fn resolve_turn_event_route(
 ) -> TurnEventRoute {
     if let Some(sid) = agent_session_id {
         if live.is_some_and(|l| {
+            // A stamped event is authoritative: an unknown owner must not be
+            // treated as a wildcard. During connect/open the live hint can
+            // briefly lack an agent id; dropping that handshake-side event is
+            // safer than allowing a late foreign session update to mutate the
+            // current chat.
             l.process_id == process_id && l.agent_session_id.as_deref() == Some(sid)
         }) {
             return TurnEventRoute::Live;
@@ -404,7 +409,7 @@ impl SessionManager {
         // Neutral chips: user stop + generic mid-run cancel. Infra / permission
         // hard ends stay is_error so history can highlight them if needed.
         let is_error = !matches!(reason, "user_stop" | "cancelled");
-        let _ = store::append_message(
+        if let Err(e) = store::append_message(
             &s.app_session_id,
             ChatMessageStored {
                 id: mid.clone(),
@@ -416,9 +421,13 @@ impl SessionManager {
                 attachments: None,
                 marker: Some("turn_cancelled".into()),
             },
-        );
+        ) {
+            tracing::error!(session = %s.app_session_id, "turn-cancelled journal append failed: {e}");
+        }
         s.meta.updated_at = chrono::Utc::now();
-        let _ = store::update_session_meta(&s.meta);
+        if let Err(e) = store::update_session_meta(&s.meta) {
+            tracing::warn!(session = %s.app_session_id, "turn-cancelled metadata update failed: {e}");
+        }
         if let Some(app) = app {
             let _ = app.emit(
                 "session://turn_marker",
@@ -716,25 +725,37 @@ impl SessionManager {
         } else {
             Some(s.stream_attachments.clone())
         };
-        let _ = store::append_message(
-            &s.app_session_id,
-            ChatMessageStored {
-                id: mid,
-                role: "assistant".into(),
-                content: s.stream_buf.clone(),
-                thought: if s.stream_thought.is_empty() {
-                    None
-                } else {
-                    Some(s.stream_thought.clone())
-                },
-                created_at: chrono::Utc::now(),
-                is_error: false,
-                attachments: atts,
-                marker: None,
+        let message = ChatMessageStored {
+            id: mid,
+            role: "assistant".into(),
+            content: s.stream_buf.clone(),
+            thought: if s.stream_thought.is_empty() {
+                None
+            } else {
+                Some(s.stream_thought.clone())
             },
-        );
+            created_at: chrono::Utc::now(),
+            is_error: false,
+            attachments: atts,
+            marker: None,
+        };
+        if let Err(e) = store::append_message(&s.app_session_id, message) {
+            // Keep the throttle watermark untouched so the next chunk retries
+            // the durable write instead of silently advancing past a lost
+            // assistant tail.
+            tracing::error!(
+                session = %s.app_session_id,
+                "stream journal append failed: {e}"
+            );
+            return;
+        }
         s.meta.updated_at = chrono::Utc::now();
-        let _ = store::update_session_meta(&s.meta);
+        if let Err(e) = store::update_session_meta(&s.meta) {
+            tracing::warn!(
+                session = %s.app_session_id,
+                "stream session metadata update failed after journal append: {e}"
+            );
+        }
         s.journal_throttle.mark_flushed(now);
         if force {
             s.journal_throttle.reset();

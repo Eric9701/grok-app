@@ -41,7 +41,10 @@ mod routing_tests;
 #[cfg(test)]
 mod stall_tests;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 use parking_lot::Mutex;
 
@@ -64,6 +67,10 @@ pub struct SessionManager {
     pub(super) parked: Mutex<HashMap<String, ParkedAgent>>,
     /// Process prewarmed while the user is composing a new chat (no session yet).
     pub(super) prewarm: Mutex<PrewarmState>,
+    /// Generation token for cancellable prewarm tasks. A task that started
+    /// before recycle/route change must not publish a stale Ready child after
+    /// a newer prewarm has taken ownership of the slot.
+    pub(super) prewarm_epoch: AtomicU64,
     /// Tool identity learned from in_progress `tool_call` notifications
     /// (terminal `tool_call_update` payloads are status-only). Keyed by
     /// app session id → tool call id. See `remember_tool_identity`.
@@ -95,6 +102,7 @@ impl SessionManager {
             background: Mutex::new(HashMap::new()),
             parked: Mutex::new(HashMap::new()),
             prewarm: Mutex::new(PrewarmState::None),
+            prewarm_epoch: AtomicU64::new(0),
             tool_identities: std::sync::Mutex::new(std::collections::HashMap::new()),
             connect_lock: tokio::sync::Mutex::new(()),
             post_turn_journal_locks: Mutex::new(HashMap::new()),
@@ -105,6 +113,11 @@ impl SessionManager {
     /// Drop bookkeeping for a chat that no longer exists in the store.
     pub fn forget_deleted_session(&self, session_id: &str) {
         self.pending_soft_respawn.lock().remove(session_id);
+    }
+
+    pub(super) fn invalidate_prewarm_epoch(&self) {
+        self.prewarm_epoch
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 
     pub(super) fn post_turn_journal_lock(

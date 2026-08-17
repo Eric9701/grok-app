@@ -7,6 +7,7 @@
 #![allow(dead_code)] // residual-clippy: is_lock_busy helper
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -15,6 +16,12 @@ use fs2::FileExt;
 /// How long to wait for a lock before failing with a clear error.
 const LOCK_WAIT: Duration = Duration::from_secs(3);
 const LOCK_POLL: Duration = Duration::from_millis(40);
+
+/// `fs2` locks coordinate separate processes, but some platforms treat a
+/// second descriptor in the same process as re-entrant.  Keep an in-process
+/// guard as well so two threads can never interleave a read-modify-write
+/// transaction (the common path for stream/journal updates).
+static PROCESS_STORE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Sidecar lock path for `foo.json` → `foo.json.lock`.
 pub fn lock_path_for(target: &Path) -> PathBuf {
@@ -25,20 +32,25 @@ pub fn lock_path_for(target: &Path) -> PathBuf {
 
 /// Holds an exclusive lock until dropped.
 pub struct ExclusiveLock {
+    // The guard must live for the full file-lock lifetime.  A single process
+    // mutex is intentionally conservative: store transactions are short and
+    // correctness matters more than parallel JSON writes.
+    _process_guard: MutexGuard<'static, ()>,
     _file: File,
-    path: PathBuf,
 }
 
 impl Drop for ExclusiveLock {
     fn drop(&mut self) {
         // Best-effort unlock; File drop also releases the lock on most OSes.
         let _ = self._file.unlock();
-        let _ = fs::remove_file(&self.path);
     }
 }
 
 /// Acquire exclusive lock for `target` (creates `target.lock`).
 pub fn lock_exclusive(target: &Path) -> Result<ExclusiveLock, String> {
+    let process_guard = PROCESS_STORE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let path = lock_path_for(target);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("lock dir: {e}"))?;
@@ -55,7 +67,10 @@ pub fn lock_exclusive(target: &Path) -> Result<ExclusiveLock, String> {
     loop {
         match file.try_lock_exclusive() {
             Ok(()) => {
-                return Ok(ExclusiveLock { _file: file, path });
+                return Ok(ExclusiveLock {
+                    _process_guard: process_guard,
+                    _file: file,
+                });
             }
             Err(_) if Instant::now() < deadline => {
                 thread::sleep(LOCK_POLL);

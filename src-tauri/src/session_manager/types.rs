@@ -861,10 +861,12 @@ pub(super) fn journal_host_tool_step(
             slot.content = content;
             slot.marker = Some("tool_step".into());
             slot.is_error = matches!(st, "failed" | "error");
-            let _ = store::save_messages(app_sid, &msgs);
+            if let Err(e) = store::save_messages(app_sid, &msgs) {
+                tracing::error!(session = %app_sid, tool = %tool_call_id, "host tool journal update failed: {e}");
+            }
         }
     } else {
-        let _ = store::append_message(
+        if let Err(e) = store::append_message(
             app_sid,
             ChatMessageStored {
                 id: mid,
@@ -876,7 +878,9 @@ pub(super) fn journal_host_tool_step(
                 attachments: None,
                 marker: Some("tool_step".into()),
             },
-        );
+        ) {
+            tracing::error!(session = %app_sid, tool = %tool_call_id, "host tool journal append failed: {e}");
+        }
     }
 }
 

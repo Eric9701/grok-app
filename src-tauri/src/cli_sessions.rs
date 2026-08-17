@@ -1775,13 +1775,18 @@ pub fn import_cli_session(
     store::save_messages(&meta.id, &msgs)?;
     meta.updated_at = now;
     // Persist agent_session_id link.
-    let mut list = store::load_sessions_index();
-    if let Some(row) = list.iter_mut().find(|s| s.id == meta.id) {
-        row.agent_session_id = meta.agent_session_id.clone();
+    let sid = meta.id.clone();
+    let agent_session_id = meta.agent_session_id.clone();
+    if let Some(updated) = store::update_sessions_index(move |list| {
+        let Some(row) = list.iter_mut().find(|s| s.id == sid) else {
+            return Ok(None);
+        };
+        row.agent_session_id = agent_session_id;
         row.updated_at = now;
-        meta = row.clone();
+        Ok(Some(row.clone()))
+    })? {
+        meta = updated;
     }
-    store::save_sessions_index(&list)?;
     Ok(meta)
 }
 

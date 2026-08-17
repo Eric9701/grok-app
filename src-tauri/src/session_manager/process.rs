@@ -20,28 +20,70 @@ use crate::store::{self, ChatMessageStored};
 
 use super::*;
 
+/// Count living ACP children by their process identity rather than by session
+/// map entries. Warm reuse intentionally leaves multiple session shells with
+/// the same `process_id` / `Arc<AcpClient>`, so counting entries can make a
+/// single child consume multiple pool slots.
+///
+/// A missing process id is counted conservatively as a distinct child. That
+/// should only occur during an incomplete connect / teardown, and collapsing
+/// unknown identities would let capacity accounting under-count real children.
+fn count_unique_alive_processes<I>(entries: I) -> u32
+where
+    I: IntoIterator<Item = (String, bool)>,
+{
+    let mut process_ids = HashSet::new();
+    let mut unknown_alive = 0u32;
+    for (process_id, alive) in entries {
+        if !alive {
+            continue;
+        }
+        if process_id.trim().is_empty() {
+            unknown_alive = unknown_alive.saturating_add(1);
+        } else {
+            process_ids.insert(process_id);
+        }
+    }
+    (process_ids.len() as u32).saturating_add(unknown_alive)
+}
+
+/// A parked entry is only a handle to a process. Never recycle it when that
+/// process identity is unknown or still has a live/background tenant.
+#[inline]
+fn process_recycle_is_blocked(process_id: &str, protected_process_ids: &HashSet<String>) -> bool {
+    process_id.trim().is_empty() || protected_process_ids.contains(process_id)
+}
+
 impl SessionManager {
     pub(super) fn active_process_count(&self) -> u32 {
-        let live = self
-            .inner
-            .lock()
-            .as_ref()
-            .and_then(|s| s.acp.as_ref())
-            .filter(|c| c.is_alive())
-            .is_some() as u32;
-        let background = self
-            .background
-            .lock()
-            .values()
-            .filter(|s| s.acp.as_ref().is_some_and(|c| c.is_alive()))
-            .count() as u32;
-        let parked = self
-            .parked
-            .lock()
-            .values()
-            .filter(|p| p.acp.is_alive())
-            .count() as u32;
-        live + background + parked
+        let mut entries = Vec::new();
+        {
+            let live = self.inner.lock();
+            if let Some(s) = live.as_ref() {
+                entries.push((
+                    s.process_id.clone(),
+                    s.acp.as_ref().is_some_and(|c| c.is_alive()),
+                ));
+            }
+        }
+        {
+            let background = self.background.lock();
+            entries.extend(background.values().map(|s| {
+                (
+                    s.process_id.clone(),
+                    s.acp.as_ref().is_some_and(|c| c.is_alive()),
+                )
+            }));
+        }
+        {
+            let parked = self.parked.lock();
+            entries.extend(
+                parked
+                    .values()
+                    .map(|p| (p.process_id.clone(), p.acp.is_alive())),
+            );
+        }
+        count_unique_alive_processes(entries)
     }
 
     /// Process ids that currently run a turn (live busy or demoted background).
@@ -50,19 +92,86 @@ impl SessionManager {
     #[allow(dead_code)] // kept for diagnostics; reuse now includes busy processes
     pub(super) fn busy_process_ids(&self) -> std::collections::HashSet<String> {
         let mut out = std::collections::HashSet::new();
-        if let Some(s) = self.inner.lock().as_ref() {
-            if Self::live_session_is_busy(s) {
-                if !s.process_id.is_empty() {
+        {
+            let live = self.inner.lock();
+            if let Some(s) = live.as_ref() {
+                if Self::live_session_is_busy(s)
+                    && s.acp.as_ref().is_some_and(|c| c.is_alive())
+                    && !s.process_id.is_empty()
+                {
                     out.insert(s.process_id.clone());
                 }
             }
         }
-        for s in self.background.lock().values() {
-            if !s.process_id.is_empty() {
-                out.insert(s.process_id.clone());
+        {
+            let background = self.background.lock();
+            for s in background.values() {
+                if Self::live_session_is_busy(s)
+                    && s.acp.as_ref().is_some_and(|c| c.is_alive())
+                    && !s.process_id.is_empty()
+                {
+                    out.insert(s.process_id.clone());
+                }
             }
         }
         out
+    }
+
+    /// Process ids with any living live/background tenant. This is deliberately
+    /// stricter than [`Self::busy_process_ids`] for parked reclamation: killing a
+    /// parked handle kills the whole child, including a Ready live shell that
+    /// has not yet become busy.
+    pub(super) fn live_or_background_process_ids(&self) -> HashSet<String> {
+        let mut out = HashSet::new();
+        {
+            let live = self.inner.lock();
+            if let Some(s) = live.as_ref() {
+                if s.acp.as_ref().is_some_and(|c| c.is_alive()) && !s.process_id.is_empty() {
+                    out.insert(s.process_id.clone());
+                }
+            }
+        }
+        {
+            let background = self.background.lock();
+            for s in background.values() {
+                if s.acp.as_ref().is_some_and(|c| c.is_alive()) && !s.process_id.is_empty() {
+                    out.insert(s.process_id.clone());
+                }
+            }
+        }
+        out
+    }
+
+    /// Whether another session tenant still owns `process_id`.
+    /// Process-level ACP shutdown must never be decided from one session map
+    /// entry when an older shared-process state may still be present. Include
+    /// parked co-tenants too: dropping a background/live handle can otherwise
+    /// kill a Ready peer that is still represented in the parked map.
+    pub(super) fn has_other_process_tenant(
+        &self,
+        process_id: &str,
+        except_session_id: &str,
+    ) -> bool {
+        if process_id.trim().is_empty() {
+            return false;
+        }
+        {
+            let live = self.inner.lock();
+            if live.as_ref().is_some_and(|s| {
+                s.app_session_id != except_session_id
+                    && s.process_id == process_id
+                    && s.acp.as_ref().is_some_and(|c| c.is_alive())
+            }) {
+                return true;
+            }
+        }
+        self.background.lock().values().any(|s| {
+            s.app_session_id != except_session_id
+                && s.process_id == process_id
+                && s.acp.as_ref().is_some_and(|c| c.is_alive())
+        }) || self.parked.lock().values().any(|p| {
+            p.app_session_id != except_session_id && p.process_id == process_id && p.acp.is_alive()
+        })
     }
 
     pub(super) fn max_concurrent_from_settings() -> u32 {
@@ -114,20 +223,26 @@ impl SessionManager {
     /// Live + background process count (excludes reclaimable parked idle).
     /// Used for diagnostics / limit messaging after parked reclaim.
     pub(super) fn busy_process_count(&self) -> u32 {
-        let live = self
-            .inner
-            .lock()
-            .as_ref()
-            .and_then(|s| s.acp.as_ref())
-            .filter(|c| c.is_alive())
-            .is_some() as u32;
-        let background = self
-            .background
-            .lock()
-            .values()
-            .filter(|s| s.acp.as_ref().is_some_and(|c| c.is_alive()))
-            .count() as u32;
-        live + background
+        let mut entries = Vec::new();
+        {
+            let live = self.inner.lock();
+            if let Some(s) = live.as_ref() {
+                entries.push((
+                    s.process_id.clone(),
+                    s.acp.as_ref().is_some_and(|c| c.is_alive()),
+                ));
+            }
+        }
+        {
+            let background = self.background.lock();
+            entries.extend(background.values().map(|s| {
+                (
+                    s.process_id.clone(),
+                    s.acp.as_ref().is_some_and(|c| c.is_alive()),
+                )
+            }));
+        }
+        count_unique_alive_processes(entries)
     }
 
     /// True while a turn is still in flight — must demote to `background`, never park.
@@ -690,46 +805,51 @@ impl SessionManager {
 
     /// Kill oldest parked agents until `need_slots` are freed (or none left).
     /// Parked = Ready idle; never touches background busy turns.
-    pub(super) async fn free_parked_for_capacity(&self, app: &AppHandle, need_slots: u32) {
+    pub(super) async fn free_parked_for_capacity(&self, app: &AppHandle, need_slots: u32) -> usize {
         if need_slots == 0 {
-            return;
+            return 0;
         }
         // One slot = one process. Parked entries may now SHARE a process, so
         // recycle whole process groups (all sessions on the oldest process),
         // never individual entries (killing one session's handle would kill
         // the shared CLI under its co-tenants).
+        let mut freed = 0usize;
         for _ in 0..need_slots {
+            // Capacity reclaim runs under `connect_lock` in the normal spawn
+            // path. Protect every living live/background process anyway: a
+            // parked entry can be a stale co-tenant handle left behind by warm
+            // reuse, and killing it would terminate the active child.
+            let protected_process_ids = self.live_or_background_process_ids();
             let victim = {
                 let mut parked = self.parked.lock();
-                let mut groups: HashMap<String, Vec<ParkedAgent>> = HashMap::new();
-                let keys: Vec<String> = parked.keys().cloned().collect();
-                for k in keys {
-                    if let Some(p) = parked.remove(&k) {
-                        groups.entry(p.process_id.clone()).or_default().push(p);
-                    }
-                }
-                let oldest_pid = groups
-                    .iter()
-                    .min_by_key(|(_, es)| {
-                        es.iter()
-                            .map(|p| p.last_activity)
-                            .min()
-                            .unwrap_or(std::time::Instant::now())
-                    })
-                    .map(|(pid, _)| pid.clone());
+                // Select only an unshared process group. Do not temporarily
+                // drain all entries: a concurrent reader should never observe
+                // unrelated parked sessions disappearing from the pool.
+                let oldest_pid = parked
+                    .values()
+                    .filter(|p| !process_recycle_is_blocked(&p.process_id, &protected_process_ids))
+                    .min_by_key(|p| p.last_activity)
+                    .map(|p| p.process_id.clone());
                 match oldest_pid {
-                    Some(pid) => {
-                        let entries = groups.remove(&pid).unwrap_or_default();
-                        let mut rest: Vec<ParkedAgent> = Vec::new();
-                        for (_, es) in groups {
-                            rest.extend(es);
-                        }
-                        for p in rest {
-                            parked.insert(p.app_session_id.clone(), p);
-                        }
-                        Some((pid, entries))
-                    }
                     None => None,
+                    Some(pid) => {
+                        let keys: Vec<String> = parked
+                            .iter()
+                            .filter(|(_, p)| p.process_id == pid)
+                            .map(|(sid, _)| sid.clone())
+                            .collect();
+                        let mut entries = Vec::with_capacity(keys.len());
+                        for sid in keys {
+                            if let Some(p) = parked.remove(&sid) {
+                                entries.push(p);
+                            }
+                        }
+                        if entries.is_empty() {
+                            None
+                        } else {
+                            Some((pid, entries))
+                        }
+                    }
                 }
             };
             let Some((pid, entries)) = victim else {
@@ -745,7 +865,9 @@ impl SessionManager {
             for p in entries {
                 Self::emit_idle_recycled(app, &p.app_session_id, "capacity");
             }
+            freed += 1;
         }
+        freed
     }
 
     /// Move every finished `background` turn into `parked`.
@@ -777,7 +899,7 @@ impl SessionManager {
         let active = self.active_process_count();
         let need = parked_slots_to_free_for_spawn(active, max_concurrent);
         if need > 0 {
-            self.free_parked_for_capacity(app, need).await;
+            let _ = self.free_parked_for_capacity(app, need).await;
         }
         // If still full (e.g. free returned fewer), keep freeing until spawnable or empty.
         while !can_spawn_process(self.active_process_count(), max_concurrent) {
@@ -785,12 +907,21 @@ impl SessionManager {
             if parked_n == 0 {
                 break;
             }
-            self.free_parked_for_capacity(app, 1).await;
+            if self.free_parked_for_capacity(app, 1).await == 0 {
+                // All remaining parked handles belong to a living process
+                // that is still owned by another tenant. Retrying forever
+                // would spin the connect task while no safe victim exists.
+                break;
+            }
         }
     }
 
     /// Idle recycle for live + parked (I03).
     pub(super) async fn tick_idle_recycle(&self, app: &AppHandle) {
+        // Serialize watchdog recycling with connect/park/unpark. Without this
+        // boundary a warm-reuse connect can bind a new live session to a PID
+        // immediately after the watchdog decides that a parked handle is idle.
+        let _connect_guard = self.connect_lock.lock().await;
         let idle_mins = Self::idle_minutes_from_settings();
         let now = Instant::now();
         self.sweep_dead_parked();
@@ -801,6 +932,10 @@ impl SessionManager {
         // Parked first — recycle whole process groups when EVERY session on the
         // process is idle-expired (a shared process must not be killed while a
         // co-tenant session is still warm).
+        // A parked handle may still share its ACP with a live/background
+        // tenant after warm reuse. Protect every living tenant PID (not only
+        // busy ones) before any process-level kill.
+        let protected_process_ids = self.live_or_background_process_ids();
         let expired_groups: Vec<(String, Vec<ParkedAgent>)> = {
             let mut parked = self.parked.lock();
             let mut groups: HashMap<String, Vec<ParkedAgent>> = HashMap::new();
@@ -813,9 +948,10 @@ impl SessionManager {
             let mut keep: HashMap<String, ParkedAgent> = HashMap::new();
             let mut expired: Vec<(String, Vec<ParkedAgent>)> = Vec::new();
             for (pid, entries) in groups {
-                if entries
-                    .iter()
-                    .all(|p| is_idle_expired(p.last_activity, idle_mins, now))
+                if !process_recycle_is_blocked(&pid, &protected_process_ids)
+                    && entries
+                        .iter()
+                        .all(|p| is_idle_expired(p.last_activity, idle_mins, now))
                 {
                     expired.push((pid, entries));
                 } else {
@@ -842,33 +978,90 @@ impl SessionManager {
 
         // Live: only true idle Ready (never mid-turn / open tools). Killing a
         // live process also reaps any parked co-tenant entries sharing it.
-        let live_kill = {
-            let mut guard = self.inner.lock();
-            if let Some(s) = guard.as_mut() {
+        let live_candidate = {
+            let guard = self.inner.lock();
+            guard.as_ref().and_then(|s| {
                 let idle = is_idle_expired(s.last_activity, idle_mins, now);
-                let ready_idle =
-                    matches!(s.fsm.state(), SessionState::Ready) && !Self::live_session_is_busy(s);
+                let ready_idle = matches!(s.fsm.state(), SessionState::Ready)
+                    && !Self::live_session_is_busy(s)
+                    && s.acp.as_ref().is_some_and(|c| c.is_alive());
                 if idle && ready_idle {
-                    if let Some(acp) = s.acp.take() {
-                        s.fsm.soft_disconnect();
-                        s.needs_history_bootstrap = false;
-                        Some((s.app_session_id.clone(), s.process_id.clone(), acp))
-                    } else {
-                        None
-                    }
+                    Some((s.app_session_id.clone(), s.process_id.clone()))
                 } else {
                     None
                 }
-            } else {
-                None
+            })
+        };
+        let live_shared_with_background = live_candidate.as_ref().is_some_and(|(_, pid)| {
+            self.background
+                .lock()
+                .values()
+                .any(|s| s.process_id == *pid && s.acp.as_ref().is_some_and(|c| c.is_alive()))
+        });
+        if live_shared_with_background {
+            if let Some((sid, pid)) = live_candidate.as_ref() {
+                tracing::debug!(
+                    session = %sid,
+                    process = %pid,
+                    "idle recycle live skipped: shared background tenant"
+                );
             }
+        }
+        let live_kill = if live_shared_with_background {
+            None
+        } else if let Some((candidate_sid, candidate_pid)) = live_candidate {
+            // Re-check the candidate while taking the ACP. The connect lock
+            // prevents map moves, but event handling can still mark a turn
+            // terminal between the first snapshot and this point.
+            let mut guard = self.inner.lock();
+            match guard.as_mut() {
+                None => None,
+                Some(s) if s.app_session_id != candidate_sid || s.process_id != candidate_pid => {
+                    None
+                }
+                Some(s) => {
+                    let idle = is_idle_expired(s.last_activity, idle_mins, now);
+                    let ready_idle = matches!(s.fsm.state(), SessionState::Ready)
+                        && !Self::live_session_is_busy(s)
+                        && s.acp.as_ref().is_some_and(|c| c.is_alive());
+                    if idle && ready_idle {
+                        if let Some(acp) = s.acp.take() {
+                            s.fsm.soft_disconnect();
+                            s.needs_history_bootstrap = false;
+                            Some((s.app_session_id.clone(), s.process_id.clone(), acp))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+            }
+        } else {
+            None
         };
         if let Some((sid, pid, acp)) = live_kill {
             tracing::info!("idle recycle live session={sid} after {idle_mins}min");
+            // Remove parked co-tenants before killing so their eventual
+            // ProcessExited notification cannot race a later reconnect.
+            let parked_cotenants = if pid.is_empty() {
+                Vec::new()
+            } else {
+                let mut parked = self.parked.lock();
+                let keys: Vec<String> = parked
+                    .iter()
+                    .filter(|(_, p)| p.process_id == pid)
+                    .map(|(session_id, _)| session_id.clone())
+                    .collect();
+                keys.into_iter()
+                    .filter_map(|session_id| parked.remove(&session_id))
+                    .collect::<Vec<_>>()
+            };
             acp.kill().await;
-            // Co-tenants on the same process lose their process too.
-            self.parked.lock().retain(|_, p| p.process_id != pid);
             Self::emit_idle_recycled(app, &sid, "idle");
+            for p in parked_cotenants {
+                Self::emit_idle_recycled(app, &p.app_session_id, "idle");
+            }
             Self::emit_state(app, &self.snapshot());
         }
     }
@@ -1064,7 +1257,7 @@ impl SessionManager {
         } else {
             format!("**{code}**\n\n{detail}")
         };
-        let _ = store::append_message(
+        if let Err(e) = store::append_message(
             &s.app_session_id,
             ChatMessageStored {
                 id: mid.clone(),
@@ -1076,9 +1269,13 @@ impl SessionManager {
                 attachments: None,
                 marker: None,
             },
-        );
+        ) {
+            tracing::error!(session = %s.app_session_id, "turn-error journal append failed: {e}");
+        }
         s.meta.updated_at = chrono::Utc::now();
-        let _ = store::update_session_meta(&s.meta);
+        if let Err(e) = store::update_session_meta(&s.meta) {
+            tracing::warn!(session = %s.app_session_id, "turn-error metadata update failed: {e}");
+        }
         // Clear *all* busy markers (including deferred prompt_complete / open tools).
         // Leaving them set after fail_with left the session as Disconnected+busy,
         // so connect no-oped forever and local sends failed while Remote IM still worked.
@@ -1094,5 +1291,42 @@ impl SessionManager {
                 "content": content,
             }),
         );
+    }
+}
+
+#[cfg(test)]
+mod process_accounting_tests {
+    use super::{count_unique_alive_processes, process_recycle_is_blocked};
+    use std::collections::HashSet;
+
+    #[test]
+    fn shared_process_id_counts_once_across_session_slots() {
+        let count = count_unique_alive_processes([
+            ("proc-shared".to_string(), true), // live
+            ("proc-shared".to_string(), true), // background co-tenant
+            ("proc-shared".to_string(), true), // parked co-tenant
+            ("proc-other".to_string(), true),
+            ("proc-dead".to_string(), false),
+        ]);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn unknown_alive_processes_are_counted_conservatively() {
+        let count = count_unique_alive_processes([
+            (String::new(), true),
+            (String::new(), true),
+            ("proc-dead".to_string(), false),
+        ]);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn parked_recycle_is_blocked_for_shared_or_unknown_processes() {
+        let protected = HashSet::from(["proc-busy".to_string(), "proc-ready".to_string()]);
+        assert!(process_recycle_is_blocked("proc-busy", &protected));
+        assert!(process_recycle_is_blocked("proc-ready", &protected));
+        assert!(process_recycle_is_blocked("", &protected));
+        assert!(!process_recycle_is_blocked("proc-idle", &protected));
     }
 }

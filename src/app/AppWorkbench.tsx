@@ -699,6 +699,7 @@ import {
 } from "@/components/PromptHistoryPanel";
 import {
   planClearSendQueue,
+  queueSessionKey,
   queuePreviewText,
   resolveSendQueueStripState,
   shouldEnqueueSend,
@@ -1578,8 +1579,28 @@ export function AppWorkbench() {
   sessionJsonSchemaRef.current = sessionJsonSchema;
   const [showJsonSchemaModal, setShowJsonSchemaModal] = useState(false);
   const [jsonSchemaDraft, setJsonSchemaDraft] = useState("");
-  /** Prevent overlapping executeSend / queue auto-flush races. */
+  /**
+   * Prevent overlapping sends per App session.  The boolean ref is retained
+   * as a compatibility aggregate for older hooks; all new claims use the
+   * session-keyed set so chat B is never blocked by chat A.
+   */
   const sendInFlightRef = useRef(false);
+  const sendInFlightBySessionRef = useRef<Set<string>>(new Set());
+  const sendEpochBySessionRef = useRef<Map<string, number>>(new Map());
+  const isSendInFlightForSession = (sessionId: string | null | undefined) =>
+    sendInFlightBySessionRef.current.has(queueSessionKey(sessionId));
+  const claimSendForSession = (sessionId: string | null | undefined) => {
+    const key = queueSessionKey(sessionId);
+    const set = sendInFlightBySessionRef.current;
+    if (set.has(key)) return false;
+    set.add(key);
+    sendInFlightRef.current = set.size > 0;
+    return true;
+  };
+  const releaseSendForSession = (sessionId: string | null | undefined) => {
+    sendInFlightBySessionRef.current.delete(queueSessionKey(sessionId));
+    sendInFlightRef.current = sendInFlightBySessionRef.current.size > 0;
+  };
   /**
    * Bumped when a send is superseded (ghost heal / new attempt) so a hung
    * `sessionSend` await cannot re-apply liveMap busy after UI already healed.
@@ -2577,6 +2598,25 @@ export function AppWorkbench() {
   const [connecting, setConnecting] = useState(false);
   /** Sync gate for ensureConnected (React state alone races two rapid sends). */
   const connectingRef = useRef(false);
+  /** Host connection claims are per session; warm-connect must not block B on A. */
+  const connectingBySessionRef = useRef<Set<string>>(new Set());
+  const ensureConnectCountRef = useRef(0);
+  const claimSessionConnection = (sessionId: string | null | undefined) => {
+    const key = queueSessionKey(sessionId);
+    const set = connectingBySessionRef.current;
+    if (set.has(key)) return false;
+    set.add(key);
+    return true;
+  };
+  const releaseSessionConnection = (keys: Iterable<string>) => {
+    const set = connectingBySessionRef.current;
+    for (const key of keys) set.delete(key);
+  };
+  const syncEnsureConnectingUi = () => {
+    const active = ensureConnectCountRef.current > 0;
+    connectingRef.current = active;
+    setConnecting(active);
+  };
   /** Live provider retry progress (session://retry); cleared on success/stop/error. */
   // Value intentionally unbound (retry chip hidden): only the setter is kept
   // for cleanup calls. See the hidden-retry comment at the status-pill site.
@@ -4856,8 +4896,8 @@ export function AppWorkbench() {
     if (
       api.isTauri() &&
       !deferForeign &&
-      !sendInFlightRef.current &&
-      !connectingRef.current &&
+      !isSendInFlightForSession(s.id) &&
+      !connectingBySessionRef.current.has(queueSessionKey(s.id)) &&
       (!proj || (proj.trusted && !isProjectPathMissing(proj.pathOk))) &&
       !(live.sessionId === s.id && live.state === "ready")
     ) {
@@ -4870,11 +4910,19 @@ export function AppWorkbench() {
       warmConnectTimerRef.current = setTimeout(() => {
         warmConnectTimerRef.current = null;
         if (!stillThisOpen()) return;
-        if (sendInFlightRef.current || connectingRef.current) return;
+        if (
+          isSendInFlightForSession(warmId) ||
+          connectingBySessionRef.current.has(queueSessionKey(warmId))
+        ) {
+          return;
+        }
         if (shouldSkipWarmConnect(isSecondaryWindowRef.current)) return;
+        if (!claimSessionConnection(warmId)) return;
         void (async () => {
-          if (!stillThisOpen()) return;
-          if (sendInFlightRef.current || connectingRef.current) return;
+          if (!stillThisOpen()) {
+            releaseSessionConnection([queueSessionKey(warmId)]);
+            return;
+          }
           try {
             const snap = await api.sessionConnect({
               projectPath: warmProjPath,
@@ -4899,6 +4947,8 @@ export function AppWorkbench() {
             }
           } catch (e) {
             console.warn("warm connect failed", e);
+          } finally {
+            releaseSessionConnection([queueSessionKey(warmId)]);
           }
         })();
       }, WARM_CONNECT_DEBOUNCE_MS);
@@ -7472,11 +7522,16 @@ export function AppWorkbench() {
     }
     // Serialize connects with a ref so two rapid sends cannot both pass a stale
     // `connecting` state check (React setState is async).
-    if (connectingRef.current) {
+    const connectKey = queueSessionKey(preferredId);
+    const heldConnectKeys = new Set<string>([connectKey]);
+    if (connectingBySessionRef.current.has(connectKey)) {
       // Another connect is in flight — do not drop the caller's send. Wait briefly
       // for the in-flight connect if it targets the same preferred session.
       const waitStart = Date.now();
-      while (connectingRef.current && Date.now() - waitStart < 120_000) {
+      while (
+        connectingBySessionRef.current.has(connectKey) &&
+        Date.now() - waitStart < 120_000
+      ) {
         await new Promise((r) => setTimeout(r, 50));
         const live = liveHostRef.current;
         if (
@@ -7488,10 +7543,11 @@ export function AppWorkbench() {
           return preferredId;
         }
       }
-      if (connectingRef.current) return null;
+      if (connectingBySessionRef.current.has(connectKey)) return null;
     }
-    connectingRef.current = true;
-    setConnecting(true);
+    if (!claimSessionConnection(preferredId)) return null;
+    ensureConnectCountRef.current += 1;
+    syncEnsureConnectingUi();
     // Capture view identity before awaits. Drafts are all `null`, so the epoch
     // is what distinguishes "still on my draft" from "user opened a new one".
     const originView = currentViewFocus();
@@ -7507,6 +7563,18 @@ export function AppWorkbench() {
           tr("session.new"),
         )) as { id: string; title?: string };
         sessionId = meta.id;
+        // Atomically move the draft connection claim onto the real id. After
+        // this synchronous handoff, a second send to the materialized session
+        // observes the same claim, while a newly opened draft stays independent.
+        const materializedKey = queueSessionKey(sessionId);
+        if (!heldConnectKeys.has(materializedKey)) {
+          const claims = connectingBySessionRef.current;
+          if (claims.has(materializedKey)) return null;
+          claims.delete(connectKey);
+          heldConnectKeys.delete(connectKey);
+          claims.add(materializedKey);
+          heldConnectKeys.add(materializedKey);
+        }
         // Persist draft-page JSON Schema onto the new session before connect
         // so spawn can take top-level `grok --json-schema`.
         const pendingSchema = sessionJsonSchemaRef.current?.trim() || "";
@@ -7628,8 +7696,9 @@ export function AppWorkbench() {
       }
       return null;
     } finally {
-      connectingRef.current = false;
-      setConnecting(false);
+      releaseSessionConnection(heldConnectKeys);
+      ensureConnectCountRef.current = Math.max(0, ensureConnectCountRef.current - 1);
+      syncEnsureConnectingUi();
     }
   };
 
@@ -7718,18 +7787,9 @@ export function AppWorkbench() {
       setLocalError(tr("session.secondaryLiveBanner"));
       return false;
     }
-    if (sendInFlightRef.current) return false;
-    sendInFlightRef.current = true;
-    const sendEpoch = ++sendEpochRef.current;
     const { storedDisplay, att, goalMode: useGoal, fromQueue } = opts;
-    const segments = parseStoredContent(storedDisplay);
-    if (isDraftEmpty(segments) && !att.length) {
-      sendInFlightRef.current = false;
-      return false;
-    }
-    // Prefer viewing id over shell sessionId — openSession points viewing at
-    // the new chat before journal load finishes setSession; using only shell
-    // mis-routed sends into the previous (often stuck) chat.
+    // Resolve the target before claiming so the lock is scoped to the chat
+    // that will actually receive the prompt (drafts use a stable sentinel).
     const sendTargetId =
       opts.targetSessionId !== undefined
         ? opts.targetSessionId
@@ -7737,6 +7797,27 @@ export function AppWorkbench() {
             viewingSessionId: viewingSessionIdRef.current,
             shellSessionId: session.sessionId,
           });
+    const sendKey = queueSessionKey(sendTargetId);
+    if (!claimSendForSession(sendTargetId)) return false;
+    const heldSendKeys = new Set<string>([sendKey]);
+    const sendEpoch = (sendEpochBySessionRef.current.get(sendKey) ?? 0) + 1;
+    sendEpochBySessionRef.current.set(sendKey, sendEpoch);
+    sendEpochRef.current += 1;
+    const sendEpochCurrent = () =>
+      [...heldSendKeys].every(
+        (key) => sendEpochBySessionRef.current.get(key) === sendEpoch,
+      );
+    const segments = parseStoredContent(storedDisplay);
+    if (isDraftEmpty(segments) && !att.length) {
+      releaseSendForSession(sendTargetId);
+      if (sendEpochBySessionRef.current.get(sendKey) === sendEpoch) {
+        sendEpochBySessionRef.current.delete(sendKey);
+      }
+      return false;
+    }
+    // Prefer viewing id over shell sessionId — openSession points viewing at
+    // the new chat before journal load finishes setSession; using only shell
+    // mis-routed sends into the previous (often stuck) chat.
     const cacheKey = sendTargetId ?? "__draft__";
     // Draft sends have no id to compare, so pin them to the view they came from:
     // otherwise the optimistic bubbles / streaming state paint whatever *new*
@@ -7907,6 +7988,25 @@ export function AppWorkbench() {
         failStrip();
         return false;
       }
+      // Draft sends materialize a real id during ensureConnected. Atomically
+      // migrate the claim so a second call targeting the new id cannot slip
+      // through, while a newly opened draft remains independent.
+      const materializedSendKey = queueSessionKey(sessionId);
+      if (!heldSendKeys.has(materializedSendKey)) {
+        const claims = sendInFlightBySessionRef.current;
+        if (claims.has(materializedSendKey)) {
+          failStrip();
+          return false;
+        }
+        claims.delete(sendKey);
+        heldSendKeys.delete(sendKey);
+        if (sendEpochBySessionRef.current.get(sendKey) === sendEpoch) {
+          sendEpochBySessionRef.current.delete(sendKey);
+        }
+        claims.add(materializedSendKey);
+        heldSendKeys.add(materializedSendKey);
+        sendEpochBySessionRef.current.set(materializedSendKey, sendEpoch);
+      }
       if (fromQueue && sendTargetId && sessionId !== sendTargetId) {
         failStrip();
         return false;
@@ -7974,17 +8074,17 @@ export function AppWorkbench() {
         // (idle recycle / crash while `liveHost` still looked ready).
         // Cold-connect that chat once, then retry the same turn.
         if (!isSessionNotLiveError(sendErr)) throw sendErr;
-        if (sendEpoch !== sendEpochRef.current) return false;
+        if (!sendEpochCurrent()) return false;
         const reconnected = await ensureConnected({
           sessionId,
           force: true,
         });
         if (reconnected !== sessionId) throw sendErr;
-        if (sendEpoch !== sendEpochRef.current) return false;
+        if (!sendEpochCurrent()) return false;
         await api.sessionSend(agentText, storedDisplay, sessionId, att);
       }
       // Ghost heal / newer send superseded this await — do not re-dirty UI.
-      if (sendEpoch !== sendEpochRef.current) return false;
+      if (!sendEpochCurrent()) return false;
       // Keep liveMap busy for this session if the user already left the thread.
       setLiveMap((prev) =>
         projectHostIntoLiveMap(prev, {
@@ -8023,14 +8123,19 @@ export function AppWorkbench() {
       }
       return true;
     } catch (e) {
-      if (sendEpoch !== sendEpochRef.current) return false;
+      if (!sendEpochCurrent()) return false;
       failStrip();
       if (viewingTarget()) setLocalError(String(e));
       return false;
     } finally {
-      if (sendEpoch === sendEpochRef.current) {
-        sendInFlightRef.current = false;
+      for (const key of heldSendKeys) {
+        // A ghost-heal or newer send may already own this session key. An old
+        // await must not release that newer claim when it finally settles.
+        if (sendEpochBySessionRef.current.get(key) !== sendEpoch) continue;
+        sendInFlightBySessionRef.current.delete(key);
+        sendEpochBySessionRef.current.delete(key);
       }
+      sendInFlightRef.current = sendInFlightBySessionRef.current.size > 0;
     }
   };
 
@@ -10497,6 +10602,8 @@ export function AppWorkbench() {
     liveHostRef,
     viewingSessionIdRef,
     sendInFlightRef,
+    sendInFlightBySessionRef,
+    connectingBySessionRef,
     executeSendRef: executeSendFromQueueRef,
     showToast,
     acceptExternal: !isSecondaryWindow,
@@ -10526,6 +10633,8 @@ export function AppWorkbench() {
     setLiveMap,
     clearTurnClock,
     setStreamStall: (v) => setStreamStall(v),
+    sendInFlightBySessionRef,
+    sendEpochBySessionRef,
     restoreComposer: (text) => {
       setDraft(text);
       requestComposerFocus();
@@ -10623,7 +10732,14 @@ export function AppWorkbench() {
 
   const sendQueuedMessageNow = useCallback(
     async (item: QueuedSend) => {
-      if (guidingQueueItemId || sendInFlightRef.current) return;
+      if (
+        guidingQueueItemId ||
+        isSendInFlightForSession(
+          viewingSessionIdRef.current ?? session.sessionId,
+        )
+      ) {
+        return;
+      }
       sendQueue.removeItem(item.id);
       setGuidingQueueItemId(item.id);
       const ok = await executeSendFromQueueRef.current({

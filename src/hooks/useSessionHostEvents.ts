@@ -260,14 +260,72 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
 
     let cancelled = false;
     const cleanups: Array<() => void> = [];
+    const registrationPromises: Promise<unknown>[] = [];
 
-    const track = async (p: Promise<() => void>) => {
-      const un = await p;
-      if (cancelled) {
-        un();
-      } else {
-        cleanups.push(un);
+    /**
+     * Registering a listener is an IPC operation in both desktop and mirror
+     * modes.  A transient transport failure must not abort the rest of the
+    * listener boot sequence (the old `track(...)` chain did exactly
+     * that).  Keep retrying with a capped backoff until this subscription epoch
+     * is disposed; this also lets a mirror reconnect heal a missed listener
+     * without requiring a full window remount.
+     */
+    const listenWithRetry = async <T>(
+      event: string,
+      handler: (payload: T) => void,
+    ): Promise<() => void> => {
+      let attempt = 0;
+      let lastError: unknown;
+      while (!cancelled) {
+        try {
+          return await api.listen<T>(event, handler);
+        } catch (e) {
+          lastError = e;
+          const delayMs = Math.min(5_000, 250 * 2 ** Math.min(attempt, 4));
+          attempt += 1;
+          if (attempt === 1 || attempt % 5 === 0) {
+            console.warn(
+              `[host-events] listener registration failed (${event}); retrying`,
+              e,
+            );
+          }
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, delayMs);
+          });
+        }
       }
+      // The caller will immediately dispose this no-op when cancellation wins
+      // the race with an in-flight registration.
+      if (lastError) {
+        console.debug(`[host-events] listener registration cancelled (${event})`);
+      }
+      return () => {};
+    };
+
+    /**
+     * Start registration independently.  Do not await one listener before
+     * starting the next: a single broken event channel must not create a
+     * startup-wide event window for every later channel.
+     */
+    const track = (p: Promise<() => void>) => {
+      const registration = p
+        .then((un) => {
+          if (cancelled) {
+            un();
+          } else {
+            cleanups.push(un);
+          }
+        })
+        .catch((e) => {
+          // `listenWithRetry` normally only rejects on an unexpected API
+          // failure.  Keep this isolated so one listener can never suppress
+          // snapshot hydration or the remaining listeners.
+          if (!cancelled) {
+            console.warn("[host-events] listener registration abandoned", e);
+          }
+        });
+      registrationPromises.push(registration);
+      void registration;
     };
 
     void (async () => {
@@ -360,8 +418,15 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
           streamCoalescer?.flushAll();
         };
 
-        const snap = await api.sessionGetState();
-        if (!cancelled) {
+        // Snapshot hydration runs after all event channels are registered.
+        const hydrateInitialSnapshot = async (opts?: {
+          adoptHostFocus?: boolean;
+        }) => {
+          const adoptHostFocus = opts?.adoptHostFocus ?? true;
+          const requestedViewing = c.viewingSessionIdRef.current;
+          const requestedOpening = c.openingSessionIdRef?.current ?? null;
+          const snap = await api.sessionGetState();
+          if (!cancelled) {
           c.setLiveHost(snap);
           c.liveHostRef.current = snap;
           // Project Host live row into liveMap for sidebar busy badges.
@@ -378,7 +443,12 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
                 streamingMessageId: snap.streamingMessageId,
               }),
             );
-            if (!secondary) {
+            const canAdoptHostFocus =
+              adoptHostFocus &&
+              (requestedViewing == null || requestedViewing === snap.sessionId) &&
+              c.viewingSessionIdRef.current === requestedViewing &&
+              (c.openingSessionIdRef?.current ?? null) === requestedOpening;
+            if (!secondary && canAdoptHostFocus) {
               c.setSession((prev) => ({
                 ...snap,
                 state: reconcileSessionState(snap.state, prev.state),
@@ -397,13 +467,38 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
               c.viewingSessionIdRef.current = snap.sessionId;
             }
           }
+          }
+        };
+
+        // Mirror clients force a reconnect when the broadcast ring reports a
+        // lagged receiver. Rehydrate the host snapshot and the currently
+        // viewed journal as soon as that socket is back so dropped stream
+        // frames cannot leave the phone UI permanently stale.
+        if (isMirrorClient()) {
+          track(
+            listenWithRetry<{ resumed?: boolean }>(
+              "mirror://reconnected",
+              () => {
+                void hydrateInitialSnapshot({ adoptHostFocus: false })
+                  .then(() => {
+                    const sid = c.viewingSessionIdRef.current;
+                    if (sid) scheduleJournalRehydrate(sid, 0);
+                  })
+                  .catch((e) => {
+                    if (!cancelled) {
+                      console.warn("[host-events] mirror resync failed", e);
+                    }
+                  });
+              },
+            ),
+          );
         }
 
         // Host finished a turn but App journal may still miss the final
         // assistant body (stream dropped / sticky finish). Rehydrate so UI
         // leaves "thinking" and shows the real answer.
-        await track(
-          api.listen<{ sessionId?: string; changed?: number }>(
+       track(
+          listenWithRetry<{ sessionId?: string; changed?: number }>(
             "session://journal_reconciled",
             (p) => {
               if (cancelled || !p?.sessionId) return;
@@ -421,8 +516,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             },
           ),
         );
-        await track(
-          api.listen<SessionSnapshot>("session://state", (s) => {
+       track(
+          listenWithRetry<SessionSnapshot>("session://state", (s) => {
             if (cancelled) return;
             // Host focus slot (the process under the live cursor). Multi-session
             // busy demotions also emit session://runtime so liveMap stays honest.
@@ -581,8 +676,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
           }),
         );
         // Background / parked multi-session runtime (does not steal liveHost focus).
-        await track(
-          api.listen<SessionSnapshot>("session://runtime", (s) => {
+       track(
+          listenWithRetry<SessionSnapshot>("session://runtime", (s) => {
             if (cancelled || !s.sessionId) return;
             const prevLiveState = c.liveMapRef.current[s.sessionId]?.state;
             c.setLiveMap((prev) =>
@@ -848,16 +943,16 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
           },
         });
         cleanups.push(() => streamCoalescer?.dispose());
-        await track(
-          api.listen<StreamPayload>("session://stream", (chunk) => {
+       track(
+          listenWithRetry<StreamPayload>("session://stream", (chunk) => {
             if (cancelled) return;
             // Turn-end honesty: drain pending tool progress before applying done.
             if (chunk.done) toolEventCoalescer?.flushAll();
             streamCoalescer?.push(chunk);
           }),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId: string;
             message: ChatMessage;
             postStreamMessageId?: string | null;
@@ -880,8 +975,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             c.restartTurnClock(payload.sessionId);
           }),
         );
-        await track(
-          api.listen<GeneratedImagePayload>(
+       track(
+          listenWithRetry<GeneratedImagePayload>(
             "session://generated_image",
             (p) => {
               if (cancelled || !p?.path) return;
@@ -891,8 +986,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             },
           ),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId?: string;
             messageId?: string;
             trigger?: string;
@@ -977,8 +1072,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             }
           }),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId?: string;
             totalTokens?: number;
             inputTokens?: number;
@@ -1079,8 +1174,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             );
           }),
         );
-        await track(
-          api.listen<HostToolEvent>("session://tool", (p) => {
+       track(
+          listenWithRetry<HostToolEvent>("session://tool", (p) => {
             if (cancelled || !p?.toolCallId) return;
             const sid = p.sessionId || c.viewingSessionIdRef.current;
             if (!sid) return;
@@ -1109,8 +1204,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             }
           }),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId?: string;
             kind?: string;
             eventName?: string;
@@ -1124,8 +1219,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             ingestHostHookPayload(p);
           }),
         );
-        await track(
-          api.listen<GoalOrchHostPayload>("session://goal", (p) => {
+       track(
+          listenWithRetry<GoalOrchHostPayload>("session://goal", (p) => {
             if (cancelled || !p) return;
             // CLI 0.2.117+ goal_updated — soft-fail when CLI never emits.
             const ev = goalEventFromHostPayload(p);
@@ -1135,15 +1230,15 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             );
           }),
         );
-        await track(
-          api.listen<{ line?: string }>("session://stderr", (p) => {
+       track(
+          listenWithRetry<{ line?: string }>("session://stderr", (p) => {
             if (cancelled || !p?.line) return;
             // Fallback: agent log lines that mention hooks (fail-open, timeouts, …).
             ingestHookLogLine(p.line);
           }),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId?: string;
             messageId?: string;
             marker?: string;
@@ -1164,8 +1259,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             }
           }),
         );
-        await track(
-          api.listen<{ sessionId?: string; reason?: string }>(
+       track(
+          listenWithRetry<{ sessionId?: string; reason?: string }>(
             "session://idle_recycled",
             (p) => {
               if (cancelled || !p) return;
@@ -1195,8 +1290,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             },
           ),
         );
-        await track(
-          api.listen<{ reason?: string; killed?: number }>(
+       track(
+          listenWithRetry<{ reason?: string; killed?: number }>(
             "session://agents_recycled",
             (p) => {
               if (cancelled || !p) return;
@@ -1232,8 +1327,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
         // #524 + plan gates: agent recycled / exited while a human gate was open —
         // drop stale Approve (permission / plan / ask_user) so UI never writes to
         // a dead stdin. Host payload includes planRpcId / askUserRpcId.
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             reason?: string;
             sessions?: Array<{
               sessionId?: string;
@@ -1294,8 +1389,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             }
           }),
         );
-        await track(
-          api.listen<{ reason?: string }>(
+       track(
+          listenWithRetry<{ reason?: string }>(
             "session://agent_soft_respawn",
             (p) => {
               if (cancelled || !p) return;
@@ -1305,8 +1400,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             },
           ),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId?: string;
             stopReason?: string;
             toolCount?: number;
@@ -1347,8 +1442,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             window.setTimeout(() => c.setToast(null), 7200);
           }),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId?: string;
             code?: string;
             message?: string;
@@ -1372,8 +1467,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             }
           }),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId?: string;
             stallSeconds?: number;
             code?: string;
@@ -1436,8 +1531,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
           }),
         );
         // Long-tool heartbeat: Host re-armed stall; clear soft banner for this chat.
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId?: string;
             toolCallIds?: string[];
             openCount?: number;
@@ -1450,8 +1545,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             }
           }),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             sessionId?: string;
             stallSeconds?: number;
             code?: string;
@@ -1507,8 +1602,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             }
           }),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             attempt?: number;
             maxRetries?: number;
             reason?: string;
@@ -1535,8 +1630,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             c.setRetryStatus({ attempt, maxRetries, reason });
           }),
         );
-        await track(
-          api.listen<TurnErrorPayload>("session://turn_error", (p) => {
+       track(
+          listenWithRetry<TurnErrorPayload>("session://turn_error", (p) => {
             if (cancelled) return;
             c.clearPendingGatesRef.current(p.sessionId);
             if (p.sessionId === c.viewingSessionIdRef.current) {
@@ -1547,8 +1642,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             );
           }),
         );
-        await track(
-          api.listen<PermissionPayload>("session://permission", (p) => {
+       track(
+          listenWithRetry<PermissionPayload>("session://permission", (p) => {
             if (cancelled) return;
             // Park it against its session so returning to that chat can answer.
             if (p.sessionId) {
@@ -1592,8 +1687,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             }
           }),
         );
-        await track(
-          api.listen<AskUserPayload>("session://ask_user", (p) => {
+       track(
+          listenWithRetry<AskUserPayload>("session://ask_user", (p) => {
             if (cancelled) return;
             // rpcId may legitimately be 0 (JSON-RPC ids start at 0). A truthy
             // guard here used to drop id=0 questions, so the modal never showed
@@ -1640,8 +1735,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
           }),
         );
         // Host stop / interject auto-cancels pending questionnaires — drop the modal.
-        await track(
-          api.listen<{ sessionId?: string; reason?: string }>(
+       track(
+          listenWithRetry<{ sessionId?: string; reason?: string }>(
             "session://ask_user_cleared",
             (p) => {
               if (cancelled) return;
@@ -1654,8 +1749,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             },
           ),
         );
-        await track(
-          api.listen<{
+       track(
+          listenWithRetry<{
             entries?: unknown[];
             body?: string | null;
             sessionId?: string;
@@ -1801,8 +1896,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             });
           }),
         );
-        await track(
-          api.listen<{ sessionId?: string; title?: string }>(
+       track(
+          listenWithRetry<{ sessionId?: string; title?: string }>(
             "session://title",
             (p) => {
               if (cancelled || !p.sessionId || !p.title) return;
@@ -1826,8 +1921,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
         );
         // Remote IM wrote sessions_index / messages.json — refresh sidebar +
         // reload journal if the user is currently viewing that session.
-        await track(
-          api.listen<{ sessionId?: string; source?: string }>(
+       track(
+          listenWithRetry<{ sessionId?: string; source?: string }>(
             "session://index_changed",
             (p) => {
               if (cancelled) return;
@@ -1861,6 +1956,22 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             },
           ),
         );
+        // Give successful listener registrations a chance to settle before
+        // hydrating the snapshot. A broken channel must not block startup
+        // forever: listenWithRetry keeps retrying independently, while this
+        // bounded barrier lets snapshot/journal hydration compensate for any
+        // subscription that is still unavailable.
+        await Promise.race([
+          Promise.allSettled(registrationPromises),
+          new Promise<void>((resolve) => window.setTimeout(resolve, 1000)),
+        ]);
+        await hydrateInitialSnapshot().catch((e) => {
+          if (!cancelled) {
+            console.warn("[host-events] initial snapshot failed", e);
+          }
+        });
+        const initialSid = c.viewingSessionIdRef.current;
+        if (initialSid) scheduleJournalRehydrate(initialSid, 0);
       } catch (e) {
         if (!cancelled) c.setLocalError(String(e));
       }

@@ -969,22 +969,19 @@ pub fn row_should_lift_official_high_to_xhigh(
 }
 
 fn migrate_official_effort_xhigh_rows(global_model_id: Option<&str>) {
-    let mut sessions = load_sessions_index();
-    let mut sessions_changed = false;
-    for s in &mut sessions {
-        if row_should_lift_official_high_to_xhigh(
-            s.model_id.as_deref(),
-            s.effort.as_deref(),
-            global_model_id,
-        ) {
-            s.effort = Some(DEFAULT_OFFICIAL_EFFORT.into());
-            sessions_changed = true;
+    if let Err(e) = update_sessions_index(|sessions| {
+        for s in sessions {
+            if row_should_lift_official_high_to_xhigh(
+                s.model_id.as_deref(),
+                s.effort.as_deref(),
+                global_model_id,
+            ) {
+                s.effort = Some(DEFAULT_OFFICIAL_EFFORT.into());
+            }
         }
-    }
-    if sessions_changed {
-        if let Err(e) = save_sessions_index(&sessions) {
-            tracing::warn!("effort row migration: sessions_index: {e}");
-        }
+        Ok(())
+    }) {
+        tracing::warn!("effort row migration: sessions_index: {e}");
     }
     let mut projects = load_projects();
     let mut projects_changed = false;
@@ -1129,17 +1126,14 @@ fn migrate_legacy_general_project(list: &mut Vec<Project>) {
 }
 
 fn rehome_general_sessions() {
-    let mut sessions: Vec<SessionMeta> = read_json_recover(&sessions_index_file());
-    let mut dirty = false;
-    for s in &mut sessions {
-        if s.project_id.as_deref() == Some(GENERAL_PROJECT_ID) {
-            s.project_id = None;
-            dirty = true;
+    let _ = update_sessions_index(|sessions| {
+        for s in sessions {
+            if s.project_id.as_deref() == Some(GENERAL_PROJECT_ID) {
+                s.project_id = None;
+            }
         }
-    }
-    if dirty {
-        let _ = write_json(&sessions_index_file(), &sessions);
-    }
+        Ok(())
+    });
 }
 
 pub fn save_projects(list: &[Project]) -> Result<(), String> {
@@ -1501,6 +1495,69 @@ pub fn save_sessions_index(list: &[SessionMeta]) -> Result<(), String> {
     write_json(&sessions_index_file(), &list)
 }
 
+/// Atomically load, mutate, and persist the sessions index.
+///
+/// The file lock must cover the *entire* read-modify-write transaction.  A
+/// lock around only `save_sessions_index` still allows two App instances to
+/// read the same stale snapshot and overwrite one another's session metadata.
+/// Callers receive their mutation result only after a required replacement
+/// write has completed successfully, so a failed write cannot be mistaken for
+/// a commit. No-op mutations avoid touching the file.
+pub fn update_sessions_index<R>(
+    mutate: impl FnOnce(&mut Vec<SessionMeta>) -> Result<R, String>,
+) -> Result<R, String> {
+    let _ = ensure_app_dirs();
+    let path = sessions_index_file();
+    crate::store_lock::with_exclusive_lock(&path, || {
+        let mut list: Vec<SessionMeta> = read_json_recover(&path);
+        sort_sessions_by_pin_then_updated(&mut list);
+        let before = serde_json::to_vec(&list).map_err(|e| e.to_string())?;
+        let result = mutate(&mut list)?;
+        sort_sessions_by_pin_then_updated(&mut list);
+        let serialized = serde_json::to_string_pretty(&list).map_err(|e| e.to_string())?;
+        // Avoid rewriting the index for no-op migrations (load_projects calls
+        // the legacy rehome check on every read), while still keeping the
+        // comparison inside the transaction boundary.
+        let after = serde_json::to_vec(&list).map_err(|e| e.to_string())?;
+        if before != after {
+            crate::store_lock::write_bytes_replace(&path, serialized.as_bytes())?;
+        }
+        Ok(result)
+    })
+}
+
+/// Update a session row under the index transaction boundary.
+///
+/// This small convenience keeps external callers from accidentally falling
+/// back to `load_sessions_index` + `save_sessions_index` and reintroducing a
+/// stale-snapshot race.
+pub fn update_session_index_row(meta: &SessionMeta) -> Result<SessionMeta, String> {
+    let meta = meta.clone();
+    update_sessions_index(move |list| {
+        if let Some(slot) = list.iter_mut().find(|s| s.id == meta.id) {
+            *slot = meta.clone();
+        } else {
+            list.insert(0, meta.clone());
+        }
+        Ok(meta)
+    })
+}
+
+/// Mutate one session row while holding the sessions-index transaction lock.
+fn update_session_row<R>(
+    id: &str,
+    mutate: impl FnOnce(&mut SessionMeta) -> Result<R, String>,
+) -> Result<R, String> {
+    let id = id.to_string();
+    update_sessions_index(move |list| {
+        let session = list
+            .iter_mut()
+            .find(|s| s.id == id)
+            .ok_or_else(|| "session not found".to_string())?;
+        mutate(session)
+    })
+}
+
 pub fn create_session(
     project_id: Option<String>,
     title: Option<String>,
@@ -1539,9 +1596,13 @@ pub fn create_session(
         fork_agent_session: false,
         no_ask_user: None,
     };
-    let mut list = load_sessions_index();
-    list.insert(0, meta.clone());
-    save_sessions_index(&list)?;
+    update_sessions_index({
+        let meta = meta.clone();
+        move |list| {
+            list.insert(0, meta);
+            Ok(())
+        }
+    })?;
     let dir = session_dir(&id);
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     write_json(&dir.join("messages.json"), &Vec::<ChatMessageStored>::new())?;
@@ -1549,19 +1610,15 @@ pub fn create_session(
 }
 
 pub fn update_session_meta(meta: &SessionMeta) -> Result<(), String> {
-    let mut list = load_sessions_index();
-    if let Some(s) = list.iter_mut().find(|s| s.id == meta.id) {
-        *s = meta.clone();
-    } else {
-        list.insert(0, meta.clone());
-    }
-    save_sessions_index(&list)
+    update_session_index_row(meta).map(|_| ())
 }
 
 pub fn delete_session(id: &str) -> Result<(), String> {
-    let mut list = load_sessions_index();
-    list.retain(|s| s.id != id);
-    save_sessions_index(&list)?;
+    let id_for_index = id.to_string();
+    update_sessions_index(move |list| {
+        list.retain(|s| s.id != id_for_index);
+        Ok(())
+    })?;
     let dir = session_dir(id);
     let _ = fs::remove_dir_all(dir);
     Ok(())
@@ -1572,55 +1629,35 @@ pub fn rename_session(id: &str, title: &str) -> Result<SessionMeta, String> {
     if title.is_empty() {
         return Err("title empty".into());
     }
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.title = title.to_string();
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.title = title.to_string();
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 pub fn set_session_scheduled(id: &str, scheduled: bool) -> Result<SessionMeta, String> {
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.scheduled = scheduled;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.scheduled = scheduled;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 pub fn set_session_archived(id: &str, archived: bool) -> Result<SessionMeta, String> {
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.archived = archived;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.archived = archived;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 pub fn set_session_pinned(id: &str, pinned: bool) -> Result<SessionMeta, String> {
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.pinned = pinned;
-    // Do not bump updated_at — pin is organizational (same as project pin).
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.pinned = pinned;
+        // Do not bump updated_at — pin is organizational (same as project pin).
+        Ok(s.clone())
+    })
 }
 
 /// Attach or clear worktree linkage on a session (path/branch/badge flag).
@@ -1636,23 +1673,18 @@ pub fn set_session_worktree(
     let branch = worktree_branch
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    if let Some(p) = path {
-        s.worktree_path = Some(p);
-        s.worktree_branch = branch;
-        s.is_worktree_session = true;
-    } else {
-        s.worktree_path = None;
-        s.worktree_branch = None;
-        s.is_worktree_session = false;
-    }
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        if let Some(p) = path {
+            s.worktree_path = Some(p);
+            s.worktree_branch = branch;
+            s.is_worktree_session = true;
+        } else {
+            s.worktree_path = None;
+            s.worktree_branch = None;
+            s.is_worktree_session = false;
+        }
+        Ok(s.clone())
+    })
 }
 
 /// Soft cap aligned with the frontend helper (~256 KiB).
@@ -1686,16 +1718,11 @@ pub fn set_session_json_schema(
             }
         }
     };
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.json_schema = normalized;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.json_schema = normalized;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 /// Normalize session plugin dirs: trim, drop empty, dedupe (first wins).
@@ -1718,16 +1745,11 @@ pub fn normalize_plugin_dirs(dirs: impl IntoIterator<Item = String>) -> Vec<Stri
 /// Set session-only `--plugin-dir` paths (empty clears). Does not touch global plugins.
 pub fn set_session_plugin_dirs(id: &str, plugin_dirs: Vec<String>) -> Result<SessionMeta, String> {
     let dirs = normalize_plugin_dirs(plugin_dirs);
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.plugin_dirs = dirs;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.plugin_dirs = dirs;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 /// Soft cap aligned with the frontend helper (~32 KiB).
@@ -1780,16 +1802,11 @@ pub fn set_session_extra_rules(
     extra_rules: Option<String>,
 ) -> Result<SessionMeta, String> {
     let normalized = sanitize_extra_rules(extra_rules);
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.extra_rules = normalized;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.extra_rules = normalized;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 /// Set or clear per-session max agent turns (`grok --max-turns` on next spawn).
@@ -1801,16 +1818,11 @@ pub fn set_session_max_agent_turns(
     max_agent_turns: Option<u32>,
 ) -> Result<SessionMeta, String> {
     let normalized = crate::acp_client::normalize_max_agent_turns(max_agent_turns);
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.max_agent_turns = normalized;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.max_agent_turns = normalized;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 /// Set or clear per-session system prompt override
@@ -1819,16 +1831,11 @@ pub fn set_session_max_agent_turns(
 /// Set or clear per-session `--no-ask-user` override.
 /// `None` inherits global `AppSettings.no_ask_user`.
 pub fn set_session_no_ask_user(id: &str, no_ask_user: Option<bool>) -> Result<SessionMeta, String> {
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.no_ask_user = no_ask_user;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.no_ask_user = no_ask_user;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 pub fn set_session_system_prompt_override(
@@ -1836,16 +1843,11 @@ pub fn set_session_system_prompt_override(
     system_prompt_override: Option<String>,
 ) -> Result<SessionMeta, String> {
     let normalized = sanitize_system_prompt_override(system_prompt_override);
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.system_prompt_override = normalized;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.system_prompt_override = normalized;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 /// Bind (or clear) a session's project folder. Used to attach orphan / legacy
@@ -1863,39 +1865,129 @@ pub fn set_session_project(id: &str, project_id: Option<String>) -> Result<Sessi
     } else {
         let _ = ensure_general_workspace_dir();
     }
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    s.project_id = pid;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        s.project_id = pid;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 /// Archive every non-archived session under a project.
 pub fn archive_project_sessions(project_id: &str) -> Result<usize, String> {
-    let mut list = load_sessions_index();
-    let mut n = 0usize;
-    for s in list.iter_mut() {
-        if s.project_id.as_deref() == Some(project_id) && !s.archived {
-            s.archived = true;
-            s.updated_at = Utc::now();
-            n += 1;
+    let project_id = project_id.to_string();
+    update_sessions_index(move |list| {
+        let mut n = 0usize;
+        for s in list.iter_mut() {
+            if s.project_id.as_deref() == Some(project_id.as_str()) && !s.archived {
+                s.archived = true;
+                s.updated_at = Utc::now();
+                n += 1;
+            }
         }
-    }
-    save_sessions_index(&list)?;
-    Ok(n)
+        Ok(n)
+    })
 }
 
 pub fn load_messages(session_id: &str) -> Vec<ChatMessageStored> {
     read_json_recover(&session_dir(session_id).join("messages.json"))
 }
 
+fn write_messages_locked(path: &Path, messages: &[ChatMessageStored]) -> Result<(), String> {
+    let serialized = serde_json::to_string_pretty(messages).map_err(|e| e.to_string())?;
+    crate::store_lock::write_bytes_replace(path, serialized.as_bytes())
+}
+
+/// Merge an incoming message snapshot with the latest on-disk journal.
+///
+/// Stream/tool writers use per-message ids and may append while a stale
+/// snapshot is being prepared.  Keep rows that are absent from the incoming
+/// snapshot, and for duplicate ids prefer the row with the newer
+/// `created_at` revision.  New rows are inserted relative to their nearest
+/// incoming neighbours so reconciliation does not scramble transcript order.
+fn merge_message_snapshots(
+    existing: &[ChatMessageStored],
+    incoming: &[ChatMessageStored],
+) -> Vec<ChatMessageStored> {
+    use std::collections::{HashMap, HashSet};
+
+    let mut merged = existing.to_vec();
+    let mut positions: HashMap<String, usize> = merged
+        .iter()
+        .enumerate()
+        .map(|(i, m)| (m.id.clone(), i))
+        .collect();
+
+    // Apply updates to rows that were already present.  A stale full snapshot
+    // must not roll a newer stream row back to an older body.
+    for message in incoming {
+        if let Some(&index) = positions.get(&message.id) {
+            if message.created_at >= merged[index].created_at {
+                merged[index] = message.clone();
+            }
+        }
+    }
+
+    let incoming_ids: HashSet<&str> = incoming.iter().map(|m| m.id.as_str()).collect();
+    for (incoming_index, message) in incoming.iter().enumerate() {
+        if positions.contains_key(&message.id) {
+            continue;
+        }
+
+        // Prefer an existing/injected predecessor, otherwise insert before the
+        // next known incoming row.  This preserves the order of a reconcile
+        // snapshot while retaining concurrent rows not present in it.
+        let predecessor = incoming[..incoming_index]
+            .iter()
+            .rev()
+            .find_map(|candidate| positions.get(&candidate.id).copied());
+        let successor = incoming[incoming_index + 1..]
+            .iter()
+            .find_map(|candidate| positions.get(&candidate.id).copied());
+        let at = if let Some(index) = predecessor {
+            index + 1
+        } else if let Some(index) = successor {
+            index
+        } else {
+            merged.len()
+        };
+        merged.insert(at, message.clone());
+        // Insertion shifts positions at/after `at`.
+        for index in positions.values_mut() {
+            if *index >= at {
+                *index += 1;
+            }
+        }
+        positions.insert(message.id.clone(), at);
+    }
+
+    // Silence an otherwise easy-to-miss accidental duplicate in malformed
+    // input without dropping the latest row from the normal path.
+    if incoming_ids.len() < incoming.len() {
+        let mut seen = HashSet::new();
+        merged.retain(|m| seen.insert(m.id.clone()));
+    }
+    merged
+}
+
+/// Save a journal snapshot without clobbering rows appended concurrently.
+///
+/// This is the default for journal reconciliation and enrichment.  Call
+/// [`replace_messages`] for an intentional destructive operation such as
+/// rewind/truncate.
 pub fn save_messages(session_id: &str, messages: &[ChatMessageStored]) -> Result<(), String> {
-    write_json(&session_dir(session_id).join("messages.json"), &messages)
+    let path = session_dir(session_id).join("messages.json");
+    crate::store_lock::with_exclusive_lock(&path, || {
+        let existing: Vec<ChatMessageStored> = read_json_recover(&path);
+        let merged = merge_message_snapshots(&existing, messages);
+        write_messages_locked(&path, &merged)
+    })
+}
+
+/// Intentionally replace a session journal under the same lock used by stream
+/// appends.  This is the only API that removes rows from an existing journal.
+pub fn replace_messages(session_id: &str, messages: &[ChatMessageStored]) -> Result<(), String> {
+    let path = session_dir(session_id).join("messages.json");
+    crate::store_lock::with_exclusive_lock(&path, || write_messages_locked(&path, messages))
 }
 
 pub fn append_message(session_id: &str, msg: ChatMessageStored) -> Result<(), String> {
@@ -1903,12 +1995,16 @@ pub fn append_message(session_id: &str, msg: ChatMessageStored) -> Result<(), St
     crate::store_lock::with_exclusive_lock(&path, || {
         let mut msgs: Vec<ChatMessageStored> = read_json_recover(&path);
         if let Some(slot) = msgs.iter_mut().find(|m| m.id == msg.id) {
-            *slot = msg;
+            // `created_at` doubles as a lightweight per-row revision.  A
+            // stale append from a delayed task must not roll back newer stream
+            // text; equal timestamps are treated as an intentional update.
+            if msg.created_at >= slot.created_at {
+                *slot = msg;
+            }
         } else {
             msgs.push(msg);
         }
-        let s = serde_json::to_string_pretty(&msgs).map_err(|e| e.to_string())?;
-        crate::store_lock::write_bytes_replace(&path, s.as_bytes())
+        write_messages_locked(&path, &msgs)
     })
 }
 
@@ -2044,21 +2140,15 @@ pub fn set_session_fork_agent_session(
     id: &str,
     fork_agent_session: bool,
 ) -> Result<SessionMeta, String> {
-    let mut list = load_sessions_index();
-    let s = list
-        .iter_mut()
-        .find(|s| s.id == id)
-        .ok_or_else(|| "session not found".to_string())?;
-    let has_agent = s
-        .agent_session_id
-        .as_deref()
-        .map(str::trim)
-        .is_some_and(|a| !a.is_empty());
-    s.fork_agent_session = fork_agent_session && has_agent;
-    s.updated_at = Utc::now();
-    let clone = s.clone();
-    save_sessions_index(&list)?;
-    Ok(clone)
+    update_session_row(id, move |s| {
+        let has_agent = s
+            .agent_session_id
+            .as_deref()
+            .is_some_and(|a| !a.trim().is_empty());
+        s.fork_agent_session = fork_agent_session && has_agent;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
 }
 
 /// Clear the one-shot fork flag after a connect attempt (success or fallthrough).
@@ -2514,14 +2604,15 @@ fn save_effort_on_session(
     let Some(sid) = session_id.filter(|s| !s.is_empty()) else {
         return Ok(Some(effort));
     };
-    let mut list = load_sessions_index();
-    let Some(sess) = list.iter_mut().find(|s| s.id == sid) else {
-        return Ok(Some(effort));
-    };
-    sess.effort = Some(effort);
-    sess.updated_at = Utc::now();
-    save_sessions_index(&list)?;
-    Ok(None)
+    let sid = sid.to_string();
+    update_sessions_index(move |list| {
+        let Some(sess) = list.iter_mut().find(|s| s.id == sid) else {
+            return Ok(Some(effort));
+        };
+        sess.effort = Some(effort);
+        sess.updated_at = Utc::now();
+        Ok(None)
+    })
 }
 
 /// Persist a partial composer prefs update at the configured scope.
@@ -2605,23 +2696,27 @@ pub fn save_composer_prefs(
         ComposerPrefsScope::Session => {
             let sid = session_id.filter(|s| !s.is_empty());
             if let Some(sid) = sid {
-                let mut list = load_sessions_index();
-                if let Some(sess) = list.iter_mut().find(|s| s.id == sid) {
-                    if let Some(v) = model_id {
+                let sid = sid.to_string();
+                let row_updated = update_sessions_index(|list| {
+                    let Some(sess) = list.iter_mut().find(|s| s.id == sid) else {
+                        return Ok(false);
+                    };
+                    if let Some(v) = model_id.clone() {
                         sess.model_id = Some(v);
                     }
-                    if let Some(v) = effort {
+                    if let Some(v) = effort.clone() {
                         sess.effort = Some(v);
                     }
-                    if let Some(v) = mode {
+                    if let Some(v) = mode.clone() {
                         sess.mode = Some(v);
                     }
-                    if let Some(v) = permission_policy {
+                    if let Some(v) = permission_policy.clone() {
                         sess.permission_policy = Some(v);
                     }
                     sess.updated_at = Utc::now();
-                    save_sessions_index(&list)?;
-                } else {
+                    Ok(true)
+                })?;
+                if !row_updated {
                     // No session row yet — fall back to global so the chip still sticks.
                     let mut s = load_settings();
                     if let Some(v) = model_id {
@@ -2664,6 +2759,7 @@ pub fn save_composer_prefs(
 mod tests {
     use super::*;
     use chrono::TimeZone;
+    use std::thread;
 
     #[test]
     fn non_plan_mode_heals_plan_default() {
@@ -3716,6 +3812,138 @@ mod tests {
         assert_eq!(resolve_composer_prefs(None, None).effort, "low");
 
         let _ = delete_session(&existing.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn sessions_index_transaction_preserves_concurrent_mutations() {
+        let _env = crate::paths::APP_HOME_ENV_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-store-index-rmw-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut workers = Vec::new();
+        for n in 0..8 {
+            workers.push(thread::spawn(move || {
+                let id = format!("concurrent-session-{n}");
+                update_sessions_index(move |list| {
+                    list.push(sample_session(&id, false, Utc::now()));
+                    Ok(())
+                })
+                .expect("atomic index mutation");
+            }));
+        }
+        for worker in workers {
+            worker.join().expect("worker panicked");
+        }
+
+        let ids: std::collections::HashSet<String> = load_sessions_index()
+            .into_iter()
+            .map(|session| session.id)
+            .collect();
+        for n in 0..8 {
+            assert!(ids.contains(&format!("concurrent-session-{n}")));
+        }
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn sessions_index_mutation_error_does_not_commit_partial_changes() {
+        let _env = crate::paths::APP_HOME_ENV_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-store-index-error-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+        let original = sample_session("original", false, Utc::now());
+        update_sessions_index({
+            let original = original.clone();
+            move |list| {
+                list.push(original);
+                Ok(())
+            }
+        })
+        .expect("seed index");
+
+        let err = update_sessions_index(|list| {
+            list.push(sample_session("partial", false, Utc::now()));
+            Err::<(), _>("abort before commit".into())
+        });
+        assert!(err.is_err());
+        let ids: Vec<String> = load_sessions_index()
+            .into_iter()
+            .map(|session| session.id)
+            .collect();
+        assert_eq!(ids, vec!["original"]);
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn merged_message_save_keeps_concurrent_append_and_replace_truncates() {
+        let _env = crate::paths::APP_HOME_ENV_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-store-journal-rmw-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let session = create_session(None, Some("journal race".into()), false).expect("session");
+        let at = Utc::now();
+        let base = ChatMessageStored {
+            id: "user-1".into(),
+            role: "user".into(),
+            content: "prompt".into(),
+            thought: None,
+            created_at: at,
+            is_error: false,
+            attachments: None,
+            marker: None,
+        };
+        let appended = ChatMessageStored {
+            id: "assistant-1".into(),
+            role: "assistant".into(),
+            content: "stream tail".into(),
+            thought: None,
+            created_at: at + chrono::Duration::milliseconds(1),
+            is_error: false,
+            attachments: None,
+            marker: None,
+        };
+
+        // `base` models a snapshot taken before the stream append.
+        append_message(&session.id, appended.clone()).expect("append stream row");
+        save_messages(&session.id, &[base.clone()]).expect("merge stale snapshot");
+        let merged = load_messages(&session.id);
+        assert!(merged.iter().any(|message| message.id == base.id));
+        assert!(merged
+            .iter()
+            .any(|message| message.id == appended.id && message.content == "stream tail"));
+
+        // Rewind-style operations must opt into destructive replacement.
+        replace_messages(&session.id, &[base]).expect("replace truncated journal");
+        let truncated = load_messages(&session.id);
+        assert_eq!(truncated.len(), 1);
+        assert_eq!(truncated[0].id, "user-1");
+
         std::env::remove_var("GROK_APP_HOME");
         let _ = fs::remove_dir_all(&tmp);
     }

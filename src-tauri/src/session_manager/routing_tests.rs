@@ -396,6 +396,29 @@ fn route_stamped_foreign_load_never_hits_parked_co_tenant() {
 }
 
 #[test]
+fn route_stamped_event_does_not_wildcard_unbound_live_hint() {
+    // During a connect/open transition the live slot may not have recorded
+    // its agent id yet. A stamped event from another session must be dropped,
+    // not accepted merely because the process id matches.
+    let live = hint("chat-live", "proc-p", None, true);
+    let parked = [hint("chat-other", "proc-p", Some("agent-other"), false)];
+    assert_eq!(
+        resolve_turn_event_route("proc-p", Some("agent-other"), Some(&live), &[], &parked),
+        TurnEventRoute::Drop
+    );
+}
+
+#[test]
+fn route_stamped_event_does_not_wildcard_unbound_background_hint() {
+    let live = hint("chat-live", "proc-other", Some("agent-live"), false);
+    let bg = [hint("chat-bg", "proc-p", None, true)];
+    assert_eq!(
+        resolve_turn_event_route("proc-p", Some("agent-foreign"), Some(&live), &bg, &[]),
+        TurnEventRoute::Drop
+    );
+}
+
+#[test]
 fn route_unstamped_load_on_shared_process_does_not_rescue_parked() {
     // Before fix: unstamped load replay → rescue parked A with pif=true → journal poison.
     let live = hint("chat-b", "proc-p", Some("agent-b"), false);

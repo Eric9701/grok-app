@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::process::{Child, Command};
-use tokio::sync::{mpsc, oneshot, Mutex as AsyncMutex};
+use tokio::sync::{mpsc, oneshot, Mutex as AsyncMutex, Notify};
 use tracing::{debug, error, info, warn};
 
 use crate::error::{AgentError, AgentErrorCode};
@@ -316,6 +316,10 @@ pub struct AcpClient {
     cwd: PathBuf,
     stopped: AtomicBool,
     reader_alive: AtomicBool,
+    /// Cancels the stdout/TCP read loop on an intentional shutdown. Without
+    /// this, a remote ACP socket could keep its read half open and deliver late
+    /// events after `kill()` had already released the session slot.
+    reader_stop: Arc<Notify>,
     /// Recent stderr lines for crash diagnostics (ring, newest last).
     stderr_tail: ParkingMutex<Vec<String>>,
     /// Last inbound `session/update` per agent session id (P0-4).
@@ -1103,7 +1107,7 @@ impl AcpClient {
             .unwrap_or(false)
     }
 
-    pub fn spawn(
+    pub async fn spawn(
         cli_path: PathBuf,
         cwd: PathBuf,
     ) -> Result<
@@ -1113,10 +1117,10 @@ impl AcpClient {
         ),
         AgentError,
     > {
-        Self::spawn_with_options(cli_path, cwd, SpawnOptions::default())
+        Self::spawn_with_options(cli_path, cwd, SpawnOptions::default()).await
     }
 
-    pub fn spawn_with_options(
+    pub async fn spawn_with_options(
         cli_path: PathBuf,
         cwd: PathBuf,
         opts: SpawnOptions,
@@ -1128,11 +1132,11 @@ impl AcpClient {
         AgentError,
     > {
         let settings = crate::store::load_settings();
-        Self::spawn_with_home(cli_path, cwd, &settings.session_data_mode, opts)
+        Self::spawn_with_home(cli_path, cwd, &settings.session_data_mode, opts).await
     }
 
     /// Spawn `grok agent stdio` with GROK_HOME from session_data_mode.
-    pub fn spawn_with_home(
+    pub async fn spawn_with_home(
         cli_path: PathBuf,
         cwd: PathBuf,
         session_data_mode: &str,
@@ -1155,7 +1159,7 @@ impl AcpClient {
             .map(str::trim)
             .filter(|s| !s.is_empty())
         {
-            return Self::connect_tcp(addr, cwd);
+            return Self::connect_tcp(addr, cwd).await;
         }
 
         let wsl_launch = crate::wsl_backend::resolve_wsl_launch(&settings_early);
@@ -1620,6 +1624,7 @@ impl AcpClient {
             cwd,
             stopped: AtomicBool::new(false),
             reader_alive: AtomicBool::new(true),
+            reader_stop: Arc::new(Notify::new()),
             stderr_tail: ParkingMutex::new(Vec::new()),
             last_update_by_session: ParkingMutex::new(HashMap::new()),
             last_update_unstamped: ParkingMutex::new(None),
@@ -1663,9 +1668,11 @@ impl AcpClient {
     /// shared build host, or a `socat`-fronted CLI). No child process, no
     /// stderr stream; the read half is wired to the same line reader.
     ///
-    /// Sync (uses a blocking connect + `from_std`) to match `spawn_with_home`;
-    /// must be called from within the Tokio runtime.
-    pub fn connect_tcp(
+    /// Connect to an ACP server without blocking a Tokio worker. The explicit
+    /// connect deadline is important for unreachable/half-open API endpoints:
+    /// a synchronous `std::net::TcpStream::connect` here used to hold the
+    /// session connect lock and starve every other chat until the OS timeout.
+    pub async fn connect_tcp(
         addr: &str,
         cwd: PathBuf,
     ) -> Result<
@@ -1675,18 +1682,24 @@ impl AcpClient {
         ),
         AgentError,
     > {
-        let std_stream = std::net::TcpStream::connect(addr).map_err(|e| {
-            AgentError::new(
-                AgentErrorCode::CliNotFound,
-                format!("failed to connect ACP server {addr}: {e}"),
-            )
-        })?;
-        std_stream.set_nonblocking(true).map_err(|e| {
-            AgentError::new(AgentErrorCode::AgentCrashed, format!("socket setup: {e}"))
-        })?;
-        let stream = TcpStream::from_std(std_stream).map_err(|e| {
-            AgentError::new(AgentErrorCode::AgentCrashed, format!("socket adopt: {e}"))
-        })?;
+        const ACP_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+        let stream = tokio::time::timeout(ACP_CONNECT_TIMEOUT, TcpStream::connect(addr))
+            .await
+            .map_err(|_| {
+                AgentError::new(
+                    AgentErrorCode::CliNotFound,
+                    format!(
+                        "ACP server connect timed out after {}s: {addr}",
+                        ACP_CONNECT_TIMEOUT.as_secs()
+                    ),
+                )
+            })?
+            .map_err(|e| {
+                AgentError::new(
+                    AgentErrorCode::CliNotFound,
+                    format!("failed to connect ACP server {addr}: {e}"),
+                )
+            })?;
         let _ = stream.set_nodelay(true);
         let (read_half, write_half) = stream.into_split();
 
@@ -1704,6 +1717,7 @@ impl AcpClient {
             cwd,
             stopped: AtomicBool::new(false),
             reader_alive: AtomicBool::new(true),
+            reader_stop: Arc::new(Notify::new()),
             stderr_tail: ParkingMutex::new(Vec::new()),
             last_update_by_session: ParkingMutex::new(HashMap::new()),
             last_update_unstamped: ParkingMutex::new(None),
@@ -1732,8 +1746,15 @@ impl AcpClient {
             let mut reader = BufReader::with_capacity(8 * 1024 * 1024, reader);
             let mut line = String::new();
             loop {
+                if !c.reader_alive.load(Ordering::SeqCst) {
+                    return;
+                }
                 line.clear();
-                match reader.read_line(&mut line).await {
+                let read = tokio::select! {
+                    _ = c.reader_stop.notified() => return,
+                    result = reader.read_line(&mut line) => result,
+                };
+                match read {
                     Ok(0) => break,
                     Ok(_) => {
                         let trimmed = line.trim();
@@ -1748,12 +1769,29 @@ impl AcpClient {
                     }
                 }
             }
-            c.reader_alive.store(false, Ordering::SeqCst);
+            // Do not turn an intentional kill into a second, late
+            // `ProcessExited` event. The owner already transitioned the
+            // session during `kill()`.
+            if !c.reader_alive.swap(false, Ordering::SeqCst) {
+                return;
+            }
+            // Stdout EOF normally follows child termination. Capture the
+            // status when it is already available so the Host can distinguish
+            // a clean/failed CLI exit from a remote TCP EOF. `try_wait` keeps
+            // the reader task bounded if a malformed child leaves the handle
+            // alive after closing stdout.
+            let exit_code = {
+                let mut child = c.child.lock().await;
+                child
+                    .as_mut()
+                    .and_then(|process| process.try_wait().ok().flatten())
+                    .and_then(|status| status.code())
+            };
             let detail = c.format_exit_detail("Agent stream closed (EOF)");
             c.fail_all_pending(&detail);
             let _ = c
                 .event_tx
-                .send((None, AcpEvent::ProcessExited { code: None }));
+                .send((None, AcpEvent::ProcessExited { code: exit_code }));
         });
     }
 
@@ -3486,6 +3524,19 @@ impl AcpClient {
     }
 
     pub async fn kill(&self) {
+        // Stop both halves of the transport before touching the child. This is
+        // essential for TCP ACP: closing only the writer left the reader task
+        // alive and allowed ghost events from a remote peer after recycle.
+        self.stopped.store(true, Ordering::SeqCst);
+        self.reader_alive.store(false, Ordering::SeqCst);
+        // `notify_waiters` only wakes tasks that are already waiting.  The
+        // reader checks `reader_alive` immediately before entering `select!`,
+        // so a kill racing that boundary could otherwise leave a TCP read
+        // blocked forever.  `notify_one` stores a permit when no waiter exists,
+        // making the cancellation edge-triggered and race-safe for the single
+        // reader task.
+        self.reader_stop.notify_one();
+        self.fail_all_pending("agent stopped");
         if let Some(mut child) = self.child.lock().await.take() {
             let _ = child.kill().await;
         }
@@ -6602,7 +6653,7 @@ mod live_handshake_tests {
             .expect("grok cli");
         let cwd = std::env::current_dir().unwrap();
         let t0 = std::time::Instant::now();
-        let (client, mut events) = AcpClient::spawn(cli, cwd).expect("spawn");
+        let (client, mut events) = AcpClient::spawn(cli, cwd).await.expect("spawn");
         // drain events in bg
         tokio::spawn(async move {
             while let Some((_sid, ev)) = events.recv().await {

@@ -19,7 +19,7 @@
 #![allow(dead_code)] // residual-clippy: x_search / aux helpers retained for tests and future host wiring
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -267,20 +267,38 @@ pub fn run_official_headless(
     );
 
     let started = Instant::now();
-    let output = std::thread::spawn(move || cmd.output())
-        .join()
-        .map_err(|_| "official aux thread join failed".to_string())?
+    // `Command::output()` cannot be interrupted once the child wedges. Poll a
+    // spawned child instead so the timeout actually kills the fallback and
+    // releases the caller's side-channel slot.
+    let mut child = cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| format!("official aux spawn: {e}"))?;
+    loop {
+        if child
+            .try_wait()
+            .map_err(|e| format!("official aux wait: {e}"))?
+            .is_some()
+        {
+            break;
+        }
+        if started.elapsed() >= timeout {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(format!(
+                "official aux timed out after {}s",
+                timeout.as_secs()
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("official aux wait: {e}"))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    if started.elapsed() > timeout {
-        tracing::warn!(
-            target: "official_aux",
-            "headless slow elapsed={:?}",
-            started.elapsed()
-        );
-    }
     if !output.status.success() && stdout.trim().is_empty() {
         let preview: String = stderr.chars().take(500).collect();
         return Err(format!("official aux failed: {preview}"));
@@ -411,6 +429,7 @@ No repo edits. Prefer built-in tools. Keep the final answer concise and complete
     );
 
     let (client, mut events) = AcpClient::spawn_with_home(cli_path, cwd, "independent", opts)
+        .await
         .map_err(|e| format!("official ACP spawn: {}", e.message))?;
 
     let acc = Arc::new(std::sync::Mutex::new(String::new()));
