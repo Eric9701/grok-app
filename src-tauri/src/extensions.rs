@@ -67,6 +67,10 @@ pub struct ExtensionsPrefs {
     /// Skill name → enabled (filters slash palette; agent still loads skill files).
     #[serde(default)]
     pub skills: HashMap<String, bool>,
+    /// App overlay for Claude/Cursor skill discovery. `Some(false)` hides them
+    /// in App catalogs. Missing / `None` = do not hide extra (config.toml still wins).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discover_external_skills: Option<bool>,
 }
 
 /// Full MCP server definition (from `grok mcp list --json` or inspect + config).

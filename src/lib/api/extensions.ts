@@ -66,10 +66,24 @@ export interface McpDto {
   enabled?: boolean;
 }
 
+/** Claude/Cursor skill discovery snapshot from `skills_list` / `skills_compat_set`. */
+export interface SkillsCompatSnapshot {
+  appPref: boolean;
+  claudeSkills: boolean | null;
+  cursorSkills: boolean | null;
+  effective: boolean;
+  hiddenCount: number;
+  mode: string;
+  writable: boolean;
+  path: string;
+  fileExists: boolean;
+}
+
 export interface SkillsListResult {
   skills: SkillDto[];
   /** Absolute allowlisted skill roots for in-app SKILL.md editing. */
   skillRoots?: string[];
+  discoverExternal?: SkillsCompatSnapshot;
   error?: string;
 }
 
@@ -108,6 +122,8 @@ export interface InspectMcpResult {
 export interface ExtensionsPrefs {
   mcp: Record<string, boolean>;
   skills: Record<string, boolean>;
+  /** App overlay: false hides Claude/Cursor skills. Missing = do not hide extra. */
+  discoverExternalSkills?: boolean | null;
 }
 
 export async function extensionsGet() {
@@ -384,6 +400,11 @@ export async function skillsList(projectPath?: string | null) {
   return invoke<SkillsListResult>("skills_list", {
     projectPath: projectPath ?? null,
   });
+}
+
+/** Toggle Claude/Cursor skill discovery (App overlay; independent also writes config.toml). */
+export async function skillsCompatSet(enabled: boolean) {
+  return invoke<SkillsCompatSnapshot>("skills_compat_set", { enabled });
 }
 
 /** Absolute allowlisted skill roots (user / agent-home / project). */

@@ -22,16 +22,40 @@ pub async fn skills_list(project_path: Option<String>) -> Result<serde_json::Val
 
     let inspect_skills = parsed.as_ref().map(parse_skills).unwrap_or_default();
     let skills = merge_skills_prefer_project(inspect_skills, project_skills);
+    let flags = crate::skill_compat::load_discover_flags();
+    let hidden_count = skills
+        .iter()
+        .filter(|s| {
+            !crate::skill_compat::should_keep_skill(&s.source, s.path.as_deref(), &flags)
+        })
+        .count() as u32;
+    let skills: Vec<SkillDto> = skills
+        .into_iter()
+        .filter(|s| crate::skill_compat::should_keep_skill(&s.source, s.path.as_deref(), &flags))
+        .collect();
+    let discover = crate::skill_compat::snapshot_from(&flags, hidden_count);
     let skills = attach_skill_enabled(skills);
     let skill_roots = crate::skill_edit::skill_roots_list(project_path.as_deref());
     let mut out = serde_json::json!({
         "skills": skills,
         "skillRoots": skill_roots,
+        "discoverExternal": discover,
     });
     if let Some(err) = error {
         out["error"] = serde_json::Value::String(err);
     }
     Ok(out)
+}
+
+/// Toggle Claude/Cursor skill discovery (App overlay; independent also writes config.toml).
+#[tauri::command]
+pub async fn skills_compat_set(enabled: bool) -> Result<crate::skill_compat::SkillsCompatSnapshot, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let flags = crate::skill_compat::set_discover_external(enabled)?;
+        Ok(crate::skill_compat::snapshot_from(&flags, 0))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Read a user-editable SKILL.md (allowlisted skills roots only).
