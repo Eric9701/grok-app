@@ -83,9 +83,12 @@ export async function listenForNativeNotifyClicks(): Promise<() => void> {
   if (!isTauriHost()) return () => {};
   try {
     const { listen } = await import("@tauri-apps/api/event");
-    return listen<NativeNotifyClickPayload>(NATIVE_NOTIFY_CLICK_EVENT, (ev) => {
-      applyNativeNotifyClick(ev.payload);
-    });
+    return await listen<NativeNotifyClickPayload>(
+      NATIVE_NOTIFY_CLICK_EVENT,
+      (ev) => {
+        applyNativeNotifyClick(ev.payload);
+      },
+    );
   } catch {
     return () => {};
   }

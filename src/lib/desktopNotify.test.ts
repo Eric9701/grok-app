@@ -3,6 +3,7 @@ import {
   applyNativeNotifyClick,
   ensureNotifyPermission,
   focusAppFromNotification,
+  listenForNativeNotifyClicks,
   notificationSupport,
   setDesktopNotifySessionFocusHandler,
   shouldShowDesktopNotify,
@@ -368,6 +369,12 @@ describe("desktopNotify", () => {
 
   it("focusAppFromNotification does not throw without Tauri", () => {
     expect(() => focusAppFromNotification()).not.toThrow();
+  });
+
+  it("listenForNativeNotifyClicks is a noop without Tauri", async () => {
+    const stop = await listenForNativeNotifyClicks();
+    expect(typeof stop).toBe("function");
+    expect(() => stop()).not.toThrow();
   });
 
   it("applyNativeNotifyClick focuses the app and opens sessionId", () => {
