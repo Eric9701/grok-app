@@ -10,6 +10,7 @@ import {
   isPetColor,
   isPetShape,
   PET_BUBBLE_WIDTH,
+  petBubbleViewportHeight,
   petOverlayHeight,
   petOverlayWidth,
   petSettingsHash,
@@ -117,11 +118,15 @@ export function PetOverlay({
 
   useLayoutEffect(() => {
     const w = petOverlayWidth(sizePx);
-    const h = petOverlayHeight(sizePx, tasks.length);
+    const h = petOverlayHeight(sizePx);
     void petSyncOverlaySize(w, h).then(() => {
       void refreshBubbleOffset();
     });
-  }, [tasks.length, sizePx, refreshBubbleOffset]);
+  }, [sizePx, refreshBubbleOffset]);
+
+  useLayoutEffect(() => {
+    reportHitChrome();
+  }, [tasks, reportHitChrome]);
 
   useEffect(() => {
     if (dragging) return;
@@ -271,11 +276,18 @@ export function PetOverlay({
       }}
     >
       <div
-        ref={stackRef}
         className="pet-bubbles-slot"
-        style={{ transform: `translateX(${bubbleDx}px)` }}
+        style={{
+          transform: `translateX(${bubbleDx}px)`,
+          height: petBubbleViewportHeight(),
+        }}
       >
-        <PetTaskBubbles tasks={tasks} t={t} onOpen={openTask} />
+        <PetTaskBubbles
+          tasks={tasks}
+          t={t}
+          onOpen={openTask}
+          listRef={stackRef}
+        />
       </div>
       <div ref={markRef} className="pet-overlay__hit">
         <PetMark

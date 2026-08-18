@@ -228,12 +228,30 @@ fn window_logical_size(size_px: u32) -> f64 {
     f64::from(size_px) + 96.0
 }
 
-/// Must match `petOverlayWidth` in `src/lib/pet/petBubbleLayout.ts`.
+/// Must match `petOverlayWidth` / `petBubbleViewportHeight` in JS.
 const PET_BUBBLE_WIDTH_PX: f64 = 216.0;
+/// 3 visible rows: 3*38 + 2*6 + 10. Always reserved so the mark does not jump.
+const PET_BUBBLE_VIEWPORT_H: f64 = 136.0;
+/// Matches `.pet-overlay` padding-bottom — mark sits on the bottom, not centered.
+const PET_MARK_BOTTOM_PAD: f64 = 16.0;
 
 fn overlay_extent(size_px: u32) -> (f64, f64) {
     let mark = window_logical_size(size_px);
-    (mark + PET_BUBBLE_WIDTH_PX, mark)
+    (mark + PET_BUBBLE_WIDTH_PX, mark + PET_BUBBLE_VIEWPORT_H)
+}
+
+fn mark_center_physical(
+    win_x: f64,
+    win_y: f64,
+    win_w: f64,
+    win_h: f64,
+    size_px: u32,
+    scale_factor: f64,
+) -> (f64, f64) {
+    let scale = scale_factor.max(0.5);
+    let cx = win_x + win_w / 2.0;
+    let cy = win_y + win_h - (PET_MARK_BOTTOM_PAD + f64::from(size_px) / 2.0) * scale;
+    (cx, cy)
 }
 
 fn persist_window_pos(app: &AppHandle) {
@@ -299,8 +317,7 @@ pub fn pet_cursor_over_mark(
     size_px: u32,
     scale_factor: f64,
 ) -> bool {
-    let cx = win_x + win_w / 2.0;
-    let cy = win_y + win_h / 2.0;
+    let (cx, cy) = mark_center_physical(win_x, win_y, win_w, win_h, size_px, scale_factor);
     let r = pet_hit_radius(size_px, scale_factor);
     let dx = cursor_x - cx;
     let dy = cursor_y - cy;
@@ -460,15 +477,23 @@ pub fn start_cursor_watch(app: AppHandle) {
             let _ = win.set_ignore_cursor_events(!over);
             // Screen-space look target so eyes track the pointer even when
             // the overlay is click-through (no webview pointer events).
+            let (fallback_cx, fallback_cy) = mark_center_physical(
+                f64::from(pos.x),
+                f64::from(pos.y),
+                f64::from(size.width),
+                f64::from(size.height),
+                size_px,
+                scale,
+            );
             let mark_cx = if chrome.valid {
                 f64::from(pos.x) + chrome.mark_cx * scale
             } else {
-                f64::from(pos.x) + f64::from(size.width) / 2.0
+                fallback_cx
             };
             let mark_cy = if chrome.valid {
                 f64::from(pos.y) + chrome.mark_cy * scale
             } else {
-                f64::from(pos.y) + f64::from(size.height) / 2.0
+                fallback_cy
             };
             let local_r = pet_hit_radius(size_px, scale);
             let _ = app.emit(
@@ -685,7 +710,7 @@ mod tests {
     fn overlay_extent_matches_js_width_and_does_not_use_hit_chrome() {
         let (w, h) = overlay_extent(128);
         assert_eq!(w, 128.0 + 96.0 + 216.0);
-        assert_eq!(h, 128.0 + 96.0);
+        assert_eq!(h, 128.0 + 96.0 + 136.0);
     }
 
     #[test]
@@ -700,23 +725,26 @@ mod tests {
     fn retina_hit_covers_the_mark_not_just_logical_pixels() {
         // 128 logical @ 2x → physical mark ~256px; center of that disc is a hit.
         let scale = 2.0;
-        let size_px = 128;
-        let win = 224.0 * scale; // window_logical_size(128) == 224
+        let size_px = 128u32;
+        let (log_w, log_h) = overlay_extent(size_px);
+        let win_w = log_w * scale;
+        let win_h = log_h * scale;
+        let (_, mark_cy) = mark_center_physical(0.0, 0.0, win_w, win_h, size_px, scale);
         let r = pet_hit_radius(size_px, scale);
         assert!(r > 120.0, "retina radius must exceed logical 66px: {r}");
         assert!(pet_cursor_over_mark(
-            win / 2.0,
-            win / 2.0,
+            win_w / 2.0,
+            mark_cy,
             0.0,
             0.0,
-            win,
-            win,
+            win_w,
+            win_h,
             size_px,
             scale,
         ));
         // Far corner of the padded window is click-through.
         assert!(!pet_cursor_over_mark(
-            2.0, 2.0, 0.0, 0.0, win, win, size_px, scale,
+            2.0, 2.0, 0.0, 0.0, win_w, win_h, size_px, scale,
         ));
     }
 

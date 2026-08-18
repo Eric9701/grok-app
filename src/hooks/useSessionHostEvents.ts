@@ -528,6 +528,22 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             const prevLiveState = s.sessionId
               ? c.liveMapRef.current[s.sessionId]?.state
               : undefined;
+            // Stamp unread before liveMap drops `working`, so the pet done-bubble
+            // never has a gap. Unfocused viewing still counts as unread.
+            let background = false;
+            if (
+              s.sessionId &&
+              s.state === "ready" &&
+              isTurnDoneReadyTransition(prevLiveState, s.state)
+            ) {
+              background = shouldMarkUnreadOnTurnDone({
+                sessionId: s.sessionId,
+                viewingSessionId: c.viewingSessionIdRef.current,
+              });
+              if (background) {
+                markSessionUnread(s.sessionId);
+              }
+            }
             c.setLiveHost(s);
             c.liveHostRef.current = s;
             c.setLiveMap((prev) =>
@@ -537,20 +553,11 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
                 streamingMessageId: s.streamingMessageId,
               }),
             );
-            // Background turn finished while user is elsewhere → unread dot.
-            // Mute only suppresses desktop notify; unread still applies.
             if (
               s.sessionId &&
               s.state === "ready" &&
               isTurnDoneReadyTransition(prevLiveState, s.state)
             ) {
-              const background = shouldMarkUnreadOnTurnDone({
-                sessionId: s.sessionId,
-                viewingSessionId: c.viewingSessionIdRef.current,
-              });
-              if (background) {
-                markSessionUnread(s.sessionId);
-              }
               // Desktop notify for turn_done:
               // - background chat: force (app may be focused on another chat)
               // - current chat: only when window unfocused (hasFocus gate inside)
@@ -684,6 +691,19 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
           listenWithRetry<SessionSnapshot>("session://runtime", (s) => {
             if (cancelled || !s.sessionId) return;
             const prevLiveState = c.liveMapRef.current[s.sessionId]?.state;
+            let background = false;
+            if (
+              s.state === "ready" &&
+              isTurnDoneReadyTransition(prevLiveState, s.state)
+            ) {
+              background = shouldMarkUnreadOnTurnDone({
+                sessionId: s.sessionId,
+                viewingSessionId: c.viewingSessionIdRef.current,
+              });
+              if (background) {
+                markSessionUnread(s.sessionId);
+              }
+            }
             c.setLiveMap((prev) =>
               projectHostIntoLiveMap(prev, {
                 sessionId: s.sessionId,
@@ -696,13 +716,6 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
               s.state === "ready" &&
               isTurnDoneReadyTransition(prevLiveState, s.state)
             ) {
-              const background = shouldMarkUnreadOnTurnDone({
-                sessionId: s.sessionId,
-                viewingSessionId: c.viewingSessionIdRef.current,
-              });
-              if (background) {
-                markSessionUnread(s.sessionId);
-              }
               if (
                 shouldShowDesktopNotify(
                   "turn_done",
@@ -918,14 +931,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             });
           }
           if (effective.done && chunk.sessionId) {
-            c.setLiveMap((prev) =>
-              projectHostIntoLiveMap(prev, {
-                sessionId: chunk.sessionId!,
-                state: "ready",
-                streamingMessageId: null,
-              }),
-            );
-            // Stream done for a non-viewed session → unread (mute still allows this).
+            // Stamp unread before liveMap leaves `working` so the pet
+            // done-bubble stays up (including unfocused viewing).
             if (
               shouldMarkUnreadOnTurnDone({
                 sessionId: chunk.sessionId,
@@ -934,6 +941,13 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
             ) {
               markSessionUnread(chunk.sessionId);
             }
+            c.setLiveMap((prev) =>
+              projectHostIntoLiveMap(prev, {
+                sessionId: chunk.sessionId!,
+                state: "ready",
+                streamingMessageId: null,
+              }),
+            );
           }
           c.patchSessionMessages(chunk.sessionId, (prev) => {
             const next = applyStreamChunk(prev, effective);

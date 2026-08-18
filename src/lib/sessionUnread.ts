@@ -203,18 +203,52 @@ export function shouldConfirmClearAllUnread(
 }
 
 /**
+ * True when the main workbench is actually in front of the user.
+ * Hidden, minimized, or unfocused windows are not a "read" — the desktop
+ * pet still shows a completed-unread bubble until they click it or come
+ * back to this chat with the window focused.
+ *
+ * Missing `document` (unit tests / SSR) defaults to foreground so callers
+ * that omit focus/visibility keep the old "viewing = read" behavior.
+ */
+export function isWorkbenchForeground(opts?: {
+  hasFocus?: boolean;
+  visibilityState?: string | null;
+}): boolean {
+  const hasFocus =
+    typeof opts?.hasFocus === "boolean"
+      ? opts.hasFocus
+      : typeof document !== "undefined" &&
+          typeof document.hasFocus === "function"
+        ? document.hasFocus()
+        : true;
+  const visibility =
+    opts && "visibilityState" in opts
+      ? opts.visibilityState
+      : typeof document !== "undefined"
+        ? document.visibilityState
+        : "visible";
+  return hasFocus && visibility !== "hidden";
+}
+
+/**
  * Whether a completed turn should mark the session unread.
- * Only background sessions (not currently viewed). Mute is intentionally ignored —
- * muted sessions still get the sidebar unread dot (mute only suppresses desktop notify).
+ * Background chats always mark. The currently viewed chat also marks when the
+ * workbench is hidden or unfocused (not a real read). Mute is intentionally
+ * ignored — muted sessions still get the sidebar unread dot (mute only
+ * suppresses desktop notify).
  */
 export function shouldMarkUnreadOnTurnDone(opts: {
   sessionId: string | null | undefined;
   viewingSessionId: string | null | undefined;
+  hasFocus?: boolean;
+  visibilityState?: string | null;
 }): boolean {
   const finished = normalizeId(opts.sessionId);
   if (!finished) return false;
   const viewing = normalizeId(opts.viewingSessionId);
-  return finished !== viewing;
+  if (finished !== viewing) return true;
+  return !isWorkbenchForeground(opts);
 }
 
 /**

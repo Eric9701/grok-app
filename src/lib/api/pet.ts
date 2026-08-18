@@ -220,19 +220,27 @@ function workRectFromMonitor(
   };
 }
 
-/** Resize only. Never move — open must restore the user's last drag origin. */
+/**
+ * Resize the overlay. When height changes, keep the bottom edge (the mark)
+ * on screen so reserved bubble space grows upward instead of shoving the pet.
+ * Open still restores the last drag origin — this is not an edge snap.
+ */
 export async function petSyncOverlaySize(w: number, h: number): Promise<void> {
   if (!isDesktopHost()) return;
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    const { LogicalSize } = await import("@tauri-apps/api/dpi");
+    const { LogicalPosition, LogicalSize } = await import("@tauri-apps/api/dpi");
     const win = getCurrentWindow();
     const scale = await win.scaleFactor();
-    const inner = await win.innerSize();
+    const [inner, pos] = await Promise.all([win.innerSize(), win.outerPosition()]);
     const curW = inner.width / scale;
     const curH = inner.height / scale;
     if (Math.abs(curW - w) < 1 && Math.abs(curH - h) < 1) return;
+    const nextY = Math.abs(curH - h) >= 1 ? pos.y / scale - (h - curH) : null;
     await win.setSize(new LogicalSize(w, h));
+    if (nextY != null) {
+      await win.setPosition(new LogicalPosition(pos.x / scale, nextY));
+    }
   } catch {
     /* best-effort */
   }

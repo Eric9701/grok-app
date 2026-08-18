@@ -2,27 +2,32 @@
  * Codex-style task chips stacked above the living mark.
  * Each chip is one session: in-progress or completed. Click opens that chat.
  */
+import type { Ref } from "react";
 import { IconAlertTriangle, IconCheck } from "@/components/icons";
 import { createT } from "@/i18n";
 import type { PetTask } from "@/lib/pet";
-import { PET_BUBBLE_WIDTH } from "@/lib/pet";
+import { PET_BUBBLE_WIDTH, petBubbleViewportHeight } from "@/lib/pet";
 
 export function PetTaskBubbles({
   tasks,
   t,
   onOpen,
+  listRef,
 }: {
   tasks: readonly PetTask[];
   t: ReturnType<typeof createT>;
   onOpen: (sessionId: string) => void;
+  listRef?: Ref<HTMLDivElement>;
 }) {
   if (tasks.length === 0) return null;
   return (
     <div
+      ref={listRef}
       className="pet-bubbles"
       role="list"
       aria-label={t("pet.bubble.list")}
-      style={{ width: PET_BUBBLE_WIDTH }}
+      style={{ width: PET_BUBBLE_WIDTH, maxHeight: petBubbleViewportHeight() }}
+      onWheel={(e) => e.stopPropagation()}
     >
       {tasks.map((task) => {
         const title = task.title?.trim() || t("pet.bubble.untitled");

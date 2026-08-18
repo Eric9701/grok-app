@@ -566,6 +566,7 @@ import {
 import {
   clearAllUnread as clearAllSessionUnread,
   clearUnread as clearSessionUnread,
+  isWorkbenchForeground,
   loadUnreadSessionIds,
   markUnread as markSessionUnread,
   SESSION_UNREAD_CHANGE_EVENT,
@@ -7443,24 +7444,26 @@ export function AppWorkbench() {
     [applyMarkSessionUnread],
   );
 
-  // Any path that binds the workbench to a session clears its unread marker
-  // (sidebar + dock/tray badge). Covers openSession, deep links, tray Recent.
-  // Also ends a manual "mark as unread" hold when the user re-opens the chat.
+  // Binding a session while the workbench is in front clears its unread
+  // (sidebar + dock/tray badge + pet done-bubble). Hidden / unfocused
+  // windows are not a read — the bubble stays until they click it or
+  // actually view this chat with the window focused.
   useEffect(() => {
-    if (session.sessionId) {
-      manualUnreadHoldIdsRef.current.delete(session.sessionId);
-      applyClearSessionUnread(session.sessionId);
-    }
+    if (!session.sessionId) return;
+    manualUnreadHoldIdsRef.current.delete(session.sessionId);
+    if (!isWorkbenchForeground()) return;
+    applyClearSessionUnread(session.sessionId);
   }, [session.sessionId, applyClearSessionUnread]);
 
   // Dock/taskbar or OS focus while already on a finished chat: clear that
-  // session's unread so the badge decrements without re-clicking the row.
+  // session's unread so the badge and pet bubble drop without re-clicking.
   useEffect(() => {
     const clearViewingIfPresent = () => {
       const id = viewingSessionIdRef.current;
       if (!id) return;
       // Keep manual "mark as unread" until the user leaves this thread.
       if (manualUnreadHoldIdsRef.current.has(id)) return;
+      if (!isWorkbenchForeground()) return;
       applyClearSessionUnread(id);
     };
     const onVis = () => {

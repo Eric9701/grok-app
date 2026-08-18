@@ -2,8 +2,10 @@
  * Codex-style task bubbles for the desktop pet.
  *
  * Only real work: streaming/busy (`working`) and unread finished turns
- * (`ready`). Connecting / permission / error / idle never get a chip —
- * switching chats must not flash a "connecting" bubble.
+ * (`ready`). A done chip stays until the user clicks it or actually reads
+ * that chat with the main window focused. Connecting / permission / error /
+ * idle never get a chip — switching chats must not flash a "connecting"
+ * bubble.
  */
 
 import {
@@ -13,7 +15,10 @@ import {
   type PetKind,
 } from "./petFocus";
 
-export const PET_TASK_LIMIT = 4;
+/** How many chips are visible at once. Extra rows scroll inside the slot. */
+export const PET_BUBBLE_VISIBLE = 3;
+/** Collect cap — more than the viewport so the slot can scroll. */
+export const PET_TASK_LIMIT = 16;
 export const PET_BUBBLE_WIDTH = 216;
 export const PET_BUBBLE_ROW_H = 38;
 export const PET_BUBBLE_GAP = 6;
@@ -58,9 +63,14 @@ export function petTaskProgress(kind: PetKind): number {
 }
 
 export function petBubbleStackHeight(count: number): number {
-  const n = Math.max(0, Math.min(PET_TASK_LIMIT, Math.floor(count)));
+  const n = Math.max(0, Math.min(PET_BUBBLE_VISIBLE, Math.floor(count)));
   if (n <= 0) return 0;
   return n * PET_BUBBLE_ROW_H + (n - 1) * PET_BUBBLE_GAP + PET_BUBBLE_STACK_PAD;
+}
+
+/** Reserved slot above the mark. Always this tall so the pet never jumps. */
+export function petBubbleViewportHeight(): number {
+  return petBubbleStackHeight(PET_BUBBLE_VISIBLE);
 }
 
 function collectIds(input: PetFocusInput): string[] {

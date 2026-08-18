@@ -3,7 +3,10 @@ import { emptyLiveSnapshot, type SessionLiveMap } from "@/lib/sessionLiveStore";
 import type { PetFocusInput } from "./petFocus";
 import {
   collectPetTasks,
+  PET_BUBBLE_VISIBLE,
+  PET_TASK_LIMIT,
   petBubbleStackHeight,
+  petBubbleViewportHeight,
   petTaskPhase,
   petTaskProgress,
   samePetTasks,
@@ -77,7 +80,31 @@ describe("collectPetTasks", () => {
     expect(collectPetTasks(input({ liveMap }))).toEqual([]);
   });
 
-  it("caps the stack and prefers unread-complete over working", () => {
+  it("keeps a completed bubble until unread is cleared", () => {
+    const liveMap: SessionLiveMap = {
+      done: snap("done", { state: "idle", updatedAt: 2_000 }),
+    };
+    const unread = collectPetTasks(
+      input({
+        liveMap,
+        unreadIds: new Set(["done"]),
+        finishedTurns: { done: 8_000 },
+      }),
+    );
+    expect(unread).toHaveLength(1);
+    expect(unread[0]?.phase).toBe("done");
+    expect(
+      collectPetTasks(
+        input({
+          liveMap,
+          unreadIds: new Set(),
+          finishedTurns: { done: 8_000 },
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("collects more than the visible viewport and prefers unread-complete", () => {
     const liveMap: SessionLiveMap = {
       p: snap("p", { state: "awaiting_permission", updatedAt: 1 }),
       e: snap("e", { state: "disconnected", updatedAt: 2 }),
@@ -104,9 +131,11 @@ describe("collectPetTasks", () => {
         ],
       }),
     );
-    expect(tasks).toHaveLength(4);
+    expect(tasks.length).toBeGreaterThan(PET_BUBBLE_VISIBLE);
+    expect(tasks).toHaveLength(5);
     expect(tasks.map((t) => t.kind)).toEqual([
       "ready",
+      "working",
       "working",
       "working",
       "working",
@@ -114,6 +143,18 @@ describe("collectPetTasks", () => {
     expect(tasks.some((t) => t.kind === "connecting")).toBe(false);
     expect(tasks.some((t) => t.kind === "needs_you")).toBe(false);
     expect(tasks.some((t) => t.kind === "error")).toBe(false);
+  });
+
+  it("caps the collected list well above the visible viewport", () => {
+    const liveMap: SessionLiveMap = {};
+    const sessions: { id: string; title: string }[] = [];
+    for (let i = 0; i < PET_TASK_LIMIT + 4; i++) {
+      const id = `w${i}`;
+      liveMap[id] = snap(id, { state: "streaming", updatedAt: 100 - i });
+      sessions.push({ id, title: id });
+    }
+    const tasks = collectPetTasks(input({ liveMap, sessions }));
+    expect(tasks).toHaveLength(PET_TASK_LIMIT);
   });
 });
 
@@ -125,11 +166,12 @@ describe("pet task helpers", () => {
     expect(petTaskProgress("working")).toBeLessThan(1);
   });
 
-  it("sizes the bubble stack from the visible count", () => {
+  it("sizes the visible viewport at 3 rows and ignores extras", () => {
     expect(petBubbleStackHeight(0)).toBe(0);
     expect(petBubbleStackHeight(1)).toBeGreaterThan(0);
-    expect(petBubbleStackHeight(4)).toBeGreaterThan(petBubbleStackHeight(1));
-    expect(petBubbleStackHeight(9)).toBe(petBubbleStackHeight(4));
+    expect(petBubbleStackHeight(3)).toBeGreaterThan(petBubbleStackHeight(1));
+    expect(petBubbleStackHeight(9)).toBe(petBubbleStackHeight(3));
+    expect(petBubbleViewportHeight()).toBe(petBubbleStackHeight(PET_BUBBLE_VISIBLE));
   });
 
   it("samePetTasks ignores progress jitter", () => {

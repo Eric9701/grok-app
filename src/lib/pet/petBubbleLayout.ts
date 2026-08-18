@@ -1,9 +1,11 @@
 /**
  * Slide task chips horizontally so they stay on-screen.
  * The living mark never moves — no layout flip, no window recentering.
+ * Overlay height always reserves the 3-chip viewport so chips cannot
+ * push the mark or make it jump when they appear/disappear.
  */
 
-import { PET_BUBBLE_WIDTH, petBubbleStackHeight } from "./petTasks";
+import { PET_BUBBLE_WIDTH, petBubbleViewportHeight } from "./petTasks";
 
 export const PET_BUBBLE_EDGE_PAD = 16;
 
@@ -12,8 +14,8 @@ export function petOverlayWidth(sizePx: number): number {
   return sizePx + 96 + PET_BUBBLE_WIDTH;
 }
 
-export function petOverlayHeight(sizePx: number, bubbleCount: number): number {
-  return sizePx + 96 + petBubbleStackHeight(bubbleCount);
+export function petOverlayHeight(sizePx: number): number {
+  return sizePx + 96 + petBubbleViewportHeight();
 }
 
 /**

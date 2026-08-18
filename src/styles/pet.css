@@ -31,7 +31,10 @@ html[data-pet-shell] .boot-gate {
 
 .pet-bubbles-slot {
   display: flex;
-  justify-content: center;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
   pointer-events: none;
   will-change: transform;
 }
@@ -46,6 +49,7 @@ html[data-pet-shell] .boot-gate {
 
 .pet-overlay__hit {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -125,8 +129,27 @@ html[data-pet-shell] .boot-gate {
   flex-direction: column;
   gap: 6px;
   margin-bottom: 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   pointer-events: auto;
   cursor: default;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted, #888) 55%, transparent)
+    transparent;
+}
+
+.pet-bubbles::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pet-bubbles::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pet-bubbles::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted, #888) 55%, transparent);
+  border-radius: 99px;
 }
 
 .pet-bubble {

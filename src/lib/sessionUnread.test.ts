@@ -14,6 +14,7 @@ import {
   parseUnreadSessionIds,
   save,
   saveUnreadSessionIds,
+  isWorkbenchForeground,
   shouldConfirmClearAllUnread,
   shouldMarkUnreadOnTurnDone,
   toggleUnread,
@@ -213,6 +214,27 @@ describe("listUnreadSessionIds / toggleUnread / clearAllUnread", () => {
   });
 });
 
+describe("isWorkbenchForeground", () => {
+  it("defaults to foreground when focus/visibility are omitted", () => {
+    expect(isWorkbenchForeground()).toBe(true);
+  });
+
+  it("requires both focus and a visible document", () => {
+    expect(isWorkbenchForeground({ hasFocus: true, visibilityState: "visible" })).toBe(
+      true,
+    );
+    expect(isWorkbenchForeground({ hasFocus: false, visibilityState: "visible" })).toBe(
+      false,
+    );
+    expect(isWorkbenchForeground({ hasFocus: true, visibilityState: "hidden" })).toBe(
+      false,
+    );
+    expect(isWorkbenchForeground({ hasFocus: false, visibilityState: "hidden" })).toBe(
+      false,
+    );
+  });
+});
+
 describe("shouldMarkUnreadOnTurnDone", () => {
   it("marks only when finished session is not the viewed one", () => {
     expect(
@@ -237,6 +259,33 @@ describe("shouldMarkUnreadOnTurnDone", () => {
       shouldMarkUnreadOnTurnDone({
         sessionId: null,
         viewingSessionId: "fg",
+      }),
+    ).toBe(false);
+  });
+
+  it("marks the viewed session when the workbench is unfocused or hidden", () => {
+    expect(
+      shouldMarkUnreadOnTurnDone({
+        sessionId: "fg",
+        viewingSessionId: "fg",
+        hasFocus: false,
+        visibilityState: "visible",
+      }),
+    ).toBe(true);
+    expect(
+      shouldMarkUnreadOnTurnDone({
+        sessionId: "fg",
+        viewingSessionId: "fg",
+        hasFocus: true,
+        visibilityState: "hidden",
+      }),
+    ).toBe(true);
+    expect(
+      shouldMarkUnreadOnTurnDone({
+        sessionId: "fg",
+        viewingSessionId: "fg",
+        hasFocus: true,
+        visibilityState: "visible",
       }),
     ).toBe(false);
   });
