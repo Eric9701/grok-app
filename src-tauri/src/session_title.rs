@@ -12,6 +12,9 @@ use crate::tray_i18n::{self, Locale};
 
 const PLACEHOLDERS: &[&str] = &[
     "New chat",
+    "Новый чат",
+    "Новая беседа",
+    "Без названия",
     "新会话",
     "新对话",
     "新對話",
@@ -80,6 +83,8 @@ fn clean_llm_title(raw: &str) -> Option<String> {
         .or_else(|| t.strip_prefix("标题:"))
         .or_else(|| t.strip_prefix("Title:"))
         .or_else(|| t.strip_prefix("Title："))
+        .or_else(|| t.strip_prefix("Заголовок:"))
+        .or_else(|| t.strip_prefix("Заголовок："))
     {
         t = rest.trim().to_string();
     }
@@ -97,6 +102,9 @@ fn title_prompt(snippet: &str, locale: Locale) -> String {
     match locale {
         Locale::En => format!(
             "Write a short session title for the user message below.\nRequirements: at most 8 English words (or match the message language if it is not English); output the title only; no quotes, prefixes, or explanation.\n\nUser message:\n{snippet}"
+        ),
+        Locale::Ru => format!(
+            "Придумай короткое название сессии для сообщения пользователя ниже.\nТребования: не более 8 слов; используй язык сообщения пользователя; выведи только название без кавычек, префиксов и пояснений.\n\nСообщение пользователя:\n{snippet}"
         ),
         Locale::Zh => format!(
             "为下面这条用户消息起一个简短会话标题。要求：最多16个汉字或8个英文单词；只输出标题；不要引号、标点前缀、解释。\n\n用户消息：\n{snippet}"
@@ -226,7 +234,10 @@ mod tests {
         assert!(is_placeholder_title("新对话"));
         assert!(is_placeholder_title("新對話"));
         assert!(is_placeholder_title("New chat"));
+        assert!(is_placeholder_title("Новый чат"));
+        assert!(is_placeholder_title("Без названия"));
         assert!(!is_placeholder_title("修权限条 bug"));
+        assert!(!is_placeholder_title("Исправить панель разрешений"));
         assert!(!is_placeholder_title("馬斯克最近有發什麼貼文"));
     }
 
@@ -254,6 +265,14 @@ mod tests {
     }
 
     #[test]
+    fn clean_strips_russian_title_prefix() {
+        assert_eq!(
+            clean_llm_title("Заголовок: Исправить вход\n"),
+            Some("Исправить вход".into())
+        );
+    }
+
+    #[test]
     fn clean_rejects_max_turns_noise() {
         assert_eq!(clean_llm_title("Max turns reached\n"), None);
         assert_eq!(clean_llm_title("Error: max turns reached\n"), None);
@@ -269,6 +288,12 @@ mod tests {
         assert!(en.contains("User message:"));
         assert!(en.contains("list open prs"));
         assert!(!en.contains("用户消息"));
+
+        let ru = title_prompt("исправить вход", Locale::Ru);
+        assert!(ru.contains("Сообщение пользователя:"));
+        assert!(ru.contains("Придумай короткое название сессии"));
+        assert!(ru.contains("исправить вход"));
+        assert!(!ru.contains("User message:"));
 
         let zh = title_prompt("list open prs", Locale::Zh);
         assert!(zh.contains("用户消息："));
