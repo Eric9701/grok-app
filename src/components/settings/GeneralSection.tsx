@@ -501,8 +501,6 @@ export function GeneralSection() {
                   value={policyToCliPermissionMode(policy)}
                   onChange={(v) => {
                     if (v === "plan") {
-                      // Plan is a product session mode, not a stored policy.
-                      // Keep current policy; user switches Plan from the composer.
                       return;
                     }
                     onPolicy(cliPermissionModeToPolicy(v));
@@ -1085,10 +1083,7 @@ export function GeneralSection() {
                 </div>
               ) : null}
               {onExperimentalMemory ? (
-                <div
-                  className={"settings-row" + rowHighlight("settings-anchor-experimentalMemory")}
-                  id="settings-anchor-experimentalMemory"
-                >
+                <div className={"settings-row" + rowHighlight("settings-anchor-experimentalMemory")} id="settings-anchor-experimentalMemory">
                   <div className="settings-row__text">
                     <div className="settings-row__label">
                       {t("settings.experimentalMemory")}
@@ -1287,10 +1282,7 @@ export function GeneralSection() {
                 />
               </div>
               {onSubagentsEnabled ? (
-                <div
-                  className={"settings-row" + rowHighlight("settings-anchor-subagents")}
-                  id="settings-anchor-subagents"
-                >
+                <div className={"settings-row" + rowHighlight("settings-anchor-subagents")} id="settings-anchor-subagents">
                   <div className="settings-row__text">
                     <div className="settings-row__label">
                       {t("settings.subagentsEnabled")}
@@ -1334,12 +1326,7 @@ export function GeneralSection() {
                 </div>
               ) : null}
               {onAutoWakeEnabled ? (
-                <div
-                  className={
-                    "settings-row" + rowHighlight("settings-anchor-autoWake")
-                  }
-                  id="settings-anchor-autoWake"
-                >
+                <div className={"settings-row" + rowHighlight("settings-anchor-autoWake")} id="settings-anchor-autoWake">
                   <div className="settings-row__text">
                     <div className="settings-row__label">
                       {t("settings.autoWake")}
@@ -1356,10 +1343,7 @@ export function GeneralSection() {
                 </div>
               ) : null}
               {onPlanEnabled ? (
-                <div
-                  className={"settings-row" + rowHighlight("settings-anchor-planEnabled")}
-                  id="settings-anchor-planEnabled"
-                >
+                <div className={"settings-row" + rowHighlight("settings-anchor-planEnabled")} id="settings-anchor-planEnabled">
                   <div className="settings-row__text">
                     <div className="settings-row__label">
                       {t("settings.planEnabled")}
@@ -1511,10 +1495,7 @@ export function GeneralSection() {
                 })()
               ) : null}
               {onDisableWebSearch ? (
-                <div
-                  className={"settings-row" + rowHighlight("settings-anchor-disableWebSearch")}
-                  id="settings-anchor-disableWebSearch"
-                >
+                <div className={"settings-row" + rowHighlight("settings-anchor-disableWebSearch")} id="settings-anchor-disableWebSearch">
                   <div className="settings-row__text">
                     <div className="settings-row__label">
                       {t("settings.disableWebSearch")}
@@ -1531,10 +1512,7 @@ export function GeneralSection() {
                 </div>
               ) : null}
               {onNoAskUser ? (
-                <div
-                  className={"settings-row" + rowHighlight("settings-anchor-noAskUser")}
-                  id="settings-anchor-noAskUser"
-                >
+                <div className={"settings-row" + rowHighlight("settings-anchor-noAskUser")} id="settings-anchor-noAskUser">
                   <div className="settings-row__text">
                     <div className="settings-row__label">
                       {t("settings.noAskUser")}
@@ -1953,6 +1931,7 @@ export function GeneralSection() {
                   options={[
                     { value: "system", label: t("settings.languageSystem") },
                     { value: "en", label: "English" },
+                    { value: "ru", label: "Русский" },
                     { value: "zh", label: "简体中文" },
                     { value: "zh-TW", label: "繁體中文" },
                   ]}
@@ -2043,10 +2022,7 @@ export function GeneralSection() {
                 </div>
               ) : null}
               {onReopenLastSession ? (
-                <div
-                  className={"settings-row" + rowHighlight("settings-anchor-reopenLastSession")}
-                  id="settings-anchor-reopenLastSession"
-                >
+                <div className={"settings-row" + rowHighlight("settings-anchor-reopenLastSession")} id="settings-anchor-reopenLastSession">
                   <div className="settings-row__text">
                     <div className="settings-row__label">
                       {t("settings.reopenLastSession")}
