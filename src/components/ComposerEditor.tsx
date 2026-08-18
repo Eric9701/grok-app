@@ -20,6 +20,7 @@ import {
   type MouseEvent,
   type Ref,
 } from "react";
+import { skillChipGlyphSvg } from "@/components/SkillChip";
 import {
   clipboardLooksLikeMedia,
   clipboardPlainText,
@@ -139,7 +140,7 @@ function makeSkillChipEl(name: string): HTMLElement {
   const icon = document.createElement("span");
   icon.className = "skill-chip__glyph";
   icon.setAttribute("aria-hidden", "true");
-  icon.textContent = "⚒";
+  icon.innerHTML = skillChipGlyphSvg(name);
 
   const label = document.createElement("span");
   label.className = "skill-chip__name";

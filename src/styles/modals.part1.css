@@ -198,8 +198,28 @@
 .skill-chip__glyph {
   display: inline-flex;
   flex-shrink: 0;
-  opacity: 0.75;
-  font-size: 11px;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  line-height: 0;
+  opacity: 0.88;
+}
+.skill-chip__icon svg,
+.skill-chip__glyph svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+.skill-chip:not(.skill-chip--sm) .skill-chip__icon,
+.skill-chip:not(.skill-chip--sm) .skill-chip__glyph {
+  width: 16px;
+  height: 16px;
+}
+.skill-chip:not(.skill-chip--sm) .skill-chip__icon svg,
+.skill-chip:not(.skill-chip--sm) .skill-chip__glyph svg {
+  width: 16px;
+  height: 16px;
 }
 .skill-chip__name {
   overflow: hidden;
