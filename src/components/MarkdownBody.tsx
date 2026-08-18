@@ -1,10 +1,11 @@
 /**
- * Assistant message body — GFM markdown with safe defaults.
+ * Assistant / file-preview markdown — GFM with safe defaults.
  * Images open the global lightbox; videos play inline; right-click menus.
  * Path links/code become media cards when imagePathMap is set.
+ * http(s) links open the OS default browser (Tauri `target=_blank` is a no-op).
  */
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type MouseEvent, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Locale } from "@/i18n";
@@ -18,6 +19,10 @@ import {
   resolveInlineMediaToken,
   resolveMediaHref,
 } from "@/lib/attachments";
+import {
+  isExternalHttpUrl,
+  openExternalHttpUrl,
+} from "@/lib/externalLinkPref";
 import {
   isRealLocalAbsolutePath,
   isSiteRootAbsolutePath,
@@ -40,11 +45,17 @@ export function MarkdownBody({
   streaming,
   locale = "en",
   imagePathMap,
+  onOpenExternalLink,
 }: {
   children: string;
   streaming?: boolean;
   locale?: Locale;
   imagePathMap?: Record<string, string>;
+  /**
+   * When set, http(s) links call this instead of the default OS-browser open.
+   * Preview / plan surfaces omit it so Host `open_external_url` runs.
+   */
+  onOpenExternalLink?: (url: string) => void;
 }) {
   const imageLabels = useMemo(() => imageUiLabels(locale), [locale]);
   const videoLabels = useMemo(() => videoUiLabels(locale), [locale]);
@@ -94,8 +105,29 @@ export function MarkdownBody({
             const text = textFromChildren(c).trim();
             const abs = resolveMediaHref(href, text, imagePathMap);
             if (abs) return renderMedia(abs, text || pathBasename(abs));
+            const hrefStr = typeof href === "string" ? href : "";
+            if (isExternalHttpUrl(hrefStr)) {
+              const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
+                e.preventDefault();
+                if (onOpenExternalLink) {
+                  onOpenExternalLink(hrefStr);
+                  return;
+                }
+                openExternalHttpUrl(hrefStr);
+              };
+              return (
+                <a
+                  className="md-body__link"
+                  href={hrefStr}
+                  rel="noreferrer noopener"
+                  onClick={onClick}
+                >
+                  {c}
+                </a>
+              );
+            }
             return (
-              <a href={href} target="_blank" rel="noreferrer noopener">
+              <a href={href} rel="noreferrer noopener">
                 {c}
               </a>
             );

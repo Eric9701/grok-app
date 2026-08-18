@@ -5,6 +5,7 @@ import {
   DEFAULT_CONFIRM_EXTERNAL_LINKS,
   isExternalHttpUrl,
   loadConfirmExternalLinksPref,
+  openExternalHttpUrl,
   parseConfirmExternalLinksPref,
   saveConfirmExternalLinksPref,
   type ConfirmExternalLinksStorage,
@@ -115,5 +116,73 @@ describe("isExternalHttpUrl", () => {
     expect(isExternalHttpUrl("../up")).toBe(false);
     expect(isExternalHttpUrl("docs/readme.md")).toBe(false);
     expect(isExternalHttpUrl("")).toBe(false);
+  });
+});
+
+describe("openExternalHttpUrl", () => {
+  it("prefers Host shell open on Tauri and skips window.open", () => {
+    const openExternalUrl = vi.fn().mockResolvedValue(undefined);
+    const openWindow = vi.fn();
+    expect(
+      openExternalHttpUrl("https://example.com/docs", {
+        isTauri: () => true,
+        openExternalUrl,
+        openWindow,
+      }),
+    ).toBe(true);
+    expect(openExternalUrl).toHaveBeenCalledWith("https://example.com/docs");
+    expect(openWindow).not.toHaveBeenCalled();
+  });
+
+  it("falls back to window.open when Host shell open fails", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const openWindow = vi.fn();
+    const openExternalUrl = vi.fn().mockRejectedValue(new Error("denied"));
+    expect(
+      openExternalHttpUrl("https://example.com", {
+        isTauri: () => true,
+        openExternalUrl,
+        openWindow,
+      }),
+    ).toBe(true);
+    await vi.waitFor(() => {
+      expect(openWindow).toHaveBeenCalledWith("https://example.com");
+    });
+    err.mockRestore();
+  });
+
+  it("uses window.open outside Tauri", () => {
+    const openExternalUrl = vi.fn();
+    const openWindow = vi.fn();
+    expect(
+      openExternalHttpUrl("http://localhost:3000", {
+        isTauri: () => false,
+        openExternalUrl,
+        openWindow,
+      }),
+    ).toBe(true);
+    expect(openExternalUrl).not.toHaveBeenCalled();
+    expect(openWindow).toHaveBeenCalledWith("http://localhost:3000");
+  });
+
+  it("rejects non-http URLs", () => {
+    const openExternalUrl = vi.fn();
+    const openWindow = vi.fn();
+    expect(
+      openExternalHttpUrl("javascript:alert(1)", {
+        isTauri: () => true,
+        openExternalUrl,
+        openWindow,
+      }),
+    ).toBe(false);
+    expect(
+      openExternalHttpUrl("./relative.md", {
+        isTauri: () => true,
+        openExternalUrl,
+        openWindow,
+      }),
+    ).toBe(false);
+    expect(openExternalUrl).not.toHaveBeenCalled();
+    expect(openWindow).not.toHaveBeenCalled();
   });
 });

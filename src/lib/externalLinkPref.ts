@@ -4,6 +4,9 @@
  * Default: false (open immediately, no extra friction).
  */
 
+import { isTauri } from "./api/host";
+import { openExternalUrl } from "./api/system";
+
 export const CONFIRM_EXTERNAL_LINKS_STORAGE_KEY = "grok.confirmExternalLinks";
 
 /** Fired on `window` after a successful save (detail = boolean confirm). */
@@ -83,4 +86,44 @@ export function isExternalHttpUrl(href: string): boolean {
   // Absolute path on same origin (or protocol-relative) — not our concern.
   if (t.startsWith("/") && !t.startsWith("//")) return false;
   return /^https?:\/\//i.test(t);
+}
+
+export type OpenExternalHttpUrlDeps = {
+  isTauri?: () => boolean;
+  openExternalUrl?: (url: string) => Promise<void>;
+  openWindow?: (url: string) => void;
+};
+
+function defaultOpenWindow(url: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch {
+    /* popup blocked / no window */
+  }
+}
+
+/**
+ * Open an absolute http(s) URL in the OS default browser.
+ * Tauri uses Host `open_external_url` (`open` / rundll32); WebView
+ * `target=_blank` is a no-op. Non-http(s) returns false and does nothing.
+ */
+export function openExternalHttpUrl(
+  url: string,
+  deps: OpenExternalHttpUrlDeps = {},
+): boolean {
+  const href = (url ?? "").trim();
+  if (!isExternalHttpUrl(href)) return false;
+  const openWindow = deps.openWindow ?? defaultOpenWindow;
+  const tauri = deps.isTauri ?? isTauri;
+  if (tauri()) {
+    const open = deps.openExternalUrl ?? openExternalUrl;
+    void Promise.resolve(open(href)).catch((e) => {
+      console.error("[link] openExternalUrl failed", e);
+      openWindow(href);
+    });
+    return true;
+  }
+  openWindow(href);
+  return true;
 }
