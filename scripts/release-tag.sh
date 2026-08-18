@@ -122,7 +122,7 @@ PY
 git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml \
   src/i18n/messages/en/core.ts src/i18n/messages/zh/core.ts src/i18n/messages/zh-TW/core.ts \
   src/i18n/messages.ts src/i18n/zh-tw.ts \
-  README.md README_EN.md README_ZH.md 2>/dev/null || true
+  README.md README_EN.md README_ZH.md README_RU.md 2>/dev/null || true
 if [[ -n "$(git status --porcelain)" ]]; then
   git commit -m "chore: release $TAG"
 fi

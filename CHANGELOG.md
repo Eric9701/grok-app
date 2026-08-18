@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.22] - 2026-08-19
+
+> **Highlight:** Move chats between projects; a persist-mounted terminal under the chat; Russian UI; pet overlay no longer steals the first click.
+>
+> **中文 · 亮点：** 会话可移到其他项目；对话栏底部常驻终端；俄语界面；宠物窗口不再抢走第一次点击。
+
 ### Changed
 - **Pet settings nav icon has two short eyes**: The hex outline now includes two short vertical strokes so the sidebar item reads as the companion, not a generic polygon.
 - **Pet menu keeps a single settings item**: The overlay context menu no longer lists both Edit and Pet settings (they opened the same Settings → Pet page).
@@ -43,6 +49,8 @@ See `docs/llm-wiki/release.md`.
 - **Voice/STT no longer re-copies official OIDC into a custom route's agent-home**: `voice_auth` blind-called `sync_cli_auth_to_agent_home` on every token read, undoing the custom-route auth strip until the next spawn (a live relay process could lazily load the OIDC). It now goes through route-aware `prepare_route_auth_for_agent`; voice still falls back to `~/.grok/auth.json` for official xAI endpoints.
 - **Rewind-unsupported error now takes the clean path in drop-last**: The `initialize`-not-advertised early return is phrased as `method not supported`, so journal drop-last skips the pointless last-turn fallback retry and its misleading warn log.
 - **Long tool-heavy chats no longer flicker stacked replies**: Collapsed thinking is no longer counted in the first-paint row estimate, and a virtual-list start that lands on a 0-height tool plateau walks back to the previous real message. A 1px height change no longer remounts a different pair of assistant bubbles (Windows WebView leftover paint looked like the transcript flashing).
+- **A refused chat move no longer kills the live agent (#616 follow-up)**: Host validated the target folder only after dropping the session's ACP process, so an untrusted / missing target (or a same-project no-op from a stale caller) still cost the chat its `agent_session_id` and forced `session/new`. `session_move_to_project` now prechecks the target and cwd change first; the agent is dropped only when the move will actually happen.
+- **Composer skill chips no longer show a tiny hammer emoji**: Inline skill / tool tags in the input (and user bubbles) use 14px Tabler SVGs so the glyph matches the 12px label. Imagine uses the wand; other skills keep the tool icon.
 
 **中文 · 修复**
 - **收起项目列表不再硬切、也不再留下滚动条（#694）**：关掉项目（或一级「项目」）会先锁住当前高度再插值到 0。动画期间隐藏 overlay 滑块；高度恢复后再把当前会话滚进视野。往已展开的文件夹里拖入会话时会改写锁定高度，新行不会被裁切，下次收起仍能插值。
@@ -58,6 +66,8 @@ See `docs/llm-wiki/release.md`.
 - **用语音不再把官方 OIDC 复制回自定义路由的 agent-home**：`voice_auth` 每次取 token 都盲同步 `auth.json`，把自定义路由刚清掉的凭据又写回去（存活的中转进程可能懒加载到）。现在改走按路由处理的 `prepare_route_auth_for_agent`；语音本身仍会回退读 `~/.grok/auth.json`。
 - **Agent 不支持 rewind 时撤回消息走干净路径**：`initialize` 未公布 rewind 的早退错误改为 `method not supported` 措辞，撤回上一条不再多发一次注定失败的兜底调用、也不再打误导性的 warn 日志。
 - **工具很多的长对话不再把两轮回复叠在一起闪**：折叠的思考不再计入行高预估；虚拟列表起点落在一串 0 高工具行上时，回退到前一条真实消息。高度差 1px 不会再换一套助手气泡（Windows 上旧层清不掉，看起来像正文狂闪）。
+- **移动会话被拒绝时不再误杀正在跑的 Agent（#616 跟进）**：Host 原来先杀掉会话的 ACP 进程、后校验目标文件夹，未信任/丢失的目标（或过期调用方发来的同项目 no-op）也会让会话丢掉 `agent_session_id`、被迫 `session/new`。现在 `session_move_to_project` 先预检目标和 cwd 是否变化，确认真的要移动才断开 Agent。
+- **输入框里的 skill 标签图标不再过小**：工具 / skills / imagine 等标签改用 14px SVG，和 12px 文字齐平。imagine 用魔杖，其余仍用扳手。
 
 ## [0.2.21] - 2026-08-18
 
