@@ -1900,10 +1900,12 @@ pub fn set_session_system_prompt_override(
 /// Bind (or clear) a session's project folder. Used to attach orphan / legacy
 /// chats to a project added later. Clearing (`None`) returns the chat to
 /// "其他会话"; agent cwd still uses the general workspace directory.
+///
+/// Internal / fork-restore path: does **not** clear `agent_session_id` or
+/// worktree meta. User-facing sidebar/chip moves must use
+/// [`move_session_to_project`].
 pub fn set_session_project(id: &str, project_id: Option<String>) -> Result<SessionMeta, String> {
-    let pid = project_id
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty() && s.as_str() != GENERAL_PROJECT_ID);
+    let pid = normalize_move_project_id(project_id);
     if let Some(ref pid) = pid {
         let projects = load_projects();
         if !projects.iter().any(|x| x.id.as_str() == pid.as_str()) {
@@ -1912,8 +1914,57 @@ pub fn set_session_project(id: &str, project_id: Option<String>) -> Result<Sessi
     } else {
         let _ = ensure_general_workspace_dir();
     }
+    apply_session_project(id, pid, false)
+}
+
+fn normalize_move_project_id(project_id: Option<String>) -> Option<String> {
+    project_id
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && s.as_str() != GENERAL_PROJECT_ID)
+}
+
+/// User-facing move: rebind cwd and drop the previous agent / worktree identity.
+/// Refuses untrusted or missing target folders. Same-project is a no-op.
+pub fn move_session_to_project(
+    id: &str,
+    project_id: Option<String>,
+) -> Result<SessionMeta, String> {
+    let pid = normalize_move_project_id(project_id);
+    if let Some(ref pid) = pid {
+        let projects = load_projects();
+        let Some(proj) = projects.iter().find(|x| x.id.as_str() == pid.as_str()) else {
+            return Err(format!("session_move_not_found: {pid}"));
+        };
+        if !proj.trusted {
+            return Err("session_move_untrusted".into());
+        }
+        if !proj.path_ok {
+            return Err("session_move_path_missing".into());
+        }
+    } else {
+        let _ = ensure_general_workspace_dir();
+    }
+    apply_session_project(id, pid, true)
+}
+
+fn apply_session_project(
+    id: &str,
+    pid: Option<String>,
+    reset_agent_identity: bool,
+) -> Result<SessionMeta, String> {
     update_session_row(id, move |s| {
+        let cwd_changes = s.project_id.as_deref() != pid.as_deref();
+        if !cwd_changes {
+            return Ok(s.clone());
+        }
         s.project_id = pid;
+        if reset_agent_identity {
+            s.agent_session_id = None;
+            s.fork_agent_session = false;
+            s.worktree_path = None;
+            s.worktree_branch = None;
+            s.is_worktree_session = false;
+        }
         s.updated_at = Utc::now();
         Ok(s.clone())
     })
@@ -4125,5 +4176,123 @@ mod tests {
         assert!(drop_last_should_truncate_journal(None));
         assert!(drop_last_should_truncate_journal(Some(true)));
         assert!(!drop_last_should_truncate_journal(Some(false)));
+    }
+
+    #[test]
+    fn set_session_project_keeps_agent_id_for_fork_restore() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-set-project-keep-agent-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let folder = tmp.join("proj");
+        fs::create_dir_all(&folder).expect("proj dir");
+        let proj = add_project(folder.to_string_lossy().to_string(), true).expect("add");
+        let mut meta = create_session(None, Some("fork".into()), false).expect("create");
+        meta.agent_session_id = Some("source-agent".into());
+        meta.fork_agent_session = true;
+        update_session_meta(&meta).expect("seed");
+
+        let bound = set_session_project(&meta.id, Some(proj.id.clone())).expect("bind");
+        assert_eq!(bound.project_id.as_deref(), Some(proj.id.as_str()));
+        assert_eq!(bound.agent_session_id.as_deref(), Some("source-agent"));
+        assert!(bound.fork_agent_session);
+
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn move_session_to_project_clears_agent_and_worktree() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-move-session-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let folder = tmp.join("proj");
+        fs::create_dir_all(&folder).expect("proj dir");
+        let proj = add_project(folder.to_string_lossy().to_string(), true).expect("add");
+
+        let mut meta = create_session(None, Some("move me".into()), false).expect("create");
+        meta.agent_session_id = Some("agent-old".into());
+        meta.fork_agent_session = true;
+        meta.worktree_path = Some("/tmp/wt".into());
+        meta.worktree_branch = Some("feat".into());
+        meta.is_worktree_session = true;
+        update_session_meta(&meta).expect("seed");
+
+        let moved = move_session_to_project(&meta.id, Some(proj.id.clone())).expect("move");
+        assert_eq!(moved.project_id.as_deref(), Some(proj.id.as_str()));
+        assert!(moved.agent_session_id.is_none());
+        assert!(!moved.fork_agent_session);
+        assert!(moved.worktree_path.is_none());
+        assert!(moved.worktree_branch.is_none());
+        assert!(!moved.is_worktree_session);
+
+        let same = move_session_to_project(&meta.id, Some(proj.id.clone())).expect("noop");
+        assert_eq!(same.project_id.as_deref(), Some(proj.id.as_str()));
+
+        let back = move_session_to_project(&meta.id, None).expect("orphan");
+        assert!(back.project_id.is_none());
+        assert!(back.agent_session_id.is_none());
+
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn move_session_to_project_refuses_untrusted_and_missing() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-move-refuse-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let folder = tmp.join("unsafe");
+        fs::create_dir_all(&folder).expect("proj dir");
+        let untrusted =
+            add_project(folder.to_string_lossy().to_string(), false).expect("add untrusted");
+        let meta = create_session(None, Some("x".into()), false).expect("create");
+
+        let err =
+            move_session_to_project(&meta.id, Some(untrusted.id.clone())).expect_err("untrusted");
+        assert!(err.contains("session_move_untrusted"), "got {err}");
+
+        let missing_folder = tmp.join("gone");
+        fs::create_dir_all(&missing_folder).expect("gone dir");
+        let missing =
+            add_project(missing_folder.to_string_lossy().to_string(), true).expect("add missing");
+        let _ = fs::remove_dir_all(&missing_folder);
+        let err = move_session_to_project(&meta.id, Some(missing.id)).expect_err("missing");
+        assert!(err.contains("session_move_path_missing"), "got {err}");
+
+        let err = move_session_to_project(&meta.id, Some("nope".into())).expect_err("missing id");
+        assert!(
+            err.contains("session_move_not_found") || err.contains("project not found"),
+            "got {err}"
+        );
+
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

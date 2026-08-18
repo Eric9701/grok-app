@@ -948,6 +948,8 @@ pub fn run() {
 
             commands::session_set_project,
 
+            commands::session_move_to_project,
+
             commands::session_set_plugin_dirs,
 
             commands::session_set_extra_rules,

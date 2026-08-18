@@ -56,6 +56,7 @@ describe("SidebarSessionRow", () => {
     expect(html).toContain("tree-l3--active");
     expect(html).toContain("Hello chat");
     expect(html).toContain("tree-l3--unread");
+    expect(html).toContain("data-session-id=\"s1\"");
   });
 
   it("renders orphan variant class", () => {

@@ -909,6 +909,7 @@ pub async fn session_set_json_schema(
 }
 
 /// Move session under a project (or clear project → orphan / 「其他会话」).
+/// Internal / fork-restore path — does not reset agent identity.
 #[tauri::command]
 pub async fn session_set_project(
     app: tauri::AppHandle,
@@ -922,6 +923,39 @@ pub async fn session_set_project(
     if snap.session_id.as_deref() == Some(meta.id.as_str()) {
         let _ = mgr.disconnect(app).await;
     }
+    Ok(meta)
+}
+
+/// User-facing move: confirm already happened in the UI.
+/// Refuses mid-turn, untrusted, or missing folders; clears agent + worktree.
+#[tauri::command]
+pub async fn session_move_to_project(
+    app: tauri::AppHandle,
+    mgr: State<'_, Arc<SessionManager>>,
+    id: String,
+    project_id: Option<String>,
+) -> Result<SessionMeta, String> {
+    if mgr.session_is_busy(&id) {
+        return Err("session_move_busy".into());
+    }
+    mgr.drop_session_agent(&app, &id).await;
+    let meta = store::move_session_to_project(&id, project_id)?;
+    let work_dir = meta
+        .project_id
+        .as_deref()
+        .and_then(|pid| {
+            store::load_projects()
+                .into_iter()
+                .find(|p| p.id == pid)
+                .map(|p| p.path)
+        })
+        .or_else(|| store::general_workspace_path_string().ok())
+        .unwrap_or_default();
+    let _ = crate::remote_im::retarget_bindings_for_app_session(
+        &meta.id,
+        meta.project_id.clone(),
+        &work_dir,
+    );
     Ok(meta)
 }
 

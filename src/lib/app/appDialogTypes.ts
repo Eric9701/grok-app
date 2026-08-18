@@ -9,6 +9,7 @@ export type ContextMenuState =
   | { kind: "project-sandbox"; id: string; x: number; y: number }
   | { kind: "project-color"; id: string; x: number; y: number }
   | { kind: "session"; id: string; x: number; y: number }
+  | { kind: "session-move"; ids: string[]; x: number; y: number }
   | { kind: "archive-older"; x: number; y: number }
   | null;
 

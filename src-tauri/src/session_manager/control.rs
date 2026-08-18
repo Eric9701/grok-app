@@ -1125,6 +1125,60 @@ impl SessionManager {
         Ok(self.snapshot())
     }
 
+    /// Mid-turn live or background chat — moving cwd would orphan in-flight tools.
+    pub fn session_is_busy(&self, session_id: &str) -> bool {
+        self.with_session_mut(session_id, |s| Self::live_session_is_busy(s))
+            .unwrap_or(false)
+    }
+
+    /// Kill live + background + parked ACP for this App session so the next
+    /// connect is `session/new` under the new cwd.
+    pub async fn drop_session_agent(&self, app: &AppHandle, session_id: &str) {
+        let (live_acp, live_process_id) = {
+            let mut guard = self.inner.lock();
+            if let Some(s) = guard.as_mut() {
+                if s.app_session_id == session_id {
+                    let process_id = s.process_id.clone();
+                    let acp = s.acp.take();
+                    s.needs_history_bootstrap = false;
+                    s.fsm.soft_disconnect();
+                    s.process_id = String::new();
+                    s.meta.agent_session_id = None;
+                    (acp, process_id)
+                } else {
+                    (None, String::new())
+                }
+            } else {
+                (None, String::new())
+            }
+        };
+        let (bg_acp, bg_process_id) = {
+            let mut bg = self.background.lock();
+            match bg.remove(session_id) {
+                Some(mut s) => (s.acp.take(), s.process_id),
+                None => (None, String::new()),
+            }
+        };
+        let parked = self.parked.lock().remove(session_id);
+        if let Some(acp) = live_acp {
+            if !self.has_other_process_tenant(&live_process_id, session_id) {
+                acp.kill().await;
+            }
+        }
+        if let Some(acp) = bg_acp {
+            if !self.has_other_process_tenant(&bg_process_id, session_id) {
+                acp.kill().await;
+            }
+        }
+        if let Some(p) = parked {
+            if !self.has_other_process_tenant(&p.process_id, session_id) {
+                p.acp.kill().await;
+            }
+        }
+        self.pending_soft_respawn.lock().remove(session_id);
+        Self::emit_state(app, &self.snapshot());
+    }
+
     pub async fn reattach(self: &Arc<Self>, app: AppHandle) -> Result<SessionSnapshot, String> {
         let (project, sid) = {
             let guard = self.inner.lock();
@@ -1141,6 +1195,12 @@ impl SessionManager {
 mod recycle_tests {
     use super::*;
     use std::time::Instant;
+
+    #[test]
+    fn session_is_busy_is_false_when_untracked() {
+        let mgr = SessionManager::new();
+        assert!(!mgr.session_is_busy("missing"));
+    }
 
     #[test]
     fn drain_all_agent_slots_clears_empty_maps() {

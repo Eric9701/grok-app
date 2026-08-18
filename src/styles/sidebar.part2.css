@@ -121,6 +121,8 @@
  */
 .tree-reveal {
   overflow: clip;
+  /* Flex item default min-height:auto refuses height:0 in WKWebView. */
+  min-height: 0;
   transition:
     height var(--motion-normal) var(--motion-pane-ease),
     min-height var(--motion-normal) var(--motion-pane-ease),
@@ -172,6 +174,16 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Block wrap so Other-sessions reveal is not a flex item of the sidebar column. */
+.tree-orphan {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tree-orphan .tree-l3-list-wrap {
+  padding-left: 4px;
 }
 
 /* Orphan sessions under “Other sessions” (same row metrics as project L3). */

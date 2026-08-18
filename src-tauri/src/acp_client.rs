@@ -3471,7 +3471,10 @@ impl AcpClient {
         restore_files: bool,
     ) -> Result<Value, String> {
         if self.rewind_supported.lock().as_ref() == Some(&false) {
-            return Err("rewind not advertised by agent initialize".into());
+            // Phrase matches `rpc_looks_like_method_not_found` so callers
+            // (journal drop-last) take the clean unsupported path, not the
+            // last-turn fallback retry.
+            return Err("rewind method not supported (not advertised by agent initialize)".into());
         }
         // Prefer conversation truncate; file restore is optional (edit-resend usually false).
         let mut params = json!({
@@ -6903,6 +6906,15 @@ fn json_id_u64(v: Option<&Value>) -> Option<u64> {
 #[cfg(test)]
 mod cached_token_route_tests {
     use super::*;
+
+    #[test]
+    fn rewind_unsupported_error_matches_method_not_found() {
+        // journal drop-last routes on this predicate: a mismatch would send
+        // the early-return error into the last-turn fallback retry path.
+        assert!(rpc_looks_like_method_not_found(
+            "rewind method not supported (not advertised by agent initialize)"
+        ));
+    }
 
     #[test]
     fn custom_route_must_not_authenticate_cached_token() {

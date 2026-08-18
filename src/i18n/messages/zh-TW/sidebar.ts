@@ -31,6 +31,7 @@ export const zhTWSidebar = {
   "sidebar.selectAllInGroup": "全選",
   "sidebar.deselectAllInGroup": "取消全選",
   "sidebar.selectedCount": "已選 {n} 項",
+  "sidebar.moveSelected": "移動 {n}…",
   "sidebar.archiveSelected": "封存 {n}",
   "sidebar.restoreSelected": "還原 {n}",
   "sidebar.deleteSelected": "刪除 {n}",

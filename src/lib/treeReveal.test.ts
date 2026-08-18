@@ -9,6 +9,7 @@ import {
   runAfterTreeRevealMotion,
   subscribeTreeRevealMotion,
   shouldAnimateTreeReveal,
+  shouldReleaseTreeRevealLock,
   TREE_REVEAL_CLOSE_MS,
   TREE_REVEAL_MS,
   treeRevealCloseSteps,
@@ -48,6 +49,46 @@ describe("treeRevealCloseSteps", () => {
   it("locks the used height before writing 0 so auto→0 can interpolate", () => {
     expect(treeRevealCloseSteps(256)).toEqual({ lockPx: 256, endPx: 0 });
     expect(treeRevealCloseSteps(0)).toEqual({ lockPx: 0, endPx: 0 });
+  });
+});
+
+describe("shouldReleaseTreeRevealLock", () => {
+  it("releases when open content outgrows the locked box", () => {
+    expect(
+      shouldReleaseTreeRevealLock({
+        open: true,
+        animatingOpen: false,
+        contentPx: 160,
+        boxPx: 96,
+      }),
+    ).toBe(true);
+  });
+
+  it("holds the lock during the open animation and when already fitting", () => {
+    expect(
+      shouldReleaseTreeRevealLock({
+        open: true,
+        animatingOpen: true,
+        contentPx: 160,
+        boxPx: 96,
+      }),
+    ).toBe(false);
+    expect(
+      shouldReleaseTreeRevealLock({
+        open: true,
+        animatingOpen: false,
+        contentPx: 96,
+        boxPx: 96,
+      }),
+    ).toBe(false);
+    expect(
+      shouldReleaseTreeRevealLock({
+        open: false,
+        animatingOpen: false,
+        contentPx: 160,
+        boxPx: 0,
+      }),
+    ).toBe(false);
   });
 });
 
@@ -127,5 +168,41 @@ describe("tree-reveal CSS", () => {
     expect(css).toMatch(/min-height var\(--motion-normal\)/);
     expect(css).toMatch(/max-height var\(--motion-normal\)/);
     expect(css).toMatch(/var\(--motion-pane-ease\)/);
+  });
+
+  it("sets min-height:0 so a flex-column sidebar can collapse the box", () => {
+    // Default flex min-height:auto keeps content visible when height animates
+    // to 0 (Other sessions used to be a direct child of .sidebar__scroll-inner).
+    expect(css).toMatch(/\.tree-reveal\s*\{[^}]*min-height:\s*0/);
+  });
+});
+
+describe("project / orphan flex shrink", () => {
+  const part1 = readFileSync(
+    resolve(__dirname, "../styles/sidebar.part1.css"),
+    "utf8",
+  );
+  const part2 = readFileSync(
+    resolve(__dirname, "../styles/sidebar.part2.css"),
+    "utf8",
+  );
+
+  it("keeps open project folders from shrinking below their session list", () => {
+    expect(part1).toMatch(/\.tree-project\s*\{[^}]*flex-shrink:\s*0/);
+    expect(part2).toMatch(/\.tree-orphan\s*\{[^}]*flex-shrink:\s*0/);
+  });
+});
+
+describe("Other sessions tree wrap", () => {
+  const src = readFileSync(
+    resolve(__dirname, "../app/AppWorkbench.tsx"),
+    "utf8",
+  );
+
+  it("wraps the Other-sessions reveal in a block .tree-orphan like .tree-project", () => {
+    expect(src).toContain('className="tree-orphan"');
+    expect(src).toMatch(
+      /className="tree-orphan"[\s\S]*SidebarTreeReveal open=\{historyOpen\}/,
+    );
   });
 });

@@ -140,6 +140,7 @@ const ruOverrides: Partial<Record<MessageKey, string>> = {
   "sidebar.selectAllInGroup": "Выбрать все",
   "sidebar.deselectAllInGroup": "Снять выделение",
   "sidebar.selectedCount": "Выбрано: {n}",
+  "sidebar.moveSelected": "Переместить {n}…",
   "sidebar.archiveSelected": "Архивировать: {n}",
   "sidebar.restoreSelected": "Восстановить: {n}",
   "sidebar.deleteSelected": "Удалить: {n}",

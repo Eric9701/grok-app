@@ -1153,6 +1153,9 @@ import {
   moveProjectInPinGroup,
 } from "@/lib/app/projectOrder";
 import { useSidebarProjectReorder } from "@/hooks/useSidebarProjectReorder";
+import { useSessionMoveProject } from "@/hooks/useSessionMoveProject";
+import { useSidebarSessionMoveDrag } from "@/hooks/useSidebarSessionMoveDrag";
+import { SESSION_DROP_ORPHAN } from "@/lib/sessionMoveProject";
 import { useSideWorkbenchProjectIsolation } from "@/hooks/useSideWorkbenchProjectIsolation";
 import { useBottomTerminal } from "@/hooks/useBottomTerminal";
 import {
@@ -13240,10 +13243,59 @@ export function AppWorkbench() {
     }
   };
 
+  const resetLiveAfterMove = useCallback(
+    (sessionId: string) => {
+      setSession((prev) =>
+        prev.sessionId === sessionId
+          ? {
+              ...IDLE_SNAPSHOT,
+              sessionId,
+              title: prev.title,
+              state: "idle",
+              backend: prev.backend || "grok_agent_stdio",
+            }
+          : prev,
+      );
+      setLiveHost((prev) =>
+        prev.sessionId === sessionId ? { ...IDLE_SNAPSHOT } : prev,
+      );
+    },
+    [setLiveHost, setSession],
+  );
+
+  const { requestMove, moveMenuItemsFor, bulkMoveMenuItems } =
+    useSessionMoveProject({
+      tr,
+      projects,
+      sessions,
+      busyIds,
+      viewingSessionId: session.sessionId,
+      setAppDialog,
+      showToast,
+      setSessions,
+      setActiveProject,
+      setExpandedProjects,
+      setHistoryOpen,
+      onViewingMoved: resetLiveAfterMove,
+      refreshSessions,
+      onMoved: exitSessionSelectMode,
+    });
+
+  useSidebarSessionMoveDrag({
+    enabled: !phoneLayout && !isMirrorClient(),
+    sessions,
+    selectedIds: selectedSessionIds,
+    selectMode: sessionSelectMode,
+    formatGhost: (count, title) =>
+      count > 1
+        ? tr("session.move.ghostMany", { n: String(count) })
+        : title || tr("session.untitled"),
+    onDrop: requestMove,
+  });
+
   /**
    * Bind the open session's project. Draft chats only switch workspace context.
-   * Untrusted projects refuse bind when a session exists. Passing `null`
-   * unbinds the folder (other sessions + general workspace cwd).
+   * Existing chats go through the confirmed move path (cwd + agent reset).
    */
   const bindSessionProject = useCallback(
     async (proj: Project | null) => {
@@ -13258,56 +13310,14 @@ export function AppWorkbench() {
         }
         return;
       }
-      if (target && !target.trusted) {
-        setLocalError(
-          tr("project.trustFirst", {
-            name: projectDisplayName(target, tr),
-          }),
-        );
-        return;
-      }
-      if (target && isProjectPathMissing(target.pathOk)) {
-        setLocalError(
-          tr("project.pathMissing", {
-            name: projectDisplayName(target, tr),
-          }),
-        );
-        return;
-      }
-      try {
-        await api.sessionSetProject(sid, target?.id ?? null);
+      const row = sessions.find((s) => s.id === sid);
+      if (!row) {
         setActiveProject(target);
-        setSessions((list) =>
-          list.map((s) =>
-            s.id === sid ? { ...s, projectId: target?.id ?? null } : s,
-          ),
-        );
-        // Live agent used old cwd — force reconnect next send
-        setSession((prev) =>
-          prev.sessionId === sid
-            ? {
-                ...IDLE_SNAPSHOT,
-                sessionId: sid,
-                title: prev.title,
-                state: "idle",
-                backend: prev.backend || "grok_agent_stdio",
-              }
-            : prev,
-        );
-        setLiveHost((prev) =>
-          prev.sessionId === sid ? { ...IDLE_SNAPSHOT } : prev,
-        );
-        if (target) {
-          setExpandedProjects((e) => ({ ...e, [target.id]: true }));
-        } else {
-          setHistoryOpen(true);
-        }
-        setLocalError(null);
-      } catch (e) {
-        showToast(String(e), 4500);
+        return;
       }
+      requestMove([row], target?.id ?? null);
     },
-    [session.sessionId, showToast, tr],
+    [requestMove, session.sessionId, sessions],
   );
 
   const gitWorktreesReqRef = useRef(0);
@@ -19150,6 +19160,7 @@ export function AppWorkbench() {
                         (projectReorder.enabled ? " tree-l2--reorderable" : "")
                       }
                       data-project-reorder-id={proj.id}
+                      data-session-drop={proj.id}
                       role="button"
                       tabIndex={0}
                       aria-expanded={open}
@@ -19399,11 +19410,14 @@ export function AppWorkbench() {
               })}
             </SidebarTreeReveal>
 
-            {/* Orphans / history */}
+            {/* Orphans / history — block wrap so the reveal is not a flex item */}
+            <div className="tree-orphan">
             <div className="tree-l1" style={{ marginTop: 8 }}>
               <button
                 type="button"
                 className="tree-l1__head"
+                data-session-drop={SESSION_DROP_ORPHAN}
+                aria-expanded={historyOpen}
                 onClick={() => setHistoryOpen((v) => !v)}
               >
                 {historyOpen ? (
@@ -19476,6 +19490,7 @@ export function AppWorkbench() {
                   const sortedOrphans = sortSessionsForSidebar(orphanSessions);
                   return (
                     <SidebarTreeReveal open={historyOpen}>
+                      <div className="tree-l3-list-wrap">
                       <VirtualList
                         className="tree-orphan-list"
                         items={sortedOrphans}
@@ -19529,10 +19544,12 @@ export function AppWorkbench() {
                           );
                         }}
                       />
+                      </div>
                     </SidebarTreeReveal>
                   );
                 })()
               : null}
+            </div>
           </OverlayScroll>
 
           {sessionSelectMode ? (
@@ -19549,6 +19566,23 @@ export function AppWorkbench() {
                   onClick={exitSessionSelectMode}
                 >
                   {tr("common.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  disabled={selectedSessionIds.size === 0}
+                  onClick={(e) => {
+                    setCtxMenu({
+                      kind: "session-move",
+                      ids: [...selectedSessionIds],
+                      x: e.clientX,
+                      y: e.clientY,
+                    });
+                  }}
+                >
+                  {tr("sidebar.moveSelected", {
+                    n: selectedSessionIds.size,
+                  })}
                 </button>
                 <button
                   type="button"
@@ -25764,6 +25798,8 @@ export function AppWorkbench() {
               ),
             ];
           }
+        } else if (ctxMenu?.kind === "session-move") {
+          items = bulkMoveMenuItems(ctxMenu.ids);
         } else if (ctxMenu?.kind === "session") {
           const s = sessions.find((x) => x.id === ctxMenu.id);
           if (s) {
@@ -26248,6 +26284,7 @@ export function AppWorkbench() {
                   void pinSession(s, !s.pinned);
                 },
               },
+              ...moveMenuItemsFor(s),
               ...(canPopOut
                 ? [
                     {

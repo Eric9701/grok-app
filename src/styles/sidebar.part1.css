@@ -1007,6 +1007,9 @@ html.platform-mac[data-theme="light"] .settings-page__content {
 .tree-project {
   position: relative;
   margin-bottom: 2px;
+  /* overflow:hidden on .tree-reveal would otherwise let this flex item shrink
+     below its session list — moving a chat in then clips the extra rows. */
+  flex-shrink: 0;
 }
 
 .tree-l2 {
@@ -1046,9 +1049,45 @@ html.platform-mac[data-theme="light"] .settings-page__content {
  * While reordering: force paint of session rows too (VirtualList windows
  * can otherwise briefly reserve empty intrinsic boxes).
  */
-.sidebar--project-reordering .tree-l3 {
+.sidebar--project-reordering .tree-l3,
+.sidebar--session-moving .tree-l3 {
   content-visibility: visible !important;
   contain: none !important;
+}
+
+.sidebar--session-moving {
+  user-select: none;
+  cursor: grabbing;
+}
+
+.tree-l3--dragging {
+  opacity: 0.4;
+}
+
+.tree-l3--drag-ghost {
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1.5px dashed var(--accent, #3b82f6);
+  background: var(--bg-elevated, var(--bg-sidebar-solid, var(--bg-app))) !important;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  content-visibility: visible !important;
+  contain: none !important;
+}
+
+.tree-l2.is-session-drop,
+.tree-l1__head.is-session-drop {
+  outline: 1.5px dashed var(--accent, #3b82f6);
+  outline-offset: -2px;
+  background: var(--bg-hover);
 }
 
 /* Source header is a faint placeholder; children (sessions) stay laid out. */

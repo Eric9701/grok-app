@@ -20,10 +20,12 @@ See `docs/llm-wiki/release.md`.
 - **宠物菜单只保留「宠物设置」**：右键里「编辑」和「宠物设置」进的是同一页，已去掉重复的「编辑」。
 
 ### Added
+- **Move chats between projects (#616)**: Sidebar menu, multi-select, and drag-and-drop can place a chat (including Other sessions) under another folder. Confirm first — the agent reopens in the new cwd and does not reuse the old CLI session. Relative paths from the previous workspace may break.
 - **Chat-column bottom terminal and pane motion (#681)**: `⌘\`` toggles a persist-mounted terminal under the chat. Sidebar / aside / settings / account-menu / project-list click-toggles interpolate instead of hard-cutting.
 - **Russian UI locale (#689)**: Settings language list and system-language detection include `ru`. Catalog is English-backed with translated overrides; tray / app menu follow the same locale.
 
 **中文 · 新增**
+- **会话可移到其他项目（#616）**：侧栏菜单、多选和拖到项目上可以把对话（含「其他会话」）挂到另一个文件夹。会先确认；Agent 在新目录重开，不会把旧 CLI 会话 load 进新仓库。原先工作区的相对路径可能失效。
 - **对话栏底部终端与分栏动画（#681）**：`⌘\`` 打开/收起聊天下方常驻终端。侧栏、右侧栏、设置、账号菜单、项目列表的点击开合改为插值，不再硬切。
 - **俄语界面（#689）**：设置语言列表和跟随系统可切到 `ru`。词库以英文兜底、常用面有俄文；托盘和原生菜单同步。
 
@@ -37,6 +39,8 @@ See `docs/llm-wiki/release.md`.
 - **Composer branch chip follows in-place checkout (#690)**: `git switch` in the same working tree no longer leaves the chip stale until the menu is opened. The dirty-status poll already had HEAD; it now patches the matching worktree row.
 - **Reasoning effort survives session respawn (#682)**: Changing effort on an existing chat was overwritten by `session/load` restoring the old CLI journal. A real change now clears `agent_session_id` (next connect uses `session/new`) and the next send waits for the preference write. Custom providers with an effort catalog get `supports_reasoning_effort` in App `agent-home` only.
 - **CLI import no longer paints `<system-reminder>` as a user bubble (#687)**: Reminder-only / `synthetic_reason: project_instructions` envelopes in `chat_history.jsonl` are skipped. A wrapped `<user_query>` is kept.
+- **Voice/STT no longer re-copies official OIDC into a custom route's agent-home**: `voice_auth` blind-called `sync_cli_auth_to_agent_home` on every token read, undoing the custom-route auth strip until the next spawn (a live relay process could lazily load the OIDC). It now goes through route-aware `prepare_route_auth_for_agent`; voice still falls back to `~/.grok/auth.json` for official xAI endpoints.
+- **Rewind-unsupported error now takes the clean path in drop-last**: The `initialize`-not-advertised early return is phrased as `method not supported`, so journal drop-last skips the pointless last-turn fallback retry and its misleading warn log.
 
 **中文 · 修复**
 - **宠物右键菜单贴着点击位置**：菜单在右键处打开，只在会出屏时平移，不再跳到标记另一侧或窗口左上角。
@@ -48,6 +52,8 @@ See `docs/llm-wiki/release.md`.
 - **输入框上的分支 chip 会跟着同目录切分支更新（#690）**：同一工作树里 `git switch` 后不再要点开菜单才刷新。脏状态轮询本来就有 HEAD，现在会补到对应 worktree 行。
 - **切换推理力度后不再被旧 CLI 会话盖回去（#682）**：已有对话改 effort 会被 `session/load` 恢复成旧值。真正改过时清掉 `agent_session_id`（下次 `session/new`），下一条发送会等偏好写完。带 effort 目录的自定义渠道只在 App `agent-home` 写 `supports_reasoning_effort`。
 - **导入 CLI 会话不再把 `<system-reminder>` 画成用户气泡（#687）**：`chat_history.jsonl` 里只有 reminder / `project_instructions` 的信封会丢掉；带 `<user_query>` 的仍保留正文。
+- **用语音不再把官方 OIDC 复制回自定义路由的 agent-home**：`voice_auth` 每次取 token 都盲同步 `auth.json`，把自定义路由刚清掉的凭据又写回去（存活的中转进程可能懒加载到）。现在改走按路由处理的 `prepare_route_auth_for_agent`；语音本身仍会回退读 `~/.grok/auth.json`。
+- **Agent 不支持 rewind 时撤回消息走干净路径**：`initialize` 未公布 rewind 的早退错误改为 `method not supported` 措辞，撤回上一条不再多发一次注定失败的兜底调用、也不再打误导性的 warn 日志。
 
 ## [0.2.21] - 2026-08-18
 

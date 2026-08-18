@@ -5,7 +5,6 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 
-use crate::account;
 use crate::process_util;
 use crate::secrets;
 
@@ -39,7 +38,11 @@ pub fn resolve_bearer_token() -> Result<String, String> {
 }
 
 fn read_cli_auth_key() -> Option<String> {
-    let _ = account::sync_cli_auth_to_agent_home();
+    // Route-aware: official syncs OIDC into agent-home; custom strips it.
+    // Never blind-copy auth.json here — a custom relay process could lazily
+    // load it and send OIDC to the relay ("works until I use voice").
+    // Custom falls back to ~/.grok/auth.json below (voice is official xAI).
+    crate::providers::prepare_route_auth_for_agent();
     let path = auth_json_path();
     let raw = fs::read_to_string(path).ok()?;
     let v: Value = serde_json::from_str(&raw).ok()?;

@@ -1,13 +1,15 @@
 //! Per-scope IM session binding (project + agent session id), disk-persisted.
 
 #![allow(dead_code)] // residual-clippy: ephemeral/reset session API
-use super::control_plane::ScopeBinding;
+use super::control_plane::{binding_after_app_session_move, ScopeBinding};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+static LIVE: Mutex<Option<SessionStore>> = Mutex::new(None);
 
 #[derive(Clone)]
 pub struct SessionStore {
@@ -28,10 +30,20 @@ impl Default for SessionStore {
 
 impl SessionStore {
     pub fn open_default() -> Self {
-        let path = crate::paths::app_data_root()
+        Self::open(Self::default_path())
+    }
+
+    fn default_path() -> PathBuf {
+        crate::paths::app_data_root()
             .join("remote")
-            .join("scope-bindings.json");
-        Self::open(path)
+            .join("scope-bindings.json")
+    }
+
+    /// Point subsequent [`Self::retarget_shared`] calls at this in-memory map
+    /// (the live Remote IM engine). Tests that use [`Self::ephemeral`] should
+    /// not register.
+    pub fn register_live(&self) {
+        *LIVE.lock() = Some(self.clone());
     }
 
     pub fn open(path: PathBuf) -> Self {
@@ -119,6 +131,42 @@ impl SessionStore {
         self.inner.lock().remove(key);
         self.save_disk();
     }
+
+    /// Rewrite every IM scope that is already bound to this App chat so the
+    /// next remote turn uses the new project cwd and does not `session/load`
+    /// the previous agent id.
+    pub fn retarget_app_session(
+        &self,
+        session_id: &str,
+        project_id: Option<String>,
+        work_dir: &str,
+    ) -> usize {
+        let mut n = 0usize;
+        {
+            let mut g = self.inner.lock();
+            for rec in g.values_mut() {
+                if let Some(next) =
+                    binding_after_app_session_move(rec, session_id, project_id.clone(), work_dir)
+                {
+                    *rec = next;
+                    n += 1;
+                }
+            }
+        }
+        if n > 0 {
+            self.save_disk();
+        }
+        n
+    }
+
+    /// Prefer the live engine store so in-memory IM bindings stay in sync;
+    /// fall back to a disk load when the bridge is not running.
+    pub fn retarget_shared(session_id: &str, project_id: Option<String>, work_dir: &str) -> usize {
+        if let Some(store) = LIVE.lock().clone() {
+            return store.retarget_app_session(session_id, project_id, work_dir);
+        }
+        Self::open(Self::default_path()).retarget_app_session(session_id, project_id, work_dir)
+    }
 }
 
 #[cfg(test)]
@@ -138,6 +186,29 @@ mod tests {
             mentioned_bot: true,
             thread_id: thread_id.map(str::to_string),
         }
+    }
+
+    #[test]
+    fn retarget_app_session_updates_only_matching_rows() {
+        use crate::remote_im::control_plane::PendingMode;
+        let store = SessionStore::ephemeral();
+        let mut hit = ScopeBinding::fresh("/old");
+        hit.local_session_id = "s1".into();
+        hit.project_id = Some("p0".into());
+        hit.agent_session_id = Some("ag".into());
+        hit.pending_mode = PendingMode::Continue;
+        store.set("k1", hit);
+        let other = ScopeBinding::fresh("/keep");
+        store.set("k2", other);
+
+        let n = store.retarget_app_session("s1", Some("p1".into()), "/new");
+        assert_eq!(n, 1);
+        let updated = store.get("k1").expect("k1");
+        assert_eq!(updated.project_id.as_deref(), Some("p1"));
+        assert_eq!(updated.work_dir, "/new");
+        assert!(updated.agent_session_id.is_none());
+        assert_eq!(updated.pending_mode, PendingMode::New);
+        assert_eq!(store.get("k2").expect("k2").work_dir, "/keep");
     }
 
     #[test]

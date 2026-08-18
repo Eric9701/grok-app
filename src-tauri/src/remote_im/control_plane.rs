@@ -73,6 +73,25 @@ pub fn effective_agent_session_id(s: &AppSessionEntry) -> String {
         .unwrap_or_else(|| s.id.clone())
 }
 
+/// After the App UI moves a chat to another project (or orphan).
+/// Only bindings that already point at this App session are rewritten.
+pub fn binding_after_app_session_move(
+    prev: &ScopeBinding,
+    app_session_id: &str,
+    project_id: Option<String>,
+    work_dir: &str,
+) -> Option<ScopeBinding> {
+    if prev.local_session_id != app_session_id {
+        return None;
+    }
+    let mut next = prev.clone();
+    next.project_id = project_id.filter(|s| !s.trim().is_empty());
+    next.work_dir = work_dir.to_string();
+    next.agent_session_id = None;
+    next.pending_mode = PendingMode::New;
+    Some(next)
+}
+
 /// After project select: bind path, clear agent session, next speak is new.
 pub fn binding_after_project_select(
     _prev: &ScopeBinding,
@@ -950,6 +969,25 @@ mod tests {
             agent_session_id: agent.map(|s| s.into()),
             updated_at: "2026-01-01T00:00:00Z".into(),
         }
+    }
+
+    #[test]
+    fn app_session_move_retargets_matching_binding() {
+        let mut b = ScopeBinding::fresh("/tmp/old");
+        b.local_session_id = "app-1".into();
+        b.project_id = Some("old".into());
+        b.agent_session_id = Some("agent-old".into());
+        b.pending_mode = PendingMode::Continue;
+        b.turn_count = 4;
+        let next = binding_after_app_session_move(&b, "app-1", Some("new".into()), "/tmp/new")
+            .expect("match");
+        assert_eq!(next.project_id.as_deref(), Some("new"));
+        assert_eq!(next.work_dir, "/tmp/new");
+        assert!(next.agent_session_id.is_none());
+        assert_eq!(next.pending_mode, PendingMode::New);
+        assert!(
+            binding_after_app_session_move(&b, "other", Some("new".into()), "/tmp/new").is_none()
+        );
     }
 
     #[test]

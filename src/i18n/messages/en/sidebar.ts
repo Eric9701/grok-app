@@ -31,6 +31,7 @@ export const enSidebar = {
   "sidebar.selectAllInGroup": "Select all",
   "sidebar.deselectAllInGroup": "Deselect all",
   "sidebar.selectedCount": "{n} selected",
+  "sidebar.moveSelected": "Move {n}…",
   "sidebar.archiveSelected": "Archive {n}",
   "sidebar.restoreSelected": "Restore {n}",
   "sidebar.deleteSelected": "Delete {n}",

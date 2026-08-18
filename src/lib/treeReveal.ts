@@ -70,6 +70,22 @@ export function measureTreeRevealContent(inner: HTMLElement | null): number {
   return Math.round(sum);
 }
 
+/**
+ * After a chat is moved into an already-open project, content can outgrow
+ * the last locked px height. Caller should retarget the lock to the new
+ * content px (do not settle to `auto` — that makes the next close snap).
+ */
+export function shouldReleaseTreeRevealLock(opts: {
+  open: boolean;
+  animatingOpen: boolean;
+  contentPx: number;
+  boxPx: number;
+}): boolean {
+  if (!opts.open || opts.animatingOpen) return false;
+  if (opts.contentPx <= 0) return false;
+  return opts.contentPx > opts.boxPx + 1;
+}
+
 let motionCount = 0;
 const idle = new Set<() => void>();
 const watchers = new Set<(active: boolean) => void>();
@@ -118,4 +134,5 @@ export function runAfterTreeRevealMotion(fn: () => void): boolean {
 export function resetTreeRevealMotionForTests(): void {
   motionCount = 0;
   idle.clear();
+  watchers.clear();
 }

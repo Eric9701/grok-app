@@ -19,6 +19,7 @@ import {
   beginTreeRevealMotion,
   measureTreeRevealContent,
   shouldAnimateTreeReveal,
+  shouldReleaseTreeRevealLock,
   TREE_REVEAL_CLOSE_MS,
   TREE_REVEAL_MS,
   TREE_REVEAL_PRESENCE_MS,
@@ -159,25 +160,39 @@ export function SidebarTreeReveal({
     }
   }, [open, presence.mounted]);
 
+  // Moving a chat into an already-open folder grows the inner list while the
+  // outer box may still be locked to the previous px height (or flex-shrunk).
+  // Retarget the lock to the new content px — do not settle to auto.
   useEffect(() => {
     if (!open || !presence.mounted) return;
     const box = boxRef.current;
     const inner = innerRef.current;
-    if (!box || !inner) return;
-    const ro = new ResizeObserver(() => {
+    if (!box || !inner || typeof ResizeObserver === "undefined") return;
+    const sync = () => {
       if (box.dataset.treeRevealMotion) return;
       const h = measureTreeRevealContent(inner);
-      if (h <= 0 || h === Math.round(box.getBoundingClientRect().height)) return;
+      if (
+        !shouldReleaseTreeRevealLock({
+          open: true,
+          animatingOpen: animateOpenRef.current,
+          contentPx: h,
+          boxPx: Math.round(box.getBoundingClientRect().height),
+        })
+      ) {
+        return;
+      }
       const prev = box.style.transition;
       box.style.transition = "none";
       applyTreeRevealSize(box, h);
       setSize(h);
       void box.getBoundingClientRect();
       box.style.transition = prev;
-    });
+    };
+    const ro = new ResizeObserver(sync);
     ro.observe(inner);
+    sync();
     return () => ro.disconnect();
-  }, [open, presence.mounted]);
+  }, [open, presence.mounted, children]);
 
   useEffect(() => stopMotion, []);
 

@@ -164,6 +164,7 @@ function SidebarSessionRowInner({
   return (
     <div
       className={className}
+      data-session-id={session.id}
       role="button"
       tabIndex={0}
       aria-checked={selectMode ? checked : undefined}

@@ -638,6 +638,25 @@ export async function sessionSetProject(
 }
 
 /**
+ * User-facing move: new cwd, drop previous agent/worktree identity.
+ * Host refuses mid-turn, untrusted, or missing folders.
+ */
+export async function sessionMoveToProject(
+  id: string,
+  projectId: string | null,
+) {
+  return invoke<{
+    id: string;
+    projectId: string | null;
+    title: string;
+    agentSessionId?: string | null;
+    worktreePath?: string | null;
+    worktreeBranch?: string | null;
+    isWorktreeSession?: boolean;
+  }>("session_move_to_project", { id, projectId });
+}
+
+/**
  * Set session-only plugin directories for spawn (`--plugin-dir`).
  * Pass `[]` to clear. Does not change global Extensions plugins.
  * Soft-respawns when this chat is the live agent.

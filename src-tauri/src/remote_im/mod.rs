@@ -39,6 +39,15 @@ pub fn set_app_handle(app: AppHandle) {
     app_sessions::set_app_handle(app);
 }
 
+/// Keep Remote IM scope bindings on the same App chat after a sidebar move.
+pub fn retarget_bindings_for_app_session(
+    session_id: &str,
+    project_id: Option<String>,
+    work_dir: &str,
+) -> usize {
+    session::SessionStore::retarget_shared(session_id, project_id, work_dir)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BridgeStatusDto {

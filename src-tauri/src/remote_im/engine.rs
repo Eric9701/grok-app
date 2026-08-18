@@ -109,8 +109,10 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(outbound: OutboundRouter, allow_remote_yolo: bool) -> Self {
+        let store = SessionStore::open_default();
+        store.register_live();
         Self {
-            store: SessionStore::open_default(),
+            store,
             outbound,
             instances: Arc::new(Mutex::new(HashMap::new())),
             pending: Arc::new(Mutex::new(HashMap::new())),

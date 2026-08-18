@@ -165,6 +165,20 @@ This covers load failure, wiped agent dirs, or agent version mismatches.
 
 Permission / mode soft-respawn **keeps** `agentSessionId` so the next connect prefers `session/load`. Bootstrap runs only if load fails.
 
+### 3a. Move chat to another project
+
+Sidebar **Move to project** (context menu, multi-select, drag onto a folder, or the composer project chip on an existing chat) rebinds `projectId`. The App journal stays under `{app_data}/sessions/<id>/` — nothing is copied into the folder.
+
+Because cwd changes:
+
+1. UI always confirms. Relative attachments, skill outputs, and FilePathCards resolve against the **new** root and can 404 or open a homonym.
+2. Host refuses mid-turn (live or background busy).
+3. Host drops live + background + parked ACP for that chat, then clears `agentSessionId` / worktree meta. Next connect is `session/new` + journal bootstrap — never `session/load` the old encoded-cwd session into the new folder.
+4. Untrusted or missing target folders are refused.
+5. Fork / resume-restore still use silent `session_set_project` so they can keep a pending `--fork-session` source id.
+6. Remote IM bindings that already point at this App session retarget cwd and drop their agent id.
+7. Drag a sidebar chat onto a project header (or Other sessions) uses the same confirm + Host path as the menu.
+
 ### 3b. Session data mode switch (E04)
 
 When Settings flips `session_data_mode` independent↔shared, Host calls `recycle_all_agents` on live + background + parked processes (same kill/soft-disconnect paths as idle recycle). Live `agentSessionId` is cleared so reconnect does not `session/load` against the previous `GROK_HOME`. Journals stay. Emits `session://agents_recycled` for a short toast.
