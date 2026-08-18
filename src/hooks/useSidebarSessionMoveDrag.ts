@@ -21,7 +21,7 @@ function isIgnoredTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return true;
   if (
     target.closest(
-      ".tree-l3__actions, .tree-icon-btn, a, input, textarea, select, [data-no-session-move]",
+      ".tree-l3__actions, .tree-l3__drag-handle, .tree-icon-btn, a, input, textarea, select, [data-no-session-move]",
     )
   ) {
     return true;

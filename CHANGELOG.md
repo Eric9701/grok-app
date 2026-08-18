@@ -30,6 +30,7 @@ See `docs/llm-wiki/release.md`.
 - **俄语界面（#689）**：设置语言列表和跟随系统可切到 `ru`。词库以英文兜底、常用面有俄文；托盘和原生菜单同步。
 
 ### Fixed
+- **Project list collapse no longer snaps and leaves a leftover scrollbar (#694)**: Closing a project (or the L1 Projects chevron) paints the locked height, then interpolates to 0. The overlay thumb stays hidden while height is moving. Open folders retarget the px lock when a chat is dropped in, so new rows are not clipped and the next close still interpolates.
 - **Pet context menu stays near the click**: The menu opens at the right-click and only slides enough to stay on the visible work-area slice of the overlay (no jump to the mark or the window corner).
 - **Pet overlay no longer steals the workbench’s first click**: The always-on-top pet window is not focusable (`canBecomeKeyWindow = NO` / `WS_EX_NOACTIVATE`). Tao `show()` still calls `makeKeyAndOrderFront`; if the overlay becomes key while the main window is visible, key is returned immediately so composer / list clicks land on the first press.
 - **Official login no longer breaks a working custom relay**: After sign-in, Host kept calling ACP `authenticate(cached_token)` on custom-route processes. That RPC reads `~/.grok/auth.json`, Grok Build then sends OIDC to the relay (`HTTP 400 Incorrect API key` / network card), and logout “fixed” it immediately. Custom routes now skip `cached_token`; login / account switch bind agent-home via `prepare_route_auth_for_agent` (official syncs, custom clears).
@@ -44,6 +45,7 @@ See `docs/llm-wiki/release.md`.
 - **Long tool-heavy chats no longer flicker stacked replies**: Collapsed thinking is no longer counted in the first-paint row estimate, and a virtual-list start that lands on a 0-height tool plateau walks back to the previous real message. A 1px height change no longer remounts a different pair of assistant bubbles (Windows WebView leftover paint looked like the transcript flashing).
 
 **中文 · 修复**
+- **收起项目列表不再硬切、也不再留下滚动条（#694）**：关掉项目（或一级「项目」）会先锁住当前高度再插值到 0。动画期间隐藏 overlay 滑块。往已展开的文件夹里拖入会话时会改写锁定高度，新行不会被裁切，下次收起仍能插值。
 - **宠物右键菜单贴着点击位置**：菜单在右键处打开，只在会出屏时平移，不再跳到标记另一侧或窗口左上角。
 - **宠物窗口不再抢走主窗口的第一次点击**：置顶宠物窗不可成为 key（macOS `canBecomeKeyWindow = NO` / Windows `WS_EX_NOACTIVATE`）。Tao 的 `show()` 仍会 `makeKeyAndOrderFront`；若主窗口已可见，立刻把焦点还回去，输入框和列表第一次点击就能生效。
 - **登录官方号不再把正在用的中转打挂**：签入后自定义路由仍会 `authenticate(cached_token)`，CLI 读 `~/.grok/auth.json` 后把 OIDC 打到中转（HTTP 400 Incorrect API key / 网络异常），退出登录立刻又好。现在自定义路由不再做 `cached_token`；登录/切号按当前路由 `prepare_route_auth`（官方同步，自定义清掉）。
