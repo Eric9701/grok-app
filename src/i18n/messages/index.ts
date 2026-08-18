@@ -3,7 +3,9 @@
 import { en, type MessageKey } from "./en";
 import { ru } from "./ru";
 import { ruAutomations } from "./ru/automations";
+import { ruDoctor } from "./ru/doctor";
 import { ruErrors } from "./ru/errors";
+import { ruExtensions } from "./ru/extensions";
 import { ruExtra } from "./ru/extra";
 import { ruProviders } from "./ru/providers";
 import { ruSession } from "./ru/session";
@@ -33,6 +35,8 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     ...ruWorkspace,
     ...ruProviders,
     ...ruAutomations,
+    ...ruDoctor,
+    ...ruExtensions,
   },
   zh,
   "zh-TW": zhTW,
