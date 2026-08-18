@@ -1,0 +1,43 @@
+name: fix-ru-title-prefix-once
+
+on:
+  push:
+    branches: [agent/russian-localization]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/russian-localization
+          fetch-depth: 0
+      - name: Normalize Russian title prefix literals
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src-tauri/src/session_title.rs')
+          text = p.read_text(encoding='utf-8')
+          old = '''        .or_else(|| t.strip_prefix("Заголовок:"))\n        .or_else(|| t.strip_prefix("Заголовок："))'''
+          new = '''        .or_else(|| t.strip_prefix("\\u{417}\\u{430}\\u{433}\\u{43e}\\u{43b}\\u{43e}\\u{432}\\u{43e}\\u{43a}:"))\n        .or_else(|| t.strip_prefix("\\u{417}\\u{430}\\u{433}\\u{43e}\\u{43b}\\u{43e}\\u{432}\\u{43e}\\u{43a}："))'''
+          if old not in text:
+              raise SystemExit('expected Russian prefix block not found')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          git diff --check
+      - name: Commit fix and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/src/session_title.rs
+          git rm .github/workflows/fix-ru-title-prefix-once.yml
+          git diff --cached --check
+          git commit -m "fix(i18n): normalize Russian title prefix"
+          git push origin HEAD:agent/russian-localization
