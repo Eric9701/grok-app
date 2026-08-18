@@ -111,6 +111,12 @@ array under the new id. Rules:
 3. Journal rehydrate upgrades only `messagesBySession[sid]`, never React prev
    from another project.
 
+**CLI import sanitization (#687):** Import still copies `chat_history.jsonl`
+into App `messages.json` (not a live official-session mirror). Reminder-only
+`<system-reminder>` rows and `synthetic_reason: project_instructions` envelopes
+are dropped so they do not become gray user bubbles. A wrapped `<user_query>`
+is kept. Official TUI remains `updates.jsonl`; App UI remains the local journal.
+
 **Fast switch (Windows freeze / open storm):** rapid sidebar clicks must not
 stack full open pipelines.
 

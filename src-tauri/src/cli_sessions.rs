@@ -940,15 +940,9 @@ pub fn read_first_user_prompt(dir: &Path) -> Option<String> {
             continue;
         }
         let content = v.get("content").map(content_to_text).unwrap_or_default();
-        let content = content.trim().to_string();
-        if content.is_empty() {
+        let Some(content) = imported_user_content(&v, &content) else {
             continue;
-        }
-        let content = extract_user_query(&content).unwrap_or(content);
-        let content = content.trim();
-        if content.is_empty() {
-            continue;
-        }
+        };
         // Cap length for UI / filter.
         let capped: String = content.chars().take(500).collect();
         return Some(capped);
@@ -1072,15 +1066,18 @@ pub fn parse_chat_history_jsonl(path: &Path) -> Result<Vec<(String, String)>, St
             _ => continue,
         };
         let content = v.get("content").map(content_to_text).unwrap_or_default();
-        let content = content.trim().to_string();
-        if content.is_empty() {
-            continue;
-        }
-        // Drop huge system-y user envelopes when possible — keep query body.
-        let content = extract_user_query(&content).unwrap_or(content);
-        if content.is_empty() {
-            continue;
-        }
+        let content = if role == "user" {
+            match imported_user_content(&v, &content) {
+                Some(c) => c,
+                None => continue,
+            }
+        } else {
+            let content = content.trim().to_string();
+            if content.is_empty() {
+                continue;
+            }
+            content
+        };
         out.push((role.to_string(), content));
     }
     if out.is_empty() {
@@ -1114,14 +1111,18 @@ fn parse_chat_history_rows(path: &Path) -> Result<Vec<(String, String, Option<St
         match typ {
             "user" | "assistant" => {
                 let content = v.get("content").map(content_to_text).unwrap_or_default();
-                let content = content.trim().to_string();
-                if content.is_empty() {
-                    continue;
-                }
-                let content = extract_user_query(&content).unwrap_or(content);
-                if content.is_empty() {
-                    continue;
-                }
+                let content = if typ == "user" {
+                    match imported_user_content(&v, &content) {
+                        Some(c) => c,
+                        None => continue,
+                    }
+                } else {
+                    let content = content.trim().to_string();
+                    if content.is_empty() {
+                        continue;
+                    }
+                    content
+                };
                 out.push((typ.to_string(), content, None));
             }
             "tool_result" => {
@@ -1158,6 +1159,46 @@ fn extract_user_query(content: &str) -> Option<String> {
     } else {
         Some(q.to_string())
     }
+}
+
+fn chat_history_synthetic_reason(v: &Value) -> Option<&str> {
+    v.get("synthetic_reason")
+        .or_else(|| v.get("syntheticReason"))
+        .or_else(|| v.pointer("/_meta/synthetic_reason"))
+        .or_else(|| v.pointer("/metadata/synthetic_reason"))
+        .and_then(|x| x.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+}
+
+fn is_synthetic_instruction_reason(reason: &str) -> bool {
+    let r = reason.to_ascii_lowercase();
+    r == "project_instructions"
+        || r == "system_reminder"
+        || r == "user_instructions"
+        || r.contains("reminder")
+        || r.contains("instruction")
+}
+
+/// Official TUI paints `updates.jsonl`, not `chat_history.jsonl`. Import must
+/// not copy reminder-only / synthetic instruction envelopes as user bubbles.
+fn imported_user_content(v: &Value, raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    if let Some(q) = extract_user_query(raw) {
+        return Some(q);
+    }
+    if raw.contains("<system-reminder>") {
+        return None;
+    }
+    if let Some(reason) = chat_history_synthetic_reason(v) {
+        if is_synthetic_instruction_reason(reason) {
+            return None;
+        }
+    }
+    Some(raw.to_string())
 }
 
 /// Split display text + `@/abs/path` (or `@C:\path`) sole-line refs — mirrors FE
@@ -1963,6 +2004,44 @@ mod tests {
         assert_eq!(pairs[0].1, "hello world");
         assert_eq!(pairs[1].0, "assistant");
         assert_eq!(pairs[1].1, "hi there");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn parse_jsonl_skips_system_reminder_user_envelopes() {
+        let dir = std::env::temp_dir().join(format!("cli-hist-reminder-{}", Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("chat_history.jsonl");
+        let mut f = fs::File::create(&path).unwrap();
+        writeln!(
+            f,
+            r#"{{"type":"user","synthetic_reason":"project_instructions","content":"<system-reminder>\nFollow AGENTS.md\n</system-reminder>"}}"#
+        )
+        .unwrap();
+        writeln!(
+            f,
+            r#"{{"type":"user","content":"<system-reminder>\nAlso this\n</system-reminder>"}}"#
+        )
+        .unwrap();
+        writeln!(
+            f,
+            r#"{{"type":"user","content":"<system-reminder>\nctx\n</system-reminder>\n<user_query>\nreal question\n</user_query>"}}"#
+        )
+        .unwrap();
+        writeln!(f, r#"{{"type":"assistant","content":"ok"}}"#).unwrap();
+        let pairs = parse_chat_history_jsonl(&path).unwrap();
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0].0, "user");
+        assert_eq!(pairs[0].1, "real question");
+        assert_eq!(pairs[1].0, "assistant");
+        assert_eq!(pairs[1].1, "ok");
+
+        let rows = parse_chat_history_rows(&path).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].1, "real question");
+
+        let first = read_first_user_prompt(&dir).unwrap();
+        assert_eq!(first, "real question");
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -14,10 +14,16 @@ See `docs/llm-wiki/release.md`.
 ### Fixed
 - **Live “思考中” timer no longer inherits another chat’s clock**: A leftover `turnStartedAt` (or a later correction) used to stick at 50+ minutes, then jump to the real duration after remount. The live timer now follows this turn’s clock and will not start before the assistant bubble’s `createdAt`.
 - **New-chat first send no longer false-heals as “message never reached the agent”**: Ghost-heal treated a leftover previous-session turn clock plus the `__draft__` → real-id handoff as “Host idle, send finished”. The toast fired, the composer was restored, and the agent still ran the prompt. New chat now clears the clock; draft sends start/migrate it; `sessionCreate` moves the send claim onto the real id immediately; heal also counts the draft claim as in-flight.
+- **Composer branch chip follows in-place checkout (#690)**: `git switch` in the same working tree no longer leaves the chip stale until the menu is opened. The dirty-status poll already had HEAD; it now patches the matching worktree row.
+- **Reasoning effort survives session respawn (#682)**: Changing effort on an existing chat was overwritten by `session/load` restoring the old CLI journal. A real change now clears `agent_session_id` (next connect uses `session/new`) and the next send waits for the preference write. Custom providers with an effort catalog get `supports_reasoning_effort` in App `agent-home` only.
+- **CLI import no longer paints `<system-reminder>` as a user bubble (#687)**: Reminder-only / `synthetic_reason: project_instructions` envelopes in `chat_history.jsonl` are skipped. A wrapped `<user_query>` is kept.
 
 **中文 · 修复**
 - **「思考中」不再沿用上一会话的计时**：上一轮留下的 `turnStartedAt` 会把时长钉在 50 多分钟，滑一下或重挂载后又变成真正的几分钟。现在跟本轮时钟走，也不会早于这条助手气泡的 `createdAt`。
 - **新建会话首条消息不再误报「消息没有真正发给 Agent」**：上一条会话留下的计时，加上草稿 `__draft__` 切到真实 session id 的空档，会被当成 Host 空闲、发送已结束。于是 toast 弹出、输入框还原，Agent 其实已经在跑。现在新建会话会清计时，草稿发送会建/迁移计时，`sessionCreate` 当下就把发送认领迁到新 id，heal 也会把草稿认领当成仍在发送。
+- **输入框上的分支 chip 会跟着同目录切分支更新（#690）**：同一工作树里 `git switch` 后不再要点开菜单才刷新。脏状态轮询本来就有 HEAD，现在会补到对应 worktree 行。
+- **切换推理力度后不再被旧 CLI 会话盖回去（#682）**：已有对话改 effort 会被 `session/load` 恢复成旧值。真正改过时清掉 `agent_session_id`（下次 `session/new`），下一条发送会等偏好写完。带 effort 目录的自定义渠道只在 App `agent-home` 写 `supports_reasoning_effort`。
+- **导入 CLI 会话不再把 `<system-reminder>` 画成用户气泡（#687）**：`chat_history.jsonl` 里只有 reminder / `project_instructions` 的信封会丢掉；带 `<user_query>` 的仍保留正文。
 
 ## [0.2.21] - 2026-08-18
 
