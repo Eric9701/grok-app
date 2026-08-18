@@ -60,6 +60,12 @@ describe("i18n catalog", () => {
       "slash.settings",
       "settings.language",
       "account.signedIn",
+      "prov.emptyTitle",
+      "automations.title",
+      "doctor.title",
+      "ext.plugins.title",
+      "ext.mcp.title",
+      "ext.market.title",
       "error.details",
     ];
     for (const key of keys) {
