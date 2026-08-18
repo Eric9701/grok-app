@@ -1685,18 +1685,53 @@ pub(super) struct DrainedAgents {
     pub(super) prewarm_count: usize,
 }
 
+/// Whole-connect budget (spawn + initialize + load/new). Sequential RPCs each
+/// have their own 45s cap; without a wall clock the pill can sit on 连接中
+/// for minutes, and a hung spawn never leaves Connecting.
+pub const CONNECT_WALL_CLOCK_SECS: u64 = 90;
+
 /// Pure policy: should connect keep the live agent process instead of respawning?
 ///
 /// Terminal states never preserve — leftover busy flags after a failed turn
 /// (`deferred_prompt_complete`, open tools, …) must not block reconnect.
+///
+/// `Connecting` is **not** healthy: handshake is unfinished. Preserving it
+/// made every later `session_connect` no-op the same Connecting snapshot
+/// until the app was restarted.
 pub(super) fn connect_should_preserve_live_process(state: SessionState, busy: bool) -> bool {
     match state {
-        SessionState::Streaming | SessionState::AwaitingPermission | SessionState::Connecting => {
-            true
-        }
+        SessionState::Streaming | SessionState::AwaitingPermission => true,
+        SessionState::Connecting => false,
         SessionState::Ready => busy,
         SessionState::Idle | SessionState::Disconnected => false,
     }
+}
+
+/// Whether `ProcessExited` should fail the FSM (crash / connect_failed).
+///
+/// Connecting used to be excluded so initialize could report a richer error.
+/// If that waiter is gone, the session stayed Connecting until restart.
+pub(super) fn process_exit_should_fail_fsm(state: SessionState, has_err: bool) -> bool {
+    if has_err {
+        return false;
+    }
+    matches!(
+        state,
+        SessionState::Ready
+            | SessionState::Streaming
+            | SessionState::AwaitingPermission
+            | SessionState::Connecting
+    )
+}
+
+/// Wall-clock timeout may only tear down an unfinished handshake.
+pub(super) fn should_fail_connect_on_wall_clock(state: SessionState) -> bool {
+    matches!(state, SessionState::Connecting)
+}
+
+/// User Stop / Retry on a handshake must abort it (not treat it as a turn).
+pub(super) fn stop_should_abort_handshake(state: SessionState) -> bool {
+    matches!(state, SessionState::Connecting)
 }
 
 /// Pure policy: may a provider `retry_state` fail the host turn / write chat error?

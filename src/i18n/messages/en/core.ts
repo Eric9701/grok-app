@@ -103,6 +103,7 @@ export const enCore = {
   "conn.streaming": "Working",
   "conn.permission": "Needs permission",
   "conn.disconnected": "Disconnected",
+  "conn.retryHint": "Click to cancel and retry the connection",
   "shortcuts.title": "Keyboard shortcuts",
   "shortcuts.close": "Close",
   "shortcuts.search": "Search chats / projects",

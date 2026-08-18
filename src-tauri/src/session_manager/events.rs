@@ -942,17 +942,10 @@ impl SessionManager {
                             crate::plan_chrome::mark_gate_stale(&s.app_session_id);
                             gate_invalidations.push(row);
                         }
-                        // During Connecting, leave error to initialize/connect_failed
-                        // (fail_all_pending already surfaces a richer stderr-backed message).
+                        // Connecting must leave too: a lost initialize waiter used
+                        // to leave the pill on 连接中 until restart.
                         let has_err = s.fsm.last_error().is_some();
-                        if !has_err
-                            && matches!(
-                                st,
-                                SessionState::Ready
-                                    | SessionState::Streaming
-                                    | SessionState::AwaitingPermission
-                            )
-                        {
+                        if process_exit_should_fail_fsm(st, has_err) {
                             let detail = match code {
                                 Some(status) => format!("Agent process exited (code {status})"),
                                 None => "Agent process exited (EOF/unknown status)".into(),

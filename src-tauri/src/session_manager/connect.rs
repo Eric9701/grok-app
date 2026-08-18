@@ -27,8 +27,77 @@ impl SessionManager {
         mock_mode: Option<String>,
     ) -> Result<SessionSnapshot, String> {
         let _connect_guard = self.connect_lock.lock().await;
-        self.connect_inner(app, project_path, app_session_id, mock_mode)
-            .await
+        match tokio::time::timeout(
+            Duration::from_secs(CONNECT_WALL_CLOCK_SECS),
+            self.connect_inner(
+                app.clone(),
+                project_path,
+                app_session_id.clone(),
+                mock_mode,
+            ),
+        )
+        .await
+        {
+            Ok(r) => r,
+            Err(_) => {
+                tracing::warn!(
+                    target: "session",
+                    session = ?app_session_id,
+                    secs = CONNECT_WALL_CLOCK_SECS,
+                    "connect wall-clock timeout"
+                );
+                Ok(self
+                    .fail_stale_connecting(&app, app_session_id.as_deref(), "connect timed out")
+                    .await)
+            }
+        }
+    }
+
+    /// Tear down an unfinished handshake (wall-clock timeout or user cancel).
+    /// No-ops when the slot is already Ready / Streaming — a late timeout
+    /// during post-open `set_mode` must not kill a working agent.
+    pub(super) async fn fail_stale_connecting(
+        self: &Arc<Self>,
+        app: &AppHandle,
+        app_session_id: Option<&str>,
+        reason: &str,
+    ) -> SessionSnapshot {
+        let err = AgentError::new(
+            AgentErrorCode::ConnectFailed,
+            format!("{reason} after {CONNECT_WALL_CLOCK_SECS}s"),
+        );
+        let mut acps = Vec::new();
+        {
+            let mut guard = self.inner.lock();
+            if let Some(s) = guard.as_mut() {
+                let matches = app_session_id
+                    .map(|id| s.app_session_id == id)
+                    .unwrap_or(true);
+                if matches && should_fail_connect_on_wall_clock(s.fsm.state()) {
+                    let _ = s.fsm.connect_failed(err.clone());
+                    if let Some(acp) = s.acp.take() {
+                        acps.push(acp);
+                    }
+                }
+            }
+        }
+        if let Some(id) = app_session_id {
+            let mut bg = self.background.lock();
+            if let Some(s) = bg.get_mut(id) {
+                if should_fail_connect_on_wall_clock(s.fsm.state()) {
+                    let _ = s.fsm.connect_failed(err);
+                    if let Some(acp) = s.acp.take() {
+                        acps.push(acp);
+                    }
+                }
+            }
+        }
+        for acp in acps {
+            acp.kill().await;
+        }
+        let snap = self.snapshot();
+        Self::emit_state(app, &snap);
+        snap
     }
 
     pub(super) async fn connect_inner(
@@ -884,6 +953,18 @@ impl SessionManager {
             });
         }
 
+        // Bind ACP before initialize so Stop / wall-clock abort can kill a
+        // hung handshake (otherwise LiveSession.acp is None until Ready).
+        {
+            let mut guard = self.inner.lock();
+            if let Some(s) = guard.as_mut() {
+                if s.app_session_id == meta.id {
+                    s.acp = Some(client.clone());
+                    s.process_id = process_id.clone();
+                }
+            }
+        }
+
         tracing::info!(
             target: "session",
             session = %meta.id,
@@ -902,24 +983,6 @@ impl SessionManager {
 
         match open_result {
             Ok((agent_sid, resumed)) => {
-                // Cold-spawn path: the process was spawned with `--model` =
-                // active channel model, and `session/new` inherits the process
-                // default — the post-open `set_model` here was a redundant RPC
-                // on every connect. Keep `set_mode` on a normal resume (product
-                // mode is per-prompt; this is only a nudge).
-                // After `session/fork` the CLI is still hydrating parent
-                // context — `set_mode` timed out 5×45s (agent/default/code/…)
-                // and pinned both the fork and the parent chat on 连接中.
-                // Spawn already passed `--permission-mode`; skip the nudge.
-                if fork_agent {
-                    tracing::info!(
-                        target: "session",
-                        session = %meta.id,
-                        "connect skip set_mode after fork (parent mode already applied)"
-                    );
-                } else if let Err(e) = client.set_mode(&prefs.mode).await {
-                    tracing::warn!("acp set_mode after session open soft-fail: {e}");
-                }
                 // Native resume / successful fork = full agent context. Fresh
                 // session + existing UI journal → bootstrap history into the next prompt.
                 let need_bootstrap = !resumed && journal_has_history;
@@ -950,7 +1013,7 @@ impl SessionManager {
                     let mut guard = self.inner.lock();
                     if let Some(s) = guard.as_mut() {
                         let _ = s.fsm.handshake_ok();
-                        s.acp = Some(client);
+                        s.acp = Some(client.clone());
                         s.process_id = process_id;
                         s.meta.agent_session_id = Some(agent_sid);
                         s.meta.fork_agent_session = false;
@@ -970,7 +1033,18 @@ impl SessionManager {
                 let _ = store::update_session_meta(&meta);
                 let snap = self.snapshot();
                 Self::emit_state(&app, &snap);
-                Ok(snap)
+                // Nudge mode *after* Ready so a slow/failed set_mode cannot pin
+                // the pill on 连接中. Fork already inherited parent mode.
+                if fork_agent {
+                    tracing::info!(
+                        target: "session",
+                        session = %meta.id,
+                        "connect skip set_mode after fork (parent mode already applied)"
+                    );
+                } else if let Err(e) = client.set_mode(&prefs.mode).await {
+                    tracing::warn!("acp set_mode after session open soft-fail: {e}");
+                }
+                Ok(self.snapshot())
             }
             Err(e) => {
                 tracing::warn!(
@@ -1464,7 +1538,7 @@ mod connect_preserve_tests {
     }
 
     #[test]
-    fn streaming_and_connecting_always_preserve() {
+    fn streaming_and_permission_always_preserve() {
         assert!(connect_should_preserve_live_process(
             SessionState::Streaming,
             false
@@ -1473,10 +1547,45 @@ mod connect_preserve_tests {
             SessionState::AwaitingPermission,
             false
         ));
-        assert!(connect_should_preserve_live_process(
+    }
+
+    #[test]
+    fn connecting_does_not_preserve_unfinished_handshake() {
+        // Leftover Connecting + live ACP used to no-op every reconnect.
+        assert!(!connect_should_preserve_live_process(
             SessionState::Connecting,
             false
         ));
+        assert!(!connect_should_preserve_live_process(
+            SessionState::Connecting,
+            true
+        ));
+    }
+
+    #[test]
+    fn process_exit_fails_connecting_as_well_as_live_turns() {
+        assert!(process_exit_should_fail_fsm(
+            SessionState::Connecting,
+            false
+        ));
+        assert!(process_exit_should_fail_fsm(SessionState::Ready, false));
+        assert!(!process_exit_should_fail_fsm(
+            SessionState::Connecting,
+            true
+        ));
+        assert!(!process_exit_should_fail_fsm(SessionState::Idle, false));
+    }
+
+    #[test]
+    fn wall_clock_and_stop_only_abort_handshake() {
+        assert!(should_fail_connect_on_wall_clock(
+            SessionState::Connecting
+        ));
+        assert!(!should_fail_connect_on_wall_clock(SessionState::Ready));
+        assert!(stop_should_abort_handshake(SessionState::Connecting));
+        assert!(!stop_should_abort_handshake(SessionState::Streaming));
+        assert!(CONNECT_WALL_CLOCK_SECS >= 60);
+        assert!(CONNECT_WALL_CLOCK_SECS <= 90);
     }
 
     #[test]

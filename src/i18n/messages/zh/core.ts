@@ -103,6 +103,7 @@ export const zhCore = {
   "conn.streaming": "工作中",
   "conn.permission": "等待授权",
   "conn.disconnected": "已断开",
+  "conn.retryHint": "点击取消并重新连接",
   "shortcuts.title": "键盘快捷键",
   "shortcuts.close": "关闭",
   "shortcuts.search": "搜索会话 / 项目",

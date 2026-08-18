@@ -34,6 +34,8 @@ See `docs/llm-wiki/release.md`.
 - **桌面输入框上方始终显示工作区（#662）**：不再只在「已选项目的全新空草稿」才出现。沿用现有 `ComposerProjectMenu` 选择、添加或回到默认工作区。中文不再用「通用」。侧栏 `+` 保留。手机仍走工具页。
 
 ### Fixed
+- **Selection comment pop hierarchy**: The comment field uses the input well so it no longer blends into the panel; the excerpt stays plain truncated text.
+- **Stuck「连接中」until restart**: The status pill is per-chat (another session’s handshake no longer paints this one Connecting). Host connect has a 90s wall clock; `ProcessExited` during handshake fails the FSM; leftover Connecting is not treated as a healthy live process. `session/set_mode` runs after Ready. Click the pill or Reconnect to cancel and retry — that button stays enabled.
 - **Chat no longer freezes when a generated image first appears (#675, #676)**: The card first-paints a placeholder or cached thumb instead of the full Imagine PNG. Host cache hits read source width/height from a sidecar (or the thumb JPEG header) and do not decode the original again.
 - **Assistant body text no longer stacks on itself**: Conclusion markdown and work-fold tool stdout could occupy the same box when a parent flex column crushed their height (`overflow: visible` expand bodies then painted over the answer). Transcript rows, timeline children, and `.chat-md--answer` no longer shrink; expand-body `overflow: visible` is only used inside a capped/virtual scroller.
 - **Compact dialog overflow + help**: Long inline help on Compact context could exceed `.modal` max-height (`overflow: hidden`, no scroll body) and clip the Compact button. Descriptions move into a title `?` tip; the body scrolls and the footer stays pinned. Connect failure after confirm no longer fails silently.
@@ -58,6 +60,8 @@ See `docs/llm-wiki/release.md`.
 - **Transcript selection quotes**: Selecting text in a bubble shows a floating bar (copy, optional comment, add to chat). Quotes sit **beside** the draft as a compact “N notes / N 条注释” chip — they are not pasted into the input. They persist on project/session drafts and the send queue. The agent sees `Quoted excerpt` / `Comment` blocks; the journal stores `[[quote]]` / `[[note]]` fences so reload rebuilds the cards. Queue **Guide** serializes quotes (and re-queues them on failure). Send settlement compares quotes so a quote added during an in-flight send is not overwritten on failure. Switching sessions closes the selection bar.
 
 **中文 · 修复**
+- **选区注释弹窗层次**：评论框用输入井，不再和面板糊成一块；摘录仍是普通截断文本。
+- **一直卡在「连接中」、只能重启**：顶栏药丸按当前会话投影（别的会话在握手时，这个聊天不再显示连接中）。整段 connect 有 90 秒墙钟；握手期间进程退出会离开 Connecting；未完成的握手不再被当成健康活进程。`session/set_mode` 改到 Ready 之后。点击药丸或「重新连接」可取消并重试，按钮不再因连接中被禁用。
 - **对话出图那一下不再卡死（#675、#676）**：卡片首屏改占位或缓存缩略图，不再先解完整原图。Host 缓存命中读 sidecar / JPEG 头拿宽高，不再为读尺寸再解一遍原图。
 - **助手正文不再叠字**：结论 Markdown 和工作轨里的工具输出会被父级 flex 压扁到同一块区域（展开体 `overflow: visible` 再盖到答案上）。消息行、时间线子项和 `.chat-md--answer` 不再被压缩；只有带滚动条的工作列表才允许展开体溢出。
 - **压缩弹窗过长、按钮被裁切**：原先说明全铺在弹窗里，超出 `.modal` 最大高度后底部「压缩」被裁掉（容器 `overflow: hidden`、没有可滚 body）。说明收到标题旁 `?`，正文可滚、底部按钮固定。确认后连不上 Agent 也不再静默失败。

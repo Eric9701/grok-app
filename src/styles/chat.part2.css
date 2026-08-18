@@ -854,6 +854,9 @@ button.composer__context-item {
 .sel-toolbar {
   position: fixed;
   z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   min-width: 220px;
   max-width: min(360px, calc(100vw - 16px));
   padding: 8px;
@@ -868,7 +871,6 @@ button.composer__context-item {
   font-size: 11px;
   line-height: 1.35;
   color: var(--text-tertiary);
-  margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -919,13 +921,23 @@ button.composer__context-item {
   width: 100%;
   resize: vertical;
   min-height: 3.2em;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-strong, var(--border-subtle));
   border-radius: 6px;
-  background: var(--bg);
+  background: var(--bg-input, var(--bg));
   color: var(--text-primary);
   font: inherit;
   font-size: 12px;
+  line-height: 1.4;
   padding: 6px 8px;
+}
+
+.sel-toolbar__textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.sel-toolbar__textarea:focus {
+  outline: none;
+  border-color: var(--border-focus, var(--accent, #6b8afd));
 }
 
 .sel-toolbar__submit:disabled {

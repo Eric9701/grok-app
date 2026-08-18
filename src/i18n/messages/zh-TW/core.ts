@@ -103,6 +103,7 @@ export const zhTWCore = {
   "conn.streaming": "工作中",
   "conn.permission": "等待授權",
   "conn.disconnected": "已中斷",
+  "conn.retryHint": "點一下取消並重新連線",
   "shortcuts.title": "鍵盤快捷鍵",
   "shortcuts.close": "關閉",
   "shortcuts.search": "搜尋對話 / 專案",

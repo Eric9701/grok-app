@@ -792,6 +792,25 @@ impl SessionManager {
                 .map(|s| s.app_session_id.clone())
                 .ok_or("no active session")?,
         };
+        // Handshake is not a turn. Stop / Retry must tear it down so the
+        // user is not stuck on 连接中 until restart.
+        let abort_handshake = self.with_session_mut(&target, |s| {
+            if !stop_should_abort_handshake(s.fsm.state()) {
+                return (false, None);
+            }
+            let _ = s.fsm.connect_failed(crate::error::AgentError::new(
+                crate::error::AgentErrorCode::ConnectFailed,
+                "connect cancelled",
+            ));
+            (true, s.acp.take())
+        });
+        if let Some((true, acp)) = abort_handshake {
+            if let Some(acp) = acp {
+                acp.kill().await;
+            }
+            self.emit_for_session(&app, &target);
+            return Ok(self.snapshot());
+        }
         let app_for_marker = app.clone();
         // Also release ask_user / plan reverse-RPCs. Leaving them set kept
         // `live_session_is_busy` true after stop, so Send/park paths stayed

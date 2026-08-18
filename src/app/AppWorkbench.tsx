@@ -516,7 +516,12 @@ import {
   stepChatFindIndex,
   type ChatFindMatch
 } from "@/lib/chatFind";
-import { connPillForState } from "@/lib/connStatus";
+import {
+  connPillForState,
+  connPillRetryable,
+  isViewedSessionConnecting,
+  shouldDisableReconnectBecauseConnecting,
+} from "@/lib/connStatus";
 import {
   matchGlobalShortcut,
   shortcutsForPlatform
@@ -2678,10 +2683,18 @@ export function AppWorkbench() {
     for (const key of keys) set.delete(key);
   };
   const syncEnsureConnectingUi = () => {
-    const active = ensureConnectCountRef.current > 0;
-    connectingRef.current = active;
-    setConnecting(active);
+    const viewedActive = isViewedSessionConnecting(
+      viewingSessionIdRef.current ?? session.sessionId,
+      connectingBySessionRef.current,
+    );
+    connectingRef.current = viewedActive;
+    setConnecting(viewedActive);
   };
+  // Switching chats must re-project the per-session claim; a foreign
+  // handshake must not keep this view on 连接中.
+  useEffect(() => {
+    syncEnsureConnectingUi();
+  }, [session.sessionId]);
   /** Live provider retry progress (session://retry); cleared on success/stop/error. */
   // Value intentionally unbound (retry chip hidden): only the setter is kept
   // for cleanup calls. See the hidden-retry comment at the status-pill site.
@@ -7557,6 +7570,7 @@ export function AppWorkbench() {
     () => connPillForState(session.state, connecting),
     [session.state, connecting],
   );
+  const connPillCanRetry = connPillRetryable(session.state, connecting);
 
   const isPlaceholderTitle = useCallback(
     (title: string | undefined | null) => {
@@ -7833,6 +7847,22 @@ export function AppWorkbench() {
       ensureConnectCountRef.current = Math.max(0, ensureConnectCountRef.current - 1);
       syncEnsureConnectingUi();
     }
+  };
+
+  const retryAgentConnect = () => {
+    const sid = viewingSessionIdRef.current ?? session.sessionId;
+    setLocalError(null);
+    void (async () => {
+      if (session.state === "connecting" || connecting) {
+        try {
+          await api.sessionStop(sid);
+        } catch {
+          /* Host may not have bound ACP yet */
+        }
+      }
+      const next = await ensureConnected({ force: true, sessionId: sid });
+      if (next) setLocalError(null);
+    })();
   };
 
   /**
@@ -15214,10 +15244,7 @@ export function AppWorkbench() {
       setErrorDetailOpen(false);
       switch (action.id) {
         case "reconnect":
-          setLocalError(null);
-          void ensureConnected(true).then((sid) => {
-            if (sid) setLocalError(null);
-          });
+          retryAgentConnect();
           break;
         case "open_doctor":
           setLocalError(null);
@@ -19728,14 +19755,26 @@ export function AppWorkbench() {
                     );
                   })()}
                   {mainPane === "chat" && (
-                    <span
-                      className={`status-pill status-pill--${connPill.tone}`}
-                      role="status"
-                      title={tr(connPill.labelKey as MessageKey)}
-                    >
-                      <span className="status-pill__dot" aria-hidden />
-                      {tr(connPill.labelKey as MessageKey)}
-                    </span>
+                    connPillCanRetry ? (
+                      <button
+                        type="button"
+                        className={`status-pill status-pill--${connPill.tone} status-pill--action`}
+                        title={tr("conn.retryHint")}
+                        onClick={() => retryAgentConnect()}
+                      >
+                        <span className="status-pill__dot" aria-hidden />
+                        {tr(connPill.labelKey as MessageKey)}
+                      </button>
+                    ) : (
+                      <span
+                        className={`status-pill status-pill--${connPill.tone}`}
+                        role="status"
+                        title={tr(connPill.labelKey as MessageKey)}
+                      >
+                        <span className="status-pill__dot" aria-hidden />
+                        {tr(connPill.labelKey as MessageKey)}
+                      </span>
+                    )
                   )}
                   {/* Retry progress is intentionally NOT shown: mid-connect
                       network retries (reqwest stream errors, transient 5xx)
@@ -20366,7 +20405,8 @@ export function AppWorkbench() {
                     type="button"
                     className="btn btn--primary error-banner__primary"
                     disabled={
-                      connecting && errorBanner.primary.id === "reconnect"
+                      shouldDisableReconnectBecauseConnecting(connecting) &&
+                      errorBanner.primary.id === "reconnect"
                     }
                     onClick={() => {
                       if (errorBanner.primary) {
@@ -20382,7 +20422,8 @@ export function AppWorkbench() {
                     type="button"
                     className="btn btn--ghost error-banner__secondary"
                     disabled={
-                      connecting && errorBanner.secondary.id === "reconnect"
+                      shouldDisableReconnectBecauseConnecting(connecting) &&
+                      errorBanner.secondary.id === "reconnect"
                     }
                     onClick={() => {
                       if (errorBanner.secondary) {
@@ -20399,13 +20440,12 @@ export function AppWorkbench() {
                     <button
                       type="button"
                       className="btn btn--ghost error-banner__reconnect"
-                      disabled={connecting}
+                      disabled={shouldDisableReconnectBecauseConnecting(
+                        connecting,
+                      )}
                       onClick={() => {
-                        setLocalError(null);
                         setErrorDetailOpen(false);
-                        void ensureConnected(true).then((sid) => {
-                          if (sid) setLocalError(null);
-                        });
+                        retryAgentConnect();
                       }}
                     >
                       {tr("main.reconnect")}
