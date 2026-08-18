@@ -83,7 +83,7 @@ export function peekChatImageThumb(
  */
 export function nextChatCardDisplaySrc(
   current: string | null | undefined,
-  thumb: ThumbResolve | null | undefined,
+  thumb: ThumbResolve | { displaySrc?: string | null } | null | undefined,
 ): string | null {
   const next = (thumb?.displaySrc || "").trim();
   if (next) return next;

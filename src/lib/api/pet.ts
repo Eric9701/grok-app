@@ -178,25 +178,10 @@ export async function petSetHitChrome(chrome: PetHitChrome): Promise<void> {
 
 type WorkRect = { x: number; y: number; w: number; h: number };
 
-async function readPetMonitor(win: {
-  currentMonitor?: () => Promise<{
-    position: { x: number; y: number };
-    size: { width: number; height: number };
-    workArea?: {
-      position: { x: number; y: number };
-      size: { width: number; height: number };
-    };
-  } | null>;
-}) {
-  try {
-    if (typeof win.currentMonitor === "function") {
-      const m = await win.currentMonitor();
-      if (m) return m;
-    }
-  } catch {
-    /* fall through */
-  }
-  const { currentMonitor, primaryMonitor } = await import("@tauri-apps/api/window");
+async function readPetMonitor() {
+  const { currentMonitor, primaryMonitor } = await import(
+    "@tauri-apps/api/window"
+  );
   return (await currentMonitor()) ?? (await primaryMonitor());
 }
 
@@ -255,7 +240,7 @@ export async function petReadBubbleOffset(maxOffset: number): Promise<number> {
       win.scaleFactor(),
       win.outerPosition(),
       win.outerSize(),
-      readPetMonitor(win),
+      readPetMonitor(),
     ]);
     if (!(scale > 0) || !mon) return 0;
     const work = workRectFromMonitor(mon, scale);

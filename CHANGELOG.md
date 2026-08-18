@@ -20,6 +20,8 @@ See `docs/llm-wiki/release.md`.
 - **俄语界面（#689）**：设置语言列表和跟随系统可切到 `ru`。词库以英文兜底、常用面有俄文；托盘和原生菜单同步。
 
 ### Fixed
+- **Official login no longer breaks a working custom relay**: After sign-in, Host kept calling ACP `authenticate(cached_token)` on custom-route processes. That RPC reads `~/.grok/auth.json`, Grok Build then sends OIDC to the relay (`HTTP 400 Incorrect API key` / network card), and logout “fixed” it immediately. Custom routes now skip `cached_token`; login / account switch bind agent-home via `prepare_route_auth_for_agent` (official syncs, custom clears).
+- **History image chips no longer decode the full original (#692, #693)**: User-message paste thumbs use the same Host thumbnail path as assistant cards (#675). First paint stays empty until the ≤480px JPEG is ready, a live loopback `src` is not blanked on remount, and the `<img>` is no longer remounted on URL change. Long threads with screenshots no longer flash the window while a new reply streams.
 - **Live “思考中” timer no longer inherits another chat’s clock**: A leftover `turnStartedAt` (or a later correction) used to stick at 50+ minutes, then jump to the real duration after remount. The live timer now follows this turn’s clock and will not start before the assistant bubble’s `createdAt`.
 - **New-chat first send no longer false-heals as “message never reached the agent”**: Ghost-heal treated a leftover previous-session turn clock plus the `__draft__` → real-id handoff as “Host idle, send finished”. The toast fired, the composer was restored, and the agent still ran the prompt. New chat now clears the clock; draft sends start/migrate it; `sessionCreate` moves the send claim onto the real id immediately; heal also counts the draft claim as in-flight.
 - **Composer branch chip follows in-place checkout (#690)**: `git switch` in the same working tree no longer leaves the chip stale until the menu is opened. The dirty-status poll already had HEAD; it now patches the matching worktree row.
@@ -27,6 +29,8 @@ See `docs/llm-wiki/release.md`.
 - **CLI import no longer paints `<system-reminder>` as a user bubble (#687)**: Reminder-only / `synthetic_reason: project_instructions` envelopes in `chat_history.jsonl` are skipped. A wrapped `<user_query>` is kept.
 
 **中文 · 修复**
+- **登录官方号不再把正在用的中转打挂**：签入后自定义路由仍会 `authenticate(cached_token)`，CLI 读 `~/.grok/auth.json` 后把 OIDC 打到中转（HTTP 400 Incorrect API key / 网络异常），退出登录立刻又好。现在自定义路由不再做 `cached_token`；登录/切号按当前路由 `prepare_route_auth`（官方同步，自定义清掉）。
+- **历史里的用户附图不再解原图（#692, #693）**：用户气泡里的粘贴缩略图走和助手图卡同一套 Host 缩略图（#675）。缓存未命中时先占位，已有 loopback 地址不再清成空，换地址时也不再拆掉 `<img>` 重挂。带截图的长对话在往外写时窗口不再整屏闪。
 - **「思考中」不再沿用上一会话的计时**：上一轮留下的 `turnStartedAt` 会把时长钉在 50 多分钟，滑一下或重挂载后又变成真正的几分钟。现在跟本轮时钟走，也不会早于这条助手气泡的 `createdAt`。
 - **新建会话首条消息不再误报「消息没有真正发给 Agent」**：上一条会话留下的计时，加上草稿 `__draft__` 切到真实 session id 的空档，会被当成 Host 空闲、发送已结束。于是 toast 弹出、输入框还原，Agent 其实已经在跑。现在新建会话会清计时，草稿发送会建/迁移计时，`sessionCreate` 当下就把发送认领迁到新 id，heal 也会把草稿认领当成仍在发送。
 - **输入框上的分支 chip 会跟着同目录切分支更新（#690）**：同一工作树里 `git switch` 后不再要点开菜单才刷新。脏状态轮询本来就有 HEAD，现在会补到对应 worktree 行。

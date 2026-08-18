@@ -522,7 +522,6 @@ export const ruWorkspace: Partial<Record<MessageKey, string>> = {
   "side.env.prOpen": "#{n} {title}",
   "side.env.prOpenNumber": "PR #{n}",
   "side.env.prUnavailable": "Состояние pull request недоступно",
-  "side.picker.terminal": "Терминал",
   "terminal.toggleShow": "Показать терминал",
   "terminal.toggleHide": "Скрыть терминал",
   "terminal.panelAria": "Панель терминала",
