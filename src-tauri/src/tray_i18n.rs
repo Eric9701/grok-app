@@ -7,6 +7,7 @@ use crate::store;
 pub enum Locale {
     Zh,
     ZhTw,
+    Ru,
     En,
 }
 
@@ -16,6 +17,7 @@ impl Locale {
         match v.as_str() {
             "system" => Locale::from_system(),
             "en" | "en-us" | "en_us" | "en-gb" => Locale::En,
+            "ru" | "ru-ru" | "ru_ru" => Locale::Ru,
             "zh-tw" | "zh_tw" | "zh-hant" | "zh_hant" => Locale::ZhTw,
             "zh" | "zh-cn" | "zh_cn" | "zh-hans" | "zh_hans" => Locale::Zh,
             // Default product locale is en (matches AppSettings::default).
@@ -50,6 +52,9 @@ impl Locale {
                 .any(|p| p == "hant" || p == "tw" || p == "hk" || p == "mo");
             return if is_trad { Locale::ZhTw } else { Locale::Zh };
         }
+        if primary == "ru" {
+            return Locale::Ru;
+        }
         if primary == "en" {
             return Locale::En;
         }
@@ -57,22 +62,24 @@ impl Locale {
         match bare.as_str() {
             "zh-tw" | "zh-hant" => Locale::ZhTw,
             "zh" | "zh-cn" | "zh-hans" => Locale::Zh,
+            "ru" | "ru-ru" => Locale::Ru,
             "en" | "en-us" | "en-gb" => Locale::En,
             _ => Locale::En,
         }
     }
 
-    /// Canonical catalog id shared with the frontend (`en` / `zh` / `zh-TW`).
+    /// Canonical catalog id shared with the frontend (`en` / `ru` / `zh` / `zh-TW`).
     pub fn as_tag(self) -> &'static str {
         match self {
             Locale::En => "en",
+            Locale::Ru => "ru",
             Locale::Zh => "zh",
             Locale::ZhTw => "zh-TW",
         }
     }
 }
 
-/// Raw OS UI language tag (`zh-CN`, `zh_TW`, `en-US`, …). Empty if unknown.
+/// Raw OS UI language tag (`zh-CN`, `zh_TW`, `ru-RU`, `en-US`, …). Empty if unknown.
 pub fn detect_os_lang_tag() -> String {
     if let Some(tag) = platform_ui_lang_tag() {
         return tag;
@@ -125,7 +132,8 @@ pub fn first_apple_languages_tag(raw: &str) -> Option<String> {
 }
 
 /// Map a Windows LANGID (GetUserDefaultUILanguage) to a BCP-47 tag.
-/// Unknown primary languages return `None` so callers can fall through.
+/// Unknown primary languages return `None` so callers can fall through to
+/// GetUserDefaultLocaleName (which covers Russian and other locales).
 pub fn windows_langid_to_tag(id: u16) -> Option<&'static str> {
     const LANG_CHINESE: u16 = 0x04;
     const LANG_ENGLISH: u16 = 0x09;
@@ -246,6 +254,23 @@ const EN: TrayStrings = TrayStrings {
     usage_unknown: "Usage  ·  —",
 };
 
+const RU: TrayStrings = TrayStrings {
+    recent: "Недавние",
+    no_recent: "Нет недавних чатов",
+    untitled: "Без названия",
+    more: "Ещё",
+    settings: "Настройки…",
+    doctor: "Диагностика",
+    account: "Аккаунт",
+    new_chat: "Новый чат",
+    open_app: "Открыть Grok",
+    quit: "Выйти из Grok",
+    tooltip: "Grok",
+    usage_with_reset: "Лимит  ·  осталось {pct}%  ·  {time}",
+    usage_pct: "Лимит  ·  осталось {pct}%",
+    usage_unknown: "Лимит  ·  —",
+};
+
 const ZH: TrayStrings = TrayStrings {
     recent: "最近",
     no_recent: "暂无最近会话",
@@ -283,6 +308,7 @@ const ZH_TW: TrayStrings = TrayStrings {
 pub fn strings(locale: Locale) -> &'static TrayStrings {
     match locale {
         Locale::En => &EN,
+        Locale::Ru => &RU,
         Locale::Zh => &ZH,
         Locale::ZhTw => &ZH_TW,
     }
@@ -312,10 +338,13 @@ mod tests {
     fn locale_parse() {
         assert_eq!(Locale::parse("en"), Locale::En);
         assert_eq!(Locale::parse("EN-US"), Locale::En);
+        assert_eq!(Locale::parse("ru"), Locale::Ru);
+        assert_eq!(Locale::parse("RU-RU"), Locale::Ru);
         assert_eq!(Locale::parse("zh"), Locale::Zh);
         assert_eq!(Locale::parse(""), Locale::En);
         assert_eq!(Locale::parse("zh-TW"), Locale::ZhTw);
         assert_eq!(Locale::parse("zh-Hant"), Locale::ZhTw);
+        assert_eq!(strings(Locale::Ru).settings, "Настройки…");
         assert_eq!(strings(Locale::ZhTw).settings, "設定…");
     }
 
@@ -344,6 +373,7 @@ mod tests {
         assert!(is_c_or_posix_locale("POSIX"));
         assert!(is_c_or_posix_locale("C.UTF-8"));
         assert!(!is_c_or_posix_locale("zh_CN.UTF-8"));
+        assert!(!is_c_or_posix_locale("ru_RU.UTF-8"));
         assert!(!is_c_or_posix_locale("en_US"));
     }
 
@@ -354,11 +384,14 @@ mod tests {
         assert_eq!(windows_langid_to_tag(0x0C04), Some("zh-TW"));
         assert_eq!(windows_langid_to_tag(0x0409), Some("en"));
         assert_eq!(windows_langid_to_tag(0x0411), None); // Japanese — fall through
+        assert_eq!(windows_langid_to_tag(0x0419), None); // Russian — locale-name fallback
     }
 
     #[test]
     fn from_lang_tag_maps_system_tags() {
         assert_eq!(Locale::from_lang_tag("en-US"), Locale::En);
+        assert_eq!(Locale::from_lang_tag("ru-RU"), Locale::Ru);
+        assert_eq!(Locale::from_lang_tag("ru_RU.UTF-8"), Locale::Ru);
         assert_eq!(Locale::from_lang_tag("zh_CN.UTF-8"), Locale::Zh);
         assert_eq!(Locale::from_lang_tag("zh-Hans-CN"), Locale::Zh);
         assert_eq!(Locale::from_lang_tag("zh-TW"), Locale::ZhTw);
@@ -367,6 +400,7 @@ mod tests {
         assert_eq!(Locale::from_lang_tag("fr_FR.UTF-8"), Locale::En);
         assert_eq!(Locale::from_lang_tag(""), Locale::En);
         assert_eq!(Locale::En.as_tag(), "en");
+        assert_eq!(Locale::Ru.as_tag(), "ru");
         assert_eq!(Locale::Zh.as_tag(), "zh");
         assert_eq!(Locale::ZhTw.as_tag(), "zh-TW");
     }
@@ -375,6 +409,8 @@ mod tests {
     fn usage_templates_fill() {
         let s = format_usage(EN.usage_with_reset, Some(73.2), Some("04-15 09:05"));
         assert_eq!(s, "Usage  ·  73% left  ·  04-15 09:05");
+        let r = format_usage(RU.usage_pct, Some(73.0), None);
+        assert_eq!(r, "Лимит  ·  осталось 73%");
         let z = format_usage(ZH.usage_pct, Some(73.0), None);
         assert_eq!(z, "额度  ·  剩余 73%");
     }

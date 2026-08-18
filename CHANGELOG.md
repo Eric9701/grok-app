@@ -11,6 +11,14 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Added
+- **Chat-column bottom terminal and pane motion (#681)**: `⌘\`` toggles a persist-mounted terminal under the chat. Sidebar / aside / settings / account-menu / project-list click-toggles interpolate instead of hard-cutting.
+- **Russian UI locale (#689)**: Settings language list and system-language detection include `ru`. Catalog is English-backed with translated overrides; tray / app menu follow the same locale.
+
+**中文 · 新增**
+- **对话栏底部终端与分栏动画（#681）**：`⌘\`` 打开/收起聊天下方常驻终端。侧栏、右侧栏、设置、账号菜单、项目列表的点击开合改为插值，不再硬切。
+- **俄语界面（#689）**：设置语言列表和跟随系统可切到 `ru`。词库以英文兜底、常用面有俄文；托盘和原生菜单同步。
+
 ### Fixed
 - **Live “思考中” timer no longer inherits another chat’s clock**: A leftover `turnStartedAt` (or a later correction) used to stick at 50+ minutes, then jump to the real duration after remount. The live timer now follows this turn’s clock and will not start before the assistant bubble’s `createdAt`.
 - **New-chat first send no longer false-heals as “message never reached the agent”**: Ghost-heal treated a leftover previous-session turn clock plus the `__draft__` → real-id handoff as “Host idle, send finished”. The toast fired, the composer was restored, and the agent still ran the prompt. New chat now clears the clock; draft sends start/migrate it; `sessionCreate` moves the send claim onto the real id immediately; heal also counts the draft claim as in-flight.

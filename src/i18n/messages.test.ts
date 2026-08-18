@@ -26,9 +26,16 @@ describe("i18n catalog", () => {
     expect(twKeys).toEqual(enKeys);
   });
 
+  it("ru shares the same keys as en", () => {
+    const enKeys = Object.keys(messages.en).sort();
+    const ruKeys = Object.keys(messages.ru).sort();
+    expect(ruKeys).toEqual(enKeys);
+  });
+
   it("interpolates variables", () => {
     expect(t("en", "project.trustFirst", { name: "Demo" })).toContain("Demo");
     expect(t("zh", "project.trustFirst", { name: "演示" })).toContain("演示");
+    expect(t("ru", "sidebar.selectedCount", { n: 3 })).toContain("3");
   });
 
   it("createT binds locale (English is the product default)", () => {
@@ -36,10 +43,38 @@ describe("i18n catalog", () => {
     expect(tr("sidebar.settings")).toBe("Settings");
     const zh = createT("zh");
     expect(zh("sidebar.settings")).toBe("设置");
+    const ru = createT("ru");
+    expect(ru("sidebar.settings")).toBe("Настройки");
+  });
+
+  it("keeps high-traffic Russian domains translated instead of falling back to English", () => {
+    const keys: MessageKey[] = [
+      "project.pin",
+      "main.startTitle",
+      "session.rename",
+      "resources.title",
+      "changes.title",
+      "search.title",
+      "tasks.title",
+      "dashboard.title",
+      "slash.settings",
+      "settings.language",
+      "account.signedIn",
+      "prov.emptyTitle",
+      "automations.title",
+      "doctor.title",
+      "ext.plugins.title",
+      "ext.mcp.title",
+      "ext.market.loading",
+      "error.details",
+    ];
+    for (const key of keys) {
+      expect(messages.ru[key], key).not.toBe(messages.en[key]);
+    }
   });
 
   it("every value is a non-empty string", () => {
-    for (const loc of ["en", "zh", "zh-TW"] as const) {
+    for (const loc of ["en", "zh", "zh-TW", "ru"] as const) {
       for (const [k, v] of Object.entries(messages[loc])) {
         expect(v.trim().length, `${loc}.${k}`).toBeGreaterThan(0);
       }
@@ -56,6 +91,7 @@ describe("resolveLocale", () => {
   it("keeps canonical ids unchanged", () => {
     expect(resolveLocale("zh-TW")).toBe("zh-TW");
     expect(resolveLocale("zh")).toBe("zh");
+    expect(resolveLocale("ru")).toBe("ru");
     expect(resolveLocale("en")).toBe("en");
   });
 
@@ -66,9 +102,11 @@ describe("resolveLocale", () => {
     expect(resolveLocale(" ZH-HANT ")).toBe("zh-TW");
   });
 
-  it("accepts case/alias variants of Simplified Chinese and English", () => {
+  it("accepts case/alias variants of Simplified Chinese, Russian and English", () => {
     expect(resolveLocale("ZH")).toBe("zh");
     expect(resolveLocale("zh-CN")).toBe("zh");
+    expect(resolveLocale("RU-RU")).toBe("ru");
+    expect(resolveLocale("ru_RU")).toBe("ru");
     expect(resolveLocale("EN-US")).toBe("en");
   });
 
@@ -91,6 +129,13 @@ describe("resolveLocaleFromSystem", () => {
     expect(resolveLocaleFromSystem("en-US")).toBe("en");
     expect(resolveLocaleFromSystem("en_GB")).toBe("en");
     expect(resolveLocaleFromSystem("en-AU")).toBe("en");
+  });
+
+  it("maps Russian tags to ru", () => {
+    expect(resolveLocaleFromSystem("ru")).toBe("ru");
+    expect(resolveLocaleFromSystem("ru-RU")).toBe("ru");
+    expect(resolveLocaleFromSystem("ru_RU")).toBe("ru");
+    expect(resolveLocaleFromSystem("ru_RU.UTF-8")).toBe("ru");
   });
 
   it("maps Simplified Chinese tags to zh", () => {
@@ -128,6 +173,7 @@ describe("parseLocalePreference / resolveLocalePreference", () => {
     expect(parseLocalePreference("system")).toBe("system");
     expect(parseLocalePreference("System")).toBe("system");
     expect(parseLocalePreference("en")).toBe("en");
+    expect(parseLocalePreference("ru")).toBe("ru");
     expect(parseLocalePreference("zh")).toBe("zh");
     expect(parseLocalePreference("zh-TW")).toBe("zh-TW");
   });
@@ -135,6 +181,7 @@ describe("parseLocalePreference / resolveLocalePreference", () => {
   it("normalizes aliases and invalid values", () => {
     expect(parseLocalePreference("zh-cn")).toBe("zh");
     expect(parseLocalePreference("zh-hant")).toBe("zh-TW");
+    expect(parseLocalePreference("ru-ru")).toBe("ru");
     expect(parseLocalePreference("fr")).toBe("en");
   });
 
@@ -147,12 +194,14 @@ describe("parseLocalePreference / resolveLocalePreference", () => {
   it("resolves system preference via an explicit lang tag", () => {
     expect(resolveLocalePreference("system", "zh-CN")).toBe("zh");
     expect(resolveLocalePreference("system", "zh-TW")).toBe("zh-TW");
+    expect(resolveLocalePreference("system", "ru-RU")).toBe("ru");
     expect(resolveLocalePreference("system", "en-US")).toBe("en");
     expect(resolveLocalePreference("system", "de")).toBe("en");
   });
 
   it("returns explicit preferences unchanged", () => {
     expect(resolveLocalePreference("zh", "en-US")).toBe("zh");
+    expect(resolveLocalePreference("ru", "en-US")).toBe("ru");
     expect(resolveLocalePreference("en", "zh-CN")).toBe("en");
     expect(resolveLocalePreference("zh-TW", "en")).toBe("zh-TW");
   });
@@ -161,6 +210,7 @@ describe("parseLocalePreference / resolveLocalePreference", () => {
     expect(migrateLegacyLocaleDefault("en")).toBe("system");
     expect(migrateLegacyLocaleDefault("EN")).toBe("system");
     expect(migrateLegacyLocaleDefault("  en  ")).toBe("system");
+    expect(migrateLegacyLocaleDefault("ru")).toBeNull();
     expect(migrateLegacyLocaleDefault("zh")).toBeNull();
     expect(migrateLegacyLocaleDefault("zh-TW")).toBeNull();
     expect(migrateLegacyLocaleDefault("system")).toBeNull();
@@ -169,6 +219,7 @@ describe("parseLocalePreference / resolveLocalePreference", () => {
   it("maps catalog locales to html lang tags", () => {
     expect(htmlLangForLocale("zh")).toBe("zh-CN");
     expect(htmlLangForLocale("zh-TW")).toBe("zh-TW");
+    expect(htmlLangForLocale("ru")).toBe("ru");
     expect(htmlLangForLocale("en")).toBe("en");
   });
 

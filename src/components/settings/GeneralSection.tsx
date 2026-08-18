@@ -1953,6 +1953,7 @@ export function GeneralSection() {
                   options={[
                     { value: "system", label: t("settings.languageSystem") },
                     { value: "en", label: "English" },
+                    { value: "ru", label: "Русский" },
                     { value: "zh", label: "简体中文" },
                     { value: "zh-TW", label: "繁體中文" },
                   ]}

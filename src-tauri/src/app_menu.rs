@@ -164,6 +164,7 @@ fn close_menu_label() -> String {
     match crate::tray_i18n::app_locale() {
         crate::tray_i18n::Locale::Zh => "关闭".into(),
         crate::tray_i18n::Locale::ZhTw => "關閉".into(),
+        crate::tray_i18n::Locale::Ru => "Закрыть".into(),
         crate::tray_i18n::Locale::En => "Close".into(),
     }
 }

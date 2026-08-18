@@ -123,6 +123,13 @@ jobs:
             Write-Host "No PATH entry ships api-ms-win-*.dll"
           }
 
+          # rust-cache restores target/ including Cargo fingerprints. Cleaning
+          # only this package forces the unit-test harness to be rebuilt from
+          # the checked-out source while preserving cached dependencies.
+          Write-Host "=== cargo clean -p grok-app ==="
+          cargo clean -p grok-app
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
           Write-Host "=== cargo test --no-run ==="
           cargo test --no-run
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
