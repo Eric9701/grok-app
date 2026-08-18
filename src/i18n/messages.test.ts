@@ -65,7 +65,7 @@ describe("i18n catalog", () => {
       "doctor.title",
       "ext.plugins.title",
       "ext.mcp.title",
-      "ext.market.title",
+      "ext.market.loading",
       "error.details",
     ];
     for (const key of keys) {
