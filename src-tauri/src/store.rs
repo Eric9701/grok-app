@@ -1923,14 +1923,10 @@ fn normalize_move_project_id(project_id: Option<String>) -> Option<String> {
         .filter(|s| !s.is_empty() && s.as_str() != GENERAL_PROJECT_ID)
 }
 
-/// User-facing move: rebind cwd and drop the previous agent / worktree identity.
-/// Refuses untrusted or missing target folders. Same-project is a no-op.
-pub fn move_session_to_project(
-    id: &str,
-    project_id: Option<String>,
-) -> Result<SessionMeta, String> {
-    let pid = normalize_move_project_id(project_id);
-    if let Some(ref pid) = pid {
+/// Refuse a user-facing move target that is missing, untrusted, or whose
+/// folder is gone. Orphan (`None`) ensures the general workspace dir exists.
+fn validate_move_target(pid: &Option<String>) -> Result<(), String> {
+    if let Some(pid) = pid {
         let projects = load_projects();
         let Some(proj) = projects.iter().find(|x| x.id.as_str() == pid.as_str()) else {
             return Err(format!("session_move_not_found: {pid}"));
@@ -1944,6 +1940,42 @@ pub fn move_session_to_project(
     } else {
         let _ = ensure_general_workspace_dir();
     }
+    Ok(())
+}
+
+/// No-write pre-flight for a user-facing move.
+///
+/// The Host command must call this **before** killing the session's agent:
+/// a refused target (untrusted / missing / unknown) or a same-project no-op
+/// must not cost the chat its live ACP process and `agent_session_id`.
+#[derive(Debug)]
+pub struct SessionMovePrecheck {
+    pub cwd_changes: bool,
+}
+
+pub fn precheck_session_move(
+    id: &str,
+    project_id: Option<String>,
+) -> Result<SessionMovePrecheck, String> {
+    let pid = normalize_move_project_id(project_id);
+    validate_move_target(&pid)?;
+    let current = load_sessions_index()
+        .into_iter()
+        .find(|s| s.id == id)
+        .ok_or_else(|| format!("session not found: {id}"))?;
+    Ok(SessionMovePrecheck {
+        cwd_changes: current.project_id.as_deref() != pid.as_deref(),
+    })
+}
+
+/// User-facing move: rebind cwd and drop the previous agent / worktree identity.
+/// Refuses untrusted or missing target folders. Same-project is a no-op.
+pub fn move_session_to_project(
+    id: &str,
+    project_id: Option<String>,
+) -> Result<SessionMeta, String> {
+    let pid = normalize_move_project_id(project_id);
+    validate_move_target(&pid)?;
     apply_session_project(id, pid, true)
 }
 
@@ -4248,6 +4280,64 @@ mod tests {
         let back = move_session_to_project(&meta.id, None).expect("orphan");
         assert!(back.project_id.is_none());
         assert!(back.agent_session_id.is_none());
+
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn precheck_session_move_validates_before_any_write() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-move-precheck-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let folder = tmp.join("proj");
+        fs::create_dir_all(&folder).expect("proj dir");
+        let proj = add_project(folder.to_string_lossy().to_string(), true).expect("add");
+        let unsafe_folder = tmp.join("unsafe");
+        fs::create_dir_all(&unsafe_folder).expect("unsafe dir");
+        let untrusted =
+            add_project(unsafe_folder.to_string_lossy().to_string(), false).expect("untrusted");
+        let meta = create_session(None, Some("x".into()), false).expect("create");
+
+        // Refusals surface without a session write (command kills the agent
+        // only after this passes).
+        let err = precheck_session_move(&meta.id, Some(untrusted.id.clone()))
+            .expect_err("untrusted refused");
+        assert!(err.contains("session_move_untrusted"), "got {err}");
+        let err =
+            precheck_session_move(&meta.id, Some("nope".into())).expect_err("unknown refused");
+        assert!(err.contains("session_move_not_found"), "got {err}");
+        let err = precheck_session_move("missing-session", Some(proj.id.clone()))
+            .expect_err("unknown session");
+        assert!(err.contains("session not found"), "got {err}");
+
+        // Orphan → orphan is a no-op; orphan → project changes cwd.
+        assert!(
+            !precheck_session_move(&meta.id, None)
+                .expect("noop")
+                .cwd_changes
+        );
+        assert!(
+            precheck_session_move(&meta.id, Some(proj.id.clone()))
+                .expect("move")
+                .cwd_changes
+        );
+        let moved = move_session_to_project(&meta.id, Some(proj.id.clone())).expect("apply");
+        assert_eq!(moved.project_id.as_deref(), Some(proj.id.as_str()));
+        assert!(
+            !precheck_session_move(&meta.id, Some(proj.id.clone()))
+                .expect("same project")
+                .cwd_changes
+        );
 
         let _ = delete_session(&meta.id);
         std::env::remove_var("GROK_APP_HOME");

@@ -935,6 +935,13 @@ pub async fn session_move_to_project(
     id: String,
     project_id: Option<String>,
 ) -> Result<SessionMeta, String> {
+    // Validate the target and detect no-ops *before* killing the agent —
+    // a refused or same-project move must not cost this chat its live ACP
+    // process and agent_session_id.
+    let plan = store::precheck_session_move(&id, project_id.clone())?;
+    if !plan.cwd_changes {
+        return store::move_session_to_project(&id, project_id);
+    }
     if mgr.session_is_busy(&id) {
         return Err("session_move_busy".into());
     }
