@@ -11,21 +11,31 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.21] - 2026-08-18
+
+> **Highlight:** Create Image / Create Video from the composer + menu; Agent Kanban and Project Spaces; chat no longer freezes on the first generated image or stays stuck Connecting.
+>
+> **中文 · 亮点：** 输入框 + 菜单可创作图像/视频；智能体看板与项目空间；出图首屏不再卡死，「连接中」不再只能重启。
+
 ### Added
 - **Create Image / Create Video in the composer + menu (#677)**: When the bundled Imagine skill is available, Add lists **Create Image** (localized Imagine) and **Create Video** (Imagine + a short video starter prompt). Skill id stays `imagine`.
 - **Side workbench CodeMirror editor (#661 follow-up)**: Files edit mode uses CodeMirror 6 (Atom One palette + line numbers, Tab as two spaces, ⌘/Ctrl+S). Markdown still uses TipTap. Preview mode is unchanged.
+- **Side-browser Design Mode (#636)**: The Browser tab can inspect localhost / same-origin preview elements and send the selection, optional snapshot, and style note into the composer.
 - **Discover Claude / Cursor skills toggle**: Settings → Extensions → Skills can turn external compat discovery off. Independent session mode also writes `[compat.claude] skills` / `[compat.cursor] skills` in agent-home `config.toml`. Shared mode only hides them in the App (does not rewrite `~/.grok`).
 - **Session interrupt recovery**: Shutdown cancels the ACP TCP reader with the process, stamped events require an exact session owner, and per-session send claims/epochs survive reconnect so a kill cannot leave a ghost stream or a wedged queue.
 - **Agent Kanban**: Sidebar / palette / `#/kanban` shows live sessions in Needs you / Working / Done. A finished turn stays in Done across pane remounts (not a personal to-do list). Opening a card does not hide it.
 - **Project Spaces**: Sidebar groups projects into named spaces (All / Default / custom). Membership survives restart; search from All does not force a space switch. Name errors stay inline in the prompt (red), not a toast.
+- **Transcript selection quotes**: Selecting text in a bubble shows a floating bar (copy, optional comment, add to chat). Quotes sit **beside** the draft as a compact “N notes / N 条注释” chip — they are not pasted into the input. They persist on project/session drafts and the send queue. The agent sees `Quoted excerpt` / `Comment` blocks; the journal stores `[[quote]]` / `[[note]]` fences so reload rebuilds the cards. Queue **Guide** serializes quotes (and re-queues them on failure). Send settlement compares quotes so a quote added during an in-flight send is not overwritten on failure. Switching sessions closes the selection bar.
 
 **中文 · 新增**
 - **输入框 + 菜单可创作图像 / 视频（#677）**：有 Imagine 技能时，「添加」里出现「创作图像」和「创作视频」。技能 id 仍是 `imagine`；创作视频会带上短片起始提示。
 - **侧栏 CodeMirror 编辑器（#661 后续）**：Files 编辑模式改用 CodeMirror 6（Atom One 配色 + 行号，Tab 两个空格，⌘/Ctrl+S）。Markdown 仍用 TipTap。预览模式不变。
+- **侧栏浏览器设计模式（#636）**：Browser 页可点选本机 / 同源预览元素，把选区、可选快照和样式备注送进输入框。
 - **探测 Claude / Cursor 技能开关**：设置 → 扩展 → 技能可关闭外源兼容探测。独立会话模式会写入 agent-home `config.toml`；共享模式只在应用内隐藏，不改写 `~/.grok`。
 - **会话中断恢复**：关掉 Agent 时一并取消 TCP 读；打戳事件必须对上会话主人；发送认领按会话隔离，重连后不会留下幽灵流或卡死的队列。
 - **智能体看板**：侧栏 / 命令面板 / `#/kanban` 按「需要你 / 工作中 / 已完成」展示运行中的会话。回合结束后切走再回来仍留在已完成（不是个人待办）。打开卡片不会把它藏掉。
 - **项目空间**：侧栏项目可分到命名空间（全部 / 默认 / 自定义）。成员关系重启后仍在；「全部」里搜索不会误切空间。重名等错误在对话框里用红字提示，不再用顶部 toast。
+- **正文选中批注**：在气泡里选中文字后出现浮层（复制、可选评论、添加到对话）。注释作为紧凑的「N 条注释」贴在输入框旁，**不粘进正文**。会跟项目/会话草稿和发送队列一起保存。发给模型的是 `Quoted excerpt` / `Comment`；日记里写 `[[quote]]` / `[[note]]`，重载后还能还原成卡片。队列「引导」会带上注释（失败重新入队也保留）。发送结算会比较注释，发送过程中新加的注释在失败时不会被旧快照盖掉。切换会话会关掉选择浮层。
 
 ### Changed
 - **Composer workspace chip on every desktop chat (#662)**: The project / default-workspace control above the input is no longer limited to a brand-new draft that already has a folder. Pick, add, or return to the default workspace from the existing `ComposerProjectMenu`. Chinese copy uses 默认工作区 (was 通用). Sidebar `+` stays. Phone still uses the tools sheet.
@@ -52,12 +62,7 @@ See `docs/llm-wiki/release.md`.
 - **New chat no longer restores a leftover first prompt**: Each project keeps a new-session composer buffer. After send, that buffer was often left on disk (`#620` leftovers, or a mid-type snapshot that is not byte-identical to the sent text). Restore now drops buffers that match a recent send **exactly**, as a **prefix** of that send, or as a **short first-line fragment** (e.g. saved `好的` / `d` vs sent `好的` / `你看好了吗？`). Attachment-only unsent drafts still restore. A follow-up send on an existing thread does not wipe a new-task buffer that still has extra files.
 - **Shift+Enter first press starts a new line**: The composer stored `\n` but re-projected a trailing `<br>`, which WebKit treats as an empty-editor sentinel (first Shift+Enter looked like a no-op). Each line is now a `div`; a trailing empty line is marked `data-composer-nl="1"` so serialize keeps the newline and the caret stays on that line. ZWSP caret pads are not used for this path (they split IME 汉字).
 - **Windows taskbar icon no longer looks a size smaller (#650)**: `icon.ico` is generated from a fill-cropped raster so the mark fills the frame. macOS `icon-source.png` / `.icns` stay on the dock-grid master.
-
-
 - **Side workbench file tabs and per-project isolation (#661 slice)**: Inactive file chips show a filename (and a short parent path on collisions). Switching projects stashes that project's tabs. Opening Files shows the tree and adopts the placeholder chip instead of minting a second pathless tab. The CodeMirror editor from the same PR is **not** in this slice.
-
-### Added
-- **Transcript selection quotes**: Selecting text in a bubble shows a floating bar (copy, optional comment, add to chat). Quotes sit **beside** the draft as a compact “N notes / N 条注释” chip — they are not pasted into the input. They persist on project/session drafts and the send queue. The agent sees `Quoted excerpt` / `Comment` blocks; the journal stores `[[quote]]` / `[[note]]` fences so reload rebuilds the cards. Queue **Guide** serializes quotes (and re-queues them on failure). Send settlement compares quotes so a quote added during an in-flight send is not overwritten on failure. Switching sessions closes the selection bar.
 
 **中文 · 修复**
 - **选区注释弹窗层次**：评论框用输入井，不再和面板糊成一块；摘录仍是普通截断文本。
@@ -65,6 +70,7 @@ See `docs/llm-wiki/release.md`.
 - **对话出图那一下不再卡死（#675、#676）**：卡片首屏改占位或缓存缩略图，不再先解完整原图。Host 缓存命中读 sidecar / JPEG 头拿宽高，不再为读尺寸再解一遍原图。
 - **助手正文不再叠字**：结论 Markdown 和工作轨里的工具输出会被父级 flex 压扁到同一块区域（展开体 `overflow: visible` 再盖到答案上）。消息行、时间线子项和 `.chat-md--answer` 不再被压缩；只有带滚动条的工作列表才允许展开体溢出。
 - **压缩弹窗过长、按钮被裁切**：原先说明全铺在弹窗里，超出 `.modal` 最大高度后底部「压缩」被裁掉（容器 `overflow: hidden`、没有可滚 body）。说明收到标题旁 `?`，正文可滚、底部按钮固定。确认后连不上 Agent 也不再静默失败。
+- **空的「文件」tab 不再和已打开文件并排**：从树里打开文件会替换选择器里的「文件」占位。再点「文件」只会聚焦已打开的文件，不会再多出一个点了没反应、还会卡住侧栏的死标签。
 - **斜杠菜单 `/rc`、`/review-` 会选中 `review-commit`（#644）**：把 `-` 当词界以匹配 kebab 首字母，名字前缀优先于描述，且只有名字全无命中时才用描述兜底。YAML 里互相点名 `review-commit` 的 skill 不再抢走默认高亮。
 - **工作轨叠字和残留 ANSI（#667、#672）**：长「工作中」不再把工具正文盖到下一行；ESC 丢掉后残留的 `[39m` / `[32m` 会被剥掉。展开后的列表不再被压进 360px 盒子里叠字。
 - **75Hz 外接屏聊天滑动（#651）**：虚拟列表窗口更新在 rAF 之外加 8ms 兜底，混用 120Hz/75Hz 时漏一帧不会掉成肉眼 37.5Hz。
@@ -77,14 +83,7 @@ See `docs/llm-wiki/release.md`.
 - **新建对话不再带回已发送的残留**：每个项目有一份新会话输入缓冲。发送后这份缓冲常留在磁盘上（`#620` 残留，或和发出去的原文不完全相同的半截）。恢复时会丢掉与最近发送**完全相同**、作为其**前缀**、或**短且首行相同**的碎片（例如存的是 `好的` / `d`，发出去的是 `好的` / `你看好了吗？`）。只有附件的未发送草稿仍会恢复。在已有会话里跟进发送时，如果新任务缓冲还带着这份发送里没有的附件，不会整份清掉。
 - **第一次 Shift+Enter 就会换行**：原先存的是 `\n`，重绘却是尾部 `<br>`，WebKit 把它当成空编辑器哨兵，第一次换行看起来没反应。现在一行一个 `div`，末尾空行标 `data-composer-nl="1"`，序列化会保留换行，光标留在新行。这条路径不再用 ZWSP 占位（会拆开输入中的汉字）。
 - **Windows 任务栏图标不再小一号（#650）**：`icon.ico` 按去留白后的画布生成。macOS 母版 / `.icns` 不动。
-
 - **侧栏文件 tab 名 + 按项目隔离（#661 切片）**：未激活的文件芯片显示文件名（重名时带上一级路径）。切换项目会收起该项目的 tab。打开 Files 显示树，并用占位芯片承接真实文件，不再并排多一个无路径 tab。同一 PR 里的 CodeMirror 编辑器不在本切片。
-
-**中文 · 修复**
-- **空的「文件」tab 不再和已打开文件并排**：从树里打开文件会替换选择器里的「文件」占位。再点「文件」只会聚焦已打开的文件，不会再多出一个点了没反应、还会卡住侧栏的死标签。
-
-**中文 · 新增**
-- **正文选中批注**：在气泡里选中文字后出现浮层（复制、可选评论、添加到对话）。注释作为紧凑的「N 条注释」贴在输入框旁，**不粘进正文**。会跟项目/会话草稿和发送队列一起保存。发给模型的是 `Quoted excerpt` / `Comment`；日记里写 `[[quote]]` / `[[note]]`，重载后还能还原成卡片。队列「引导」会带上注释（失败重新入队也保留）。发送结算会比较注释，发送过程中新加的注释在失败时不会被旧快照盖掉。切换会话会关掉选择浮层。
 
 ## [0.2.20] - 2026-08-17
 
