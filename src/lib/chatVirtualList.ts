@@ -99,23 +99,32 @@ export function estimateChatRowHeight(input: {
    * height — long agent turns otherwise paint a blank transcript.
    */
   collapsed?: boolean;
+  /**
+   * Thinking fold is open (live stream, or user set keep-open). Default is
+   * collapsed — do not count thoughtLength or first-paint overshoots by
+   * hundreds of px and the pin window jumps between assistants (flicker).
+   */
+  thoughtExpanded?: boolean;
 }): number {
   if (input.collapsed) return 0;
   const content = Math.max(0, input.contentLength ?? 0);
-  const thought = Math.max(0, input.thoughtLength ?? 0);
+  const thoughtRaw = Math.max(0, input.thoughtLength ?? 0);
+  const thought = input.thoughtExpanded === true ? thoughtRaw : 0;
   const role = (input.role ?? "assistant").toLowerCase();
   const imageCards = Math.max(0, input.imageCardCount ?? 0);
   // Empty tool journal rows must not inflate the pin window (blank transcript).
   if (
     role === "tool" &&
     content === 0 &&
-    thought === 0 &&
+    thoughtRaw === 0 &&
     !(input.attachmentCount && input.attachmentCount > 0) &&
     imageCards === 0 &&
     !input.hasVideoCard
   ) {
     return 0;
   }
+  // Collapsed CoT is a one-line "Thought" chip, not the raw thought body.
+  const thoughtChrome = !input.thoughtExpanded && thoughtRaw > 0 ? 28 : 0;
   // ~42 chars/line in the bubble, ~20px line height, role chrome.
   const lines = Math.ceil((content + thought * 0.5) / 42);
   const chrome = role === "user" ? 72 : role === "tool" ? 28 : 96;
@@ -132,7 +141,8 @@ export function estimateChatRowHeight(input: {
       : 0;
   const imgBoost = imgRows * CHAT_IMAGE_CARD_ESTIMATE_H;
   const videoBoost = input.hasVideoCard ? 260 : 0;
-  const raw = chrome + lines * 20 + attBoost + imgBoost + videoBoost;
+  const raw =
+    chrome + lines * 20 + thoughtChrome + attBoost + imgBoost + videoBoost;
   // Tool rows are compact; do not floor them at the assistant default (120px).
   const floor = role === "tool" ? 0 : CHAT_DEFAULT_ROW_ESTIMATE_PX;
   return Math.min(CHAT_MAX_ROW_ESTIMATE_PX, Math.max(floor, raw));
@@ -260,6 +270,28 @@ export function findEndIndex(offsets: number[], y: number): number {
 }
 
 /**
+ * If `start` sits on a 0-height plateau (many inlined/collapsed tool rows
+ * sharing one offset), walk back to the last non-zero row before that run.
+ * A 1px viewTop change otherwise jumps start across the whole plateau and
+ * remounts a different set of real messages (transcript flicker).
+ */
+export function snapVirtualStartBeforeZeroRun(
+  offsets: readonly number[],
+  start: number,
+): number {
+  const count = offsets.length - 1;
+  if (count <= 0) return 0;
+  let i = Math.max(0, Math.min(Math.floor(start), count - 1));
+  while (i > 0 && offsets[i] === offsets[i - 1]) {
+    i--;
+  }
+  if (i > 0 && i < count && offsets[i] === offsets[i + 1]) {
+    i--;
+  }
+  return i;
+}
+
+/**
  * Expand [start, end) to include force indices.
  * - When pinned: always expand (blank-pin defense for tool-heavy tails).
  * - When escaped: only expand if within {@link CHAT_FORCE_EXPAND_MAX_GAP}
@@ -364,6 +396,8 @@ export function computeChatVirtualWindow(input: {
     forceIndices: input.forceIndices,
     pinToBottom: pin,
   }));
+
+  start = snapVirtualStartBeforeZeroRun(offsets, start);
 
   start = Math.max(0, Math.min(start, count - 1));
   end = Math.max(start + 1, Math.min(end, count));

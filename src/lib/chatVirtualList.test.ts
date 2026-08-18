@@ -251,6 +251,28 @@ describe("estimateChatRowHeight", () => {
     ).toBeLessThan(50);
   });
 
+  it("collapsed thinking does not inflate the first-paint estimate", () => {
+    const bodyOnly = estimateChatRowHeight({
+      contentLength: 240,
+      role: "assistant",
+    });
+    const withCollapsedThought = estimateChatRowHeight({
+      contentLength: 240,
+      thoughtLength: 1800,
+      role: "assistant",
+    });
+    // Default UI collapses thinking when the turn is done. Counting the
+    // CoT made estimates hundreds of px taller than the measured row.
+    expect(withCollapsedThought - bodyOnly).toBeLessThan(48);
+    const expanded = estimateChatRowHeight({
+      contentLength: 240,
+      thoughtLength: 1800,
+      thoughtExpanded: true,
+      role: "assistant",
+    });
+    expect(expanded).toBeGreaterThan(withCollapsedThought + 200);
+  });
+
   it("image cards boost height more than 36px chips (virtual scroll)", () => {
     const chips = estimateChatRowHeight({
       contentLength: 80,
@@ -400,6 +422,49 @@ describe("long transcript window scale", () => {
     expect(mounted).toBeLessThan(80);
     expect(w.end).toBeLessThan(count - 10);
     expect(w.start).toBeGreaterThan(50);
+  });
+
+  it("pin window start does not jump across a mid-list zero-height plateau", () => {
+    // Real session shape: two assistant replies with hundreds of inlined
+    // tool_step zeros between them. viewTop sitting on the plateau used to
+    // flip start from message A to message B (stacked/flickering text).
+    const heights = [
+      80,
+      400,
+      ...Array(220).fill(0),
+      300,
+      72,
+      240,
+    ];
+    const count = heights.length;
+    const getHeight = (i: number) => heights[i] ?? 0;
+    const total = heights.reduce((a, b) => a + b, 0);
+    const laterTop = 80 + 400;
+    const laterIndex = 2 + 220;
+    const justBefore = computeChatVirtualWindow({
+      count,
+      getHeight,
+      scrollTop: laterTop - 1,
+      viewportHeight: 700,
+      pinToBottom: false,
+      overscanPx: 0,
+    });
+    const onPlateau = computeChatVirtualWindow({
+      count,
+      getHeight,
+      scrollTop: laterTop,
+      viewportHeight: 700,
+      pinToBottom: false,
+      overscanPx: 0,
+    });
+    expect(justBefore.totalHeight).toBe(total);
+    expect(onPlateau.totalHeight).toBe(total);
+    // Both must keep the earlier real assistant (index 1). Pre-fix, landing
+    // exactly on the plateau jumped start to `laterIndex` (222).
+    expect(justBefore.start).toBeLessThanOrEqual(1);
+    expect(onPlateau.start).toBeLessThanOrEqual(1);
+    expect(onPlateau.start).toBe(justBefore.start);
+    expect(onPlateau.end).toBeGreaterThan(laterIndex);
   });
 
   it("pin still mounts the tail on a 500-message stream", () => {

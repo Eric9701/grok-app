@@ -41,6 +41,7 @@ See `docs/llm-wiki/release.md`.
 - **CLI import no longer paints `<system-reminder>` as a user bubble (#687)**: Reminder-only / `synthetic_reason: project_instructions` envelopes in `chat_history.jsonl` are skipped. A wrapped `<user_query>` is kept.
 - **Voice/STT no longer re-copies official OIDC into a custom route's agent-home**: `voice_auth` blind-called `sync_cli_auth_to_agent_home` on every token read, undoing the custom-route auth strip until the next spawn (a live relay process could lazily load the OIDC). It now goes through route-aware `prepare_route_auth_for_agent`; voice still falls back to `~/.grok/auth.json` for official xAI endpoints.
 - **Rewind-unsupported error now takes the clean path in drop-last**: The `initialize`-not-advertised early return is phrased as `method not supported`, so journal drop-last skips the pointless last-turn fallback retry and its misleading warn log.
+- **Long tool-heavy chats no longer flicker stacked replies**: Collapsed thinking is no longer counted in the first-paint row estimate, and a virtual-list start that lands on a 0-height tool plateau walks back to the previous real message. A 1px height change no longer remounts a different pair of assistant bubbles (Windows WebView leftover paint looked like the transcript flashing).
 
 **中文 · 修复**
 - **宠物右键菜单贴着点击位置**：菜单在右键处打开，只在会出屏时平移，不再跳到标记另一侧或窗口左上角。
@@ -54,6 +55,7 @@ See `docs/llm-wiki/release.md`.
 - **导入 CLI 会话不再把 `<system-reminder>` 画成用户气泡（#687）**：`chat_history.jsonl` 里只有 reminder / `project_instructions` 的信封会丢掉；带 `<user_query>` 的仍保留正文。
 - **用语音不再把官方 OIDC 复制回自定义路由的 agent-home**：`voice_auth` 每次取 token 都盲同步 `auth.json`，把自定义路由刚清掉的凭据又写回去（存活的中转进程可能懒加载到）。现在改走按路由处理的 `prepare_route_auth_for_agent`；语音本身仍会回退读 `~/.grok/auth.json`。
 - **Agent 不支持 rewind 时撤回消息走干净路径**：`initialize` 未公布 rewind 的早退错误改为 `method not supported` 措辞，撤回上一条不再多发一次注定失败的兜底调用、也不再打误导性的 warn 日志。
+- **工具很多的长对话不再把两轮回复叠在一起闪**：折叠的思考不再计入行高预估；虚拟列表起点落在一串 0 高工具行上时，回退到前一条真实消息。高度差 1px 不会再换一套助手气泡（Windows 上旧层清不掉，看起来像正文狂闪）。
 
 ## [0.2.21] - 2026-08-18
 
