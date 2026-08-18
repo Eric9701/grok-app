@@ -3,6 +3,12 @@
 //! The main window owns session focus; this module owns show/hide, position,
 //! click-through on empty pixels, and prefs persistence. Status changes never
 //! call `set_focus` on the pet window.
+//!
+//! The overlay is **not focusable**. Tao's `show()` on macOS always calls
+//! `makeKeyAndOrderFront`, which would otherwise make the pet the key window.
+//! WKWebView then eats the first click on the workbench just to focus it.
+//! `focusable(false)` maps to `canBecomeKeyWindow = NO` / `WS_EX_NOACTIVATE`
+//! so the pet stays above other apps without stealing key.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -206,8 +212,8 @@ fn normalize_prefs(mut p: PetPrefs) -> PetPrefs {
         p.shape = default_shape();
     }
     let colors = [
-        "black", "brown", "red", "orange", "yellow", "green", "cyan", "blue", "violet",
-        "magenta", "gray",
+        "black", "brown", "red", "orange", "yellow", "green", "cyan", "blue", "violet", "magenta",
+        "gray",
     ];
     if !colors.contains(&p.color.as_str()) {
         p.color = default_color();
@@ -329,6 +335,34 @@ fn apply_window_chrome(win: &tauri::WebviewWindow) {
     let _ = win.set_skip_taskbar(true);
     let _ = win.set_decorations(false);
     let _ = win.set_shadow(false);
+    // Must stay false: show() / always-on-top must not make this the key window.
+    let _ = win.set_focusable(false);
+}
+
+/// Give the workbench key/activation back when the overlay stole it.
+///
+/// Do not raise a hidden or minimized main window — the pet can float alone
+/// over other apps.
+pub fn should_return_main_key(pet_focused: bool, main_visible: bool, main_minimized: bool) -> bool {
+    pet_focused && main_visible && !main_minimized
+}
+
+fn yield_key_to_main(app: &AppHandle) {
+    let Some(pet) = app.get_webview_window(PET_WINDOW_LABEL) else {
+        return;
+    };
+    let pet_focused = pet.is_focused().unwrap_or(false);
+    let Some(main) = app.get_webview_window("main") else {
+        return;
+    };
+    if !should_return_main_key(
+        pet_focused,
+        main.is_visible().unwrap_or(false),
+        main.is_minimized().unwrap_or(false),
+    ) {
+        return;
+    }
+    let _ = main.set_focus();
 }
 
 fn emit_prefs(app: &AppHandle, prefs: &PetPrefs) {
@@ -342,6 +376,7 @@ fn reveal_if_wanted(win: &tauri::WebviewWindow) {
     apply_window_chrome(win);
     let _ = win.show();
     apply_window_chrome(win);
+    yield_key_to_main(win.app_handle());
 }
 
 /// Build (or reuse) the overlay. Never focuses the pet window.
@@ -368,6 +403,7 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
     .skip_taskbar(true)
     .visible(false)
     .focused(false)
+    .focusable(false)
     .shadow(false)
     .accept_first_mouse(true)
     .initialization_script(PET_INIT_SCRIPT)
@@ -387,11 +423,22 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
     apply_window_chrome(&win);
     let handle = app.clone();
     win.on_window_event(move |ev| {
-        if let tauri::WindowEvent::Moved(_) = ev {
-            // Size-sync / show must not overwrite the user's drag position.
-            if DRAGGING.load(Ordering::Relaxed) {
-                persist_window_pos(&handle);
+        match ev {
+            tauri::WindowEvent::Moved(_) => {
+                // Size-sync / show must not overwrite the user's drag position.
+                if DRAGGING.load(Ordering::Relaxed) {
+                    persist_window_pos(&handle);
+                }
             }
+            tauri::WindowEvent::Focused(true) => {
+                // show() uses makeKeyAndOrderFront even when focused(false).
+                // If the workbench is already up, give key back immediately.
+                // Skip while dragging / menu is open so pointer capture stays.
+                if !DRAGGING.load(Ordering::Relaxed) && !MENU_OPEN.load(Ordering::Relaxed) {
+                    yield_key_to_main(&handle);
+                }
+            }
+            _ => {}
         }
     });
     start_cursor_watch(app.clone());
@@ -416,6 +463,7 @@ pub fn show_pet(app: &AppHandle) -> Result<(), String> {
     // while the pet bundle was still booting.
     win.show().map_err(|e| e.to_string())?;
     apply_window_chrome(&win);
+    yield_key_to_main(app);
     Ok(())
 }
 
@@ -660,7 +708,11 @@ pub fn pet_push_tasks(app: AppHandle, tasks: Vec<PetTaskPayload>) -> Result<(), 
 
 #[tauri::command]
 pub fn pet_get_tasks() -> Vec<PetTaskPayload> {
-    LAST_TASKS.lock().ok().map(|g| g.clone()).unwrap_or_default()
+    LAST_TASKS
+        .lock()
+        .ok()
+        .map(|g| g.clone())
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -793,5 +845,22 @@ mod tests {
         assert!(!pet_cursor_over_chrome(
             4.0, 4.0, 0.0, 0.0, win_w, win_h, 128, scale, &chrome,
         ));
+    }
+
+    #[test]
+    fn overlay_does_not_keep_key_when_workbench_is_up() {
+        assert!(should_return_main_key(true, true, false));
+        assert!(
+            !should_return_main_key(false, true, false),
+            "pet never took key — leave main alone"
+        );
+        assert!(
+            !should_return_main_key(true, false, false),
+            "hidden workbench must stay hidden (pet can float over other apps)"
+        );
+        assert!(
+            !should_return_main_key(true, true, true),
+            "minimized workbench must not be raised"
+        );
     }
 }

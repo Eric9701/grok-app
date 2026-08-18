@@ -42,6 +42,8 @@ export {
   petOverlayWidth,
 } from "./petBubbleLayout";
 
+export { placePetContextMenu, type PetWorkRect } from "./petMenuPlace";
+
 export {
   PET_SETTINGS_HASH,
   PET_SETTINGS_SECTION,

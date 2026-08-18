@@ -1,10 +1,11 @@
 /**
  * Overlay chrome: living mark + task bubbles + in-window menu.
- * 编辑 opens the same Settings → 宠物 hash as the settings nav item.
+ * Pet settings opens the same Settings → 宠物 hash as the settings nav item.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PetMark } from "./PetMark";
 import { PetTaskBubbles } from "./PetTaskBubbles";
+import { ContextMenu } from "@/components/ContextMenu";
 import { createT, type Locale } from "@/i18n";
 import {
   isPetColor,
@@ -15,6 +16,7 @@ import {
   petOverlayWidth,
   petSettingsHash,
   petVerbFor,
+  placePetContextMenu,
   type PetFocus,
   type PetTask,
 } from "@/lib/pet";
@@ -23,6 +25,7 @@ import {
   petHide,
   petOpenSettings,
   petReadBubbleOffset,
+  petReadOverlayFrame,
   petSetDragging,
   petSetHitChrome,
   petSetIgnoreCursor,
@@ -34,10 +37,6 @@ import {
 import type { PetPrefs } from "@/lib/api/pet";
 
 export { petSettingsHash };
-
-export function openPetSettingsFromMenu(): Promise<void> {
-  return petOpenSettings();
-}
 
 const DRAG_SLOP = 6;
 const DBLCLICK_MS = 280;
@@ -58,7 +57,8 @@ export function PetOverlay({
   const color = isPetColor(prefs.color) ? prefs.color : "green";
   const verb = petVerbFor(focus.kind, focus.toolTitle);
   const sizePx = prefs.sizePx || 128;
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const menuOpen = menu != null;
   const [dragging, setDragging] = useState(false);
   const [bubbleDx, setBubbleDx] = useState(0);
   const originRef = useRef<{ x: number; y: number } | null>(null);
@@ -164,7 +164,7 @@ export function PetOverlay({
   }, []);
 
   const closeMenu = useCallback(() => {
-    setMenuOpen(false);
+    setMenu(null);
     void petSetMenuOpen(false);
   }, []);
 
@@ -179,15 +179,50 @@ export function PetOverlay({
   const openMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setMenuOpen(true);
+    const clickX = e.clientX;
+    const clickY = e.clientY;
+    const overlayW = window.innerWidth;
+    const overlayH = window.innerHeight;
+    const local = placePetContextMenu({
+      overlayW,
+      overlayH,
+      clickX,
+      clickY,
+      menuW: 128,
+      menuH: 80,
+      winX: 0,
+      winY: 0,
+      work: { x: 0, y: 0, w: overlayW, h: overlayH },
+    });
+    setMenu({ x: local.left, y: local.top });
     void petSetIgnoreCursor(false);
     void petSetMenuOpen(true);
+    void (async () => {
+      const frame = await petReadOverlayFrame();
+      if (!frame) return;
+      const pos = placePetContextMenu({
+        overlayW: frame.overlayW,
+        overlayH: frame.overlayH,
+        clickX,
+        clickY,
+        menuW: 128,
+        menuH: 80,
+        winX: frame.winX,
+        winY: frame.winY,
+        work: frame.work,
+      });
+      setMenu((prev) => {
+        if (!prev) return prev;
+        if (prev.x === pos.left && prev.y === pos.top) return prev;
+        return { x: pos.left, y: pos.top };
+      });
+    })();
   }, []);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (e.button !== 0) return;
-      if ((e.target as HTMLElement | null)?.closest?.(".pet-menu, .pet-bubbles")) {
+      if ((e.target as HTMLElement | null)?.closest?.(".context-menu, .pet-bubbles")) {
         return;
       }
       if (menuOpen) {
@@ -298,52 +333,31 @@ export function PetOverlay({
           title={title}
         />
       </div>
-      {menuOpen ? (
-        <div
-          className="pet-menu menu-panel context-menu att-menu"
-          role="menu"
-          onPointerDown={(e) => e.stopPropagation()}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          <button
-            type="button"
-            className="context-menu__item"
-            role="menuitem"
-            onClick={() => {
-              closeMenu();
-              void openPetSettingsFromMenu();
-            }}
-          >
-            {t("pet.menu.edit")}
-          </button>
-          <button
-            type="button"
-            className="context-menu__item"
-            role="menuitem"
-            onClick={() => {
-              closeMenu();
+      <ContextMenu
+        open={menuOpen}
+        x={menu?.x ?? 0}
+        y={menu?.y ?? 0}
+        onClose={closeMenu}
+        estimatedWidth={128}
+        estimatedHeight={80}
+        items={[
+          {
+            id: "pet-settings",
+            label: t("pet.menu.settings"),
+            onClick: () => {
               void petOpenSettings();
-            }}
-          >
-            {t("pet.menu.settings")}
-          </button>
-          <div className="context-menu__sep" role="separator" />
-          <button
-            type="button"
-            className="context-menu__item"
-            role="menuitem"
-            onClick={() => {
-              closeMenu();
+            },
+          },
+          { id: "pet-sep", separator: true },
+          {
+            id: "pet-hide",
+            label: t("pet.menu.hide"),
+            onClick: () => {
               void petHide();
-            }}
-          >
-            {t("pet.menu.hide")}
-          </button>
-        </div>
-      ) : null}
+            },
+          },
+        ]}
+      />
     </div>
   );
 }

@@ -61,37 +61,7 @@ html[data-pet-shell] .boot-gate {
   pointer-events: none;
 }
 
-.pet-menu {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  min-width: 148px;
-  z-index: 20;
-  pointer-events: auto;
-}
 
-.pet-menu .context-menu__item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  padding: 7px 10px;
-}
-
-.pet-menu .context-menu__item:hover {
-  background: var(--menu-item-hover, rgba(127, 127, 127, 0.16));
-}
-
-.pet-menu .context-menu__sep {
-  height: 1px;
-  margin: 4px 8px;
-  background: var(--menu-context-border, rgba(127, 127, 127, 0.28));
-}
 
 .pet-settings-grid {
   display: flex;

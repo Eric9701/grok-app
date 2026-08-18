@@ -6,7 +6,7 @@ import {
 import { PET_SETTINGS_HASH, PET_SETTINGS_SECTION, petSettingsHash } from "./petNav";
 
 describe("pet settings navigation helper", () => {
-  it("编辑 and the 宠物 menu share one hash/section", () => {
+  it("pet-window settings and the 宠物 nav share one hash/section", () => {
     expect(PET_SETTINGS_SECTION).toBe("pet");
     expect(PET_SETTINGS_HASH).toBe("#/settings/pet");
     expect(petSettingsHash()).toBe("#/settings/pet");

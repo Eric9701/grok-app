@@ -68,14 +68,21 @@ export function clampContextMenuPos(
   y: number,
   width = 200,
   height = 220,
+  viewport?: { width: number; height: number },
 ): { left: number; top: number } {
-  if (typeof window === "undefined") return { left: x, top: y };
-  // Cap height to the same budget as CSS max-height so tall session menus
-  // still open fully on-screen (with overflow scroll) instead of clipping.
-  const maxH = Math.min(height, window.innerHeight - 16);
+  const vw =
+    viewport?.width ??
+    (typeof window !== "undefined" ? window.innerWidth : 1024);
+  const vh =
+    viewport?.height ??
+    (typeof window !== "undefined" ? window.innerHeight : 768);
+  const margin = 8;
+  const maxW = Math.max(1, vw - margin * 2);
+  const maxH = Math.max(1, Math.min(height, vh - margin * 2));
+  const w = Math.min(width, maxW);
   return {
-    left: Math.max(8, Math.min(x, window.innerWidth - width - 8)),
-    top: Math.max(8, Math.min(y, window.innerHeight - maxH - 8)),
+    left: Math.max(margin, Math.min(x, vw - w - margin)),
+    top: Math.max(margin, Math.min(y, vh - maxH - margin)),
   };
 }
 

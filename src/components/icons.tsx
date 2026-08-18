@@ -302,6 +302,58 @@ export const IconListCheck = wrap(TbListCheck);
 export const IconInstructions = wrap(TbFileText);
 export const IconSettings = wrap(TbSettings);
 export const IconHexagon = wrap(TbHexagon);
+
+/** Settings / slash pet — hex body with two short vertical eyes. */
+export function IconPet({
+  size = 18,
+  title,
+  stroke = 1.75,
+  className = "",
+}: IconProps) {
+  const classes = ["g-icon", className].filter(Boolean).join(" ");
+  return (
+    <span
+      className={classes}
+      style={{
+        display: "inline-flex",
+        width: size,
+        height: size,
+        lineHeight: 0,
+        color: "currentColor",
+        flexShrink: 0,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+      role={title ? "img" : undefined}
+      aria-hidden={title ? undefined : true}
+      aria-label={title}
+      title={title}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden
+      >
+        <path
+          d="M19.875 6.27c.7.398 1.13 1.143 1.125 1.948v7.284c0 .809-.443 1.555-1.158 1.948l-6.75 4.27a2.269 2.269 0 0 1-2.184 0l-6.75-4.27a2.225 2.225 0 0 1-1.158-1.948v-7.285c0-.809.443-1.554 1.158-1.947l6.75-3.98a2.33 2.33 0 0 1 2.25 0l6.75 3.98z"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M9.6 10.2v2.7M14.4 10.2v2.7"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+        />
+      </svg>
+    </span>
+  );
+}
 export const IconDoctor = wrap(TbFirstAidKit);
 export const IconThemeSun = wrap(TbSun);
 export const IconThemeMoon = wrap(TbMoon);

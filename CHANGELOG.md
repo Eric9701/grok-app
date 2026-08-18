@@ -11,6 +11,14 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Changed
+- **Pet settings nav icon has two short eyes**: The hex outline now includes two short vertical strokes so the sidebar item reads as the companion, not a generic polygon.
+- **Pet menu keeps a single settings item**: The overlay context menu no longer lists both Edit and Pet settings (they opened the same Settings → Pet page).
+
+**中文 · 变更**
+- **设置里的宠物图标加了两只短竖线眼睛**：不再只是空六边形。
+- **宠物菜单只保留「宠物设置」**：右键里「编辑」和「宠物设置」进的是同一页，已去掉重复的「编辑」。
+
 ### Added
 - **Chat-column bottom terminal and pane motion (#681)**: `⌘\`` toggles a persist-mounted terminal under the chat. Sidebar / aside / settings / account-menu / project-list click-toggles interpolate instead of hard-cutting.
 - **Russian UI locale (#689)**: Settings language list and system-language detection include `ru`. Catalog is English-backed with translated overrides; tray / app menu follow the same locale.
@@ -20,6 +28,8 @@ See `docs/llm-wiki/release.md`.
 - **俄语界面（#689）**：设置语言列表和跟随系统可切到 `ru`。词库以英文兜底、常用面有俄文；托盘和原生菜单同步。
 
 ### Fixed
+- **Pet context menu stays near the click**: The menu opens at the right-click and only slides enough to stay on the visible work-area slice of the overlay (no jump to the mark or the window corner).
+- **Pet overlay no longer steals the workbench’s first click**: The always-on-top pet window is not focusable (`canBecomeKeyWindow = NO` / `WS_EX_NOACTIVATE`). Tao `show()` still calls `makeKeyAndOrderFront`; if the overlay becomes key while the main window is visible, key is returned immediately so composer / list clicks land on the first press.
 - **Official login no longer breaks a working custom relay**: After sign-in, Host kept calling ACP `authenticate(cached_token)` on custom-route processes. That RPC reads `~/.grok/auth.json`, Grok Build then sends OIDC to the relay (`HTTP 400 Incorrect API key` / network card), and logout “fixed” it immediately. Custom routes now skip `cached_token`; login / account switch bind agent-home via `prepare_route_auth_for_agent` (official syncs, custom clears).
 - **History image chips no longer decode the full original (#692, #693)**: User-message paste thumbs use the same Host thumbnail path as assistant cards (#675). First paint stays empty until the ≤480px JPEG is ready, a live loopback `src` is not blanked on remount, and the `<img>` is no longer remounted on URL change. Long threads with screenshots no longer flash the window while a new reply streams.
 - **Live “思考中” timer no longer inherits another chat’s clock**: A leftover `turnStartedAt` (or a later correction) used to stick at 50+ minutes, then jump to the real duration after remount. The live timer now follows this turn’s clock and will not start before the assistant bubble’s `createdAt`.
@@ -29,6 +39,8 @@ See `docs/llm-wiki/release.md`.
 - **CLI import no longer paints `<system-reminder>` as a user bubble (#687)**: Reminder-only / `synthetic_reason: project_instructions` envelopes in `chat_history.jsonl` are skipped. A wrapped `<user_query>` is kept.
 
 **中文 · 修复**
+- **宠物右键菜单贴着点击位置**：菜单在右键处打开，只在会出屏时平移，不再跳到标记另一侧或窗口左上角。
+- **宠物窗口不再抢走主窗口的第一次点击**：置顶宠物窗不可成为 key（macOS `canBecomeKeyWindow = NO` / Windows `WS_EX_NOACTIVATE`）。Tao 的 `show()` 仍会 `makeKeyAndOrderFront`；若主窗口已可见，立刻把焦点还回去，输入框和列表第一次点击就能生效。
 - **登录官方号不再把正在用的中转打挂**：签入后自定义路由仍会 `authenticate(cached_token)`，CLI 读 `~/.grok/auth.json` 后把 OIDC 打到中转（HTTP 400 Incorrect API key / 网络异常），退出登录立刻又好。现在自定义路由不再做 `cached_token`；登录/切号按当前路由 `prepare_route_auth`（官方同步，自定义清掉）。
 - **历史里的用户附图不再解原图（#692, #693）**：用户气泡里的粘贴缩略图走和助手图卡同一套 Host 缩略图（#675）。缓存未命中时先占位，已有 loopback 地址不再清成空，换地址时也不再拆掉 `<img>` 重挂。带截图的长对话在往外写时窗口不再整屏闪。
 - **「思考中」不再沿用上一会话的计时**：上一轮留下的 `turnStartedAt` 会把时长钉在 50 多分钟，滑一下或重挂载后又变成真正的几分钟。现在跟本轮时钟走，也不会早于这条助手气泡的 `createdAt`。

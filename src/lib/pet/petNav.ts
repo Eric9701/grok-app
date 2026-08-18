@@ -1,6 +1,6 @@
 /**
- * Shared navigation contract: settings 宠物 menu and pet-window 编辑
- * must open the same destination.
+ * Shared navigation contract: settings 宠物 nav and the pet-window
+ * 「宠物设置」 item must open the same destination.
  */
 
 import { buildSettingsHash } from "@/lib/settingsCatalog";

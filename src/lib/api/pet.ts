@@ -231,6 +231,39 @@ export async function petSyncOverlaySize(w: number, h: number): Promise<void> {
   }
 }
 
+export type PetOverlayFrame = {
+  winX: number;
+  winY: number;
+  overlayW: number;
+  overlayH: number;
+  work: WorkRect;
+};
+
+/** Overlay position + monitor work area, in logical CSS pixels. */
+export async function petReadOverlayFrame(): Promise<PetOverlayFrame | null> {
+  if (!isDesktopHost()) return null;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const win = getCurrentWindow();
+    const [scale, pos, size, mon] = await Promise.all([
+      win.scaleFactor(),
+      win.outerPosition(),
+      win.innerSize(),
+      readPetMonitor(),
+    ]);
+    if (!(scale > 0) || !mon) return null;
+    return {
+      winX: pos.x / scale,
+      winY: pos.y / scale,
+      overlayW: size.width / scale,
+      overlayH: size.height / scale,
+      work: workRectFromMonitor(mon, scale),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function petReadBubbleOffset(maxOffset: number): Promise<number> {
   if (!isDesktopHost()) return 0;
   try {

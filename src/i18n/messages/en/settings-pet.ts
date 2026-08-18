@@ -17,7 +17,6 @@ export const enSettingsPet = {
   "settings.pet.size.sm": "Small",
   "settings.pet.size.md": "Medium",
   "settings.pet.size.lg": "Large",
-  "pet.menu.edit": "Edit…",
   "pet.menu.show": "Show pet",
   "pet.menu.hide": "Hide pet",
   "pet.menu.settings": "Pet settings",

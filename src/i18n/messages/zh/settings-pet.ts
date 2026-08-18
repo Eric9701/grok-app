@@ -17,7 +17,6 @@ export const zhSettingsPet = {
   "settings.pet.size.sm": "小",
   "settings.pet.size.md": "中",
   "settings.pet.size.lg": "大",
-  "pet.menu.edit": "编辑…",
   "pet.menu.show": "显示宠物",
   "pet.menu.hide": "隐藏宠物",
   "pet.menu.settings": "宠物设置",
