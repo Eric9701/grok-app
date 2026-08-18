@@ -18974,7 +18974,11 @@ export function AppWorkbench() {
             ) : null}
           </div>
 
-          <OverlayScroll className="sidebar__scroll" viewportClassName="sidebar__scroll-inner">
+          <OverlayScroll
+            className="sidebar__scroll"
+            viewportClassName="sidebar__scroll-inner"
+            syncTreeReveal
+          >
             {/* L1 — Projects section */}
             <div className="tree-l1">
               <button
@@ -19108,14 +19112,14 @@ export function AppWorkbench() {
               </div>
             </div>
 
-            {projectsOpen && projects.length === 0 && (
+            <SidebarTreeReveal open={projectsOpen} className="tree-reveal--projects">
+            {projects.length === 0 && (
               <div className="sidebar-empty">
                 {tr("sidebar.noProjects")}
               </div>
             )}
 
-            {projectsOpen &&
-              projects.length > 0 &&
+            {projects.length > 0 &&
               visibleProjects.length === 0 && (
               <div className="sidebar-empty sidebar-empty--space">
                 {tr("sidebar.spaces.empty")}
@@ -19125,8 +19129,7 @@ export function AppWorkbench() {
               </div>
             )}
 
-            {projectsOpen &&
-              visibleProjects.map((proj) => {
+            {visibleProjects.map((proj) => {
                 const open = expandedProjects[proj.id] !== false;
                 const projSessions = sessionsForProject(proj.id);
                 const projSessionIds = projSessions.map((s) => s.id);
@@ -19394,6 +19397,7 @@ export function AppWorkbench() {
                   </div>
                 );
               })}
+            </SidebarTreeReveal>
 
             {/* Orphans / history */}
             <div className="tree-l1" style={{ marginTop: 8 }}>

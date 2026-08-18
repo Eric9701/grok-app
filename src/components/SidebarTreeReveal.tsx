@@ -1,7 +1,8 @@
 /**
  * Keep a sidebar tree section mounted through its exit so expand/collapse
  * interpolates height. WKWebView only interpolates concrete inline px
- * (see treeReveal.ts) — CSS 0fr/1fr snaps.
+ * (see treeReveal.ts). Stay on px after expand — settling to `auto` makes
+ * the next close an auto→0 snap.
  */
 
 import {
@@ -11,13 +12,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useOpenPresence, OPEN_PRESENCE_MS } from "@/lib/openPresence";
+import { useOpenPresence } from "@/lib/openPresence";
 import { prefersReducedMotion } from "@/lib/paneSplitMotion";
 import {
   applyTreeRevealSize,
+  beginTreeRevealMotion,
+  measureTreeRevealContent,
   shouldAnimateTreeReveal,
+  TREE_REVEAL_CLOSE_MS,
+  TREE_REVEAL_MS,
+  TREE_REVEAL_PRESENCE_MS,
+  treeRevealCloseSteps,
   treeRevealSizeStyle,
-  type TreeRevealSize,
 } from "@/lib/treeReveal";
 
 type SidebarTreeRevealProps = {
@@ -40,18 +46,24 @@ export function SidebarTreeReveal({
   className,
   children,
 }: SidebarTreeRevealProps) {
-  const presence = useOpenPresence(open, true, OPEN_PRESENCE_MS);
+  const presence = useOpenPresence(open, true, TREE_REVEAL_PRESENCE_MS);
   const boxRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const firstCommitRef = useRef(true);
   const animateOpenRef = useRef(false);
-  const [size, setSize] = useState<TreeRevealSize>(() => (open ? "auto" : 0));
+  const animateCloseRef = useRef(false);
+  const endMotionRef = useRef<(() => void) | null>(null);
+  const [size, setSize] = useState<number | null>(() => (open ? null : 0));
+
+  const stopMotion = () => {
+    endMotionRef.current?.();
+    endMotionRef.current = null;
+  };
 
   useLayoutEffect(() => {
     const box = boxRef.current;
     const inner = innerRef.current;
     if (!box) {
-      // Collapsed first paint returns null — the next expand must animate.
       firstCommitRef.current = false;
       return;
     }
@@ -63,70 +75,123 @@ export function SidebarTreeReveal({
       isFirstCommit,
       reducedMotion: reduced,
     });
-    const contentPx = inner?.scrollHeight ?? 0;
+    const visualPx = Math.round(box.getBoundingClientRect().height);
+    const contentPx = measureTreeRevealContent(inner);
     animateOpenRef.current = false;
+    animateCloseRef.current = false;
 
     if (!animate) {
-      const next: TreeRevealSize = open ? "auto" : 0;
+      const next = open ? contentPx || visualPx : 0;
       applyTreeRevealSize(box, next);
       setSize(next);
       return;
     }
 
+    stopMotion();
+    endMotionRef.current = beginTreeRevealMotion();
+    box.dataset.treeRevealMotion = "1";
+
     if (open) {
-      // Leave height at 0 for this paint. Promoting to px before paint
-      // lets WKWebView skip the transition (same class of bug as 0fr/1fr).
       applyTreeRevealSize(box, 0);
       setSize(0);
       animateOpenRef.current = true;
       return;
     }
 
-    const locked = contentPx || Math.round(box.getBoundingClientRect().height);
-    applyTreeRevealSize(box, locked);
-    void box.getBoundingClientRect();
-    applyTreeRevealSize(box, 0);
-    setSize(0);
+    const { lockPx } = treeRevealCloseSteps(
+      visualPx || contentPx || size || 0,
+    );
+    applyTreeRevealSize(box, lockPx);
+    setSize(lockPx);
+    animateCloseRef.current = true;
   }, [open, presence.mounted]);
 
   useEffect(() => {
-    if (!open || !presence.mounted || !animateOpenRef.current) return;
+    if (!presence.mounted) return;
     const box = boxRef.current;
     if (!box) return;
     let cancelled = false;
-    const id = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        if (cancelled) return;
-        animateOpenRef.current = false;
-        const h = innerRef.current?.scrollHeight ?? 0;
-        if (h <= 0) {
-          applyTreeRevealSize(box, "auto");
-          setSize("auto");
-          return;
-        }
-        applyTreeRevealSize(box, h);
-        setSize(h);
-      });
-    });
-    const t = window.setTimeout(() => {
+
+    const finish = (next: number) => {
       if (cancelled) return;
-      applyTreeRevealSize(box, "auto");
-      setSize("auto");
-    }, OPEN_PRESENCE_MS + 32);
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(id);
-      window.clearTimeout(t);
+      applyTreeRevealSize(box, next);
+      setSize(next);
+      delete box.dataset.treeRevealMotion;
+      stopMotion();
     };
+
+    if (open && animateOpenRef.current) {
+      const id = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          if (cancelled) return;
+          animateOpenRef.current = false;
+          const h = measureTreeRevealContent(innerRef.current);
+          applyTreeRevealSize(box, h);
+          setSize(h);
+        });
+      });
+      const t = window.setTimeout(() => {
+        const h = measureTreeRevealContent(innerRef.current);
+        finish(h);
+      }, TREE_REVEAL_MS + 32);
+      return () => {
+        cancelled = true;
+        window.cancelAnimationFrame(id);
+        window.clearTimeout(t);
+      };
+    }
+
+    if (!open && animateCloseRef.current) {
+      const id = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          if (cancelled) return;
+          animateCloseRef.current = false;
+          applyTreeRevealSize(box, 0);
+          setSize(0);
+        });
+      });
+      const t = window.setTimeout(() => finish(0), TREE_REVEAL_CLOSE_MS + 32);
+      return () => {
+        cancelled = true;
+        window.cancelAnimationFrame(id);
+        window.clearTimeout(t);
+      };
+    }
   }, [open, presence.mounted]);
+
+  useEffect(() => {
+    if (!open || !presence.mounted) return;
+    const box = boxRef.current;
+    const inner = innerRef.current;
+    if (!box || !inner) return;
+    const ro = new ResizeObserver(() => {
+      if (box.dataset.treeRevealMotion) return;
+      const h = measureTreeRevealContent(inner);
+      if (h <= 0 || h === Math.round(box.getBoundingClientRect().height)) return;
+      const prev = box.style.transition;
+      box.style.transition = "none";
+      applyTreeRevealSize(box, h);
+      setSize(h);
+      void box.getBoundingClientRect();
+      box.style.transition = prev;
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [open, presence.mounted]);
+
+  useEffect(() => stopMotion, []);
 
   if (!presence.mounted) return null;
 
   return (
     <div
       ref={boxRef}
-      className={"tree-reveal" + (className ? ` ${className}` : "")}
-      style={size === "auto" ? undefined : treeRevealSizeStyle(size)}
+      className={
+        "tree-reveal" +
+        (!open ? " is-closing" : "") +
+        (className ? ` ${className}` : "")
+      }
+      style={size == null ? undefined : treeRevealSizeStyle(size)}
       data-testid="tree-reveal"
       aria-hidden={!open || undefined}
       inert={!open || undefined}

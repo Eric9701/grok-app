@@ -1,9 +1,17 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   applyTreeRevealSize,
+  beginTreeRevealMotion,
+  isTreeRevealMotionActive,
+  resetTreeRevealMotionForTests,
+  runAfterTreeRevealMotion,
+  subscribeTreeRevealMotion,
   shouldAnimateTreeReveal,
+  TREE_REVEAL_CLOSE_MS,
+  TREE_REVEAL_MS,
+  treeRevealCloseSteps,
   treeRevealSizeStyle,
 } from "./treeReveal";
 
@@ -36,6 +44,13 @@ describe("shouldAnimateTreeReveal", () => {
   });
 });
 
+describe("treeRevealCloseSteps", () => {
+  it("locks the used height before writing 0 so auto→0 can interpolate", () => {
+    expect(treeRevealCloseSteps(256)).toEqual({ lockPx: 256, endPx: 0 });
+    expect(treeRevealCloseSteps(0)).toEqual({ lockPx: 0, endPx: 0 });
+  });
+});
+
 describe("applyTreeRevealSize", () => {
   it("sets the px tuple and clears it for auto", () => {
     const el = { style: { height: "", minHeight: "", maxHeight: "" } };
@@ -50,13 +65,63 @@ describe("applyTreeRevealSize", () => {
   });
 });
 
+describe("tree reveal motion deferral", () => {
+  afterEach(() => {
+    resetTreeRevealMotionForTests();
+  });
+
+  it("defers work until the last expand/collapse ends", () => {
+    const ran: string[] = [];
+    expect(runAfterTreeRevealMotion(() => ran.push("early"))).toBe(false);
+    const end = beginTreeRevealMotion();
+    expect(isTreeRevealMotionActive()).toBe(true);
+    expect(runAfterTreeRevealMotion(() => ran.push("later"))).toBe(true);
+    expect(ran).toEqual([]);
+    end();
+    expect(isTreeRevealMotionActive()).toBe(false);
+    expect(ran).toEqual(["later"]);
+  });
+
+  it("notifies subscribers on start and end even if they never deferred", () => {
+    const seen: boolean[] = [];
+    const stop = subscribeTreeRevealMotion((active) => seen.push(active));
+    const end = beginTreeRevealMotion();
+    expect(seen).toEqual([true]);
+    end();
+    expect(seen).toEqual([true, false]);
+    stop();
+  });
+});
+
 describe("tree-reveal CSS", () => {
   const css = readFileSync(
     resolve(__dirname, "../styles/sidebar.part2.css"),
     "utf8",
   );
 
+  it("drives the L1 projects chevron, not only per-project chats", () => {
+    const src = readFileSync(
+      resolve(__dirname, "../app/AppWorkbench.tsx"),
+      "utf8",
+    );
+    expect(src).toMatch(
+      /<SidebarTreeReveal open=\{projectsOpen\} className="tree-reveal--projects">/,
+    );
+    expect(src).toMatch(/syncTreeReveal/);
+  });
+
+  it("hides the sidebar overlay thumb while the project list is moving", () => {
+    expect(css).toMatch(
+      /\.sidebar__scroll:has\(\[data-tree-reveal-motion\]\) \.overlay-scroll__thumb/,
+    );
+    expect(css).toMatch(
+      /\.sidebar__scroll:has\(\[data-tree-reveal-motion\]\) \.overlay-scroll__viewport/,
+    );
+  });
+
   it("interpolates the inline height tuple — not 0fr/1fr, which WKWebView snaps", () => {
+    expect(TREE_REVEAL_MS).toBe(200);
+    expect(TREE_REVEAL_CLOSE_MS).toBe(200);
     expect(css).not.toMatch(/grid-template-rows/);
     expect(css).toMatch(/\.tree-reveal\s*\{[^}]*height var\(--motion-normal\)/);
     expect(css).toMatch(/min-height var\(--motion-normal\)/);

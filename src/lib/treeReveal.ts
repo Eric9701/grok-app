@@ -5,6 +5,11 @@
  * `width: 0 !important`).
  */
 
+/** Matches `--motion-normal`. */
+export const TREE_REVEAL_MS = 200;
+export const TREE_REVEAL_CLOSE_MS = 200;
+export const TREE_REVEAL_PRESENCE_MS = TREE_REVEAL_CLOSE_MS + 48;
+
 export type TreeRevealSize = number | "auto";
 
 export type TreeRevealSizeStyle = {
@@ -41,4 +46,76 @@ export function shouldAnimateTreeReveal(opts: {
 }): boolean {
   if (opts.isFirstCommit || opts.reducedMotion) return false;
   return true;
+}
+
+/**
+ * Close must paint a locked px height, then 0. Writing auto→0 in one
+ * commit is the WKWebView snap (same as promoting 0→N before paint).
+ */
+export function treeRevealCloseSteps(contentPx: number): {
+  lockPx: number;
+  endPx: number;
+} {
+  return { lockPx: Math.max(0, Math.round(contentPx)), endPx: 0 };
+}
+
+export function measureTreeRevealContent(inner: HTMLElement | null): number {
+  if (!inner) return 0;
+  const direct = Math.round(inner.scrollHeight);
+  if (direct > 0) return direct;
+  let sum = 0;
+  for (let i = 0; i < inner.children.length; i++) {
+    sum += inner.children[i].getBoundingClientRect().height;
+  }
+  return Math.round(sum);
+}
+
+let motionCount = 0;
+const idle = new Set<() => void>();
+const watchers = new Set<(active: boolean) => void>();
+
+export function isTreeRevealMotionActive(): boolean {
+  return motionCount > 0;
+}
+
+export function subscribeTreeRevealMotion(
+  fn: (active: boolean) => void,
+): () => void {
+  watchers.add(fn);
+  return () => {
+    watchers.delete(fn);
+  };
+}
+
+function emitMotion(active: boolean): void {
+  for (const fn of [...watchers]) fn(active);
+}
+
+export function beginTreeRevealMotion(): () => void {
+  const wasIdle = motionCount === 0;
+  motionCount += 1;
+  if (wasIdle) emitMotion(true);
+  let open = true;
+  return () => {
+    if (!open) return;
+    open = false;
+    motionCount = Math.max(0, motionCount - 1);
+    if (motionCount > 0) return;
+    const waiters = [...idle];
+    idle.clear();
+    for (const fn of waiters) fn();
+    emitMotion(false);
+  };
+}
+
+/** Queue `fn` until expand/collapse ends. Returns true when deferred. */
+export function runAfterTreeRevealMotion(fn: () => void): boolean {
+  if (motionCount === 0) return false;
+  idle.add(fn);
+  return true;
+}
+
+export function resetTreeRevealMotionForTests(): void {
+  motionCount = 0;
+  idle.clear();
 }

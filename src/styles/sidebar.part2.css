@@ -120,7 +120,14 @@
  * on .tree-l3-list-wrap so a closed section does not leave leftover inset.
  */
 .tree-reveal {
-  overflow: hidden;
+  overflow: clip;
+  transition:
+    height var(--motion-normal) var(--motion-pane-ease),
+    min-height var(--motion-normal) var(--motion-pane-ease),
+    max-height var(--motion-normal) var(--motion-pane-ease);
+}
+
+.tree-reveal.is-closing {
   transition:
     height var(--motion-normal) var(--motion-pane-ease),
     min-height var(--motion-normal) var(--motion-pane-ease),
@@ -134,6 +141,17 @@
 .tree-reveal .tree-l3 {
   content-visibility: visible;
   contain: none;
+}
+
+/* Collapsing the list leaves a stale overlay thumb (and WKWebView's
+ * native indicator) until the next hover. Hide both while height moves. */
+.sidebar__scroll:has([data-tree-reveal-motion]) .overlay-scroll__thumb {
+  opacity: 0;
+  transition: none;
+}
+
+.sidebar__scroll:has([data-tree-reveal-motion]) .overlay-scroll__viewport {
+  overflow: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {

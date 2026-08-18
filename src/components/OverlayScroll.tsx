@@ -14,6 +14,10 @@ import {
   type UIEvent,
 } from "react";
 import { runAfterPaneSplitMotion } from "@/lib/paneSplitMotion";
+import {
+  runAfterTreeRevealMotion,
+  subscribeTreeRevealMotion,
+} from "@/lib/treeReveal";
 
 type OverlayScrollProps = {
   children: ReactNode;
@@ -25,6 +29,8 @@ type OverlayScrollProps = {
   onScroll?: (e: UIEvent<HTMLDivElement>) => void;
   /** Optional external ref to the scrolling viewport element. */
   viewportRef?: Ref<HTMLDivElement | null>;
+  /** Sidebar project-list reveal: hide the stale thumb, remasure after. */
+  syncTreeReveal?: boolean;
 };
 
 function assignRef<T>(ref: Ref<T> | undefined, value: T) {
@@ -40,6 +46,7 @@ export function OverlayScroll({
   style,
   onScroll,
   viewportRef: viewportRefProp,
+  syncTreeReveal = false,
 }: OverlayScrollProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const hideTimer = useRef<number | null>(null);
@@ -60,10 +67,12 @@ export function OverlayScroll({
 
   const measure = useCallback(() => {
     if (runAfterPaneSplitMotion(measure)) return;
+    if (runAfterTreeRevealMotion(measure)) return;
     const el = viewportRef.current;
     if (!el) return;
     const { scrollTop, scrollHeight, clientHeight } = el;
     const needed = scrollHeight > clientHeight + 1;
+    el.style.overflowY = needed ? "auto" : "hidden";
     if (!needed) {
       setThumb((t) => (t.needed ? { top: 0, height: 0, needed: false } : t));
       return;
@@ -87,13 +96,31 @@ export function OverlayScroll({
     if (!el) return;
     const ro = new ResizeObserver(() => measure());
     ro.observe(el);
-    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    for (const child of el.children) {
+      if (child instanceof Element) ro.observe(child);
+    }
     window.addEventListener("resize", measure);
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
   }, [measure, children]);
+
+  useEffect(() => {
+    if (!syncTreeReveal) return;
+    return subscribeTreeRevealMotion((active) => {
+      const el = viewportRef.current;
+      if (active) {
+        if (el) el.style.overflowY = "hidden";
+        setActive(false);
+        setThumb((t) =>
+          t.needed ? { top: 0, height: 0, needed: false } : t,
+        );
+        return;
+      }
+      measure();
+    });
+  }, [measure, syncTreeReveal]);
 
   const flash = () => {
     setActive(true);
