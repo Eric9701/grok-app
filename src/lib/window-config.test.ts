@@ -68,6 +68,20 @@ describe("window chrome", () => {
     expect(body).toContain("com.grokapp.desktop");
   });
 
+  it("user close keeps the macOS Dock icon", () => {
+    const tray = readFileSync(resolve(TAURI_DIR, "src/tray.rs"), "utf8");
+    expect(tray).toContain("pub fn hide_to_tray");
+    expect(tray).toContain("pub fn hide_to_tray_accessory");
+    const hideFn = tray.slice(tray.indexOf("pub fn hide_to_tray("));
+    const innerStart = tray.indexOf("fn hide_to_tray_inner");
+    const inner = tray.slice(innerStart, innerStart + 1800);
+    expect(hideFn.startsWith("pub fn hide_to_tray(app: &AppHandle) {\n    hide_to_tray_inner(app, false);")).toBe(
+      true,
+    );
+    expect(inner).toContain("set_dock_visibility(true)");
+    expect(inner).toContain("ActivationPolicy::Regular");
+  });
+
   it("base product identity is Grok", () => {
     const conf = JSON.parse(readFileSync(CONF_PATH, "utf8")) as {
       productName?: string;

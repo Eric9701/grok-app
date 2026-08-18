@@ -1,6 +1,19 @@
 <!doctype html>
 <html lang="zh-CN" data-theme="dark">
   <head>
+    <script>
+      /* Pet overlay: kill boot splash before first paint. Must stay first in <head>. */
+      (function () {
+        var h = location.hash || "";
+        if (h !== "#/pet" && h.indexOf("#/pet?") !== 0) return;
+        document.documentElement.setAttribute("data-pet-shell", "1");
+        var s = document.createElement("style");
+        s.setAttribute("data-pet-boot", "1");
+        s.textContent =
+          "html,html[data-theme],html[data-theme] body,body,#root,.boot-gate{background:transparent!important;background-image:none!important;background-color:transparent!important;}html[data-pet-shell] .boot-gate,.boot-gate{display:none!important;visibility:hidden!important;opacity:0!important;}";
+        document.documentElement.appendChild(s);
+      })();
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

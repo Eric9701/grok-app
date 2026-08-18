@@ -24,3 +24,4 @@ export * from "./api/memory";
 export * from "./api/voice";
 export * from "./api/runtime";
 export * from "./api/wallpaper";
+export * from "./api/pet";

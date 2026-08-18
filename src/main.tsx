@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { PetApp } from "./components/pet/PetApp";
+import { isPetShellHash } from "@/lib/pet/petShell";
 import { UpdaterProvider } from "./hooks/UpdaterProvider";
 import "./styles/tokens.css";
 import "./styles/skins.css";
@@ -99,16 +101,25 @@ applyWallpaperScrimToDocument(loadWallpaperScrim(localStorage));
 void applyNativeWindowTheme(
   bootPref === "system" && !bootSchedule.enabled ? null : bootTheme,
 );
-// Desktop always-on-top (localStorage; fail-closed outside Tauri).
-void applyWindowAlwaysOnTop(loadWindowAlwaysOnTopPref(localStorage));
+const petShell =
+  typeof window !== "undefined" && isPetShellHash(window.location.hash);
 
-// The app has document-level capture handlers. Install the zoom handler on
-// window capture so Command +/- is handled before those shortcuts.
-if (
-  typeof window !== "undefined" &&
-  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
-) {
-  installZoomHotkeys(window);
+if (petShell) {
+  document.documentElement.setAttribute("data-pet-shell", "1");
+  document.querySelector(".boot-gate")?.setAttribute("hidden", "");
+} else {
+  // Desktop always-on-top (localStorage; fail-closed outside Tauri).
+  // Never run this on the pet overlay — it would clear Rust always_on_top.
+  void applyWindowAlwaysOnTop(loadWindowAlwaysOnTopPref(localStorage));
+
+  // The app has document-level capture handlers. Install the zoom handler on
+  // window capture so Command +/- is handled before those shortcuts.
+  if (
+    typeof window !== "undefined" &&
+    ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
+  ) {
+    installZoomHotkeys(window);
+  }
 }
 
 // Kill the native WebView right-click menu app-wide (copy/paste/reload/etc.).
@@ -215,8 +226,12 @@ document.addEventListener(
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <UpdaterProvider>
-      <App />
-    </UpdaterProvider>
+    {petShell ? (
+      <PetApp />
+    ) : (
+      <UpdaterProvider>
+        <App />
+      </UpdaterProvider>
+    )}
   </StrictMode>,
 );

@@ -1,0 +1,304 @@
+/** API domain: desktop pet overlay */
+
+import { invoke, isDesktopHost } from "./host";
+import {
+  PET_BUBBLE_WIDTH,
+  petBubbleOffsetX,
+  type PetFocus,
+  type PetKind,
+  type PetTask,
+  type PetTaskPhase,
+} from "@/lib/pet";
+
+export type PetPrefs = {
+  enabled: boolean;
+  visible: boolean;
+  shape: string;
+  color: string;
+  sizePx: number;
+  x?: number | null;
+  y?: number | null;
+};
+
+export async function petPrefsGet(): Promise<PetPrefs> {
+  if (!isDesktopHost()) {
+    return {
+      enabled: false,
+      visible: false,
+      shape: "hex",
+      color: "green",
+      sizePx: 128,
+    };
+  }
+  return invoke<PetPrefs>("pet_prefs_get");
+}
+
+export async function petPrefsSet(prefs: PetPrefs): Promise<PetPrefs> {
+  if (!isDesktopHost()) return prefs;
+  return invoke<PetPrefs>("pet_prefs_set", { prefs });
+}
+
+export async function petShow(): Promise<PetPrefs> {
+  if (!isDesktopHost()) {
+    return petPrefsGet();
+  }
+  return invoke<PetPrefs>("pet_show");
+}
+
+export async function petHide(): Promise<PetPrefs> {
+  if (!isDesktopHost()) {
+    return petPrefsGet();
+  }
+  return invoke<PetPrefs>("pet_hide");
+}
+
+export async function petToggle(): Promise<PetPrefs> {
+  if (!isDesktopHost()) {
+    return petPrefsGet();
+  }
+  return invoke<PetPrefs>("pet_toggle");
+}
+
+export async function petIsVisible(): Promise<boolean> {
+  if (!isDesktopHost()) return false;
+  return invoke<boolean>("pet_is_visible");
+}
+
+export async function petPushFocus(focus: PetFocus): Promise<void> {
+  if (!isDesktopHost()) return;
+  await invoke("pet_push_focus", {
+    focus: {
+      kind: focus.kind,
+      sessionId: focus.sessionId,
+      title: focus.title,
+      toolTitle: focus.toolTitle,
+      rank: focus.rank,
+      updatedAt: focus.updatedAt,
+    },
+  });
+}
+
+export async function petPushTasks(tasks: readonly PetTask[]): Promise<void> {
+  if (!isDesktopHost()) return;
+  await invoke("pet_push_tasks", {
+    tasks: tasks.map((task) => ({
+      sessionId: task.sessionId,
+      title: task.title,
+      toolTitle: task.toolTitle,
+      kind: task.kind,
+      phase: task.phase,
+      progress: task.progress,
+      updatedAt: task.updatedAt,
+    })),
+  });
+}
+
+export async function petGetTasks(): Promise<PetTask[]> {
+  if (!isDesktopHost()) return [];
+  const raw = await invoke<
+    Array<{
+      sessionId?: string;
+      title?: string | null;
+      toolTitle?: string | null;
+      kind?: PetKind;
+      phase?: PetTaskPhase;
+      progress?: number;
+      updatedAt?: number;
+    }>
+  >("pet_get_tasks");
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((row) => typeof row.sessionId === "string" && row.sessionId)
+    .map((row) => ({
+      sessionId: row.sessionId as string,
+      title: row.title ?? null,
+      toolTitle: row.toolTitle ?? null,
+      kind: row.kind ?? "working",
+      phase: row.phase === "done" ? "done" : "active",
+      progress: typeof row.progress === "number" ? row.progress : 0,
+      updatedAt: row.updatedAt ?? 0,
+    }));
+}
+
+export async function petGetFocus(): Promise<PetFocus | null> {
+  if (!isDesktopHost()) return null;
+  const raw = await invoke<{
+    kind: PetFocus["kind"];
+    sessionId?: string | null;
+    title?: string | null;
+    toolTitle?: string | null;
+    rank?: number;
+    updatedAt?: number;
+  } | null>("pet_get_focus");
+  if (!raw) return null;
+  return {
+    kind: raw.kind,
+    sessionId: raw.sessionId ?? null,
+    title: raw.title ?? null,
+    toolTitle: raw.toolTitle ?? null,
+    rank: raw.rank ?? 5,
+    updatedAt: raw.updatedAt ?? 0,
+  };
+}
+
+export async function petOpenSettings(): Promise<void> {
+  if (!isDesktopHost()) {
+    window.location.hash = "#/settings/pet";
+    return;
+  }
+  await invoke("pet_open_settings");
+}
+
+export async function petFocusSession(sessionId: string): Promise<void> {
+  if (!isDesktopHost()) return;
+  await invoke("pet_focus_session", { sessionId });
+}
+
+export async function petShowMain(): Promise<void> {
+  if (!isDesktopHost()) return;
+  await invoke("pet_show_main");
+}
+
+export type PetHitChrome = {
+  markCx: number;
+  markCy: number;
+  markR: number;
+  bubbleX: number;
+  bubbleY: number;
+  bubbleW: number;
+  bubbleH: number;
+  windowW: number;
+  windowH: number;
+};
+
+export async function petSetHitChrome(chrome: PetHitChrome): Promise<void> {
+  if (!isDesktopHost()) return;
+  await invoke("pet_set_hit_chrome", { chrome });
+}
+
+type WorkRect = { x: number; y: number; w: number; h: number };
+
+async function readPetMonitor(win: {
+  currentMonitor?: () => Promise<{
+    position: { x: number; y: number };
+    size: { width: number; height: number };
+    workArea?: {
+      position: { x: number; y: number };
+      size: { width: number; height: number };
+    };
+  } | null>;
+}) {
+  try {
+    if (typeof win.currentMonitor === "function") {
+      const m = await win.currentMonitor();
+      if (m) return m;
+    }
+  } catch {
+    /* fall through */
+  }
+  const { currentMonitor, primaryMonitor } = await import("@tauri-apps/api/window");
+  return (await currentMonitor()) ?? (await primaryMonitor());
+}
+
+function workRectFromMonitor(
+  mon: {
+    position: { x: number; y: number };
+    size: { width: number; height: number };
+    workArea?: {
+      position: { x: number; y: number };
+      size: { width: number; height: number };
+    };
+  },
+  scale: number,
+): WorkRect {
+  const src = mon.workArea ?? { position: mon.position, size: mon.size };
+  return {
+    x: src.position.x / scale,
+    y: src.position.y / scale,
+    w: src.size.width / scale,
+    h: src.size.height / scale,
+  };
+}
+
+/** Keep the mark centered; grow height upward. Does not flip the frame. */
+export async function petSyncOverlaySize(w: number, h: number): Promise<void> {
+  if (!isDesktopHost()) return;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const { LogicalSize, LogicalPosition } = await import("@tauri-apps/api/dpi");
+    const win = getCurrentWindow();
+    const scale = await win.scaleFactor();
+    const inner = await win.innerSize();
+    const pos = await win.outerPosition();
+    const curW = inner.width / scale;
+    const curH = inner.height / scale;
+    const winX = pos.x / scale;
+    const winY = pos.y / scale;
+    const nextX = winX - (w - curW) / 2;
+    const nextY = winY - (h - curH);
+    if (Math.abs(curW - w) >= 1 || Math.abs(curH - h) >= 1) {
+      await win.setSize(new LogicalSize(w, h));
+    }
+    if (Math.abs(nextX - winX) >= 2 || Math.abs(nextY - winY) >= 2) {
+      await win.setPosition(new LogicalPosition(nextX, nextY));
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
+export async function petReadBubbleOffset(maxOffset: number): Promise<number> {
+  if (!isDesktopHost()) return 0;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const win = getCurrentWindow();
+    const [scale, pos, size, mon] = await Promise.all([
+      win.scaleFactor(),
+      win.outerPosition(),
+      win.outerSize(),
+      readPetMonitor(win),
+    ]);
+    if (!(scale > 0) || !mon) return 0;
+    const work = workRectFromMonitor(mon, scale);
+    const markX = pos.x / scale + size.width / scale / 2;
+    return petBubbleOffsetX({
+      leftGap: markX - work.x,
+      rightGap: work.x + work.w - markX,
+      bubbleWidth: PET_BUBBLE_WIDTH,
+      maxOffset,
+    });
+  } catch {
+    return 0;
+  }
+}
+
+export async function petSetDragging(dragging: boolean): Promise<void> {
+  if (!isDesktopHost()) return;
+  await invoke("pet_set_dragging", { dragging });
+}
+
+export async function petSetMenuOpen(open: boolean): Promise<void> {
+  if (!isDesktopHost()) return;
+  await invoke("pet_set_menu_open", { open });
+}
+
+export async function petSetIgnoreCursor(ignore: boolean): Promise<void> {
+  if (!isDesktopHost()) return;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().setIgnoreCursorEvents(ignore);
+  } catch {
+    await invoke("pet_set_ignore_cursor", { ignore });
+  }
+}
+
+export async function petStartDragging(): Promise<void> {
+  if (!isDesktopHost()) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().startDragging();
+}
+
+export async function petWebviewReady(): Promise<void> {
+  if (!isDesktopHost()) return;
+  await invoke("pet_webview_ready");
+}

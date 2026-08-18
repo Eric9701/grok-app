@@ -221,7 +221,7 @@ export const zhSettings = {
   "settings.closeToTray": "关闭窗口时最小化到托盘",
   "settings.keepTrayForSchedules": "为已安排任务保留托盘",
   "settings.keepTrayForSchedulesDesc": "只要有已启用的已安排任务，关闭窗口仍会收起到托盘以便继续调度——即使关闭了「关闭窗口时最小化到托盘」。完全退出应用仍会暂停任务。没有独立的后台守护进程。",
-  "settings.closeToTrayDesc": "开启后，关闭按钮会隐藏到菜单栏/系统托盘。关闭此项则关闭窗口即退出（托盘「退出」始终可用）。",
+  "settings.closeToTrayDesc": "开启后，关闭按钮只隐藏主窗口，程序坞图标保留，点击即可回来。关闭此项则关闭窗口即退出（托盘「退出」始终可用）。",
   "settings.trayBusyBadge": "在程序坞/托盘显示未读数",
   "settings.trayBusyBadgeDesc": "后台会话回复结束后，在 macOS 程序坞角标、菜单栏图标旁数字（或其他平台托盘提示）显示未读会话数。数量在回合结束后更新，发送时不会变。关闭则清除。当前正在查看的会话完成后不会增加未读。",
   "settings.trayBusyBadge.status.off": "角标已关闭 — 程序坞/托盘计数已清除。",

@@ -11,6 +11,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useThemeShell } from "@/providers/ThemeProvider";
+import { usePetCompanion } from "@/hooks/usePetCompanion";
 import { createPortal } from "react-dom";
 import { useFloatingMenu } from "@/lib/floatingMenu";
 import { DEFAULT_WALLPAPER_FOCUS } from "@/lib/themeSkin";
@@ -1741,6 +1742,10 @@ export function AppWorkbench() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
+  usePetCompanion({
+    host: windowRoleReady && !isSecondaryWindow,
+    sessions,
+  });
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   useSideWorkbenchProjectIsolation(
     activeProject?.id,
@@ -12271,6 +12276,9 @@ export function AppWorkbench() {
             return;
           case "settings":
             navigateSettings();
+            return;
+          case "pet":
+            void import("@/lib/api/pet").then((m) => m.petToggle());
             return;
           case "export":
             void exportActiveSessionMd();

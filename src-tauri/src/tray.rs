@@ -202,8 +202,18 @@ fn usage_status_label(tr: &TrayStrings) -> String {
     tr.usage_unknown.to_string()
 }
 
-/// Hide main window to tray only: no Dock (macOS) / no taskbar button (Windows).
+/// Hide the main workbench without quitting. Dock stays so click-to-reopen
+/// still works (the pet overlay is skip-taskbar and must not replace the Dock).
 pub fn hide_to_tray(app: &AppHandle) {
+    hide_to_tray_inner(app, false);
+}
+
+/// Headless launch (`--start-in-tray` / fire-due): hide Dock + become Accessory.
+pub fn hide_to_tray_accessory(app: &AppHandle) {
+    hide_to_tray_inner(app, true);
+}
+
+fn hide_to_tray_inner(app: &AppHandle, hide_dock: bool) {
     // Persist geometry before hide so force-kill while tray-resident still restores
     // the last size/position on next launch (plugin also saves on process Exit;
     // resize is additionally debounced to disk from lib.rs window events).
@@ -230,11 +240,17 @@ pub fn hide_to_tray(app: &AppHandle) {
             let _ = w.set_skip_taskbar(true);
         }
     }
-    // macOS: hide Dock icon (menu-bar app while window is closed).
     #[cfg(target_os = "macos")]
     {
-        let _ = app.set_dock_visibility(false);
-        let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+        if hide_dock {
+            let _ = app.set_dock_visibility(false);
+            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+        } else {
+            // Closing the window used to drop the Dock icon (Accessory). Keep
+            // Regular + visible so Dock click can show_main_window again.
+            let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+            let _ = app.set_dock_visibility(true);
+        }
     }
 }
 

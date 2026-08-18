@@ -194,6 +194,7 @@ import { RemoteImSection } from "@/components/settings/RemoteImSection";
 import { RuntimeSection } from "@/components/settings/RuntimeSection";
 import { ShortcutsSection } from "@/components/settings/ShortcutsSection";
 import { AboutSection } from "@/components/settings/AboutSection";
+import { PetSection } from "@/components/settings/PetSection";
 
 export type {
   SettingsSectionId,
@@ -1851,6 +1852,7 @@ export function SettingsPage({
         {section === "appearance" && <AppearanceSection />}
         {section === "account" && <AccountSection />}
         {section === "archived" && <ArchivedSection />}
+        {section === "pet" && <PetSection />}
         {section === "extensions" && <ExtensionsSection />}
         {section === "remote_im" && <RemoteImSection />}
         {section === "runtime" && <RuntimeSection />}

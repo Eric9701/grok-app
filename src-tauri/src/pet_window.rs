@@ -1,0 +1,730 @@
+//! Desktop pet overlay — extra transparent always-on-top webview.
+//!
+//! The main window owns session focus; this module owns show/hide, position,
+//! click-through on empty pixels, and prefs persistence. Status changes never
+//! call `set_focus` on the pet window.
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+use tauri::{
+    webview::PageLoadEvent, AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl,
+    WebviewWindowBuilder,
+};
+
+pub const PET_WINDOW_LABEL: &str = "pet";
+const PREFS_FILE: &str = "pet-prefs.json";
+
+static DRAGGING: AtomicBool = AtomicBool::new(false);
+static MENU_OPEN: AtomicBool = AtomicBool::new(false);
+static WATCH_STARTED: AtomicBool = AtomicBool::new(false);
+static WEBVIEW_READY: AtomicBool = AtomicBool::new(false);
+static WANT_SHOW: AtomicBool = AtomicBool::new(false);
+static CACHED_SIZE_PX: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(128);
+
+const PET_INIT_SCRIPT: &str = r#"(function(){try{document.documentElement.setAttribute("data-pet-shell","1");var s=document.createElement("style");s.setAttribute("data-pet-boot","1");s.textContent="html,html[data-theme],body,#root,.boot-gate{background:transparent!important;background-image:none!important;background-color:transparent!important;} .boot-gate{display:none!important;visibility:hidden!important;opacity:0!important;}";document.documentElement.appendChild(s);}catch(e){}})();"#;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PetPrefs {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub visible: bool,
+    #[serde(default = "default_shape")]
+    pub shape: String,
+    #[serde(default = "default_color")]
+    pub color: String,
+    #[serde(default = "default_size")]
+    pub size_px: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y: Option<f64>,
+}
+
+fn default_shape() -> String {
+    "hex".into()
+}
+fn default_color() -> String {
+    "green".into()
+}
+fn default_size() -> u32 {
+    128
+}
+
+impl Default for PetPrefs {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            visible: false,
+            shape: default_shape(),
+            color: default_color(),
+            size_px: default_size(),
+            x: None,
+            y: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PetFocusPayload {
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_title: Option<String>,
+    #[serde(default)]
+    pub rank: u32,
+    #[serde(default)]
+    pub updated_at: u64,
+}
+
+static LAST_FOCUS: Mutex<Option<PetFocusPayload>> = Mutex::new(None);
+static LAST_TASKS: Mutex<Vec<PetTaskPayload>> = Mutex::new(Vec::new());
+static HIT_CHROME: Mutex<PetHitChrome> = Mutex::new(PetHitChrome::empty());
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PetTaskPayload {
+    pub session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_title: Option<String>,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub phase: String,
+    #[serde(default)]
+    pub progress: f32,
+    #[serde(default)]
+    pub updated_at: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PetHitChrome {
+    valid: bool,
+    mark_cx: f64,
+    mark_cy: f64,
+    mark_r: f64,
+    bubble_x: f64,
+    bubble_y: f64,
+    bubble_w: f64,
+    bubble_h: f64,
+    window_w: f64,
+    window_h: f64,
+}
+
+impl PetHitChrome {
+    const fn empty() -> Self {
+        Self {
+            valid: false,
+            mark_cx: 0.0,
+            mark_cy: 0.0,
+            mark_r: 0.0,
+            bubble_x: 0.0,
+            bubble_y: 0.0,
+            bubble_w: 0.0,
+            bubble_h: 0.0,
+            window_w: 0.0,
+            window_h: 0.0,
+        }
+    }
+
+    fn contains(&self, x: f64, y: f64) -> bool {
+        if !self.valid {
+            return false;
+        }
+        let dx = x - self.mark_cx;
+        let dy = y - self.mark_cy;
+        if dx * dx + dy * dy <= self.mark_r * self.mark_r {
+            return true;
+        }
+        self.bubble_w > 0.0
+            && self.bubble_h > 0.0
+            && x >= self.bubble_x
+            && x <= self.bubble_x + self.bubble_w
+            && y >= self.bubble_y
+            && y <= self.bubble_y + self.bubble_h
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PetHitChromeIn {
+    pub mark_cx: f64,
+    pub mark_cy: f64,
+    pub mark_r: f64,
+    #[serde(default)]
+    pub bubble_x: f64,
+    #[serde(default)]
+    pub bubble_y: f64,
+    #[serde(default)]
+    pub bubble_w: f64,
+    #[serde(default)]
+    pub bubble_h: f64,
+    #[serde(default)]
+    pub window_w: f64,
+    #[serde(default)]
+    pub window_h: f64,
+}
+
+fn prefs_path() -> std::path::PathBuf {
+    crate::paths::app_data_root().join(PREFS_FILE)
+}
+
+pub fn load_prefs() -> PetPrefs {
+    let _ = crate::paths::ensure_app_dirs();
+    let path = prefs_path();
+    let prefs = match std::fs::read_to_string(&path) {
+        Ok(s) if !s.trim().is_empty() => serde_json::from_str(&s).unwrap_or_default(),
+        _ => PetPrefs::default(),
+    };
+    let prefs = normalize_prefs(prefs);
+    CACHED_SIZE_PX.store(prefs.size_px.max(64), Ordering::Relaxed);
+    prefs
+}
+
+pub fn save_prefs(prefs: &PetPrefs) -> Result<(), String> {
+    let _ = crate::paths::ensure_app_dirs();
+    CACHED_SIZE_PX.store(prefs.size_px.max(64), Ordering::Relaxed);
+    let s = serde_json::to_string_pretty(prefs).map_err(|e| e.to_string())?;
+    crate::store_lock::write_bytes_atomic(&prefs_path(), s.as_bytes())
+}
+
+fn normalize_prefs(mut p: PetPrefs) -> PetPrefs {
+    let shapes = [
+        "blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop",
+    ];
+    if !shapes.contains(&p.shape.as_str()) {
+        p.shape = default_shape();
+    }
+    let colors = [
+        "black", "brown", "red", "orange", "yellow", "green", "cyan", "blue", "violet",
+        "magenta", "gray",
+    ];
+    if !colors.contains(&p.color.as_str()) {
+        p.color = default_color();
+    }
+    p.size_px = if p.size_px <= 112 {
+        96
+    } else if p.size_px >= 144 {
+        160
+    } else {
+        128
+    };
+    p
+}
+
+fn window_logical_size(size_px: u32) -> f64 {
+    // Extra pad so the in-app context menu can sit next to the mark
+    // while empty pixels stay click-through via the cursor watch.
+    f64::from(size_px) + 96.0
+}
+
+fn overlay_extent(size_px: u32) -> (f64, f64) {
+    let mark = window_logical_size(size_px);
+    if let Ok(g) = HIT_CHROME.lock() {
+        if g.valid && g.window_w >= 64.0 && g.window_h >= 64.0 {
+            return (g.window_w.max(mark), g.window_h.max(mark));
+        }
+    }
+    (mark, mark)
+}
+
+/// Physical cursor vs logical hit chrome (mark disc + task-bubble stack).
+pub fn pet_cursor_over_chrome(
+    cursor_x: f64,
+    cursor_y: f64,
+    win_x: f64,
+    win_y: f64,
+    win_w: f64,
+    win_h: f64,
+    size_px: u32,
+    scale_factor: f64,
+    chrome: &PetHitChrome,
+) -> bool {
+    let scale = scale_factor.max(0.5);
+    if chrome.valid {
+        let x = (cursor_x - win_x) / scale;
+        let y = (cursor_y - win_y) / scale;
+        return chrome.contains(x, y);
+    }
+    pet_cursor_over_mark(
+        cursor_x,
+        cursor_y,
+        win_x,
+        win_y,
+        win_w,
+        win_h,
+        size_px,
+        scale_factor,
+    )
+}
+
+/// Physical hit radius for the living mark.
+/// `size_px` is CSS/logical; cursor + window geometry are physical.
+pub fn pet_hit_radius(size_px: u32, scale_factor: f64) -> f64 {
+    f64::from(size_px.max(64)) * scale_factor.max(0.5) * 0.52
+}
+
+pub fn pet_cursor_over_mark(
+    cursor_x: f64,
+    cursor_y: f64,
+    win_x: f64,
+    win_y: f64,
+    win_w: f64,
+    win_h: f64,
+    size_px: u32,
+    scale_factor: f64,
+) -> bool {
+    let cx = win_x + win_w / 2.0;
+    let cy = win_y + win_h / 2.0;
+    let r = pet_hit_radius(size_px, scale_factor);
+    let dx = cursor_x - cx;
+    let dy = cursor_y - cy;
+    dx * dx + dy * dy <= r * r
+}
+
+fn apply_window_chrome(win: &tauri::WebviewWindow) {
+    let _ = win.set_always_on_top(true);
+    let _ = win.set_skip_taskbar(true);
+    let _ = win.set_decorations(false);
+    let _ = win.set_shadow(false);
+}
+
+fn emit_prefs(app: &AppHandle, prefs: &PetPrefs) {
+    let _ = app.emit("pet://prefs", prefs);
+}
+
+fn reveal_if_wanted(win: &tauri::WebviewWindow) {
+    if !WANT_SHOW.load(Ordering::SeqCst) {
+        return;
+    }
+    apply_window_chrome(win);
+    let _ = win.show();
+    apply_window_chrome(win);
+}
+
+/// Build (or reuse) the overlay. Never focuses the pet window.
+pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
+    if let Some(existing) = app.get_webview_window(PET_WINDOW_LABEL) {
+        apply_window_chrome(&existing);
+        return Ok(existing);
+    }
+    let prefs = normalize_prefs(load_prefs());
+    let (side_w, side_h) = overlay_extent(prefs.size_px);
+    WEBVIEW_READY.store(false, Ordering::SeqCst);
+    let mut builder = WebviewWindowBuilder::new(
+        app,
+        PET_WINDOW_LABEL,
+        WebviewUrl::App("index.html#/pet".into()),
+    )
+    .title("Grok Pet")
+    .inner_size(side_w, side_h)
+    .min_inner_size(96.0, 96.0)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .visible(false)
+    .focused(false)
+    .shadow(false)
+    .accept_first_mouse(true)
+    .initialization_script(PET_INIT_SCRIPT)
+    .on_page_load(|win, payload| {
+        if payload.event() != PageLoadEvent::Finished {
+            return;
+        }
+        WEBVIEW_READY.store(true, Ordering::SeqCst);
+        reveal_if_wanted(&win);
+    });
+
+    if let (Some(x), Some(y)) = (prefs.x, prefs.y) {
+        builder = builder.position(x, y);
+    }
+
+    let win = builder.build().map_err(|e| format!("pet window: {e}"))?;
+    apply_window_chrome(&win);
+    let handle = app.clone();
+    win.on_window_event(move |ev| {
+        if let tauri::WindowEvent::Moved(pos) = ev {
+            let mut prefs = load_prefs();
+            if let Some(w) = handle.get_webview_window(PET_WINDOW_LABEL) {
+                if let (Ok(scale), Ok(inner)) = (w.scale_factor(), w.inner_position()) {
+                    let _ = scale;
+                    let logical = LogicalPosition::<f64>::from_physical(*pos, scale.max(0.1));
+                    let _ = inner;
+                    prefs.x = Some(logical.x);
+                    prefs.y = Some(logical.y);
+                    let _ = save_prefs(&prefs);
+                }
+            }
+        }
+    });
+    start_cursor_watch(app.clone());
+    Ok(win)
+}
+
+pub fn show_pet(app: &AppHandle) -> Result<(), String> {
+    let mut prefs = normalize_prefs(load_prefs());
+    prefs.enabled = true;
+    prefs.visible = true;
+    save_prefs(&prefs)?;
+    let win = ensure_pet_window(app)?;
+    apply_window_chrome(&win);
+    let (side_w, side_h) = overlay_extent(prefs.size_px);
+    let _ = win.set_size(LogicalSize::new(side_w, side_h));
+    if let (Some(x), Some(y)) = (prefs.x, prefs.y) {
+        let _ = win.set_position(LogicalPosition::new(x, y));
+    }
+    WANT_SHOW.store(true, Ordering::SeqCst);
+    // Transparent boot (index.html + init script) already hides the splash.
+    // Do not wait on WEBVIEW_READY — first toggle used to look like a no-op
+    // while the pet bundle was still booting.
+    win.show().map_err(|e| e.to_string())?;
+    apply_window_chrome(&win);
+    Ok(())
+}
+
+pub fn hide_pet(app: &AppHandle) -> Result<(), String> {
+    WANT_SHOW.store(false, Ordering::SeqCst);
+    let mut prefs = normalize_prefs(load_prefs());
+    prefs.visible = false;
+    save_prefs(&prefs)?;
+    if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
+        win.hide().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn start_cursor_watch(app: AppHandle) {
+    if WATCH_STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_millis(64)).await;
+            let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) else {
+                continue;
+            };
+            if DRAGGING.load(Ordering::Relaxed) || MENU_OPEN.load(Ordering::Relaxed) {
+                let _ = win.set_ignore_cursor_events(false);
+                continue;
+            }
+            let visible = win.is_visible().unwrap_or(false);
+            if !visible {
+                continue;
+            }
+            let Ok(cursor) = app.cursor_position() else {
+                continue;
+            };
+            let Ok(pos) = win.outer_position() else {
+                continue;
+            };
+            let Ok(size) = win.outer_size() else {
+                continue;
+            };
+            let scale = win.scale_factor().unwrap_or(1.0);
+            let size_px = CACHED_SIZE_PX.load(Ordering::Relaxed);
+            let chrome = HIT_CHROME
+                .lock()
+                .map(|g| *g)
+                .unwrap_or(PetHitChrome::empty());
+            let over = pet_cursor_over_chrome(
+                cursor.x,
+                cursor.y,
+                f64::from(pos.x),
+                f64::from(pos.y),
+                f64::from(size.width),
+                f64::from(size.height),
+                size_px,
+                scale,
+                &chrome,
+            );
+            let _ = win.set_ignore_cursor_events(!over);
+        }
+    });
+}
+
+#[tauri::command]
+pub fn pet_webview_ready(app: AppHandle) -> Result<(), String> {
+    WEBVIEW_READY.store(true, Ordering::SeqCst);
+    if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
+        reveal_if_wanted(&win);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn pet_prefs_get() -> PetPrefs {
+    normalize_prefs(load_prefs())
+}
+
+#[tauri::command]
+pub fn pet_prefs_set(app: AppHandle, prefs: PetPrefs) -> Result<PetPrefs, String> {
+    let prev = load_prefs();
+    let mut next = normalize_prefs(prefs);
+    next.x = next.x.or(prev.x);
+    next.y = next.y.or(prev.y);
+    save_prefs(&next)?;
+    if next.enabled && next.visible {
+        show_pet(&app)?;
+        if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
+            let (side_w, side_h) = overlay_extent(next.size_px);
+            let _ = win.set_size(LogicalSize::new(side_w, side_h));
+        }
+    } else {
+        hide_pet(&app)?;
+    }
+    let saved = normalize_prefs(load_prefs());
+    emit_prefs(&app, &saved);
+    Ok(saved)
+}
+
+#[tauri::command]
+pub fn pet_show(app: AppHandle) -> Result<PetPrefs, String> {
+    show_pet(&app)?;
+    let prefs = normalize_prefs(load_prefs());
+    emit_prefs(&app, &prefs);
+    Ok(prefs)
+}
+
+#[tauri::command]
+pub fn pet_hide(app: AppHandle) -> Result<PetPrefs, String> {
+    hide_pet(&app)?;
+    let prefs = normalize_prefs(load_prefs());
+    emit_prefs(&app, &prefs);
+    Ok(prefs)
+}
+
+#[tauri::command]
+pub fn pet_toggle(app: AppHandle) -> Result<PetPrefs, String> {
+    let prefs = normalize_prefs(load_prefs());
+    if prefs.enabled && prefs.visible {
+        hide_pet(&app)?;
+    } else {
+        show_pet(&app)?;
+    }
+    let next = normalize_prefs(load_prefs());
+    emit_prefs(&app, &next);
+    Ok(next)
+}
+
+#[tauri::command]
+pub fn pet_is_visible(app: AppHandle) -> bool {
+    app.get_webview_window(PET_WINDOW_LABEL)
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+pub fn pet_set_ignore_cursor(app: AppHandle, ignore: bool) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
+        win.set_ignore_cursor_events(ignore)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn pet_set_dragging(dragging: bool) {
+    DRAGGING.store(dragging, Ordering::Relaxed);
+}
+
+#[tauri::command]
+pub fn pet_set_menu_open(app: AppHandle, open: bool) {
+    MENU_OPEN.store(open, Ordering::Relaxed);
+    if open {
+        if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
+            let _ = win.set_ignore_cursor_events(false);
+        }
+    }
+}
+
+#[tauri::command]
+pub fn pet_push_focus(app: AppHandle, focus: PetFocusPayload) -> Result<(), String> {
+    if let Ok(mut g) = LAST_FOCUS.lock() {
+        *g = Some(focus.clone());
+    }
+    // Broadcast only — never focus the overlay.
+    let _ = app.emit("pet://focus", &focus);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn pet_get_focus() -> Option<PetFocusPayload> {
+    LAST_FOCUS.lock().ok().and_then(|g| g.clone())
+}
+
+#[tauri::command]
+pub fn pet_open_settings(app: AppHandle) -> Result<(), String> {
+    crate::tray::show_main_window(&app);
+    let _ = app.emit(
+        "tray://open-settings",
+        serde_json::json!({ "section": "pet" }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn pet_focus_session(app: AppHandle, session_id: String) -> Result<(), String> {
+    crate::tray::show_main_window(&app);
+    let id = session_id.trim();
+    if !id.is_empty() {
+        let _ = app.emit(
+            "tray://open-session",
+            serde_json::json!({ "sessionId": id }),
+        );
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn pet_show_main(app: AppHandle) {
+    crate::tray::show_main_window(&app);
+}
+
+#[tauri::command]
+pub fn pet_push_tasks(app: AppHandle, tasks: Vec<PetTaskPayload>) -> Result<(), String> {
+    if let Ok(mut g) = LAST_TASKS.lock() {
+        *g = tasks.clone();
+    }
+    let _ = app.emit("pet://tasks", &tasks);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn pet_get_tasks() -> Vec<PetTaskPayload> {
+    LAST_TASKS.lock().ok().map(|g| g.clone()).unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn pet_set_hit_chrome(chrome: PetHitChromeIn) {
+    if let Ok(mut g) = HIT_CHROME.lock() {
+        *g = PetHitChrome {
+            valid: chrome.mark_r > 0.0 || chrome.bubble_w > 0.0,
+            mark_cx: chrome.mark_cx,
+            mark_cy: chrome.mark_cy,
+            mark_r: chrome.mark_r.max(0.0),
+            bubble_x: chrome.bubble_x,
+            bubble_y: chrome.bubble_y,
+            bubble_w: chrome.bubble_w.max(0.0),
+            bubble_h: chrome.bubble_h.max(0.0),
+            window_w: chrome.window_w.max(0.0),
+            window_h: chrome.window_h.max(0.0),
+        };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pet_init_script_hides_boot_gate() {
+        assert!(PET_INIT_SCRIPT.contains("data-pet-shell"));
+        assert!(PET_INIT_SCRIPT.contains("boot-gate"));
+        assert!(PET_INIT_SCRIPT.contains("transparent"));
+        assert!(PET_INIT_SCRIPT.contains("display:none"));
+    }
+
+    #[test]
+    fn normalize_clamps_identity() {
+        let p = normalize_prefs(PetPrefs {
+            shape: "nope".into(),
+            color: "neon".into(),
+            size_px: 12,
+            ..Default::default()
+        });
+        assert_eq!(p.shape, "hex");
+        assert_eq!(p.color, "green");
+        assert_eq!(p.size_px, 96);
+    }
+
+    #[test]
+    fn hit_radius_is_logical_size_times_scale_times_half() {
+        // Shipped formula: r = size_px * scale_factor() * 0.52
+        assert_eq!(pet_hit_radius(128, 1.0), 128.0 * 1.0 * 0.52);
+        assert_eq!(pet_hit_radius(128, 2.0), 128.0 * 2.0 * 0.52);
+        assert_eq!(pet_hit_radius(160, 2.0), 160.0 * 2.0 * 0.52);
+    }
+
+    #[test]
+    fn retina_hit_covers_the_mark_not_just_logical_pixels() {
+        // 128 logical @ 2x → physical mark ~256px; center of that disc is a hit.
+        let scale = 2.0;
+        let size_px = 128;
+        let win = 224.0 * scale; // window_logical_size(128) == 224
+        let r = pet_hit_radius(size_px, scale);
+        assert!(r > 120.0, "retina radius must exceed logical 66px: {r}");
+        assert!(pet_cursor_over_mark(
+            win / 2.0,
+            win / 2.0,
+            0.0,
+            0.0,
+            win,
+            win,
+            size_px,
+            scale,
+        ));
+        // Far corner of the padded window is click-through.
+        assert!(!pet_cursor_over_mark(
+            2.0, 2.0, 0.0, 0.0, win, win, size_px, scale,
+        ));
+    }
+
+    #[test]
+    fn chrome_hit_covers_bubbles_above_the_mark() {
+        let chrome = PetHitChrome {
+            valid: true,
+            mark_cx: 130.0,
+            mark_cy: 200.0,
+            mark_r: 50.0,
+            bubble_x: 22.0,
+            bubble_y: 8.0,
+            bubble_w: 216.0,
+            bubble_h: 80.0,
+            window_w: 260.0,
+            window_h: 280.0,
+        };
+        let scale = 2.0;
+        let win_w = 260.0 * scale;
+        let win_h = 280.0 * scale;
+        // Center of a bubble in physical pixels.
+        assert!(pet_cursor_over_chrome(
+            130.0 * scale,
+            40.0 * scale,
+            0.0,
+            0.0,
+            win_w,
+            win_h,
+            128,
+            scale,
+            &chrome,
+        ));
+        // Mark disc.
+        assert!(pet_cursor_over_chrome(
+            130.0 * scale,
+            200.0 * scale,
+            0.0,
+            0.0,
+            win_w,
+            win_h,
+            128,
+            scale,
+            &chrome,
+        ));
+        // Empty padding stays click-through.
+        assert!(!pet_cursor_over_chrome(
+            4.0, 4.0, 0.0, 0.0, win_w, win_h, 128, scale, &chrome,
+        ));
+    }
+}

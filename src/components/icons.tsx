@@ -61,6 +61,7 @@ import {
   IconFolderPlus as TbFolderPlus,
   IconHandStop as TbHandStop,
   IconHelp as TbHelp,
+  IconHexagon as TbHexagon,
   IconInfoCircle as TbInfoCircle,
   IconKeyboard as TbKeyboard,
   IconLanguage as TbLanguage,
@@ -300,6 +301,7 @@ export const IconList = wrap(TbList);
 export const IconListCheck = wrap(TbListCheck);
 export const IconInstructions = wrap(TbFileText);
 export const IconSettings = wrap(TbSettings);
+export const IconHexagon = wrap(TbHexagon);
 export const IconDoctor = wrap(TbFirstAidKit);
 export const IconThemeSun = wrap(TbSun);
 export const IconThemeMoon = wrap(TbMoon);

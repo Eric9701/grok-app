@@ -68,6 +68,8 @@ mod side_browser_host;
 
 mod commands;
 
+mod pet_window;
+
 mod editors;
 
 mod error;
@@ -700,7 +702,7 @@ pub fn run() {
 
             {
 
-                tray::hide_to_tray(app.handle());
+                tray::hide_to_tray_accessory(app.handle());
 
             }
 
@@ -783,6 +785,13 @@ pub fn run() {
 
                 }
 
+            }
+
+            let pet_prefs = pet_window::load_prefs();
+            if pet_prefs.enabled && pet_prefs.visible {
+                if let Err(e) = pet_window::show_pet(&app.handle()) {
+                    tracing::warn!("pet restore: {e}");
+                }
             }
 
             Ok(())
@@ -1472,6 +1481,25 @@ pub fn run() {
 
             commands::side_browser_install_download_hook,
 
+            pet_window::pet_prefs_get,
+            pet_window::pet_prefs_set,
+            pet_window::pet_show,
+            pet_window::pet_hide,
+            pet_window::pet_toggle,
+            pet_window::pet_is_visible,
+            pet_window::pet_set_ignore_cursor,
+            pet_window::pet_set_dragging,
+            pet_window::pet_set_menu_open,
+            pet_window::pet_webview_ready,
+            pet_window::pet_push_focus,
+            pet_window::pet_get_focus,
+            pet_window::pet_open_settings,
+            pet_window::pet_focus_session,
+            pet_window::pet_show_main,
+            pet_window::pet_push_tasks,
+            pet_window::pet_get_tasks,
+            pet_window::pet_set_hit_chrome,
+
         ])
 
         .build(tauri::generate_context!())
@@ -1480,25 +1508,15 @@ pub fn run() {
 
         .run(|app, event| {
 
-            // macOS: click Dock icon when all windows hidden → show main window again.
+            // macOS: Dock click. The pet overlay is a visible skip-taskbar
+            // window, so `has_visible_windows` stays true and must not block
+            // bringing the workbench back.
 
             #[cfg(target_os = "macos")]
 
-            if let tauri::RunEvent::Reopen {
+            if let tauri::RunEvent::Reopen { .. } = event {
 
-                has_visible_windows,
-
-                ..
-
-            } = event
-
-            {
-
-                if !has_visible_windows {
-
-                    tray::show_main_window(app);
-
-                }
+                tray::show_main_window(app);
 
             }
 

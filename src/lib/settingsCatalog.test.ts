@@ -135,7 +135,34 @@ describe("settingsCatalog", () => {
 
   it("isSettingsSectionId", () => {
     expect(isSettingsSectionId("runtime")).toBe(true);
+    expect(isSettingsSectionId("pet")).toBe(true);
     expect(isSettingsSectionId("nope")).toBe(false);
+  });
+
+  it("pet is a first-class nav section and hash round-trips", () => {
+    expect(SETTINGS_NAV.some((n) => n.id === "pet")).toBe(true);
+    expect(SETTINGS_ENTRIES.some((e) => e.section === "pet")).toBe(true);
+    expect(buildSettingsHash({ section: "pet" })).toBe("#/settings/pet");
+    expect(parseSettingsHash("#/settings/pet")).toEqual({
+      section: "pet",
+      tab: null,
+    });
+    expect(parseSettingsHash("settings/pet")).toEqual({
+      section: "pet",
+      tab: null,
+    });
+    const loc = parseSettingsHash(buildSettingsHash({ section: "pet" }));
+    expect(loc).toEqual({ section: "pet", tab: null });
+  });
+
+  it("search finds 宠物 / pet menu", () => {
+    const tZh = createT("zh");
+    const tEn = createT("en");
+    const zhHits = searchSettingsEntries("宠物", tZh, tEn);
+    expect(zhHits.some((h) => h.entry.section === "pet")).toBe(true);
+    const enHits = searchSettingsEntries("pet", tZh, tEn);
+    expect(enHits.some((h) => h.entry.section === "pet")).toBe(true);
+    expect(enHits.some((h) => h.entry.id === "pet.companion")).toBe(true);
   });
 
   it("keywordKeysForSection includes appearance prefs and remote control", () => {

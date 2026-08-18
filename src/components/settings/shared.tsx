@@ -9,6 +9,7 @@ import {
   IconCheck,
   IconDoctor,
   IconHelp,
+  IconHexagon,
   IconInfo,
   IconKeyboard,
   IconMinimize,
@@ -38,6 +39,7 @@ export function NavIcon({
   if (name === "remote_im") return <IconChat size={size} />;
   if (name === "doctor") return <IconDoctor size={size} />;
   if (name === "info") return <IconInfo size={size} />;
+  if (name === "pet") return <IconHexagon size={size} />;
   return <IconSettings size={size} />;
 }
 
@@ -56,6 +58,39 @@ export function formatSessionWhen(iso: string, locale: string): string {
   } catch {
     return iso;
   }
+}
+
+/** App-styled switch (no native OS control). Reuses `.ext-switch`. */
+export function UiSwitch({
+  checked,
+  disabled,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      className={"ext-switch" + (checked ? " is-on" : "")}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!disabled) onChange(!checked);
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <span className="ext-switch__thumb" aria-hidden />
+    </button>
+  );
 }
 
 /** App-styled checkbox (no native OS control). */

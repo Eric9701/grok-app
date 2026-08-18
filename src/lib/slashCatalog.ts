@@ -205,6 +205,15 @@ export function builtinSlashItems(): SlashItem[] {
       action: "settings",
     },
     {
+      id: "pet",
+      kind: "action",
+      name: "pet",
+      titleKey: "slash.pet",
+      descriptionKey: "slash.petDesc",
+      action: "pet",
+      aliases: ["宠物", "寵物", "companion"],
+    },
+    {
       id: "export",
       kind: "action",
       name: "export",

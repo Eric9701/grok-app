@@ -10,6 +10,7 @@ export type SettingsSectionId =
   | "appearance"
   | "account"
   | "archived"
+  | "pet"
   | "extensions"
   | "remote_im"
   | "runtime"
@@ -21,6 +22,7 @@ export const SETTINGS_SECTION_IDS: readonly SettingsSectionId[] = [
   "appearance",
   "account",
   "archived",
+  "pet",
   "extensions",
   "runtime",
   "remote_im",
@@ -71,6 +73,7 @@ export type SettingsNavIcon =
   | "appearance"
   | "user"
   | "archive"
+  | "pet"
   | "extensions"
   | "remote_im"
   | "doctor"

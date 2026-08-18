@@ -1,0 +1,63 @@
+export {
+  startPetFocusBridge,
+  type PetFocusBridge,
+  type PetFocusBridgeOpts,
+} from "./petFocusBridge";
+
+export {
+  kindForSession,
+  petKindRank,
+  petVerbFor,
+  pickPetFocus,
+  resolvePetFocus,
+  type PetFocus,
+  type PetFocusInput,
+  type PetFocusSession,
+  type PetKind,
+  type PetVerb,
+} from "./petFocus";
+
+export {
+  PET_BUBBLE_GAP,
+  PET_BUBBLE_ROW_H,
+  PET_BUBBLE_STACK_PAD,
+  PET_BUBBLE_WIDTH,
+  PET_TASK_LIMIT,
+  collectPetTasks,
+  isPetTaskBubbleKind,
+  petBubbleStackHeight,
+  petTaskPhase,
+  petTaskProgress,
+  samePetTasks,
+  type PetTask,
+  type PetTaskPhase,
+} from "./petTasks";
+
+export {
+  PET_BUBBLE_EDGE_PAD,
+  petBubbleOffsetX,
+  petOverlayHeight,
+  petOverlayWidth,
+} from "./petBubbleLayout";
+
+export {
+  PET_SETTINGS_HASH,
+  PET_SETTINGS_SECTION,
+  petSettingsHash,
+} from "./petNav";
+
+export { isPetShellHash } from "./petShell";
+
+export {
+  PET_COLORS,
+  PET_COLOR_SWATCH,
+  PET_INK,
+  PET_SHAPES,
+  PET_SIZES,
+  isPetColor,
+  isPetShape,
+  normalizePetSize,
+  type PetColor,
+  type PetShape,
+  type PetSizePx,
+} from "./petIdentity";

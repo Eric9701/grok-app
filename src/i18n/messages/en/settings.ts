@@ -219,7 +219,7 @@ export const enSettings = {
   "settings.useLeader": "Share agent backend (leader)",
   "settings.useLeaderDesc": "Connect with --leader so multiple clients can share one backend process. Off uses --no-leader (default). Soft-respawns after change.",
   "settings.closeToTray": "Close window to tray",
-  "settings.closeToTrayDesc": "When on, the red close button hides the app to the menu bar / system tray. Turn off to quit the app on close (Quit from the tray still works either way).",
+  "settings.closeToTrayDesc": "When on, the red close button hides the main window. The Dock icon stays so you can click it to come back. Turn off to quit the app on close (Quit from the tray still works either way).",
   "settings.keepTrayForSchedules": "Keep tray for schedules",
   "settings.keepTrayForSchedulesDesc": "When any scheduled task is enabled, closing the window still hides to the tray so schedules keep firing — even if “Close window to tray” is off. Fully quitting the app still pauses schedules. There is no separate background daemon.",
   "settings.trayBusyBadge": "Show unread count on dock/tray",

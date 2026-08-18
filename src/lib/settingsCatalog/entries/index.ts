@@ -8,6 +8,7 @@ import { GENERAL_ENTRIES } from "./general";
 import { REMOTE_IM_ENTRIES } from "./remoteIm";
 import { RUNTIME_ENTRIES } from "./runtime";
 import { SHORTCUTS_ENTRIES } from "./shortcuts";
+import { PET_ENTRIES } from "./pet";
 
 /** Full registry of searchable settings (UI rows / cards). */
 export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
@@ -15,6 +16,7 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   ...APPEARANCE_ENTRIES,
   ...ACCOUNT_ENTRIES,
   ...ARCHIVED_ENTRIES,
+  ...PET_ENTRIES,
   ...EXTENSIONS_ENTRIES,
   ...RUNTIME_ENTRIES,
   ...REMOTE_IM_ENTRIES,

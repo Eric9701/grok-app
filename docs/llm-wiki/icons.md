@@ -17,13 +17,13 @@ Two **separate** pipelines — never mix them.
 ## Close vs Quit
 
 - Window close (traffic light / self-drawn close / `window.close`) → **hide to tray** (`CloseRequested` + `prevent_close` + `tray::hide_to_tray`):
-  - **macOS**: Dock icon hidden (`set_dock_visibility(false)` + `ActivationPolicy::Accessory`).
+  - **macOS**: main window hides; **Dock icon stays** (`ActivationPolicy::Regular` + `set_dock_visibility(true)`). Do **not** switch to Accessory on user close — that removed the Dock icon and broke click-to-reopen (the pet overlay is skip-taskbar and does not count as the workbench).
   - **Windows**: taskbar button removed via `win_shell::set_main_window_skip_taskbar` (`WS_EX_TOOLWINDOW` + `ITaskbarList::DeleteTab`). Do **not** use bare `set_skip_taskbar` alone — incomplete restore breaks **Show Desktop** when this is the only window.
   - Status bar / system tray icon stays.
-- Reopen via tray **Open Grok** / menu actions → restore Dock/taskbar + show window (`show_main_window`).
+  - Headless `--start-in-tray` / fire-due uses `hide_to_tray_accessory` (Dock hidden + Accessory).
+- Reopen via **Dock click** (`RunEvent::Reopen` → `show_main_window`) or tray **Open Grok** / menu actions.
 - **Windows shell**: `win_shell.rs` sets process AppUserModelID (`com.grokapp.desktop`) and re-asserts `WS_EX_APPWINDOW` / `WS_MINIMIZEBOX` / taskbar tab on setup and every show so Explorer **Show Desktop** (taskbar far-right) minimizes the window even when it is alone.
 - **Quit Grok** in the tray menu (or app quit) fully exits.
-- macOS Dock click when windows are hidden may still fire `RunEvent::Reopen` if Dock is restored; primary reopen path is the tray.
 
 ## Window chrome by platform
 

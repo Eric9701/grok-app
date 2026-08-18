@@ -220,7 +220,7 @@ export const zhTWSettings = {
   "settings.useLeader": "共用 Agent 後端（leader）",
   "settings.useLeaderDesc": "使用 --leader 讓多個用戶端共用一個後端行程；關閉則 --no-leader（預設）。變更後 soft-respawn。",
   "settings.closeToTray": "關閉視窗時縮到系統匣",
-  "settings.closeToTrayDesc": "開啟後，關閉按鈕會隱藏到選單列/系統匣。關閉此項則關閉視窗即結束（系統匣「結束」始終可用）。",
+  "settings.closeToTrayDesc": "開啟後，關閉按鈕只隱藏主視窗，Dock 圖示保留，點一下即可回來。關閉此項則關閉視窗即結束（系統匣「結束」始終可用）。",
   "settings.keepTrayForSchedules": "為已排程任務保留系統匣",
   "settings.keepTrayForSchedulesDesc": "只要有已啟用的已排程任務，關閉視窗仍會收到系統匣以便繼續排程——即使關閉了「關閉視窗時縮到系統匣」。完全結束應用仍會暫停任務。沒有獨立的背景守護行程。",
   "settings.trayBusyBadge": "在 Dock/系統匣顯示未讀數",

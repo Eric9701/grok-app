@@ -14,9 +14,11 @@ export { RemoteImSection } from "./RemoteImSection";
 export { RuntimeSection } from "./RuntimeSection";
 export { ShortcutsSection } from "./ShortcutsSection";
 export { AboutSection } from "./AboutSection";
+export { PetSection } from "./PetSection";
 export {
   NavIcon,
   UiCheck,
+  UiSwitch,
   SettingsTabStrip,
   SettingsLabelWithTip,
   formatSessionWhen,

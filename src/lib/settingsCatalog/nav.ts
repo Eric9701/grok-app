@@ -49,6 +49,13 @@ export const SETTINGS_NAV: readonly SettingsNavDef[] = [
     tabs: [],
   },
   {
+    id: "pet",
+    icon: "pet",
+    labelKey: "settings.nav.pet",
+    group: "personal",
+    tabs: [],
+  },
+  {
     id: "extensions",
     icon: "extensions",
     labelKey: "settings.nav.extensions",

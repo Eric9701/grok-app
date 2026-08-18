@@ -10,9 +10,9 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | Shell | `src/components/SettingsPage.tsx` | 左栏 + 搜索命中列表 + 分 section 内容 |
 | 路由 | `App.tsx` hash | `#/settings/{section}[/{tab}]` |
 
-## 一级导航（固定 9 项，禁止双登记）
+## 一级导航（10 项，禁止双登记）
 
-个人：`general` · `appearance` · `account` · `archived`  
+个人：`general` · `appearance` · `account` · `archived` · `pet`（展示名「宠物」）  
 系统：`extensions` · `runtime` · `remote_im`（展示名「远程控制」）· `shortcuts` · `about`
 
 **不要**再往 `SETTINGS_NAV` 塞重复 `runtime`。
@@ -45,6 +45,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 #/settings/remote_im/mirror         → 远程控制 · 手机镜像
 #/settings/appearance               → appearance/theme
 #/settings/appearance/interface     → 外观 · 界面（聊天展示）
+#/settings/pet                      → 宠物
 ```
 
 - 仅 section 的旧链**永远有效**（落到 default tab）。
