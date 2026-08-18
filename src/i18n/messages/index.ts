@@ -4,6 +4,8 @@ import { en, type MessageKey } from "./en";
 import { ru } from "./ru";
 import { ruErrors } from "./ru/errors";
 import { ruExtra } from "./ru/extra";
+import { ruSession } from "./ru/session";
+import { ruSettingsVisible } from "./ru/settings-visible";
 import { zh } from "./zh";
 import { zhTW } from "./zh-TW";
 
@@ -15,7 +17,13 @@ export { en };
 
 export const messages: Record<Locale, Record<MessageKey, string>> = {
   en: en as Record<MessageKey, string>,
-  ru: { ...ru, ...ruExtra, ...ruErrors },
+  ru: {
+    ...ru,
+    ...ruExtra,
+    ...ruErrors,
+    ...ruSession,
+    ...ruSettingsVisible,
+  },
   zh,
   "zh-TW": zhTW,
 };
