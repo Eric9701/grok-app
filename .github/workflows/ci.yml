@@ -123,6 +123,18 @@ jobs:
             Write-Host "No PATH entry ships api-ms-win-*.dll"
           }
 
+          # rust-cache restores target/, which can retain old grok_app test
+          # executables. Remove only those harnesses so cargo must relink the
+          # current source before we embed the Windows manifest and run tests.
+          $cachedHarnesses = @(Get-ChildItem -Path "target\debug\deps" -Filter "grok_app_lib-*.exe" -ErrorAction SilentlyContinue)
+          if ($cachedHarnesses.Count) {
+            Write-Host "Removing cached grok_app test harness(es):"
+            foreach ($exe in $cachedHarnesses) {
+              Write-Host "  - $($exe.Name)"
+              Remove-Item -LiteralPath $exe.FullName -Force
+            }
+          }
+
           Write-Host "=== cargo test --no-run ==="
           cargo test --no-run
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
