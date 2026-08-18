@@ -2,6 +2,7 @@
 
 import { en, type MessageKey } from "./en";
 import { ru } from "./ru";
+import { ruExtra } from "./ru/extra";
 import { zh } from "./zh";
 import { zhTW } from "./zh-TW";
 
@@ -13,7 +14,7 @@ export { en };
 
 export const messages: Record<Locale, Record<MessageKey, string>> = {
   en: en as Record<MessageKey, string>,
-  ru,
+  ru: { ...ru, ...ruExtra },
   zh,
   "zh-TW": zhTW,
 };
