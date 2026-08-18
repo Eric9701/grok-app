@@ -3,7 +3,7 @@
 
 Source of truth: GitHub Contributors API for RongleCat/grok-app.
 Replaces the block between <!-- CONTRIBUTORS:START --> and <!-- CONTRIBUTORS:END -->
-in README.md / README_EN.md / README_ZH.md.
+in README.md / README_EN.md / README_ZH.md / README_RU.md.
 
 Rules (docs/llm-wiki/release.md):
   - One presentation only: circular avatars (no table, no contrib.rocks strip).
@@ -41,6 +41,7 @@ README_FILES = (
     "README.md",
     "README_EN.md",
     "README_ZH.md",
+    "README_RU.md",
 )
 
 # Skip automation / bot accounts (not human contributors).
@@ -118,6 +119,12 @@ def render_gallery(contributors: list[dict], *, lang: str) -> str:
             f"以下为 GitHub 仓库全部人类贡献者（按 commits 降序，{today} 更新）。"
         )
         graph = "完整贡献图"
+    elif lang == "ru":
+        thanks = (
+            f"Спасибо всем, кто внёс вклад в Grok App. "
+            f"Все участники GitHub — люди (по числу коммитов, обновлено {today})."
+        )
+        graph = "Полный граф участников"
     else:
         thanks = (
             f"Thanks to everyone who has contributed to Grok App. "
@@ -148,6 +155,8 @@ def lang_for_path(path: Path) -> str:
     name = path.name.lower()
     if name in ("readme_zh.md", "readme.zh.md"):
         return "zh"
+    if name in ("readme_ru.md", "readme.ru.md"):
+        return "ru"
     return "en"
 
 

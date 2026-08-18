@@ -82,7 +82,7 @@ python3 scripts/changelog-for-release.py 0.1.0
 | 脚本 | `python3 scripts/update-contributors.py` |
 | 数据源 | GitHub Contributors API（`RongleCat/grok-app`），过滤 bot |
 | 展示 | **仅圆形头像**（`border-radius:50%`），中英 README 同一结构 |
-| 写入位置 | `README.md` / `README_EN.md` / `README_ZH.md` 内 `<!-- CONTRIBUTORS:START -->` … `END` |
+| 写入位置 | `README.md` / `README_EN.md` / `README_ZH.md` / `README_RU.md` 内 `<!-- CONTRIBUTORS:START -->` … `END` |
 | 禁止 | 贡献者表格 + 方形头像 + `contrib.rocks` 条带（避免双轨维护） |
 
 发版前（工作区可先 dirty）：
@@ -90,7 +90,7 @@ python3 scripts/changelog-for-release.py 0.1.0
 ```bash
 # 需要网络；有 token 时更稳：export GITHUB_TOKEN="$(gh auth token)"
 python3 scripts/update-contributors.py
-git add README.md README_EN.md README_ZH.md
+git add README.md README_EN.md README_ZH.md README_RU.md
 git commit -m "docs: refresh README contributors gallery"   # 若有变更
 ```
 

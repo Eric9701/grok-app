@@ -9,7 +9,8 @@
 
 <p align="center">
   <a href="./README.md">English</a> ·
-  <a href="./README_ZH.md">中文</a>
+  <a href="./README_ZH.md">中文</a> ·
+  <a href="./README_RU.md">Русский</a>
 </p>
 
 <p align="center">
@@ -61,7 +62,7 @@
 
 ## Overview
 
-The `grok` CLI is powerful in a terminal. Day-to-day work still needs multi-project sessions, a permission bar, rich previews, scheduled jobs, and bilingual UI.
+The `grok` CLI is powerful in a terminal. Day-to-day work still needs multi-project sessions, a permission bar, rich previews, scheduled jobs, and multilingual UI.
 
 **Grok App** is that workbench:
 
@@ -92,7 +93,7 @@ The `grok` CLI is powerful in a terminal. Day-to-day work still needs multi-proj
 | **Account & quota** | Multi-account switcher, official login, SuperGrok quota + heatmap, custom-provider local usage |
 | **Custom relays** | Independent `GROK_HOME` agent profile (keeps `~/.grok` clean when desired) |
 | **Security** | Optional OS keychain for API keys (default `secrets.json` 0600); store write locks; in-app confirms only |
-| **i18n** | Simplified Chinese / Traditional Chinese / English + tray |
+| **i18n** | Simplified Chinese / Traditional Chinese / English / Russian + tray |
 | **Packaging** | macOS ARM / Intel · Windows x64 (setup + portable) · Linux x64 (AppImage / deb / rpm) |
 
 ---
