@@ -42,10 +42,11 @@ export function createT(locale: Locale) {
 
 /**
  * Best-effort normalization of a raw locale id to a canonical {@link Locale}.
- * Accepts common case/alias variants (e.g. "zh-tw", "zh_Hant", "EN-US") so a
- * hand-edited settings value still resolves. Returns `null` when the id is not
- * a recognizable variant, leaving the fallback to the caller. Mirrors the
- * case-insensitive parsing on the Rust side (see tray_i18n.rs `Locale::parse`).
+ * Accepts common case/alias variants (e.g. "zh-tw", "zh_Hant", "ru-RU",
+ * "EN-US") so a hand-edited settings value still resolves. Returns `null`
+ * when the id is not a recognizable variant, leaving the fallback to the caller.
+ * Mirrors the case-insensitive parsing on the Rust side (see tray_i18n.rs
+ * `Locale::parse`).
  */
 function normalizeLocale(raw: string): Locale | null {
   const v = raw.trim().toLowerCase().replace(/_/g, "-");
@@ -54,6 +55,9 @@ function normalizeLocale(raw: string): Locale | null {
   }
   if (v === "zh" || v === "zh-cn" || v === "zh-hans") {
     return "zh";
+  }
+  if (v === "ru" || v === "ru-ru") {
+    return "ru";
   }
   if (v === "en" || v === "en-us" || v === "en-gb") {
     return "en";
@@ -68,6 +72,7 @@ function normalizeLocale(raw: string): Locale | null {
  * Rules:
  * - Chinese + Traditional script/region (`Hant`, `TW`, `HK`, `MO`) → `zh-TW`
  * - Other Chinese (`zh`, `zh-CN`, `zh-Hans`, `zh-SG`, …) → `zh`
+ * - Russian (`ru`, `ru-RU`, …) → `ru`
  * - English (`en`, `en-US`, …) → `en`
  * - Everything else → product default `en`
  */
@@ -97,6 +102,7 @@ export function resolveLocaleFromSystem(
     return "zh";
   }
 
+  if (primary === "ru") return "ru";
   if (primary === "en") return "en";
 
   return normalizeLocale(bare) ?? "en";
@@ -124,7 +130,7 @@ export function parseLocalePreference(
 
 /**
  * One-shot lift of the old factory default (`en`) to follow-system.
- * Explicit `zh` / `zh-TW` / `system` stay. Callers still set the migrated flag.
+ * Explicit `zh` / `zh-TW` / `ru` / `system` stay. Callers still set the migrated flag.
  */
 export function migrateLegacyLocaleDefault(
   stored: string | null | undefined,
@@ -138,6 +144,7 @@ export function migrateLegacyLocaleDefault(
 export function htmlLangForLocale(locale: Locale): string {
   if (locale === "zh") return "zh-CN";
   if (locale === "zh-TW") return "zh-TW";
+  if (locale === "ru") return "ru";
   return "en";
 }
 
