@@ -47,6 +47,26 @@ describe("i18n catalog", () => {
     expect(ru("sidebar.settings")).toBe("Настройки");
   });
 
+  it("keeps high-traffic Russian domains translated instead of falling back to English", () => {
+    const keys: MessageKey[] = [
+      "project.pin",
+      "main.startTitle",
+      "session.rename",
+      "resources.title",
+      "changes.title",
+      "search.title",
+      "tasks.title",
+      "dashboard.title",
+      "slash.settings",
+      "settings.language",
+      "account.signedIn",
+      "error.details",
+    ];
+    for (const key of keys) {
+      expect(messages.ru[key], key).not.toBe(messages.en[key]);
+    }
+  });
+
   it("every value is a non-empty string", () => {
     for (const loc of ["en", "zh", "zh-TW", "ru"] as const) {
       for (const [k, v] of Object.entries(messages[loc])) {
