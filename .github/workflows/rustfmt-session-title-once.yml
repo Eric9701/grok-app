@@ -1,0 +1,38 @@
+name: rustfmt-session-title-once
+
+on:
+  push:
+    branches: [agent/russian-localization]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/russian-localization
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format only the changed Rust file
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt src-tauri/src/session_title.rs
+          changed="$(git diff --name-only)"
+          test "$changed" = "src-tauri/src/session_title.rs"
+      - name: Commit formatting and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/src/session_title.rs
+          git rm .github/workflows/rustfmt-session-title-once.yml
+          git diff --cached --check
+          git commit -m "chore: rustfmt Russian title prefix"
+          git push origin HEAD:agent/russian-localization
