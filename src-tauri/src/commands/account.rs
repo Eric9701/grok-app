@@ -31,9 +31,9 @@ pub async fn account_login(
         .filter(|s| !s.is_empty());
     let method = method.unwrap_or_else(|| "oauth".into());
     let result = crate::account::account_login(&method, manual.as_deref()).await;
-    // Auth.json is synced into agent-home on success — drop warm/prewarm
-    // processes so the next send cannot reuse a CLI spawned with stale/missing
-    // credentials (sessionDisconnect alone only parks; connect prefers prewarm).
+    // Bind agent-home to the current route (official syncs OIDC; custom
+    // clears it) then drop warm/prewarm so the next send cannot reuse a CLI
+    // spawned with stale OIDC (sessionDisconnect alone only parks).
     if result.ok {
         mgr.recycle_all_agents(&app, "account_auth").await;
     }

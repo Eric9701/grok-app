@@ -1383,6 +1383,13 @@ pub fn active_grok_build_proxy_spawn(composer_model: &str) -> Option<GrokBuildPr
     grok_build_proxy_spawn_from_text(&text, composer_model)
 }
 
+/// After official login / account switch: only the official route should
+/// receive a copy of `~/.grok/auth.json` in agent-home. Custom relays must
+/// keep that file out so Grok Build uses `[model.<id>].api_key`.
+pub fn should_sync_cli_auth_after_account_change(route: &ActiveRoute) -> bool {
+    matches!(route, ActiveRoute::Official)
+}
+
 /// Prepare agent-home auth material for the active route.
 ///
 /// Custom: strip agent-home `auth.json` so inference uses `api_key` only.
@@ -1399,6 +1406,9 @@ pub fn prepare_route_auth_for_agent() {
             );
         }
         ActiveRoute::Official => {
+            debug_assert!(should_sync_cli_auth_after_account_change(
+                &ActiveRoute::Official
+            ));
             if let Err(e) = crate::account::sync_cli_auth_to_agent_home() {
                 tracing::warn!(
                     target: "providers",
@@ -3285,5 +3295,21 @@ context_window = "1000000"
             "rewrite must keep bare int:\n{text}"
         );
         assert!(!text.contains("context_window = \"1000000\""));
+    }
+
+    #[test]
+    fn login_must_not_sync_oidc_into_custom_agent_home() {
+        // grok login always writes ~/.grok/auth.json. Copying that into
+        // agent-home while a custom relay is active makes the next spawn
+        // send OIDC to the relay. Official stays the only route that
+        // should receive the mirror.
+        assert!(!should_sync_cli_auth_after_account_change(
+            &ActiveRoute::Custom {
+                id: "claudex".into()
+            }
+        ));
+        assert!(should_sync_cli_auth_after_account_change(
+            &ActiveRoute::Official
+        ));
     }
 }

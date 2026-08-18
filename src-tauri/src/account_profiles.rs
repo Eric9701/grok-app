@@ -254,9 +254,10 @@ pub fn switch_account(id: &str) -> Result<AccountProfile, String> {
         let _ = fs::set_permissions(&cli_auth, fs::Permissions::from_mode(0o600));
     }
 
-    if let Err(e) = account::sync_cli_auth_to_agent_home() {
-        warn!("account_profiles: agent-home sync after switch: {e}");
-    }
+    // ~/.grok/auth.json is the canonical login (billing / official-aux).
+    // Agent-home must follow the *current* route: official syncs OIDC,
+    // custom must not receive auth.json (OIDC pollution).
+    crate::providers::prepare_route_auth_for_agent();
 
     let mut idx = load_index();
     idx.active_id = Some(id.to_string());

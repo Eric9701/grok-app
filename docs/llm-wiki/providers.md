@@ -151,7 +151,7 @@ Verified working combinations:
 | Custom relay | provider id (`yunyi`) | **provider id** | **removed** (api_key only) |
 | Official | `grok` | catalog id (`grok-4.6`) | **synced** from `~/.grok` |
 
-Host must rebind both sides on every switch and before each ACP spawn (`prepare_route_auth_for_agent` + `agent_spawn_model_id`). Composer catalog `modelId` remains the official selection preference; spawn resolves the channel id separately. **Alternate activate entry:** picking a custom provider row in the composer model menu also calls `providers_activate` (same Host path as Settings **Use**).
+Host must rebind both sides on every switch and before each ACP spawn (`prepare_route_auth_for_agent` + `agent_spawn_model_id`). After official login / account switch, call `prepare_route_auth_for_agent` instead of blindly copying `auth.json` into agent-home — a custom main must stay api_key-only. Custom ACP processes also **skip** `authenticate(cached_token)` because that RPC reads `~/.grok/auth.json` even when `GROK_HOME` is agent-home. Composer catalog `modelId` remains the official selection preference; spawn resolves the channel id separately. **Alternate activate entry:** picking a custom provider row in the composer model menu also calls `providers_activate` (same Host path as Settings **Use**).
 
 ## Host commands
 

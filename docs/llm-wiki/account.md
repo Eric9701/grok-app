@@ -29,7 +29,9 @@ CLI auth is shared with Grok Build TUI (hot-reload of `auth.json` is CLI-side).
 | Agent spawn (`session_data_mode=shared`, product default) | `GROK_HOME=~/.grok` |
 | Agent spawn (`session_data_mode=independent`) | `GROK_HOME=~/.grok-app/agent-home` |
 
-Host **must** sync `auth.json` into agent-home on login and before each ACP spawn; otherwise the UI shows signed-in while the agent reports `auth_kind=none` → HTTP 401. Logout clears both copies.
+Host **must** sync `auth.json` into agent-home on login and before each ACP spawn **when the official route is active**; otherwise the UI shows signed-in while the agent reports `auth_kind=none` → HTTP 401. Logout clears both copies.
+
+**Custom route + official login:** keep `~/.grok/auth.json` (billing / official-aux) but do **not** copy it into the custom main agent-home, and do **not** call ACP `authenticate(cached_token)` on that process. `cached_token` reads `~/.grok/auth.json` even when `GROK_HOME` is agent-home; Grok Build then sends OIDC to the relay (`HTTP 400 Incorrect API key` / 401). Symptom: relay works until the user signs in, and works again immediately after logout.
 
 ### Warm process recycle after auth change
 
@@ -37,9 +39,9 @@ Syncing the file is not enough while multi-session **parked** / **prewarm** CLI 
 
 | Event | Host action |
 |-------|-------------|
-| Login success | `sync_cli_auth_to_agent_home` + `recycle_all_agents(..., "account_auth")` |
+| Login success | `prepare_route_auth_for_agent` (official sync / custom clear) + `recycle_all_agents(..., "account_auth")` |
 | Logout | clear agent-home auth + `recycle_all_agents(..., "account_auth")` |
-| Multi-account switch | snapshot → auth paths + `recycle_all_agents(..., "account_auth")` |
+| Multi-account switch | snapshot → `~/.grok/auth.json` + `prepare_route_auth_for_agent` + `recycle_all_agents(..., "account_auth")` |
 | Provider route activate | `prepare_route_auth_for_agent` + `recycle_all_agents(..., "provider_route")` |
 
 `recycle_all_agents` drains **live + background + parked + prewarm**. Do **not** use `session_disconnect` alone after login (that only parks and leaves prewarm alive).

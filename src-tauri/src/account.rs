@@ -1821,13 +1821,13 @@ If the browser showed a code to paste into Grok Build, start sign-in again and p
     let profile = read_auth_profile();
     let ok = profile.signed_in;
 
-    // Independent mode agents read GROK_HOME=agent-home — mirror credentials there.
-    // Host command `account_login` also recycles warm/prewarm agents after ok
-    // so connect cannot reuse a process that initialized with empty/stale auth.
+    // Bind agent-home to the *current* route. Official mirrors OIDC;
+    // custom must not receive auth.json (Grok Build would send OIDC to
+    // the relay). Host command `account_login` also recycles warm/prewarm
+    // agents after ok so connect cannot reuse a process that initialized
+    // with empty/stale auth.
     if ok {
-        if let Err(e) = sync_cli_auth_to_agent_home() {
-            warn!("account: post-login auth sync failed: {e}");
-        }
+        crate::providers::prepare_route_auth_for_agent();
         crate::account_profiles::auto_snapshot_after_login();
     }
 
