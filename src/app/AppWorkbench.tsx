@@ -718,6 +718,7 @@ import {
   type PromptHistoryScope
 } from "@/components/PromptHistoryPanel";
 import {
+  migrateDraftSendClaim,
   planClearSendQueue,
   queueSessionKey,
   queuePreviewText,
@@ -725,6 +726,11 @@ import {
   shouldEnqueueSend,
   type QueuedSend
 } from "@/lib/sendQueue";
+import {
+  migrateDraftTurnClock,
+  resolveTurnClockKey,
+  shouldSyncViewedTurnClock,
+} from "@/lib/turnClock";
 import {
   useSendQueue,
   type ExecuteSendFromQueue
@@ -2718,7 +2724,14 @@ export function AppWorkbench() {
   const turnStartedAtBySessionRef = useRef<Map<string, number>>(new Map());
   /** Mirror a chat's clock into the visible timer when it is the viewed one. */
   const syncViewedTurnClock = useCallback((sessionId: string) => {
-    if (sessionId !== viewingSessionIdRef.current) return;
+    if (
+      !shouldSyncViewedTurnClock({
+        clockSessionId: sessionId,
+        viewingSessionId: viewingSessionIdRef.current,
+      })
+    ) {
+      return;
+    }
     setTurnStartedAt(turnStartedAtBySessionRef.current.get(sessionId) ?? null);
   }, [viewingSessionIdRef]);
   /** Begin a chat's turn clock, keeping the start of a turn already running. */
@@ -2745,6 +2758,9 @@ export function AppWorkbench() {
   const clearTurnClock = useCallback(
     (sessionId?: string | null) => {
       if (!sessionId) {
+        // Viewed timer only. An in-flight new-chat send still owns `__draft__`
+        // in the map until migrateDraftTurnClock; deleting it here would leave
+        // that background session with no grace clock if the user hits New chat.
         setTurnStartedAt(null);
         return;
       }
@@ -5508,6 +5524,12 @@ export function AppWorkbench() {
       state: "idle",
       backend: "grok_agent_stdio",
     });
+    // Drop the previous chat's elapsed timer. Ghost-heal grace uses this
+    // value; leaving it in place made a new-chat first send look 45s+ old.
+    clearTurnClock();
+    if (!isSendInFlightForSession(null)) {
+      turnStartedAtBySessionRef.current.delete(resolveTurnClockKey(null));
+    }
     setLocalError(null);
     // Multi-session: NEVER sessionDisconnect here.
     // Disconnect kills the live ACP process — that aborted in-flight turns when
@@ -7723,6 +7745,19 @@ export function AppWorkbench() {
           claims.add(materializedKey);
           heldConnectKeys.add(materializedKey);
         }
+        // Same handoff for the send claim. Heal re-arms on setSession(newId)
+        // below; if the claim stayed on __draft__ until connect returned,
+        // it looked like the turn never left.
+        if (
+          migrateDraftSendClaim(
+            sendInFlightBySessionRef.current,
+            sendEpochBySessionRef.current,
+            sessionId,
+          )
+        ) {
+          sendInFlightRef.current =
+            sendInFlightBySessionRef.current.size > 0;
+        }
         // Persist draft-page JSON Schema onto the new session before connect
         // so spawn can take top-level `grok --json-schema`.
         const pendingSchema = sessionJsonSchemaRef.current?.trim() || "";
@@ -7750,6 +7785,9 @@ export function AppWorkbench() {
         if (draftMsgs?.length) {
           messagesBySessionRef.current.set(meta.id, draftMsgs);
           messagesBySessionRef.current.delete("__draft__");
+        }
+        if (migrateDraftTurnClock(turnStartedAtBySessionRef.current, meta.id)) {
+          syncViewedTurnClock(meta.id);
         }
         // Auto-tag worktree-bound chats when cwd is a linked worktree.
         if (api.isTauri() && connectProject?.path) {
@@ -8074,7 +8112,11 @@ export function AppWorkbench() {
           ? prev
           : { ...prev, state: "streaming", lastError: null },
       );
-      restartTurnClock(sendTargetId ?? viewingSessionIdRef.current);
+      restartTurnClock(
+        resolveTurnClockKey(
+          sendTargetId ?? viewingSessionIdRef.current,
+        ),
+      );
     }
     // Optimistic liveHost only when we already own the live slot (or nothing is live).
     // Never stamp streaming onto a foreign mid-turn — ensureConnected demotes first.
@@ -8162,7 +8204,11 @@ export function AppWorkbench() {
       const materializedSendKey = queueSessionKey(sessionId);
       if (!heldSendKeys.has(materializedSendKey)) {
         const claims = sendInFlightBySessionRef.current;
-        if (claims.has(materializedSendKey)) {
+        const alreadyOurs =
+          claims.has(materializedSendKey) &&
+          sendEpochBySessionRef.current.get(materializedSendKey) ===
+            sendEpoch;
+        if (claims.has(materializedSendKey) && !alreadyOurs) {
           failStrip();
           return false;
         }
@@ -8171,9 +8217,11 @@ export function AppWorkbench() {
         if (sendEpochBySessionRef.current.get(sendKey) === sendEpoch) {
           sendEpochBySessionRef.current.delete(sendKey);
         }
-        claims.add(materializedSendKey);
+        if (!alreadyOurs) {
+          claims.add(materializedSendKey);
+          sendEpochBySessionRef.current.set(materializedSendKey, sendEpoch);
+        }
         heldSendKeys.add(materializedSendKey);
-        sendEpochBySessionRef.current.set(materializedSendKey, sendEpoch);
       }
       if (fromQueue && sendTargetId && sessionId !== sendTargetId) {
         failStrip();
@@ -8187,6 +8235,9 @@ export function AppWorkbench() {
         if (draftMsgs?.length) {
           messagesBySessionRef.current.set(sessionId, draftMsgs);
           messagesBySessionRef.current.delete("__draft__");
+        }
+        if (migrateDraftTurnClock(turnStartedAtBySessionRef.current, sessionId)) {
+          syncViewedTurnClock(sessionId);
         }
       }
       // Sticky setup only for explicit “用 AI 创建”, so a one-off “每天…” line

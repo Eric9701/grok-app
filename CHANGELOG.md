@@ -13,9 +13,11 @@ See `docs/llm-wiki/release.md`.
 
 ### Fixed
 - **Live “思考中” timer no longer inherits another chat’s clock**: A leftover `turnStartedAt` (or a later correction) used to stick at 50+ minutes, then jump to the real duration after remount. The live timer now follows this turn’s clock and will not start before the assistant bubble’s `createdAt`.
+- **New-chat first send no longer false-heals as “message never reached the agent”**: Ghost-heal treated a leftover previous-session turn clock plus the `__draft__` → real-id handoff as “Host idle, send finished”. The toast fired, the composer was restored, and the agent still ran the prompt. New chat now clears the clock; draft sends start/migrate it; `sessionCreate` moves the send claim onto the real id immediately; heal also counts the draft claim as in-flight.
 
 **中文 · 修复**
 - **「思考中」不再沿用上一会话的计时**：上一轮留下的 `turnStartedAt` 会把时长钉在 50 多分钟，滑一下或重挂载后又变成真正的几分钟。现在跟本轮时钟走，也不会早于这条助手气泡的 `createdAt`。
+- **新建会话首条消息不再误报「消息没有真正发给 Agent」**：上一条会话留下的计时，加上草稿 `__draft__` 切到真实 session id 的空档，会被当成 Host 空闲、发送已结束。于是 toast 弹出、输入框还原，Agent 其实已经在跑。现在新建会话会清计时，草稿发送会建/迁移计时，`sessionCreate` 当下就把发送认领迁到新 id，heal 也会把草稿认领当成仍在发送。
 
 ## [0.2.21] - 2026-08-18
 
