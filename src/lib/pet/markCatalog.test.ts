@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import shapes from "@/lib/pet/data/shapes.json";
 import eyes from "@/lib/pet/data/eyes.json";
 import { STATE_TOPOLOGIES, verbToMarkState } from "@/lib/pet/markTables";
-import { lerpPts, polyPath, spring, stepSpring } from "@/lib/pet/markMath";
+import {
+  gazeFromDelta,
+  gazeFromPointer,
+  lerpPts,
+  polyPath,
+  spring,
+  stepSpring,
+} from "@/lib/pet/markMath";
 
 describe("ported Sand mark catalog", () => {
   it("ships official Jo paths for picker shapes", () => {
@@ -24,6 +31,32 @@ describe("ported Sand mark catalog", () => {
   it("maps waiting to listening (original expectant pose)", () => {
     expect(verbToMarkState("waiting")).toBe("listening");
     expect(STATE_TOPOLOGIES.listening.length).toBeGreaterThan(0);
+  });
+
+  it("gazeFromDelta looks along the cursor vector, not a tiny nudge", () => {
+    const farRight = gazeFromDelta(400, 0, 60);
+    expect(farRight.x).toBeGreaterThan(20);
+    expect(Math.abs(farRight.y)).toBeLessThan(0.01);
+    const down = gazeFromDelta(0, 300, 60);
+    expect(down.y).toBeGreaterThan(14);
+    const near = gazeFromDelta(10, 0, 60);
+    expect(near.x).toBeGreaterThan(0);
+    expect(near.x).toBeLessThan(farRight.x);
+    const origin = gazeFromDelta(0, 0, 60);
+    expect(origin).toEqual({ x: 0, y: 0 });
+  });
+
+  it("gazeFromPointer looks toward the cursor relative to the mark", () => {
+    const rect = { left: 0, top: 0, width: 100, height: 100 };
+    const mid = gazeFromPointer(50, 50, rect);
+    expect(mid.x).toBeCloseTo(0, 5);
+    expect(mid.y).toBeCloseTo(0, 5);
+    const right = gazeFromPointer(100, 50, rect);
+    expect(right.x).toBeGreaterThan(10);
+    expect(Math.abs(right.y)).toBeLessThan(1);
+    const upLeft = gazeFromPointer(0, 0, rect);
+    expect(upLeft.x).toBeLessThan(0);
+    expect(upLeft.y).toBeLessThan(0);
   });
 
   it("spring + lerp are the original stepping primitives", () => {

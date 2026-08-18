@@ -228,14 +228,29 @@ fn window_logical_size(size_px: u32) -> f64 {
     f64::from(size_px) + 96.0
 }
 
+/// Must match `petOverlayWidth` in `src/lib/pet/petBubbleLayout.ts`.
+const PET_BUBBLE_WIDTH_PX: f64 = 216.0;
+
 fn overlay_extent(size_px: u32) -> (f64, f64) {
     let mark = window_logical_size(size_px);
-    if let Ok(g) = HIT_CHROME.lock() {
-        if g.valid && g.window_w >= 64.0 && g.window_h >= 64.0 {
-            return (g.window_w.max(mark), g.window_h.max(mark));
-        }
-    }
-    (mark, mark)
+    (mark + PET_BUBBLE_WIDTH_PX, mark)
+}
+
+fn persist_window_pos(app: &AppHandle) {
+    let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) else {
+        return;
+    };
+    let Ok(scale) = win.scale_factor() else {
+        return;
+    };
+    let Ok(pos) = win.outer_position() else {
+        return;
+    };
+    let logical = LogicalPosition::<f64>::from_physical(pos, scale.max(0.1));
+    let mut prefs = load_prefs();
+    prefs.x = Some(logical.x);
+    prefs.y = Some(logical.y);
+    let _ = save_prefs(&prefs);
 }
 
 /// Physical cursor vs logical hit chrome (mark disc + task-bubble stack).
@@ -355,17 +370,10 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
     apply_window_chrome(&win);
     let handle = app.clone();
     win.on_window_event(move |ev| {
-        if let tauri::WindowEvent::Moved(pos) = ev {
-            let mut prefs = load_prefs();
-            if let Some(w) = handle.get_webview_window(PET_WINDOW_LABEL) {
-                if let (Ok(scale), Ok(inner)) = (w.scale_factor(), w.inner_position()) {
-                    let _ = scale;
-                    let logical = LogicalPosition::<f64>::from_physical(*pos, scale.max(0.1));
-                    let _ = inner;
-                    prefs.x = Some(logical.x);
-                    prefs.y = Some(logical.y);
-                    let _ = save_prefs(&prefs);
-                }
+        if let tauri::WindowEvent::Moved(_) = ev {
+            // Size-sync / show must not overwrite the user's drag position.
+            if DRAGGING.load(Ordering::Relaxed) {
+                persist_window_pos(&handle);
             }
         }
     });
@@ -450,6 +458,27 @@ pub fn start_cursor_watch(app: AppHandle) {
                 &chrome,
             );
             let _ = win.set_ignore_cursor_events(!over);
+            // Screen-space look target so eyes track the pointer even when
+            // the overlay is click-through (no webview pointer events).
+            let mark_cx = if chrome.valid {
+                f64::from(pos.x) + chrome.mark_cx * scale
+            } else {
+                f64::from(pos.x) + f64::from(size.width) / 2.0
+            };
+            let mark_cy = if chrome.valid {
+                f64::from(pos.y) + chrome.mark_cy * scale
+            } else {
+                f64::from(pos.y) + f64::from(size.height) / 2.0
+            };
+            let local_r = pet_hit_radius(size_px, scale);
+            let _ = app.emit(
+                "pet://cursor",
+                serde_json::json!({
+                    "dx": cursor.x - mark_cx,
+                    "dy": cursor.y - mark_cy,
+                    "localR": local_r,
+                }),
+            );
         }
     });
 }
@@ -535,8 +564,11 @@ pub fn pet_set_ignore_cursor(app: AppHandle, ignore: bool) -> Result<(), String>
 }
 
 #[tauri::command]
-pub fn pet_set_dragging(dragging: bool) {
-    DRAGGING.store(dragging, Ordering::Relaxed);
+pub fn pet_set_dragging(app: AppHandle, dragging: bool) {
+    let was = DRAGGING.swap(dragging, Ordering::Relaxed);
+    if was && !dragging {
+        persist_window_pos(&app);
+    }
 }
 
 #[tauri::command]
@@ -647,6 +679,13 @@ mod tests {
         assert_eq!(p.shape, "hex");
         assert_eq!(p.color, "green");
         assert_eq!(p.size_px, 96);
+    }
+
+    #[test]
+    fn overlay_extent_matches_js_width_and_does_not_use_hit_chrome() {
+        let (w, h) = overlay_extent(128);
+        assert_eq!(w, 128.0 + 96.0 + 216.0);
+        assert_eq!(h, 128.0 + 96.0);
     }
 
     #[test]

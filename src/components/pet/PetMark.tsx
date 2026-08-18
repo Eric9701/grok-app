@@ -3,6 +3,7 @@
  * clip-path body, --fg/--bg eyes, spring pose, 25 eye topologies, state table.
  */
 import { useEffect, useId, useRef } from "react";
+import { listen } from "@/lib/api/host";
 import type { PetColor, PetShape, PetVerb } from "@/lib/pet";
 import { PET_INK } from "@/lib/pet";
 import shapes from "@/lib/pet/data/shapes.json";
@@ -17,6 +18,8 @@ import {
 } from "@/lib/pet/markTables";
 import {
   clamp,
+  gazeFromDelta,
+  gazeFromPointer,
   lerpPts,
   polyPath,
   randBetween,
@@ -176,6 +179,32 @@ export function PetMark({
     const morph = spring(1);
     const gazeX = spring(0);
     const gazeY = spring(0);
+    const look = { dx: 0, dy: 0, localR: 48, at: 0, fromScreen: false };
+    let unlistenCursor: (() => void) | undefined;
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (look.fromScreen && performance.now() - look.at < 180) return;
+      look.dx = e.clientX;
+      look.dy = e.clientY;
+      look.localR = 0;
+      look.fromScreen = false;
+      look.at = performance.now();
+    };
+    const onPointerLeave = () => {
+      if (!look.fromScreen) look.at = 0;
+    };
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerleave", onPointerLeave);
+    void listen<{ dx?: number; dy?: number; localR?: number }>("pet://cursor", (p) => {
+      if (p == null || typeof p.dx !== "number" || typeof p.dy !== "number") return;
+      look.dx = p.dx;
+      look.dy = p.dy;
+      look.localR = typeof p.localR === "number" && p.localR > 0 ? p.localR : 64;
+      look.fromScreen = true;
+      look.at = performance.now();
+    }).then((u) => {
+      unlistenCursor = u;
+    });
 
     let topoIdx = 0;
     let fromEyes = [EYES[0][0], EYES[0][1]] as number[][][];
@@ -238,7 +267,20 @@ export function PetMark({
         const u = 1 - (blinkingUntil - now) / 160;
         pose.lid.t = u < 0.45 ? 0.06 : pose.lid.t;
       }
-      if (now >= gazeUntil) {
+      const tracking =
+        look.at > 0 && now - look.at < 280 && state !== "sleeping" && state !== "dragging";
+      if (tracking) {
+        const g = look.fromScreen
+          ? gazeFromDelta(look.dx, look.dy, look.localR)
+          : svgRef.current
+            ? gazeFromPointer(look.dx, look.dy, svgRef.current.getBoundingClientRect())
+            : { x: 0, y: 0 };
+        gazeX.t = g.x;
+        gazeY.t = g.y;
+        pose.turn.t = g.x * 0.32;
+        pose.tilt.t = g.y * 0.22;
+        gazeUntil = now + 640;
+      } else if (now >= gazeUntil) {
         gazeX.t = randBetween(-0.4, 0.4) * 15;
         gazeY.t = randBetween(-0.3, 0.3) * 9;
         gazeUntil = now + randBetween(1800, 4200);
@@ -253,8 +295,8 @@ export function PetMark({
         stepSpring(pose.bob, 4, 1, h);
         stepSpring(pose.scale, 10, 0.8, h);
         stepSpring(pose.lid, 26, 1, h);
-        stepSpring(gazeX, 13, 1, h);
-        stepSpring(gazeY, 13, 1, h);
+        stepSpring(gazeX, tracking ? 16 : 13, 1, h);
+        stepSpring(gazeY, tracking ? 16 : 13, 1, h);
       }
 
       const recNow = SHAPES[shapeRef.current] ?? SHAPES.hex;
@@ -264,11 +306,12 @@ export function PetMark({
       const face = recNow.face;
       const lid = clamp(pose.lid.x, 0.04, 1.2);
       const eyeS = face.eye * (8 / 9);
+      const lookAmp = tracking ? 1 : 0.35;
       const place = (pts: number[][], side: 0 | 1) => {
         const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
         const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-        const dx = (cx - Re) * face.sx + gazeX.x * 0.35 + (side === 0 ? (face.leftDX ?? 0) : 0);
-        const dy = (cy - Re) * face.sy + gazeY.x * 0.35;
+        const dx = (cx - Re) * face.sx + gazeX.x * lookAmp + (side === 0 ? (face.leftDX ?? 0) : 0);
+        const dy = (cy - Re) * face.sy + gazeY.x * lookAmp;
         return pts.map(([x, y]) => [
           Re + face.x + (x - cx) * eyeS + dx,
           Re + face.y + (y - cy) * eyeS * lid + dy,
@@ -294,7 +337,12 @@ export function PetMark({
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerleave", onPointerLeave);
+      unlistenCursor?.();
+    };
   }, [shape, verb, paused]);
 
   const fill = `light-dark(${ink.light}, ${ink.dark})`;

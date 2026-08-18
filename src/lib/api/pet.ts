@@ -220,28 +220,19 @@ function workRectFromMonitor(
   };
 }
 
-/** Keep the mark centered; grow height upward. Does not flip the frame. */
+/** Resize only. Never move — open must restore the user's last drag origin. */
 export async function petSyncOverlaySize(w: number, h: number): Promise<void> {
   if (!isDesktopHost()) return;
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    const { LogicalSize, LogicalPosition } = await import("@tauri-apps/api/dpi");
+    const { LogicalSize } = await import("@tauri-apps/api/dpi");
     const win = getCurrentWindow();
     const scale = await win.scaleFactor();
     const inner = await win.innerSize();
-    const pos = await win.outerPosition();
     const curW = inner.width / scale;
     const curH = inner.height / scale;
-    const winX = pos.x / scale;
-    const winY = pos.y / scale;
-    const nextX = winX - (w - curW) / 2;
-    const nextY = winY - (h - curH);
-    if (Math.abs(curW - w) >= 1 || Math.abs(curH - h) >= 1) {
-      await win.setSize(new LogicalSize(w, h));
-    }
-    if (Math.abs(nextX - winX) >= 2 || Math.abs(nextY - winY) >= 2) {
-      await win.setPosition(new LogicalPosition(nextX, nextY));
-    }
+    if (Math.abs(curW - w) < 1 && Math.abs(curH - h) < 1) return;
+    await win.setSize(new LogicalSize(w, h));
   } catch {
     /* best-effort */
   }

@@ -47,3 +47,43 @@ export function randBetween(a: number, b: number): number {
 export function expSmooth(target: number, dt: number): number {
   return 1 - Math.exp(Math.log(1 - target) * 60 * dt);
 }
+
+/**
+ * Directional look from a pixel delta (cursor − mark center).
+ * Near the face: look at that point on the face. Farther away: full look
+ * along the vector so it reads as watching the pointer, not a nudge.
+ */
+export function gazeFromDelta(
+  dx: number,
+  dy: number,
+  localR: number,
+  rangeX = 28,
+  rangeY = 20,
+): { x: number; y: number } {
+  const r = Math.max(localR, 8);
+  const len = Math.hypot(dx, dy);
+  if (len < 0.5) return { x: 0, y: 0 };
+  const nx = dx / len;
+  const ny = dy / len;
+  const reach = clamp(len / r, 0, 1);
+  return { x: nx * rangeX * reach, y: ny * rangeY * reach };
+}
+
+/** Map a client pointer onto the mark's gaze springs (view-box units). */
+export function gazeFromPointer(
+  clientX: number,
+  clientY: number,
+  rect: { left: number; top: number; width: number; height: number },
+  rangeX = 28,
+  rangeY = 20,
+): { x: number; y: number } {
+  const hw = rect.width > 1 ? rect.width / 2 : 1;
+  const hh = rect.height > 1 ? rect.height / 2 : 1;
+  return gazeFromDelta(
+    clientX - (rect.left + hw),
+    clientY - (rect.top + hh),
+    Math.min(hw, hh),
+    rangeX,
+    rangeY,
+  );
+}
