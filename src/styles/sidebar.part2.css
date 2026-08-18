@@ -114,6 +114,34 @@
   color: var(--text-primary);
 }
 
+/*
+ * Project / Other-sessions disclosure. Inline height/min/max px (see
+ * treeReveal.ts) interpolate; 0fr/1fr snaps in WKWebView. Padding stays
+ * on .tree-l3-list-wrap so a closed section does not leave leftover inset.
+ */
+.tree-reveal {
+  overflow: hidden;
+  transition:
+    height var(--motion-normal) var(--motion-pane-ease),
+    min-height var(--motion-normal) var(--motion-pane-ease),
+    max-height var(--motion-normal) var(--motion-pane-ease);
+}
+
+.tree-reveal__inner {
+  overflow: hidden;
+}
+
+.tree-reveal .tree-l3 {
+  content-visibility: visible;
+  contain: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-reveal {
+    transition: none;
+  }
+}
+
 /* Outer wrap keeps trust hint / empty state outside the windowed list. */
 .tree-l3-list-wrap {
   padding: 2px 0 6px 12px;

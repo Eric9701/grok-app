@@ -45,6 +45,7 @@
 body > .composer-wrap.composer-wrap--side-dock {
   position: fixed !important;
   left: var(--sw-sidebar-occupied, 0px) !important;
+  transition: --sw-sidebar-occupied var(--motion-pane) var(--motion-pane-ease);
   right: 0 !important;
   bottom: 0 !important;
   top: auto !important;
@@ -71,6 +72,10 @@ body > .composer-wrap.composer-wrap--side-dock {
   justify-content: center;
 }
 
+.composer-wrap--side-dock.is-sidebar-resizing {
+  transition: none;
+}
+
 .composer-wrap--side-dock .composer {
   pointer-events: auto !important;
   width: 100%;
@@ -82,6 +87,11 @@ body > .composer-wrap.composer-wrap--side-dock {
   box-shadow:
     0 1px 0 rgba(0, 0, 0, 0.04),
     0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+/* Expanded overlay is a mode switch, not a split open — do not interpolate width. */
+.workbench--side-expanded .aside {
+  transition: none;
 }
 
 /* Side pane: full free area when no dock; bottom inset only with --sw-dock-composer-h */
@@ -1001,6 +1011,20 @@ html[data-theme="light"] .sw-terminal--pty {
   border-radius: 12px;
   padding: 10px 8px 8px;
   box-sizing: border-box;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.97);
+  transform-origin: top right;
+  transition:
+    opacity var(--motion-normal) var(--motion-pane-ease),
+    transform var(--motion-normal) var(--motion-pane-ease);
+  pointer-events: none;
+}
+
+.sw-env-menu.menu-panel.is-open,
+.menu-panel.sw-env-menu.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 
 .sw-env-menu__head {
@@ -1102,6 +1126,14 @@ html[data-theme="light"] .sw-terminal--pty {
 
 .sw-env-menu__del {
   color: #d45454;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-env-menu.menu-panel,
+  .menu-panel.sw-env-menu {
+    transform: none;
+    transition: none;
+  }
 }
 
 /* Review — Codex-style stacked diffs + side tree (theme-aware) */

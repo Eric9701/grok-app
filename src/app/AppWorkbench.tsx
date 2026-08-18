@@ -150,6 +150,14 @@ import {
   isWindowFitSuppressed
 } from "@/lib/windowFit";
 import {
+  bumpPaneSplitMotion,
+  isPaneSplitMotionActive,
+  paneSplitSizeStyle,
+} from "@/lib/paneSplitMotion";
+import { usePaneSplitMotion } from "@/hooks/usePaneSplitMotion";
+import { useOpenPresence, VIEW_PRESENCE_MS } from "@/lib/openPresence";
+import { acquireNativeWebviewCover } from "@/lib/nativeWebviewCover";
+import {
   PHONE_KEYBOARD_INSET_VAR,
   keyboardInsetBottom
 } from "@/lib/phoneViewport";
@@ -758,6 +766,7 @@ import {
   type SidebarSessionRowLabels,
   type SidebarSessionWorktreeBadgeProp,
 } from "@/components/SidebarSessionRow";
+import { SidebarTreeReveal } from "@/components/SidebarTreeReveal";
 import {
   SIDEBAR_DENSITY_EVENT,
   loadSidebarDensity,
@@ -1143,6 +1152,11 @@ import {
 } from "@/lib/app/projectOrder";
 import { useSidebarProjectReorder } from "@/hooks/useSidebarProjectReorder";
 import { useSideWorkbenchProjectIsolation } from "@/hooks/useSideWorkbenchProjectIsolation";
+import { useBottomTerminal } from "@/hooks/useBottomTerminal";
+import {
+  BottomTerminal,
+  BottomTerminalToggle,
+} from "@/components/bottom-terminal";
 import { useProjectSpaces } from "@/hooks/useProjectSpaces";
 import { SpaceSwitcher } from "@/components/SpaceSwitcher";
 import {
@@ -1733,6 +1747,7 @@ export function AppWorkbench() {
     sideWorkbench,
     setSideWorkbench,
   );
+  const bottomTerminal = useBottomTerminal(activeProject?.id);
   /**
    * On-disk default cwd for unbound chats (`workspaces/general`).
    * Not a sidebar project — used by connect / resource pane when no folder bound.
@@ -2014,6 +2029,8 @@ export function AppWorkbench() {
     toggleRightPane: () => {},
     /** Open / focus a Side Workbench tab from the empty-state picker chords. */
     openSidePicker: (_kind: SidePickerKind) => {},
+    /** Toggle the chat-column bottom terminal (⌘`). */
+    toggleBottomTerminal: () => {},
     toggleVoice: () => {},
     cancelVoice: () => {},
     startLiveVoice: () => {},
@@ -2195,7 +2212,7 @@ export function AppWorkbench() {
           shortcutHandlersRef.current.openSidePicker("browser");
           return;
         case "sideTerminal":
-          shortcutHandlersRef.current.openSidePicker("terminal");
+          shortcutHandlersRef.current.toggleBottomTerminal();
           return;
         case "liveVoice":
           // Defense in depth: Settings can disable only this hotkey.
@@ -2774,6 +2791,13 @@ export function AppWorkbench() {
   );
   const [resizingAside, setResizingAside] = useState(false);
   const [resizingSidebar, setResizingSidebar] = useState(false);
+  const { paneMotionClass } = usePaneSplitMotion({
+    sidebarCollapsed: layout.sidebarCollapsed,
+    asideCollapsed: layout.asideCollapsed,
+    phoneLayout,
+  });
+  const asideFitGenRef = useRef(0);
+  const sidebarFitGenRef = useRef(0);
   /** Pointer-drag origin for left-rail resize (clientX + width at down). */
   const sidebarResizeStartRef = useRef<{ x: number; width: number } | null>(
     null,
@@ -2917,11 +2941,14 @@ export function AppWorkbench() {
       asideCollapsed: false as const,
       asideWidth: preferredAside,
     };
+    const fitGen = ++asideFitGenRef.current;
     void fitWindowThenClampAside(projected).then((width) => {
+      if (asideFitGenRef.current !== fitGen) return;
       setLayout((l) => {
         // User may have closed the pane while the window fit was in flight.
         if (l.asideCollapsed) return l;
         if (l.asideWidth === width) return l;
+        if (isPaneSplitMotionActive()) bumpPaneSplitMotion();
         const n = { ...l, asideWidth: width };
         saveLayout(localStorage, n);
         return n;
@@ -2931,6 +2958,7 @@ export function AppWorkbench() {
 
   /** Collapse the right Side Workbench (and exit expand / dock composer). */
   const closeAsidePane = useCallback(() => {
+    asideFitGenRef.current += 1;
     planOpenedAsideRef.current = false;
     setSideWorkbench((s) => (s.expanded ? { ...s, expanded: false } : s));
     setSideDockComposer(false);
@@ -2961,7 +2989,11 @@ export function AppWorkbench() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume once per target
   }, [resourceOpenTarget, layout.asideCollapsed]);
 
-  /** Open the left project rail; one window fit (+ reclamp open files pane). */
+  /**
+   * Open the left rail immediately, then fit/clamp the window in the
+   * background. Waiting on Tauri setSize first skipped the CSS width
+   * interpolation (same freeze we already fixed on the right pane).
+   */
   const openSidebarPane = useCallback(() => {
     if (phoneLayout) {
       setLayout((l) => {
@@ -2973,6 +3005,7 @@ export function AppWorkbench() {
       return;
     }
     const cur = layoutRef.current;
+    if (!cur.sidebarCollapsed) return;
     // After auto-collapse (drag below threshold) width is stored as MIN;
     // always open at least SIDEBAR_WIDTH_MIN.
     const openWidth = clampSidebarWidth(
@@ -2983,6 +3016,16 @@ export function AppWorkbench() {
         asideOccupiedWidth: cur.asideCollapsed ? 0 : cur.asideWidth || 0,
       },
     );
+    setLayout((l) => {
+      if (!l.sidebarCollapsed && (l.sidebarWidth || 0) === openWidth) return l;
+      const n = {
+        ...l,
+        sidebarCollapsed: false,
+        sidebarWidth: openWidth,
+      };
+      saveLayout(localStorage, n);
+      return n;
+    });
     const projected = {
       sidebarCollapsed: false as const,
       sidebarWidth: openWidth,
@@ -2991,21 +3034,29 @@ export function AppWorkbench() {
         ? cur.asideWidth
         : Math.max(cur.asideWidth || 0, DEFAULT_LAYOUT.asideWidth),
     };
+    const fitGen = ++sidebarFitGenRef.current;
     void fitWindowThenClampAside(projected).then((width) => {
+      if (sidebarFitGenRef.current !== fitGen) return;
       setLayout((l) => {
-        let n = {
-          ...l,
-          sidebarCollapsed: false,
-          sidebarWidth: openWidth,
-        };
-        if (!projected.asideCollapsed) {
-          n = { ...n, asideWidth: width };
-        }
+        if (l.sidebarCollapsed) return l;
+        if (projected.asideCollapsed || l.asideWidth === width) return l;
+        if (isPaneSplitMotionActive()) bumpPaneSplitMotion();
+        const n = { ...l, asideWidth: width };
         saveLayout(localStorage, n);
         return n;
       });
     });
   }, [fitWindowThenClampAside, phoneLayout]);
+
+  const closeSidebarPane = useCallback(() => {
+    sidebarFitGenRef.current += 1;
+    setLayout((l) => {
+      if (l.sidebarCollapsed) return l;
+      const n = { ...l, sidebarCollapsed: true };
+      saveLayout(localStorage, n);
+      return n;
+    });
+  }, []);
 
   const openAsidePaneRef = useRef(openAsidePane);
   openAsidePaneRef.current = openAsidePane;
@@ -4164,10 +4215,10 @@ export function AppWorkbench() {
     if (phoneLayout) return;
     let resizeTimer: number | null = null;
     const onResize = () => {
-      if (isWindowFitSuppressed()) return;
+      if (isWindowFitSuppressed() || isPaneSplitMotionActive()) return;
       if (resizeTimer != null) window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
-        if (isWindowFitSuppressed()) return;
+        if (isWindowFitSuppressed() || isPaneSplitMotionActive()) return;
         const opts = asideClampOpts();
         setLayout((l) => {
           if (l.asideCollapsed) return l;
@@ -12994,6 +13045,10 @@ export function AppWorkbench() {
     expanded: sideWorkbench.expanded,
     phoneLayout,
   });
+  const sidebarPaint = layout.sidebarCollapsed
+    ? 0
+    : layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH;
+  const asidePaint = layout.asideCollapsed ? 0 : layout.asideWidth;
   const sideDockActive = isSideDockComposerActive({
     expanded: sideWorkbench.expanded,
     dockComposer: sideDockComposer,
@@ -14737,12 +14792,7 @@ export function AppWorkbench() {
         openSidebarPane();
         return;
       }
-      setLayout((l) => {
-        if (l.sidebarCollapsed) return l;
-        const n = { ...l, sidebarCollapsed: true };
-        saveLayout(localStorage, n);
-        return n;
-      });
+      closeSidebarPane();
     },
     toggleRightPane: () => {
       if (layoutRef.current.asideCollapsed) {
@@ -14760,6 +14810,9 @@ export function AppWorkbench() {
         return next;
       });
       openAsidePane();
+    },
+    toggleBottomTerminal: () => {
+      bottomTerminal.toggle();
     },
     toggleVoice: () => {
       toggleVoice();
@@ -17865,6 +17918,20 @@ export function AppWorkbench() {
     [],
   );
 
+  const settingsPresence = useOpenPresence(
+    appView === "settings",
+    true,
+    VIEW_PRESENCE_MS,
+  );
+  useEffect(() => {
+    if (!settingsPresence.mounted) return;
+    return acquireNativeWebviewCover();
+  }, [settingsPresence.mounted]);
+  useEffect(() => {
+    if (!showUserMenu) return;
+    void import("@/components/SettingsPage");
+  }, [showUserMenu]);
+
   return (
     <ImageViewerProvider locale={locale}>
     <div
@@ -17997,7 +18064,17 @@ export function AppWorkbench() {
         </Suspense>
       )}
 
-      {appGate === "ready" && (appView === "settings" ? (
+      {appGate === "ready" && (
+      <>
+      {settingsPresence.mounted ? (
+        <div
+          className={
+            "app-settings-stage" +
+            (settingsPresence.entered ? " is-open" : "")
+          }
+          data-testid="settings-stage"
+          aria-hidden={!settingsPresence.entered || undefined}
+        >
                 <Suspense fallback={null}>
           <SettingsPage
           section={settingsSection}
@@ -18675,14 +18752,21 @@ export function AppWorkbench() {
           })();
           }}
           />        </Suspense>
-      ) : (
+        </div>
+      ) : null}
       <div
         className={
           "workbench" +
           (phoneLayout ? " workbench--phone" : "") +
           (hideChatForSideExpand ? " workbench--side-expanded" : "") +
-          (sideDockActive ? " workbench--side-dock" : "")
+          (sideDockActive ? " workbench--side-dock" : "") +
+          (appView === "settings" && settingsPresence.entered
+            ? " is-view-idle"
+            : "") +
+          paneMotionClass
         }
+        aria-hidden={appView === "settings" || undefined}
+        inert={appView === "settings" || undefined}
         style={
           {
             // Free-area left edge for expanded side overlay (px).
@@ -18720,13 +18804,12 @@ export function AppWorkbench() {
           aria-label={tr("a11y.sidebar")}
           aria-hidden={layout.sidebarCollapsed}
           style={
-            !layout.sidebarCollapsed && !phoneLayout
-              ? {
-                  width: layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-                  minWidth: layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-                  maxWidth: layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-                }
-              : undefined
+            phoneLayout
+              ? undefined
+              : ({
+                  ...paneSplitSizeStyle(sidebarPaint, "x", resizingSidebar),
+                  ["--sidebar-rail-min"]: `${layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH}px`,
+                } as CSSProperties)
           }
         >
           {dragZone === "sidebar" && (
@@ -18760,6 +18843,7 @@ export function AppWorkbench() {
               }}
             />
           ) : null}
+          <div className="sidebar__clip">
           {/* Row 1: traffic-light height — panel toggle sits just right of traffic lights */}
           <div
             className="sidebar-chrome"
@@ -18771,13 +18855,7 @@ export function AppWorkbench() {
                 type="button"
                 className="chrome-btn chrome-btn--traffic main__pane-toggle is-on"
                 aria-label={tr("main.leftPaneHide")}
-                onClick={() =>
-                  setLayout((l) => {
-                    const n = { ...l, sidebarCollapsed: true };
-                    saveLayout(localStorage, n);
-                    return n;
-                  })
-                }
+                onClick={() => closeSidebarPane()}
               >
                 <IconPanel size={16} />
               </button>
@@ -19201,7 +19279,7 @@ export function AppWorkbench() {
                       </span>
                     </div>
 
-                    {open && (
+                    <SidebarTreeReveal open={open}>
                       <div className="tree-l3-list-wrap">
                         {isProjectPathMissing(proj.pathOk) && (
                           <button
@@ -19301,7 +19379,7 @@ export function AppWorkbench() {
                           </div>
                         )}
                       </div>
-                    )}
+                    </SidebarTreeReveal>
                   </div>
                 );
               })}
@@ -19378,10 +19456,11 @@ export function AppWorkbench() {
                 </div>
               ) : null}
             </div>
-            {historyOpen && orphanSessions.length > 0
+            {orphanSessions.length > 0
               ? (() => {
                   const sortedOrphans = sortSessionsForSidebar(orphanSessions);
                   return (
+                    <SidebarTreeReveal open={historyOpen}>
                       <VirtualList
                         className="tree-orphan-list"
                         items={sortedOrphans}
@@ -19435,6 +19514,7 @@ export function AppWorkbench() {
                           );
                         }}
                       />
+                    </SidebarTreeReveal>
                   );
                 })()
               : null}
@@ -19660,6 +19740,7 @@ export function AppWorkbench() {
             </button>
             </Tip>
           </UserMenu>
+          </div>
         </aside>
 
         {/* CENTER — solid pane; top icons fully toggle L/R columns */}
@@ -19804,6 +19885,7 @@ export function AppWorkbench() {
             </div>
             <div className="main__top-actions">
               {phoneLayout ? (
+                <>
                 <button
                   type="button"
                   className="chrome-btn main__phone-account"
@@ -19812,6 +19894,12 @@ export function AppWorkbench() {
                 >
                   <IconUser size={20} />
                 </button>
+                <BottomTerminalToggle
+                  locale={locale}
+                  open={bottomTerminal.state.open}
+                  onToggle={bottomTerminal.toggle}
+                />
+                </>
               ) : (
                 <>
                   {isMirrorClient() && (() => {
@@ -19952,6 +20040,11 @@ export function AppWorkbench() {
                       }}
                     />
                   ) : null}
+                  <BottomTerminalToggle
+                    locale={locale}
+                    open={bottomTerminal.state.open}
+                    onToggle={bottomTerminal.toggle}
+                  />
                   {/* Always keep a main-chrome toggle: when the window is not
                       maximized, the side pane can clip its own close control
                       past the right edge — main column stays reachable. */}
@@ -20727,7 +20820,8 @@ export function AppWorkbench() {
               (welcomeSession && !sideDockActive
                 ? " composer-wrap--welcome"
                 : "") +
-              (sideDockActive ? " composer-wrap--side-dock" : "")
+              (sideDockActive ? " composer-wrap--side-dock" : "") +
+              (resizingSidebar ? " is-sidebar-resizing" : "")
             }
             style={
               sideDockActive
@@ -21750,6 +21844,16 @@ export function AppWorkbench() {
           </div>
           </>
           )}
+          <BottomTerminal
+            locale={locale}
+            projectPath={effectiveProjectPath}
+            state={bottomTerminal.state}
+            onAddTab={bottomTerminal.addTab}
+            onCloseTab={bottomTerminal.closeTab}
+            onActivateTab={bottomTerminal.activateTab}
+            onHeightChange={bottomTerminal.setHeight}
+            onClosePanel={bottomTerminal.closePanel}
+          />
         </main>
 
         {/* RIGHT — session-linked project resource viewer (fully hideable + resizable) */}
@@ -21763,13 +21867,12 @@ export function AppWorkbench() {
           aria-label={tr("a11y.resourcesPane")}
           aria-hidden={layout.asideCollapsed}
           style={
-            !layout.asideCollapsed && !phoneLayout && !hideChatForSideExpand
-              ? {
-                  width: layout.asideWidth,
-                  minWidth: layout.asideWidth,
-                  maxWidth: layout.asideWidth,
-                }
-              : undefined
+            phoneLayout || hideChatForSideExpand
+              ? undefined
+              : ({
+                  ...paneSplitSizeStyle(asidePaint, "x", resizingAside),
+                  ["--aside-rail-min"]: `${layout.asideWidth || DEFAULT_LAYOUT.asideWidth}px`,
+                } as CSSProperties)
           }
         >
           {!layout.asideCollapsed && !hideChatForSideExpand && (
@@ -21844,7 +21947,8 @@ export function AppWorkbench() {
           </div>
         </aside>
       </div>
-      ))}
+      </>
+      )}
 
       {phoneLayout ? (
         <>
