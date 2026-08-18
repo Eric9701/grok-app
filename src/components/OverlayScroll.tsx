@@ -29,7 +29,7 @@ type OverlayScrollProps = {
   onScroll?: (e: UIEvent<HTMLDivElement>) => void;
   /** Optional external ref to the scrolling viewport element. */
   viewportRef?: Ref<HTMLDivElement | null>;
-  /** Sidebar project-list reveal: hide the stale thumb, remasure after. */
+  /** Sidebar project-list reveal: hide the stale thumb, remeasure after. */
   syncTreeReveal?: boolean;
 };
 
@@ -67,12 +67,14 @@ export function OverlayScroll({
 
   const measure = useCallback(() => {
     if (runAfterPaneSplitMotion(measure)) return;
-    if (runAfterTreeRevealMotion(measure)) return;
+    if (syncTreeReveal && runAfterTreeRevealMotion(measure)) return;
     const el = viewportRef.current;
     if (!el) return;
     const { scrollTop, scrollHeight, clientHeight } = el;
     const needed = scrollHeight > clientHeight + 1;
-    el.style.overflowY = needed ? "auto" : "hidden";
+    if (syncTreeReveal) {
+      el.style.overflowY = needed ? "auto" : "hidden";
+    }
     if (!needed) {
       setThumb((t) => (t.needed ? { top: 0, height: 0, needed: false } : t));
       return;
@@ -88,7 +90,7 @@ export function OverlayScroll({
         : Math.round((scrollTop / (scrollHeight - clientHeight)) * maxTop) +
           inset;
     setThumb({ top, height, needed: true });
-  }, []);
+  }, [syncTreeReveal]);
 
   useEffect(() => {
     measure();

@@ -117,10 +117,12 @@ export function beginTreeRevealMotion(): () => void {
     open = false;
     motionCount = Math.max(0, motionCount - 1);
     if (motionCount > 0) return;
+    // Restore overflow (subscribers) before deferred align / measure.
+    // Waiters call findScrollParent, which skips overflow:hidden.
+    emitMotion(false);
     const waiters = [...idle];
     idle.clear();
     for (const fn of waiters) fn();
-    emitMotion(false);
   };
 }
 
@@ -134,5 +136,6 @@ export function runAfterTreeRevealMotion(fn: () => void): boolean {
 export function resetTreeRevealMotionForTests(): void {
   motionCount = 0;
   idle.clear();
+  if (watchers.size > 0) emitMotion(false);
   watchers.clear();
 }

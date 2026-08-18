@@ -132,6 +132,18 @@ describe("tree reveal motion deferral", () => {
     expect(seen).toEqual([true, false]);
     stop();
   });
+
+  it("restores overflow subscribers before deferred align waiters", () => {
+    const ran: string[] = [];
+    const stop = subscribeTreeRevealMotion((active) => {
+      if (!active) ran.push("overflow");
+    });
+    const end = beginTreeRevealMotion();
+    expect(runAfterTreeRevealMotion(() => ran.push("align"))).toBe(true);
+    end();
+    expect(ran).toEqual(["overflow", "align"]);
+    stop();
+  });
 });
 
 describe("tree-reveal CSS", () => {

@@ -66,6 +66,7 @@ export function SidebarTreeReveal({
     const inner = innerRef.current;
     if (!box) {
       firstCommitRef.current = false;
+      stopMotion();
       return;
     }
 
@@ -108,9 +109,15 @@ export function SidebarTreeReveal({
   }, [open, presence.mounted]);
 
   useEffect(() => {
-    if (!presence.mounted) return;
+    if (!presence.mounted) {
+      stopMotion();
+      return;
+    }
     const box = boxRef.current;
-    if (!box) return;
+    if (!box) {
+      stopMotion();
+      return;
+    }
     let cancelled = false;
 
     const finish = (next: number) => {
@@ -201,11 +208,7 @@ export function SidebarTreeReveal({
   return (
     <div
       ref={boxRef}
-      className={
-        "tree-reveal" +
-        (!open ? " is-closing" : "") +
-        (className ? ` ${className}` : "")
-      }
+      className={"tree-reveal" + (className ? ` ${className}` : "")}
       style={size == null ? undefined : treeRevealSizeStyle(size)}
       data-testid="tree-reveal"
       aria-hidden={!open || undefined}

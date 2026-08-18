@@ -129,13 +129,6 @@
     max-height var(--motion-normal) var(--motion-pane-ease);
 }
 
-.tree-reveal.is-closing {
-  transition:
-    height var(--motion-normal) var(--motion-pane-ease),
-    min-height var(--motion-normal) var(--motion-pane-ease),
-    max-height var(--motion-normal) var(--motion-pane-ease);
-}
-
 .tree-reveal__inner {
   overflow: hidden;
 }
