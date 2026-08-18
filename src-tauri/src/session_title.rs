@@ -83,8 +83,8 @@ fn clean_llm_title(raw: &str) -> Option<String> {
         .or_else(|| t.strip_prefix("标题:"))
         .or_else(|| t.strip_prefix("Title:"))
         .or_else(|| t.strip_prefix("Title："))
-        .or_else(|| t.strip_prefix("Заголовок:"))
-        .or_else(|| t.strip_prefix("Заголовок："))
+        .or_else(|| t.strip_prefix("\u{417}\u{430}\u{433}\u{43e}\u{43b}\u{43e}\u{432}\u{43e}\u{43a}:"))
+        .or_else(|| t.strip_prefix("\u{417}\u{430}\u{433}\u{43e}\u{43b}\u{43e}\u{432}\u{43e}\u{43a}："))
     {
         t = rest.trim().to_string();
     }
