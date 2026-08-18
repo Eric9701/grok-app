@@ -12,6 +12,7 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- **Create Image / Create Video in the composer + menu (#677)**: When the bundled Imagine skill is available, Add lists **Create Image** (localized Imagine) and **Create Video** (Imagine + a short video starter prompt). Skill id stays `imagine`.
 - **Side workbench CodeMirror editor (#661 follow-up)**: Files edit mode uses CodeMirror 6 (Atom One palette + line numbers, Tab as two spaces, ⌘/Ctrl+S). Markdown still uses TipTap. Preview mode is unchanged.
 - **Discover Claude / Cursor skills toggle**: Settings → Extensions → Skills can turn external compat discovery off. Independent session mode also writes `[compat.claude] skills` / `[compat.cursor] skills` in agent-home `config.toml`. Shared mode only hides them in the App (does not rewrite `~/.grok`).
 - **Session interrupt recovery**: Shutdown cancels the ACP TCP reader with the process, stamped events require an exact session owner, and per-session send claims/epochs survive reconnect so a kill cannot leave a ghost stream or a wedged queue.
@@ -19,6 +20,7 @@ See `docs/llm-wiki/release.md`.
 - **Project Spaces**: Sidebar groups projects into named spaces (All / Default / custom). Membership survives restart; search from All does not force a space switch. Name errors stay inline in the prompt (red), not a toast.
 
 **中文 · 新增**
+- **输入框 + 菜单可创作图像 / 视频（#677）**：有 Imagine 技能时，「添加」里出现「创作图像」和「创作视频」。技能 id 仍是 `imagine`；创作视频会带上短片起始提示。
 - **侧栏 CodeMirror 编辑器（#661 后续）**：Files 编辑模式改用 CodeMirror 6（Atom One 配色 + 行号，Tab 两个空格，⌘/Ctrl+S）。Markdown 仍用 TipTap。预览模式不变。
 - **探测 Claude / Cursor 技能开关**：设置 → 扩展 → 技能可关闭外源兼容探测。独立会话模式会写入 agent-home `config.toml`；共享模式只在应用内隐藏，不改写 `~/.grok`。
 - **会话中断恢复**：关掉 Agent 时一并取消 TCP 读；打戳事件必须对上会话主人；发送认领按会话隔离，重连后不会留下幽灵流或卡死的队列。
@@ -32,6 +34,7 @@ See `docs/llm-wiki/release.md`.
 - **桌面输入框上方始终显示工作区（#662）**：不再只在「已选项目的全新空草稿」才出现。沿用现有 `ComposerProjectMenu` 选择、添加或回到默认工作区。中文不再用「通用」。侧栏 `+` 保留。手机仍走工具页。
 
 ### Fixed
+- **Chat no longer freezes when a generated image first appears (#675, #676)**: The card first-paints a placeholder or cached thumb instead of the full Imagine PNG. Host cache hits read source width/height from a sidecar (or the thumb JPEG header) and do not decode the original again.
 - **Assistant body text no longer stacks on itself**: Conclusion markdown and work-fold tool stdout could occupy the same box when a parent flex column crushed their height (`overflow: visible` expand bodies then painted over the answer). Transcript rows, timeline children, and `.chat-md--answer` no longer shrink; expand-body `overflow: visible` is only used inside a capped/virtual scroller.
 - **Compact dialog overflow + help**: Long inline help on Compact context could exceed `.modal` max-height (`overflow: hidden`, no scroll body) and clip the Compact button. Descriptions move into a title `?` tip; the body scrolls and the footer stays pinned. Connect failure after confirm no longer fails silently.
 - **Pathless「文件」tab no longer stays beside an opened file**: Opening a file from the tree replaces the picker Files chip. Picking Files again focuses the open file instead of minting a second dead tab (which did nothing and could stall the pane).
@@ -55,6 +58,7 @@ See `docs/llm-wiki/release.md`.
 - **Transcript selection quotes**: Selecting text in a bubble shows a floating bar (copy, optional comment, add to chat). Quotes sit **beside** the draft as a compact “N notes / N 条注释” chip — they are not pasted into the input. They persist on project/session drafts and the send queue. The agent sees `Quoted excerpt` / `Comment` blocks; the journal stores `[[quote]]` / `[[note]]` fences so reload rebuilds the cards. Queue **Guide** serializes quotes (and re-queues them on failure). Send settlement compares quotes so a quote added during an in-flight send is not overwritten on failure. Switching sessions closes the selection bar.
 
 **中文 · 修复**
+- **对话出图那一下不再卡死（#675、#676）**：卡片首屏改占位或缓存缩略图，不再先解完整原图。Host 缓存命中读 sidecar / JPEG 头拿宽高，不再为读尺寸再解一遍原图。
 - **助手正文不再叠字**：结论 Markdown 和工作轨里的工具输出会被父级 flex 压扁到同一块区域（展开体 `overflow: visible` 再盖到答案上）。消息行、时间线子项和 `.chat-md--answer` 不再被压缩；只有带滚动条的工作列表才允许展开体溢出。
 - **压缩弹窗过长、按钮被裁切**：原先说明全铺在弹窗里，超出 `.modal` 最大高度后底部「压缩」被裁掉（容器 `overflow: hidden`、没有可滚 body）。说明收到标题旁 `?`，正文可滚、底部按钮固定。确认后连不上 Agent 也不再静默失败。
 - **斜杠菜单 `/rc`、`/review-` 会选中 `review-commit`（#644）**：把 `-` 当词界以匹配 kebab 首字母，名字前缀优先于描述，且只有名字全无命中时才用描述兜底。YAML 里互相点名 `review-commit` 的 skill 不再抢走默认高亮。
