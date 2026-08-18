@@ -157,6 +157,22 @@ describe("session projection", () => {
     expect(truncateBeforeLastUser([])).toEqual([]);
   });
 
+  it("truncateBeforeLastUser skips interjections when finding the last prompt", () => {
+    const msgs: ChatMessage[] = [
+      { id: "u1", role: "user", content: "start" },
+      { id: "a1", role: "assistant", content: "ok" },
+      { id: "s1", role: "user", content: "还没好吗", marker: "interjection" },
+      { id: "s2", role: "user", content: "？", marker: "interjection" },
+      { id: "u2", role: "user", content: "做的怎么样了" },
+    ];
+    expect(truncateBeforeLastUser(msgs).map((m) => m.id)).toEqual([
+      "u1",
+      "a1",
+      "s1",
+      "s2",
+    ]);
+  });
+
   it("lastRegenerableAssistantId / canRegenerateAssistant gate last turn only", () => {
     const msgs: ChatMessage[] = [
       { id: "u1", role: "user", content: "first" },

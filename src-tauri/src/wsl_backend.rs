@@ -487,6 +487,7 @@ pub fn start_wsl_tokio_command(
 /// Do **not** forward Windows `PATH` (it breaks Linux tool resolution).
 const WSLENV_KEYS: &str = concat!(
     "GROK_HOME/p:",
+    "GROK_CONFIG:",
     "GROK_CLAUDE_MCPS_ENABLED:",
     "GROK_CURSOR_MCPS_ENABLED:",
     "GROK_SANDBOX:",

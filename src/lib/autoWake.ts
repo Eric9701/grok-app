@@ -1,20 +1,25 @@
 /**
- * Auto-wake (CLI config `auto_wake_enabled`) — pure normalize helpers.
+ * Auto-wake (CLI `[features].auto_wake`) — pure normalize helpers.
  *
  * When enabled, Grok Build may inject a synthetic turn after background
  * work completes (bash / monitor / task completion, scheduled loops) so the
  * agent can react without a new user prompt. Behavior is entirely CLI-side.
  *
- * - Config key (agent-home independent mode): top-level `auto_wake_enabled`.
- * - No well-documented CLI flag. Env `GROK_AUTO_WAKE` appears pattern-shaped
- *   (wildcards) in the CLI binary — App does **not** invent 0/1 env overrides.
- * - App default: **off** (opt-in). Soft-respawn after change so the next agent
- *   process reloads independent agent-home config. Older / unknown CLIs that
- *   ignore the key soft-fail (config write is still safe).
+ * - Independent: write agent-home `auto_wake_enabled` + `[features].auto_wake`.
+ * - Shared: spawn injects `GROK_CONFIG` `{"features":{"auto_wake":true}}`
+ *   (allowlisted overlay — never rewrites `~/.grok`).
+ * - App default: **off** (opt-in). Soft-respawn after change.
  */
 
 /** Top-level config.toml key. */
 export const AUTO_WAKE_CONFIG_KEY = "auto_wake_enabled";
+
+/** `GROK_CONFIG` overlay used in shared session-data mode. */
+export function autoWakeGrokConfigOverlay(
+  enabled: boolean | null | undefined,
+): { features: { auto_wake: boolean } } {
+  return { features: { auto_wake: normalizeAutoWakeEnabled(enabled) } };
+}
 
 /**
  * Normalize the enable toggle.

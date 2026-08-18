@@ -7,7 +7,8 @@ use tauri::{AppHandle, Emitter};
 
 use crate::session_fsm::SessionState;
 use crate::stream_stall::{
-    is_maybe_done_candidate, is_stream_stalled, should_emit_soft_stall, stall_tier_from_evidence,
+    effective_stall_seconds, is_maybe_done_candidate, is_stream_stalled, should_emit_soft_stall,
+    stall_tier_from_evidence,
 };
 
 use super::*;
@@ -95,6 +96,9 @@ impl SessionManager {
                 session_id: s.app_session_id.clone(),
             });
         }
+        let saw_model_this_turn = s.saw_model_output || !s.stream_buf.trim().is_empty();
+        let saw_tools = s.tools_this_turn > 0 || !s.open_tool_ids.is_empty();
+        let stall_secs = effective_stall_seconds(stall_secs, saw_model_this_turn, saw_tools);
         // No silence yet — keep working.
         if !is_stream_stalled(s.last_stream_progress, stall_secs, now) {
             return None;
@@ -109,11 +113,9 @@ impl SessionManager {
 
         // This-turn body only (do not use prior-turn journal — that false-triggers
         // maybe_done tier on a new turn that has not produced text yet).
-        let saw_model_this_turn = s.saw_model_output || !s.stream_buf.trim().is_empty();
         if saw_model_this_turn {
             s.saw_model_output = true;
         }
-        let saw_tools = s.tools_this_turn > 0 || !s.open_tool_ids.is_empty();
         // Soft-banner tier may look at prior journal so we never say pre-token
         // after a full earlier answer in the same chat.
         let saw_model_for_tier =

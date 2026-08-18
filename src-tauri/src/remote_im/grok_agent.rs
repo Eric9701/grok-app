@@ -185,6 +185,12 @@ fn apply_agent_env(cmd: &mut Command) {
     // Same proxy injection as ACP spawn (NEW-02) — without this, Remote IM
     // turns go direct and only work when the OS has TUN.
     crate::proxy::apply_to_tokio_command(cmd);
+    let settings = crate::store::load_settings();
+    crate::agent_auto_wake::apply_auto_wake_to_command(
+        cmd,
+        settings.auto_wake_enabled,
+        &settings.session_data_mode,
+    );
 }
 
 /// One-shot headless turn with JSON-line stream parse (compatible with Grok Build CLI).

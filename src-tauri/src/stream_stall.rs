@@ -19,6 +19,11 @@ use std::time::{Duration, Instant};
 /// without being stuck; 180s false-stalled too often.
 pub const DEFAULT_STREAM_STALL_SECONDS: u32 = 600;
 
+/// Shorter silence window when a turn has produced **no tokens and no tools**.
+/// A dead gateway / hung `session/prompt` should offer Keep waiting / End turn
+/// (retry) well before the 10-minute default. Never auto-cancels.
+pub const PRE_FIRST_TOKEN_STALL_SECONDS: u32 = 45;
+
 /// Prior product defaults (120 then 180). Used only for one-shot settings migration.
 pub const LEGACY_STREAM_STALL_SECONDS: &[u32] = &[120, 180];
 
@@ -49,6 +54,22 @@ pub const MAX_SOFT_STALL_EMITS_PER_TURN: u32 = 64;
 /// Normalize user/settings value for stream stall timeout (seconds).
 pub fn normalize_stream_stall_seconds(raw: u32) -> u32 {
     raw.clamp(MIN_STREAM_STALL_SECONDS, MAX_STREAM_STALL_SECONDS)
+}
+
+/// Effective silence window for this turn.
+///
+/// Pre-first-token (no body, no tools) uses a shorter cap so a hung gateway
+/// can surface retry UI; other tiers keep the user setting. Never auto-ends.
+pub fn effective_stall_seconds(
+    settings_seconds: u32,
+    saw_model_output: bool,
+    saw_tool_activity: bool,
+) -> u32 {
+    let settings = normalize_stream_stall_seconds(settings_seconds);
+    if !saw_model_output && !saw_tool_activity {
+        return settings.min(PRE_FIRST_TOKEN_STALL_SECONDS.max(MIN_STREAM_STALL_SECONDS));
+    }
+    settings
 }
 
 /// Hard end silence: at least 10 minutes, or 3× soft window (whichever larger),
@@ -342,8 +363,17 @@ mod tests {
     fn defaults_match_spec() {
         assert_eq!(DEFAULT_STREAM_STALL_SECONDS, 600);
         assert_eq!(MIN_STREAM_STALL_SECONDS, 15);
+        assert_eq!(PRE_FIRST_TOKEN_STALL_SECONDS, 45);
         assert!(MAX_SOFT_STALL_EMITS_PER_TURN >= 8);
         assert!(LEGACY_STREAM_STALL_SECONDS.contains(&180));
+    }
+
+    #[test]
+    fn pre_token_uses_shorter_window() {
+        assert_eq!(effective_stall_seconds(600, false, false), 45);
+        assert_eq!(effective_stall_seconds(30, false, false), 30);
+        assert_eq!(effective_stall_seconds(600, true, false), 600);
+        assert_eq!(effective_stall_seconds(600, false, true), 600);
     }
 
     #[test]

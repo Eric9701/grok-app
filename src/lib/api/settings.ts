@@ -152,10 +152,11 @@ export interface AppSettings {
    */
   subagentWorktreeSnapshotEnabled?: boolean;
   /**
-   * Enable CLI auto-wake (config `auto_wake_enabled`). Default false (opt-in).
+   * Enable CLI auto-wake (`[features].auto_wake`). Default false (opt-in).
    * When on, Grok Build may inject a synthetic turn after background work
-   * completes (CLI-side). Independent mode writes agent-home `auto_wake_enabled`
-   * only — no invented env override. Soft-respawns on change.
+   * completes (CLI-side). Independent mode writes agent-home keys. Shared
+   * mode injects a `GROK_CONFIG` overlay (does not rewrite `~/.grok`).
+   * Soft-respawns on change.
    */
   autoWakeEnabled?: boolean;
   /**

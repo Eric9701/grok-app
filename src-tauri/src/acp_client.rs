@@ -337,6 +337,9 @@ pub struct AcpClient {
     /// provider section id; that mis-labeled processes as "official" and
     /// let them be reused after auth.json was cleared → #528 re-login).
     custom_route: bool,
+    /// Agent `initialize` advertisement for rewind RPCs.
+    /// `None` = unknown (try RPC); `Some(false)` = skip; `Some(true)` = call.
+    rewind_supported: ParkingMutex<Option<bool>>,
 }
 
 /// Options applied at agent process start (CLI flags).
@@ -1497,6 +1500,11 @@ impl AcpClient {
             two_pass_compaction,
             cli_ver.as_deref(),
         );
+        crate::agent_auto_wake::apply_auto_wake_to_command(
+            &mut cmd,
+            auto_wake_enabled,
+            session_data_mode,
+        );
         cmd.arg("agent");
         cmd.arg(leader_spawn_flag(use_leader));
         // Agent option: `--agent-profile <PATH>` (before `stdio`). Path only —
@@ -1633,6 +1641,7 @@ impl AcpClient {
             empty_mcp_servers,
             sandbox_profile: ParkingMutex::new(sandbox.map(|sb| sb.profile.clone())),
             custom_route,
+            rewind_supported: ParkingMutex::new(None),
         });
 
         client.start_read_loop(Box::new(stdout));
@@ -1728,6 +1737,7 @@ impl AcpClient {
             sandbox_profile: ParkingMutex::new(None),
             // Remote ACP: treat as official-class for reuse (no local auth strip).
             custom_route: false,
+            rewind_supported: ParkingMutex::new(None),
         });
         client.start_read_loop(Box::new(read_half));
         Ok((client, event_rx))
@@ -2770,11 +2780,13 @@ impl AcpClient {
             .and_then(|v| v.as_str());
         crate::cli_probe::record_acp_agent_version(acp_agent_version);
         info!(
-            "acp initialized agentVersion={:?} loadSession={:?}",
+            "acp initialized agentVersion={:?} loadSession={:?} rewind={:?}",
             acp_agent_version,
             init.pointer("/agentCapabilities/loadSession")
                 .or_else(|| init.pointer("/capabilities/loadSession")),
+            initialize_advertises_rewind(&init),
         );
+        *self.rewind_supported.lock() = initialize_advertises_rewind(&init);
 
         // Live per-model context windows (ClaudeCode `_meta.modelState`).
         // Soft-fail silently when absent — Grok CLI does not expose this yet.
@@ -3433,12 +3445,19 @@ impl AcpClient {
     }
 
     /// Truncate agent conversation on an explicit session (shared-process safe).
+    ///
+    /// Tries `x.ai/rewind/execute` then `_x.ai/rewind/execute` (stdio often
+    /// registers the underscored ext-method, same as interject). Skips the RPC
+    /// when `initialize` explicitly did not advertise rewind.
     pub async fn rewind_execute_for(
         &self,
         session_id: &str,
         target_prompt_index: u32,
         restore_files: bool,
     ) -> Result<Value, String> {
+        if self.rewind_supported.lock().as_ref() == Some(&false) {
+            return Err("rewind not advertised by agent initialize".into());
+        }
         // Prefer conversation truncate; file restore is optional (edit-resend usually false).
         let mut params = json!({
             "sessionId": session_id,
@@ -3449,7 +3468,21 @@ impl AcpClient {
             // Some builds accept this camelCase alias.
             obj.insert("restore_files".into(), Value::Bool(restore_files));
         }
-        self.request("x.ai/rewind/execute", params).await
+        let mut last_err = String::new();
+        for method in rewind_execute_method_candidates() {
+            match self.request(method, params.clone()).await {
+                Ok(v) => {
+                    *self.rewind_supported.lock() = Some(true);
+                    return Ok(v);
+                }
+                Err(e) if rpc_looks_like_method_not_found(&e) => {
+                    last_err = e;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        *self.rewind_supported.lock() = Some(false);
+        Err(last_err)
     }
 
     /// Unblock a waiting `session/prompt` RPC (e.g. after host circuit-breaker cancel).
@@ -3640,6 +3673,58 @@ pub fn rpc_looks_like_method_not_found(err: &str) -> bool {
         || lower.contains("unknown method")
         || lower.contains("unknown ext_method")
         || lower.contains("method not supported")
+}
+
+/// Wire method names for conversation rewind (canonical, then stdio underscore).
+pub fn rewind_execute_method_candidates() -> &'static [&'static str] {
+    &["x.ai/rewind/execute", "_x.ai/rewind/execute"]
+}
+
+/// Parse `initialize` for rewind support.
+///
+/// - `Some(true)` when a methods list includes rewind
+/// - `Some(false)` when an explicit methods list exists and omits rewind
+/// - `None` when initialize does not publish a methods list (try RPC)
+pub fn initialize_advertises_rewind(init: &Value) -> Option<bool> {
+    const LISTS: &[&str] = &[
+        "/_meta/extMethods",
+        "/_meta/rpcMethods",
+        "/_meta/methods",
+        "/agentCapabilities/extMethods",
+        "/agentCapabilities/_meta/extMethods",
+        "/capabilities/extMethods",
+    ];
+    let mut saw_list = false;
+    for pointer in LISTS {
+        let Some(arr) = init.pointer(pointer).and_then(|v| v.as_array()) else {
+            continue;
+        };
+        saw_list = true;
+        for item in arr {
+            let name = item.as_str().map(str::to_string).or_else(|| {
+                item.get("method")
+                    .or_else(|| item.get("name"))
+                    .or_else(|| item.get("id"))
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            });
+            if name.as_deref().is_some_and(method_looks_like_rewind) {
+                return Some(true);
+            }
+        }
+    }
+    if saw_list {
+        return Some(false);
+    }
+    None
+}
+
+fn method_looks_like_rewind(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.contains("rewind/execute")
+        || lower.contains("x.ai/rewind")
+        || lower.contains("_x.ai/rewind")
+        || lower == "rewind"
 }
 
 /// Host → agent `session/cancel` notification params.

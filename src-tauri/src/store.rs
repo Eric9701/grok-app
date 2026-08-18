@@ -415,12 +415,13 @@ pub struct AppSettings {
     /// key; spawn sets env (soft-fail when CLI is known older). Soft-respawns.
     #[serde(default)]
     pub subagent_worktree_snapshot_enabled: bool,
-    /// Enable CLI auto-wake (config `auto_wake_enabled`): when on, Grok Build may
+    /// Enable CLI auto-wake (`[features].auto_wake`): when on, Grok Build may
     /// inject a synthetic turn after background work completes (bash / monitor /
-    /// task / loop). Default **false** (opt-in; CLI default not documented).
-    /// Independent mode writes the top-level agent-home key only (no invented env
-    /// override — `GROK_AUTO_WAKE` is pattern-shaped). Soft-respawns so the next
-    /// agent process reloads config. Older CLIs that ignore the key soft-fail.
+    /// task / loop). Default **false** (opt-in). Independent mode writes
+    /// agent-home `auto_wake_enabled` + `[features].auto_wake`. Shared mode
+    /// never rewrites `~/.grok` — spawn injects a `GROK_CONFIG` overlay instead.
+    /// Soft-respawns so the next agent process reloads. Older CLIs ignore the
+    /// overlay / key (soft-fail).
     #[serde(default)]
     pub auto_wake_enabled: bool,
     /// Enable Grok Build workflows (`workflows_enabled` in agent-home config.toml).
@@ -2091,6 +2092,45 @@ pub fn truncate_through_user_prompt(
     let end = end_index_through_user_prompt(messages, user_prompt_index)
         .ok_or_else(|| format!("user prompt index out of range: {user_prompt_index}"))?;
     Ok(messages[..end].to_vec())
+}
+
+/// Count real user prompts (excludes mid-turn `interjection` markers).
+pub fn user_prompt_count(messages: &[ChatMessageStored]) -> u32 {
+    messages
+        .iter()
+        .filter(|m| is_user_prompt_message(m))
+        .count() as u32
+}
+
+/// ACP `targetPromptIndex` that keeps every prompt except the last one.
+///
+/// TUI `/rewind` keeps the selected turn and drops after it. Drop-last therefore
+/// targets the previous prompt when `count > 1`, or `0` when editing the only
+/// prompt. `None` when there is nothing to rewind.
+pub fn drop_last_user_prompt_exec_index(user_prompt_count: u32) -> Option<u32> {
+    match user_prompt_count {
+        0 => None,
+        1 => Some(0),
+        n => Some(n - 2),
+    }
+}
+
+/// Exclusive cut index: keep messages strictly before the last real user prompt.
+pub fn cut_index_before_last_user_prompt(messages: &[ChatMessageStored]) -> usize {
+    messages
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, m)| is_user_prompt_message(m))
+        .map(|(i, _)| i)
+        .unwrap_or(messages.len())
+}
+
+/// Drop-last may truncate the Host journal only when agent rewind was skipped
+/// (mock / disconnected) or succeeded. A failed live RPC must leave the journal
+/// untouched — otherwise UI edit-resend can destroy turns the agent never dropped.
+pub fn drop_last_should_truncate_journal(agent_rewind_ok: Option<bool>) -> bool {
+    !matches!(agent_rewind_ok, Some(false))
 }
 
 /// Fork a session: new journal + meta, same project.
@@ -4039,5 +4079,51 @@ mod tests {
 
         std::env::remove_var("GROK_APP_HOME");
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    fn stored_msg(id: &str, role: &str, content: &str, marker: Option<&str>) -> ChatMessageStored {
+        ChatMessageStored {
+            id: id.into(),
+            role: role.into(),
+            content: content.into(),
+            thought: None,
+            created_at: Utc::now(),
+            is_error: false,
+            attachments: None,
+            marker: marker.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn user_prompt_count_skips_interjections() {
+        let msgs = vec![
+            stored_msg("u1", "user", "start the lookbook", None),
+            stored_msg("a1", "assistant", "ok", None),
+            stored_msg("u2", "user", "begin", None),
+            stored_msg("a2", "assistant", "running", None),
+            stored_msg("s1", "user", "还没好吗", Some("interjection")),
+            stored_msg("s2", "user", "？", Some("interjection")),
+            stored_msg("u3", "user", "做的怎么样了", None),
+        ];
+        assert_eq!(user_prompt_count(&msgs), 3);
+        assert_eq!(drop_last_user_prompt_exec_index(3), Some(1));
+        assert_eq!(cut_index_before_last_user_prompt(&msgs), 6);
+        let kept = &msgs[..cut_index_before_last_user_prompt(&msgs)];
+        assert_eq!(kept.last().map(|m| m.id.as_str()), Some("s2"));
+        assert_eq!(user_prompt_count(kept), 2);
+    }
+
+    #[test]
+    fn drop_last_exec_index_edges() {
+        assert_eq!(drop_last_user_prompt_exec_index(0), None);
+        assert_eq!(drop_last_user_prompt_exec_index(1), Some(0));
+        assert_eq!(drop_last_user_prompt_exec_index(2), Some(0));
+    }
+
+    #[test]
+    fn drop_last_keeps_journal_when_agent_rewind_fails() {
+        assert!(drop_last_should_truncate_journal(None));
+        assert!(drop_last_should_truncate_journal(Some(true)));
+        assert!(!drop_last_should_truncate_journal(Some(false)));
     }
 }

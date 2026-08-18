@@ -3,6 +3,7 @@ import {
   AUTO_WAKE_CONFIG_KEY,
   autoWakeConfigAssignment,
   autoWakeEqual,
+  autoWakeGrokConfigOverlay,
   normalizeAutoWakeEnabled,
 } from "./autoWake";
 
@@ -41,5 +42,16 @@ describe("autoWakeEqual", () => {
 describe("config key constant", () => {
   it("matches CLI surface", () => {
     expect(AUTO_WAKE_CONFIG_KEY).toBe("auto_wake_enabled");
+  });
+});
+
+describe("autoWakeGrokConfigOverlay", () => {
+  it("emits features.auto_wake for GROK_CONFIG", () => {
+    expect(autoWakeGrokConfigOverlay(true)).toEqual({
+      features: { auto_wake: true },
+    });
+    expect(autoWakeGrokConfigOverlay(null)).toEqual({
+      features: { auto_wake: false },
+    });
   });
 });

@@ -34,7 +34,7 @@ impl SessionManager {
                 return Err("cannot edit while a turn is running".into());
             }
             let msgs = store::load_messages(&s.app_session_id);
-            let user_prompt_count = msgs.iter().filter(|m| m.role == "user").count() as u32;
+            let user_prompt_count = store::user_prompt_count(&msgs);
             if user_prompt_count == 0 {
                 return Err("no user message to rewind".into());
             }
@@ -50,66 +50,61 @@ impl SessionManager {
         // Agent: discard last user turn. TUI semantics keep the selected turn and drop after;
         // so for "drop last user" we target the previous turn when count > 1.
         // When count == 1, execute target 0 with best-effort; host journal is the source of truth for UI.
+        let mut agent_rewind_ok: Option<bool> = None;
         if backend != "mock_acp" && !AcpClient::use_mock() {
             if let Some(client) = acp {
                 let target = user_prompt_count.saturating_sub(1);
-                // Prefer rewinding to previous turn (keep 0..n-2, drop n-1..).
-                // When only one user turn: try target 0 then clear local journal fully.
-                let exec_index = if user_prompt_count <= 1 {
-                    0u32
-                } else {
-                    // Keep through previous user turn → drop last.
-                    user_prompt_count - 2
-                };
-                match client
-                    .rewind_execute_for(
-                        agent_sid.as_deref().ok_or("chat has no agent session id")?,
-                        exec_index,
-                        false,
-                    )
-                    .await
-                {
+                let exec_index =
+                    store::drop_last_user_prompt_exec_index(user_prompt_count).unwrap_or(0);
+                let sid = agent_sid.as_deref().ok_or("chat has no agent session id")?;
+                match client.rewind_execute_for(sid, exec_index, false).await {
                     Ok(_) => {
+                        agent_rewind_ok = Some(true);
                         tracing::info!(
                             target: "session",
                             "rewind_drop_last_user_turn: agent rewound target={exec_index} (user_turns={user_prompt_count})"
                         );
                     }
                     Err(e) => {
-                        // Fallback: try targeting the last turn itself (some builds discard at/after index).
-                        tracing::warn!(
-                            target: "session",
-                            error = %e,
-                            "rewind_execute({exec_index}) failed; trying last-turn index {target}"
-                        );
-                        if let Err(e2) = client
-                            .rewind_execute_for(
-                                agent_sid.as_deref().ok_or("chat has no agent session id")?,
-                                target,
-                                false,
-                            )
-                            .await
-                        {
+                        agent_rewind_ok = Some(false);
+                        if crate::acp_client::rpc_looks_like_method_not_found(&e) {
                             tracing::warn!(
                                 target: "session",
-                                error = %e2,
-                                "agent rewind failed; local journal still truncated"
+                                error = %e,
+                                "rewind_execute({exec_index}) failed; leaving local journal intact"
                             );
+                        } else {
+                            // Fallback: try targeting the last turn itself (some builds discard at/after index).
+                            tracing::warn!(
+                                target: "session",
+                                error = %e,
+                                "rewind_execute({exec_index}) failed; trying last-turn index {target}"
+                            );
+                            match client.rewind_execute_for(sid, target, false).await {
+                                Ok(_) => {
+                                    agent_rewind_ok = Some(true);
+                                }
+                                Err(e2) => {
+                                    tracing::warn!(
+                                        target: "session",
+                                        error = %e2,
+                                        "agent rewind failed; leaving local journal intact"
+                                    );
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Local journal: keep messages strictly before the last user message.
-        let msgs = store::load_messages(&app_sid);
-        let mut cut = msgs.len();
-        for (i, m) in msgs.iter().enumerate().rev() {
-            if m.role == "user" {
-                cut = i;
-                break;
-            }
+        if !store::drop_last_should_truncate_journal(agent_rewind_ok) {
+            return Err("agent rewind failed; local journal left intact".into());
         }
+
+        // Local journal: keep messages strictly before the last *prompt* user message.
+        let msgs = store::load_messages(&app_sid);
+        let cut = store::cut_index_before_last_user_prompt(&msgs);
         let kept: Vec<_> = msgs.into_iter().take(cut).collect();
         store::replace_messages(&app_sid, &kept)?;
 
@@ -152,7 +147,7 @@ impl SessionManager {
         let mut out = Vec::new();
         let mut idx = 0u32;
         for m in msgs {
-            if m.role != "user" {
+            if !store::is_user_prompt_message(&m) {
                 continue;
             }
             let raw = m.content.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -175,8 +170,8 @@ impl SessionManager {
     }
 
     /// Rewind a session to a user-prompt index (keep that turn, drop after).
-    /// Always truncates the local journal. Agent `x.ai/rewind/execute` is best-effort
-    /// when this session is the live ACP session.
+    /// Truncates the local journal to the selected prompt. Agent rewind is
+    /// best-effort when this session is the live ACP session (`agent_ok`).
     pub async fn rewind_to_prompt_index(
         self: &Arc<Self>,
         app: AppHandle,
@@ -216,7 +211,7 @@ impl SessionManager {
         }
 
         let msgs = store::load_messages(&app_sid);
-        let user_count = msgs.iter().filter(|m| m.role == "user").count() as u32;
+        let user_count = store::user_prompt_count(&msgs);
         if user_count == 0 {
             return Err("no user messages to rewind".into());
         }
