@@ -6,6 +6,9 @@ import { ruErrors } from "./ru/errors";
 import { ruExtra } from "./ru/extra";
 import { ruSession } from "./ru/session";
 import { ruSettingsVisible } from "./ru/settings-visible";
+import { ruSlash } from "./ru/slash";
+import { ruTasks } from "./ru/tasks";
+import { ruWorkspace } from "./ru/workspace";
 import { zh } from "./zh";
 import { zhTW } from "./zh-TW";
 
@@ -23,6 +26,9 @@ export const messages: Record<Locale, Record<MessageKey, string>> = {
     ...ruErrors,
     ...ruSession,
     ...ruSettingsVisible,
+    ...ruSlash,
+    ...ruTasks,
+    ...ruWorkspace,
   },
   zh,
   "zh-TW": zhTW,
