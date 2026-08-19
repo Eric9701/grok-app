@@ -33,6 +33,8 @@ static MENU_OPEN: AtomicBool = AtomicBool::new(false);
 static WATCH_STARTED: AtomicBool = AtomicBool::new(false);
 static WEBVIEW_READY: AtomicBool = AtomicBool::new(false);
 static WANT_SHOW: AtomicBool = AtomicBool::new(false);
+/// `u8::MAX` = unknown. 0/1 = last `set_ignore_cursor_events` value.
+static LAST_IGNORE_CURSOR: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(u8::MAX);
 static CACHED_SIZE_PX: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(128);
 static SHOW_LOCK: Mutex<()> = Mutex::new(());
 
@@ -689,7 +691,39 @@ pub fn should_return_main_key(pet_focused: bool, main_visible: bool, main_minimi
     pet_focused && main_visible && !main_minimized
 }
 
-fn yield_key_to_main(app: &AppHandle) {
+/// After `show()`, macOS `makeKeyAndOrderFront` can make the overlay the key
+/// window even when `focusable(false)` keeps `is_focused()` false.
+pub fn should_force_return_main_key_after_show(
+    linux: bool,
+    main_visible: bool,
+    main_minimized: bool,
+) -> bool {
+    !linux && main_visible && !main_minimized
+}
+
+/// Skip redundant `set_ignore_cursor_events` — repeating it every poll tick
+/// remaps mouse routing in the workbench and arms session drag on a click.
+pub fn pet_ignore_cursor_should_apply(prev: Option<bool>, next: bool) -> bool {
+    prev != Some(next)
+}
+
+fn last_ignore_cursor() -> Option<bool> {
+    match LAST_IGNORE_CURSOR.load(Ordering::Relaxed) {
+        0 => Some(false),
+        1 => Some(true),
+        _ => None,
+    }
+}
+
+fn remember_ignore_cursor(next: bool) {
+    LAST_IGNORE_CURSOR.store(if next { 1 } else { 0 }, Ordering::Relaxed);
+}
+
+fn forget_ignore_cursor() {
+    LAST_IGNORE_CURSOR.store(u8::MAX, Ordering::Relaxed);
+}
+
+fn yield_key_to_main(app: &AppHandle, after_show: bool) {
     let Some(pet) = app.get_webview_window(PET_WINDOW_LABEL) else {
         return;
     };
@@ -697,11 +731,16 @@ fn yield_key_to_main(app: &AppHandle) {
     let Some(main) = app.get_webview_window("main") else {
         return;
     };
-    if !should_return_main_key(
-        pet_focused,
-        main.is_visible().unwrap_or(false),
-        main.is_minimized().unwrap_or(false),
-    ) {
+    let main_visible = main.is_visible().unwrap_or(false);
+    let main_minimized = main.is_minimized().unwrap_or(false);
+    let steal = should_return_main_key(pet_focused, main_visible, main_minimized)
+        || (after_show
+            && should_force_return_main_key_after_show(
+                cfg!(target_os = "linux"),
+                main_visible,
+                main_minimized,
+            ));
+    if !steal {
         return;
     }
     let _ = main.set_focus();
@@ -718,7 +757,7 @@ fn reveal_if_wanted(win: &tauri::WebviewWindow) {
     apply_window_chrome(win);
     let _ = win.show();
     apply_window_chrome(win);
-    yield_key_to_main(win.app_handle());
+    yield_key_to_main(win.app_handle(), true);
 }
 
 /// Build (or reuse) the overlay. Never focuses the pet window.
@@ -791,7 +830,7 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
                     DRAGGING.load(Ordering::Relaxed),
                     MENU_OPEN.load(Ordering::Relaxed),
                 ) {
-                    yield_key_to_main(&handle);
+                    yield_key_to_main(&handle, false);
                 }
             }
             tauri::WindowEvent::Destroyed => {
@@ -833,6 +872,7 @@ pub fn show_pet(app: &AppHandle) -> Result<(), String> {
         }
     }
     WANT_SHOW.store(true, Ordering::SeqCst);
+    forget_ignore_cursor();
     // Transparent boot (index.html + init script) already hides the splash.
     // Do not wait on WEBVIEW_READY — first toggle used to look like a no-op
     // while the pet bundle was still booting.
@@ -842,7 +882,7 @@ pub fn show_pet(app: &AppHandle) -> Result<(), String> {
         let _ = win.show();
         apply_window_chrome(&win);
     }
-    yield_key_to_main(app);
+    yield_key_to_main(app, true);
     // GTK reapplies the app menubar on map; strip again after realize.
     let later = win.clone();
     tauri::async_runtime::spawn(async move {
@@ -862,6 +902,7 @@ pub fn hide_pet(app: &AppHandle) -> Result<(), String> {
     save_prefs(&prefs)?;
     if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
         let _ = win.set_ignore_cursor_events(true);
+        remember_ignore_cursor(true);
         win.hide().map_err(|e| e.to_string())?;
         // Do not destroy() here: CloseRequested (File>Close) also calls hide_pet,
         // and destroy-from-that-handler can deadlock the window event loop.
@@ -938,7 +979,10 @@ pub fn start_cursor_watch(app: AppHandle) {
                 &chrome,
             );
             if let Some(ignore) = pet_poll_ignore_cursor(false, over) {
-                let _ = win.set_ignore_cursor_events(ignore);
+                if pet_ignore_cursor_should_apply(last_ignore_cursor(), ignore) {
+                    let _ = win.set_ignore_cursor_events(ignore);
+                    remember_ignore_cursor(ignore);
+                }
             }
             // Screen-space look target so eyes track the pointer even when
             // the overlay is click-through (no webview pointer events).
@@ -1392,6 +1436,29 @@ mod tests {
             !should_return_main_key(true, true, true),
             "minimized workbench must not be raised"
         );
+    }
+
+    #[test]
+    fn show_forces_main_key_back_when_pet_is_unfocused() {
+        // macOS show() uses makeKeyAndOrderFront while focusable(false)
+        // keeps is_focused() false — still stole key from the workbench.
+        assert!(should_force_return_main_key_after_show(false, true, false));
+        assert!(
+            !should_force_return_main_key_after_show(true, true, false),
+            "Linux same-tick yield eats the overlay click"
+        );
+        assert!(!should_force_return_main_key_after_show(
+            false, false, false
+        ));
+        assert!(!should_force_return_main_key_after_show(false, true, true));
+    }
+
+    #[test]
+    fn ignore_cursor_only_applies_when_the_value_changes() {
+        assert!(pet_ignore_cursor_should_apply(None, true));
+        assert!(!pet_ignore_cursor_should_apply(Some(true), true));
+        assert!(pet_ignore_cursor_should_apply(Some(true), false));
+        assert!(!pet_ignore_cursor_should_apply(Some(false), false));
     }
 
     #[test]

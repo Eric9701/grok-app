@@ -6,6 +6,7 @@ import {
   SESSION_DRAG_THRESHOLD_PX,
   sessionDragArmDecision,
   sessionDragDropFromElements,
+  sessionDragShouldTrackPointer,
 } from "@/hooks/useSidebarSessionMoveDrag";
 
 function rowWithChrome() {
@@ -78,6 +79,20 @@ describe("sidebar attach vs move gestures", () => {
         buttons: 0,
       }),
     ).toBe("ignore");
+  });
+
+  it("does not arm drag while the workbench is still taking key from the pet", () => {
+    expect(sessionDragShouldTrackPointer(false)).toBe(false);
+    expect(sessionDragShouldTrackPointer(true)).toBe(true);
+    expect(
+      sessionDragArmDecision({
+        dx: SESSION_DRAG_THRESHOLD_PX,
+        dy: 0,
+        elapsedMs: SESSION_DRAG_HOLD_MS,
+        buttons: 1,
+        activationDuring: true,
+      }),
+    ).toBe("rebase");
   });
 
   it("prefers composer attach over project move in the hit stack", () => {

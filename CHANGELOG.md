@@ -12,22 +12,24 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Fixed
-- **Sidebar session drag needs a clearer move**: Opening a chat no longer turns into a drag from an 8px twitch or the first-click synthetic jump. The gesture waits for 16px after an 80ms hold, and rebases the origin if that jump happens too early.
+- **Sidebar session drag needs a clearer move**: Opening a chat no longer turns into a drag from an 8px twitch, the first-click synthetic jump, or the pet overlay stealing key / remapping the cursor. The gesture waits for 16px after an 80ms hold. Showing the pet gives the workbench key back so the first click after launch still selects a chat.
 - **Shift+Enter no longer wipes composer text**: Newlines split the live line in place. The editor no longer rebuilds from a lagging React snapshot, which deleted what you had just typed.
 - **Chat timeline keeps think → tools → body cycles**: Mid-turn status no longer gets hoisted into the thinking fold, and the next “思考中” no longer starts while tools from the previous round are still running. Live interleave stays in stream order after the turn ends (v0.2.19 honesty; the 0.2.20/0.2.21 process-fold had mashed the whole turn).
 - **Thinking timer is per episode**: The first “思考中” no longer keeps counting through later tool rounds, and the next thinking row starts from zero instead of continuing the previous clock. Work-phase “工作中” uses this phase’s tool times, not the assistant bubble’s send time.
 - **Live work stays expanded**: The “工作中” rail stays open so you can see which tools are running. It auto-collapses when that burst finishes with no errors, and stays open if any tool failed.
 - **Live tools no longer look stuck on the first reads**: Journal completion now settles in-progress reads even after later tools arrive, and the work rail follows the currently running step so later bash/polls are not clipped off-screen.
 - **STREAM_STALL after send is this-turn only**: A new prompt no longer inherits the previous answer as “output paused”. The empty first-token wait is 90s (was 45s) so Grok 4.x high-effort thinking is less likely to look like a dead gateway.
+- **Relative chat images resolve from curl dest and journal tail**: Markdown basenames like `foo.png` no longer miss when the real file was written with `curl -o` (or similar) into an absolute path. Rehydrate after journal ready so first-paint does not lock an empty card. `/workspace/` is not matched inside `/Users/…/Documents/workspace`.
 
 **中文 · 修复**
-- **侧栏会话拖动不再一碰就触发**：点开会话时 8px 的轻微移动、以及按下后第一次虚假位移，都不会立刻变成拖动。需要按住 80ms 且再移动 16px 才出现幽灵行。
+- **侧栏会话拖动不再一碰就触发**：点开会话时 8px 的轻微移动、按下后第一次虚假位移、以及宠物窗口抢焦点/重映射指针，都不会立刻变成拖动。启动后第一次点击会话会选中，不会被宠物 `show()` 吃掉。
 - **Shift+Enter 不再删掉输入框文字**：换行在当前行原地拆开，不再用滞后的 React 草稿整页重绘（那会把刚打的字清掉）。
 - **对话时间线恢复「思考 → 工具 → 正文」循环**：过程旁白不再被折进思考折叠里；上一轮工具还没跑完时，也不会在下面先画出新的「思考中」。回合结束后仍保持流式顺序（回到 0.2.19；0.2.20/0.2.21 的过程折叠把整轮揉成一团）。
 - **思考计时按轮次清零**：第一轮「思考中」不再把后面的工具时间算进去；下一轮思考从 0 开始，而不是接着上一轮的秒数。工作阶段的「工作中」只用本阶段工具时间，不用整条气泡的发送时刻。
 - **进行中的工作不折叠**：「工作中」保持展开，能看到正在跑哪些工具；这一段跑完且没有报错再自动折叠，有报错则保持展开。
 - **进行中的工具不再卡在第一条读取**：后面又来新工具时，前面已完成的读取会从「进行中」结算掉；工作列表会跟到当前正在跑的那一步，后面的命令/轮询不会被截在视口外。
 - **发消息后的 STREAM_STALL 只看本轮**：新 prompt 不会因为上一轮已有正文而显示「输出暂时停住了」。尚未出首 token 的等待窗口改为 90 秒（原 45 秒），减少高思考模型被误判成网关挂死。
+- **相对路径聊天图片能对上 curl 落盘和日记尾**：`foo.png` 这类 markdown 文件名不再漏掉 `curl -o` 写到绝对路径的文件。日记 ready 后再解析一次，避免首屏把卡片钉成空图。`/Users/…/Documents/workspace` 里的 `/workspace/` 不会被误当成工作区根。
 
 ### Changed
 - **Remaining UI locales filled**: German, Spanish, French, Korean, Brazilian Portuguese, Indonesian, Filipino, Ukrainian, Tamil, and Russian catalogs now cover essentially the full key set (product names and symbols stay English). Russian leftovers after that pass were filled again. Korean leftovers after the first pass were filled again.
@@ -46,7 +48,7 @@ See `docs/llm-wiki/release.md`.
 - **Double-click a sidebar chat to rename (#702)**: Project and Other-session rows edit the title in place. Enter / blur save when the name changed; Escape cancels. F2 on a focused row does the same. Right-click Rename still uses the existing prompt. Multi-select does not start rename.
 - **Pet eye color, white body, and celebrate spin**: Settings → Pet can pick eyes independently of the body (body palette + Auto). White stays pale in both themes. The mark spins when a focused task finishes, or from the pet menu.
 - **Pet task bubbles can be turned off (#696)**: Settings → Pet and the pet context menu can hide the session chips above the mark. The overlay shrinks when they are off.
-- **Attach another chat as context**: `/attach-chat`, composer `+`, sidebar attach icon, or right-click **Attach to current chat** picks a local conversation; chips sit on the composer; the journal stores `[[chat:id]]` tokens; the host prefixes a compact transcript for the agent only (max 3; source chat unchanged). Row-body drag still moves the chat between projects.
+- **Attach another chat as context**: `/attach-chat`, composer `+`, or right-click **Attach to current chat** picks a local conversation; drag a sidebar chat onto the composer to attach it. Chips sit on the composer; the journal stores `[[chat:id]]` tokens; the host prefixes a compact transcript for the agent only (max 3; source chat unchanged). Row-body drag onto a project still moves the chat.
 - **Custom OpenAI-compatible STT endpoint for composer dictation (#700)**: Settings → Voice can pick a custom `/audio/transcriptions` endpoint (Groq / OpenAI / Mistral / local server) with per-provider API keys stored in the OS keychain; official xAI dictation and Live Voice stay unchanged. Chinese dictation gets simplified / traditional script steering, and the 跟随系统 language hint now follows the resolved UI locale.
 
 **中文 · 新增**
@@ -58,7 +60,7 @@ See `docs/llm-wiki/release.md`.
 - **双击侧栏对话可重命名（#702）**：项目里和其他会话的行内直接改标题。Enter / 失焦在标题有改动时保存，Esc 取消。聚焦行按 F2 同样进入。右键「重命名」仍走原来的弹窗。多选模式不会进入重命名。
 - **宠物可改眼睛颜色、白色身体、完成转圈**：设置 → 宠物里眼睛和身体分开选（身体色板 + 自动）。白色在两种主题下都保持浅色。聚焦任务完成时（或右键菜单）会转圈。
 - **桌宠提示框可关（#696）**：设置 → 宠物，以及宠物右键菜单，都能关掉任务气泡；关掉后浮层会收小。
-- **把另一段对话当作上下文加入**：`/attach-chat`、输入框 `+`、侧栏对话图标或右键「加入目前对话」可加入本地对话；chip 挂在输入框；日记只存 `[[chat:id]]`；Host 只给 Agent 加一段压缩记录（最多 3 段；来源对话不改）。拖行身到项目仍是移动会话。
+- **把另一段对话当作上下文加入**：`/attach-chat`、输入框 `+`、或右键「加入目前对话」可加入本地对话；把侧栏会话拖到输入框也会附加。chip 挂在输入框；日记只存 `[[chat:id]]`；Host 只给 Agent 加一段压缩记录（最多 3 段；来源对话不改）。拖行身到项目仍是移动会话。
 - **Composer 听写支持自定义 OpenAI 兼容 STT 端点（#700）**：设置 → Voice 可选用任意 `/audio/transcriptions` 端点（Groq / OpenAI / Mistral / 本地服务），API Key 按提供方独立存入系统钥匙串，明文不出 webview；官方 xAI 听写与 Live Voice 不变。中文听写支持简体 / 繁体引导，「跟随系统」语言提示跟随界面实际语言。
 
 ### Fixed
@@ -72,7 +74,7 @@ See `docs/llm-wiki/release.md`.
 - **User images no longer echo as broken assistant cards**: Pasted / attached user files are not re-attached onto the assistant turn. Outside-project paths 403 after restart no longer lock the card as a corrupt blob.
 - **Windows pet overlay no longer inherits File / Edit / Window / Help; toggle follows real window visibility; hit target shrinks after drag (#696)**: The overlay keeps a window-local empty menu and strips the native bar. Hide retries if the HWND stays painted; File → Close hides instead of destroying. Host clears drag when the left button is up, and measured hit radius is clamped to the mark size.
 - **Linux / KDE pet overlay can be clicked and dragged**: The always-on-top pet stays focusable on Linux so KWin delivers pointer events, hides the GTK Edit/Window/Help bar that `app.set_menu` reapplied on the transparent window, and moves with `movementX/Y` on Wayland (late `startDragging` has no button serial).
-- Sidebar attach is an icon click (tooltip keeps the full phrase). No ⋮⋮ grip-drag. Host compact keeps the newest turns; chips-only missing/empty sources return typed errors; recycle bootstrap keeps a stub or re-expanded attach context.
+- Attach is drag-onto-composer or the row menu (no ⋮⋮ grip-drag). Host compact keeps the newest turns; chips-only missing/empty sources return typed errors; recycle bootstrap keeps a stub or re-expanded attach context.
 
 **中文 · 修复**
 - **宠物气泡正文可折 2–3 行；浅色底上也能看见会话标题**：阶段性回复不再只挤一行省略。下面的会话标题用对比色，纸张/白色背景不再把标题隐成空行。关掉进度条时不再留那条空白。
@@ -85,7 +87,7 @@ See `docs/llm-wiki/release.md`.
 - **用户图片不再回显成损坏的助手图卡**：用户粘贴/附图不会再挂到助手回合上。项目外路径重启后 403 也不再把卡片钉成坏图。
 - **Windows 宠物不再继承 File / Edit / Window / Help；开关跟真实窗口走；拖完热区会收回（#696）**：浮层用自己的空菜单并卸掉原生菜单栏。关掉后若仍显示会再 hide 一次；File → 关闭只会收起。松开鼠标后 Host 清掉拖拽状态，热区半径按标记尺寸封顶。
 - **Linux / KDE 上可以点、可以拖桌面宠物**：Linux 上宠物窗保持可接收指针；去掉 GTK 应用菜单画在透明 overlay 上的 Edit/Window/Help；Wayland 用位移挪窗，不再等已经过期的 `startDragging` 抓手。
-- 侧栏用对话图标一按即可加入目前对话（无 ⋮⋮ 拖曳）。压缩时保留最新轮次；只发 chip 且来源缺失/空白会返回明确错误；Agent 重开后仍保留附加上下文或占位。
+- 附加对话改为拖到输入框或用行菜单（无 ⋮⋮ 拖曳）。压缩时保留最新轮次；只发 chip 且来源缺失/空白会返回明确错误；Agent 重开后仍保留附加上下文或占位。
 
 ## [0.2.22] - 2026-08-19
 

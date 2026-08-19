@@ -53,16 +53,25 @@ export function isPastSessionDragThreshold(dx: number, dy: number): boolean {
   return Math.hypot(dx, dy) >= SESSION_DRAG_THRESHOLD_PX;
 }
 
+/** First click after the pet stole key is a select, not a drag. */
+export function sessionDragShouldTrackPointer(windowFocused: boolean): boolean {
+  return windowFocused;
+}
+
 /** Decide whether this sample should start drag chrome. */
 export function sessionDragArmDecision(input: {
   dx: number;
   dy: number;
   elapsedMs: number;
   buttons: number;
+  /** Window just became key mid-press (pet / activation remapped coords). */
+  activationDuring?: boolean;
 }): SessionDragArm {
   if (input.buttons === 0) return "ignore";
   if (!isPastSessionDragThreshold(input.dx, input.dy)) return "ignore";
-  if (input.elapsedMs < SESSION_DRAG_HOLD_MS) return "rebase";
+  if (input.activationDuring || input.elapsedMs < SESSION_DRAG_HOLD_MS) {
+    return "rebase";
+  }
   return "arm";
 }
 
@@ -200,6 +209,7 @@ export function useSidebarSessionMoveDrag(opts: {
     startY: number;
     startTime: number;
     active: boolean;
+    activationDuring: boolean;
     captureEl: HTMLElement | null;
     ghost: HTMLElement | null;
     ghostOffsetX: number;
@@ -259,6 +269,13 @@ export function useSidebarSessionMoveDrag(opts: {
       if (!enabledRef.current) return;
       if (e.button !== 0) return;
       if (sessionRef.current) return;
+      if (
+        !sessionDragShouldTrackPointer(
+          typeof document.hasFocus === "function" ? document.hasFocus() : true,
+        )
+      ) {
+        return;
+      }
       if (isSessionMoveIgnoredTarget(e.target)) return;
       const raw = e.target;
       if (!(raw instanceof Element)) return;
@@ -286,6 +303,7 @@ export function useSidebarSessionMoveDrag(opts: {
         startY: e.clientY,
         startTime: e.timeStamp,
         active: false,
+        activationDuring: false,
         captureEl: row,
         ghost: null,
         ghostOffsetX: 0,
@@ -304,11 +322,14 @@ export function useSidebarSessionMoveDrag(opts: {
             dy,
             elapsedMs: ev.timeStamp - s.startTime,
             buttons: ev.buttons,
+            activationDuring: s.activationDuring,
           });
           if (decision === "ignore") return;
           if (decision === "rebase") {
             s.startX = ev.clientX;
             s.startY = ev.clientY;
+            s.startTime = ev.timeStamp;
+            s.activationDuring = false;
             return;
           }
           s.active = true;
@@ -386,13 +407,21 @@ export function useSidebarSessionMoveDrag(opts: {
         endSession(false);
       };
 
+      const onWinFocus = () => {
+        const s = sessionRef.current;
+        if (!s || s.active) return;
+        s.activationDuring = true;
+      };
+
       window.addEventListener("pointermove", onMove, true);
       window.addEventListener("pointerup", onUp, true);
       window.addEventListener("pointercancel", onCancel, true);
+      window.addEventListener("focus", onWinFocus);
       cleanupRef.current = () => {
         window.removeEventListener("pointermove", onMove, true);
         window.removeEventListener("pointerup", onUp, true);
         window.removeEventListener("pointercancel", onCancel, true);
+        window.removeEventListener("focus", onWinFocus);
       };
     };
 

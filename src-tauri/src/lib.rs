@@ -538,6 +538,7 @@ pub fn run() {
             );
             let window = tauri::WebviewWindowBuilder::from_config(app, &main_cfg)?
                 .visible(false)
+                .accept_first_mouse(true)
                 .initialization_script(&boot_theme_script)
                 .build()?;
 
