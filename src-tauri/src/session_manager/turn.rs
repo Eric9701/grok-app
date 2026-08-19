@@ -25,10 +25,7 @@ impl SessionManager {
         session_id: Option<String>,
     ) -> Result<SessionSnapshot, String> {
         let text = text.trim().to_string();
-        if text.is_empty() {
-            return Err("empty message".into());
-        }
-        // Journal stores UI form when provided (skill chips); agent still receives `text`.
+        // Journal stores UI form when provided (skill / attached-chat tokens).
         // Do not wholesale-trim display: that drops leading/trailing blank lines the user
         // typed. Empty-check uses trim; payload keeps internal + intentional edge blanks.
         let mut journal_content = display_text
@@ -41,6 +38,11 @@ impl SessionManager {
                 }
             })
             .unwrap_or_else(|| text.clone());
+        let attached = crate::session_attach::extract_attached_chats(&journal_content);
+        let stripped_text = crate::session_attach::strip_chat_tokens(&text);
+        if stripped_text.is_empty() && attached.is_empty() {
+            return Err("empty message".into());
+        }
         // User file/image cards — structured field is primary for history cards.
         // Also dual-write `@/abs/path` sole-lines into content so reload can recover
         // cards even if an older reader ignores the attachments field (FE strips
@@ -55,7 +57,16 @@ impl SessionManager {
 
         // Serialize against connect for the whole focus + turn-open window, so
         // the slot cannot move between the target check and `begin_stream`.
-        let _focus_guard = self.connect_lock.lock().await;
+        let Some(_focus_guard) = self
+            .try_lock_connect(Duration::from_secs(CONNECT_WALL_CLOCK_SECS))
+            .await
+        else {
+            return Err(format!(
+                "{}: {}",
+                AgentErrorCode::ConnectFailed.as_str(),
+                connect_gave_up_reason(false)
+            ));
+        };
         if let Some(target) = session_id.as_deref() {
             match self.ensure_promptable_session(&app, target) {
                 Ok(true) => {}
@@ -104,6 +115,23 @@ impl SessionManager {
                     s.app_session_id
                 ));
             }
+
+            let mut agent_prompt = crate::session_attach::agent_prompt_after_attach(
+                &stripped_text,
+                &attached,
+                &s.app_session_id,
+                &crate::session_attach::StoreAttachJournal,
+            )
+            .map_err(|e| e.to_string())?;
+            if !attached.is_empty() && agent_prompt.len() > stripped_text.len() {
+                tracing::info!(
+                    "attached chat context ({} chars, {} id(s)) for session {}",
+                    agent_prompt.len().saturating_sub(stripped_text.len()),
+                    attached.len(),
+                    s.app_session_id
+                );
+            }
+
             s.fsm.begin_stream().map_err(|e| e.to_string())?;
             s.prompt_in_flight = true;
             s.sent_prompt_this_visit = true;
@@ -134,10 +162,9 @@ impl SessionManager {
             s.provider_retry_aborted = false;
             s.tools_this_turn = 0;
 
-            let mut agent_prompt = text.clone();
             if s.needs_history_bootstrap {
                 if let Some(ctx) = build_history_bootstrap(&s.app_session_id) {
-                    agent_prompt = format!("{ctx}\n{text}");
+                    agent_prompt = format!("{ctx}\n{agent_prompt}");
                     tracing::info!(
                         "history bootstrap attached ({} chars) for session {}",
                         ctx.len(),
@@ -147,7 +174,7 @@ impl SessionManager {
                 s.needs_history_bootstrap = false;
             }
             // P2: steer session-by-UUID lookups to App/agent-home roots (avoid home-wide find).
-            if let Some(hint) = session_lookup_host_hint(&text) {
+            if let Some(hint) = session_lookup_host_hint(&stripped_text) {
                 agent_prompt = format!("{hint}\n{agent_prompt}");
             }
 

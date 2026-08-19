@@ -95,6 +95,7 @@ import {
 } from "@/lib/contextUsage";
 import type { ModelOption } from "@/lib/grokCatalog";
 import { useStickToBottom } from "@/hooks/useStickToBottom";
+import { shouldBumpStickOnBusyEdge } from "@/lib/stickToBottom";
 import { useChatMessageVirtualizer } from "@/hooks/useChatMessageVirtualizer";
 import {
   estimateChatRowHeight,
@@ -119,6 +120,8 @@ import { LeadFragmentsStrip } from "./LeadFragmentsStrip";
 import { BackBottom } from "./BackBottom";
 import { InlineUserEdit } from "./InlineUserEdit";
 import { SkillChip } from "@/components/SkillChip";
+import { ChatRefChip } from "@/components/ChatRefChip";
+import { useAttachedChatLookup } from "@/components/AttachedChatLookup";
 import { HighlightedText } from "@/components/HighlightedText";
 import { findChatMatches } from "@/lib/chatFind";
 import { hydrateDisplayContent, parseStoredContent } from "@/lib/draftDoc";
@@ -389,9 +392,10 @@ function UserBodyText({
   findQuery?: string;
   findActiveOccurrence?: number | null;
 }) {
+  const chatLookup = useAttachedChatLookup();
   const hydrated = hydrateDisplayContent(content);
   const segs = parseStoredContent(hydrated);
-  if (!segs.some((s) => s.type === "skill")) {
+  if (!segs.some((s) => s.type === "skill" || s.type === "chat")) {
     if (findQuery?.trim()) {
       return (
         <span className="user-msg-body">
@@ -407,22 +411,42 @@ function UserBodyText({
   }
   return (
     <span className="user-msg-body">
-      {segs.map((s, i) =>
-        s.type === "skill" ? (
-          <SkillChip key={`sk-${i}-${s.name}`} name={s.name} size="sm" />
-        ) : findQuery?.trim() && s.text ? (
-          <HighlightedText
-            key={`t-${i}`}
-            text={s.text}
-            query={findQuery}
-            activeOccurrence={findActiveOccurrence ?? null}
-          />
-        ) : (
+      {segs.map((s, i) => {
+        if (s.type === "skill") {
+          return <SkillChip key={`sk-${i}-${s.name}`} name={s.name} size="sm" />;
+        }
+        if (s.type === "chat") {
+          const status = chatLookup.statusOf(s.sessionId);
+          return (
+            <ChatRefChip
+              key={`ch-${i}-${s.sessionId}`}
+              title={chatLookup.titleOf(s.sessionId)}
+              status={status}
+              size="sm"
+              onOpen={
+                chatLookup.onOpen
+                  ? () => chatLookup.onOpen?.(s.sessionId)
+                  : undefined
+              }
+            />
+          );
+        }
+        if (findQuery?.trim() && s.text) {
+          return (
+            <HighlightedText
+              key={`t-${i}`}
+              text={s.text}
+              query={findQuery}
+              activeOccurrence={findActiveOccurrence ?? null}
+            />
+          );
+        }
+        return (
           <span key={`t-${i}`} className="user-msg-body__text">
             {s.text}
           </span>
-        ),
-      )}
+        );
+      })}
     </span>
   );
 }
@@ -1770,29 +1794,39 @@ export function ConversationThread({
    * ends, or a user who scrolled up mid-stream would be yanked back.
    */
   const prevTurnBusyRef = useRef(false);
+  const prevLastUserIdForStickRef = useRef<string | null>(null);
   const [stickBump, setStickBump] = useState(0);
   const turnBusyForStick =
     sessionState === "streaming" || sessionState === "awaiting_permission";
+  const lastUserIdForStick = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === "user") return messages[i]!.id;
+    }
+    return null;
+  }, [messages]);
   useEffect(() => {
     if (turnBusyForStick && !prevTurnBusyRef.current) {
-      // Task just started → re-enter auto-follow once.
-      setStickBump((n) => n + 1);
-    }
-    prevTurnBusyRef.current = turnBusyForStick;
-  }, [turnBusyForStick]);
-
-  const forceStickKey = useMemo(() => {
-    let lastUserId: string | null = null;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i]?.role === "user") {
-        lastUserId = messages[i]!.id;
-        break;
+      // Same user turn became busy (regenerate / permission) — bump.
+      // A new lastUserId already changes forceStickKey; bumping again
+      // would snap twice (#703 send flicker).
+      if (
+        shouldBumpStickOnBusyEdge(
+          lastUserIdForStick,
+          prevLastUserIdForStickRef.current,
+        )
+      ) {
+        setStickBump((n) => n + 1);
       }
     }
-    if (!lastUserId && stickBump === 0) return null;
+    prevTurnBusyRef.current = turnBusyForStick;
+    prevLastUserIdForStickRef.current = lastUserIdForStick;
+  }, [turnBusyForStick, lastUserIdForStick]);
+
+  const forceStickKey = useMemo(() => {
+    if (!lastUserIdForStick && stickBump === 0) return null;
     // stickBump only increments on busy edge — end-of-turn leaves it stable.
-    return `${lastUserId ?? "turn"}:${stickBump}`;
-  }, [messages, stickBump]);
+    return `${lastUserIdForStick ?? "turn"}:${stickBump}`;
+  }, [lastUserIdForStick, stickBump]);
 
   /** Last non-streaming assistant in the current user turn — regenerate target. */
   const regenerableAssistantId = useMemo(

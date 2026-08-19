@@ -308,58 +308,21 @@ pub(super) const HISTORY_BOOTSTRAP_MAX_CHARS: usize = 14_000;
 /// Keeps recent turns so the model still "remembers" the chat after respawn.
 pub(super) fn build_history_bootstrap(app_session_id: &str) -> Option<String> {
     let msgs = store::load_messages(app_session_id);
-    // Take last N non-empty user/assistant turns (errors abbreviated).
-    let mut picked: Vec<&store::ChatMessageStored> = Vec::new();
-    for m in msgs.iter().rev() {
-        if m.role != "user" && m.role != "assistant" {
-            continue;
-        }
-        if m.content.trim().is_empty() {
-            continue;
-        }
-        picked.push(m);
-        if picked.len() >= HISTORY_BOOTSTRAP_MAX_MSGS {
-            break;
-        }
-    }
-    if picked.is_empty() {
-        return None;
-    }
-    picked.reverse();
-
+    let turns = crate::session_attach::compact_user_assistant_turns_with(
+        &msgs,
+        HISTORY_BOOTSTRAP_MAX_MSGS,
+        HISTORY_BOOTSTRAP_PER_MSG_CHARS,
+        HISTORY_BOOTSTRAP_MAX_CHARS,
+        crate::session_attach::NestedAttach::Expand,
+        &crate::session_attach::StoreAttachJournal,
+    )?;
     let mut body = String::from(
         "[Prior conversation context — this chat continues an existing Grok App session. \
 The agent process was restarted; use the following transcript for continuity ONLY. \
 Rules: do NOT re-greet; do NOT restate, quote, or re-answer prior assistant turns; \
 do NOT reprint the transcript in your reply; answer ONLY the new user message below.]\n\n",
     );
-    let header_len = body.len();
-
-    for m in picked {
-        let role = if m.role == "user" {
-            "User"
-        } else if m.is_error {
-            "Assistant (error)"
-        } else {
-            "Assistant"
-        };
-        let mut content = m.content.trim().to_string();
-        // Soft-trim huge tool dumps / tables for bootstrap.
-        if content.len() > HISTORY_BOOTSTRAP_PER_MSG_CHARS {
-            let keep = HISTORY_BOOTSTRAP_PER_MSG_CHARS.saturating_sub(40);
-            content = format!(
-                "{}…\n[truncated {} chars]",
-                content.chars().take(keep).collect::<String>(),
-                m.content.len()
-            );
-        }
-        let block = format!("### {role}\n{content}\n\n");
-        if body.len() - header_len + block.len() > HISTORY_BOOTSTRAP_MAX_CHARS {
-            body.push_str("### …\n[earlier turns omitted for length]\n\n");
-            break;
-        }
-        body.push_str(&block);
-    }
+    body.push_str(&turns);
     body.push_str("---\n\n[End of prior context. Continue with the user's new message below.]\n");
     Some(body)
 }
@@ -1736,10 +1699,41 @@ pub(super) struct DrainedAgents {
     pub(super) prewarm_count: usize,
 }
 
-/// Whole-connect budget (spawn + initialize + load/new). Sequential RPCs each
-/// have their own 45s cap; without a wall clock the pill can sit on 连接中
-/// for minutes, and a hung spawn never leaves Connecting.
+/// Whole-connect budget: lock wait + spawn + initialize + load/new.
+/// Sibling-task timer so a blocking ACP poll cannot starve it; lock wait is
+/// inside this budget (otherwise Connecting never times out).
 pub const CONNECT_WALL_CLOCK_SECS: u64 = 90;
+
+/// Idle recycle / disconnect must not wait forever for `connect_lock`.
+pub const CONNECT_LOCK_WATCHDOG_SECS: u64 = 5;
+
+/// `AcpClient::kill` under the recycle watchdog — a hung child must not
+/// pin `connect_lock` for the rest of the process lifetime.
+pub const ACP_KILL_TIMEOUT_SECS: u64 = 5;
+
+/// Why a connect attempt gave up. `lock_acquired` is false when we never
+/// entered `connect_inner`.
+pub fn connect_gave_up_reason(lock_acquired: bool) -> &'static str {
+    if lock_acquired {
+        "connect timed out"
+    } else {
+        "connect lock busy"
+    }
+}
+
+/// Latest-wins generation: only the current attempt may enter `connect_inner`.
+pub fn connect_attempt_still_current(current: u64, attempt_gen: u64) -> bool {
+    current == attempt_gen
+}
+
+/// Invalidate `attempt_gen` only if it is still the latest connect.
+pub fn next_connect_epoch_on_timeout(current: u64, attempt_gen: u64) -> u64 {
+    if current == attempt_gen {
+        attempt_gen.wrapping_add(1)
+    } else {
+        current
+    }
+}
 
 /// Pure policy: should connect keep the live agent process instead of respawning?
 ///
