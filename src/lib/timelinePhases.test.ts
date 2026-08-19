@@ -303,7 +303,7 @@ function edit(id: string): MessageToolSegment {
 }
 
 describe("foldProcessIntoTimeline", () => {
-  it("puts process speech inside 工作了 and leaves the conclusion below", () => {
+  it("keeps process body as content — never folds it into 工作了 speech", () => {
     const segs: MessageSegment[] = [
       { kind: "thought", text: "The plan is to decode eight shots" },
       tool("r1", "Read a"),
@@ -335,22 +335,18 @@ describe("foldProcessIntoTimeline", () => {
     expect(phase.kind).toBe("phase");
     if (phase.kind === "phase") {
       expect(phase.thoughts).toEqual([]);
-      expect(phase.items.some((i) => i.kind === "speech")).toBe(true);
-      expect(phase.items.some((i) => i.kind === "tool")).toBe(true);
-      const firstSpeech = phase.items.find((i) => i.kind === "speech");
-      expect(firstSpeech && firstSpeech.kind === "speech" && firstSpeech.text).toContain(
-        "先把 8 张",
-      );
+      expect(phase.items.every((i) => i.kind === "tool")).toBe(true);
+      expect(phase.items.some((i) => i.kind === "speech")).toBe(false);
     }
     const answer = units[2]!;
     expect(answer.kind).toBe("content");
     if (answer.kind === "content") {
-      expect(answer.text.startsWith("成品文件名带")).toBe(true);
-      expect(answer.text).not.toContain("先把 8 张");
+      expect(answer.text).toContain("先把 8 张");
+      expect(answer.text).toContain("成品文件名带");
     }
   });
 
-  it("keeps interleaved mid-turn content in stream order", () => {
+  it("keeps every mid-turn content visible instead of last-sentence-only", () => {
     const segs: MessageSegment[] = [
       { kind: "thought", text: "round1" },
       tool("r1", "Read a"),
@@ -370,29 +366,28 @@ describe("foldProcessIntoTimeline", () => {
       },
     ];
     const units = buildAssistantTimeline(segs, { streaming: false });
-    expect(units.map((u) => u.kind)).toEqual(["thought", "phase", "content"]);
+    expect(units.map((u) => u.kind)).toEqual([
+      "thought",
+      "phase",
+      "content",
+      "content",
+    ]);
     const phase = units[1]!;
     expect(phase.kind).toBe("phase");
     if (phase.kind === "phase") {
-      expect(phase.items.map((i) => i.kind)).toEqual([
-        "tool",
-        "tool",
-        "speech",
-        "tool",
-        "tool",
-        "speech",
-      ]);
-      const speeches = phase.items.filter((i) => i.kind === "speech");
-      expect(speeches[0]).toMatchObject({
-        kind: "speech",
-        text: "先看仓库结构，接着对一下入口。",
-      });
+      expect(phase.items.every((i) => i.kind === "tool")).toBe(true);
+      expect(phase.items).toHaveLength(4);
     }
-    const answer = units[2]!;
-    expect(answer.kind).toBe("content");
-    if (answer.kind === "content") {
-      expect(answer.text).toContain("成品在");
-    }
+    const bodies = units.filter((u) => u.kind === "content");
+    expect(bodies.map((u) => (u.kind === "content" ? u.text : ""))).toEqual([
+      "先看仓库结构，接着对一下入口。",
+      expect.stringContaining("成品在"),
+    ]);
+    expect(
+      bodies.some(
+        (u) => u.kind === "content" && u.text.includes("先看仓库结构"),
+      ),
+    ).toBe(true);
   });
 
   it("weaves a trailing process blob in front of tool family groups", () => {
@@ -433,7 +428,7 @@ describe("foldProcessIntoTimeline", () => {
     }
   });
 
-  it("keeps the last-content conclusion visible when tools follow it", () => {
+  it("keeps the whole body visible when tools follow it", () => {
     const segs: MessageSegment[] = [
       { kind: "thought", text: "plan" },
       tool("r1", "Read a"),
@@ -452,8 +447,12 @@ describe("foldProcessIntoTimeline", () => {
     expect(answer && answer.kind === "content" && answer.text).toContain(
       "成品文件名带",
     );
-    expect(answer && answer.kind === "content" && answer.text).not.toContain(
+    expect(answer && answer.kind === "content" && answer.text).toContain(
       "先把 8 张",
+    );
+    const phase = units.find((u) => u.kind === "phase");
+    expect(phase && phase.kind === "phase" && phase.items.every((i) => i.kind === "tool")).toBe(
+      true,
     );
   });
 
@@ -475,7 +474,7 @@ describe("foldProcessIntoTimeline", () => {
     );
   });
 
-  it("synthesizes a work fold when there is process speech but no tools", () => {
+  it("does not invent a work fold for a body-only turn", () => {
     const segs: MessageSegment[] = [
       {
         kind: "content",
@@ -491,17 +490,47 @@ describe("foldProcessIntoTimeline", () => {
       },
     ];
     const units = buildAssistantTimeline(segs, { streaming: false });
-    expect(units.map((u) => u.kind)).toEqual(["phase", "content"]);
-    const phase = units[0]!;
-    expect(phase.kind).toBe("phase");
-    if (phase.kind === "phase") {
-      expect(phase.items.every((i) => i.kind === "speech")).toBe(true);
-      expect(phase.tools).toHaveLength(0);
-    }
-    const answer = units[1]!;
+    expect(units.map((u) => u.kind)).toEqual(["content"]);
+    const answer = units[0]!;
     expect(answer.kind).toBe("content");
     if (answer.kind === "content") {
+      expect(answer.text).toContain("先接手这个");
       expect(answer.text).toContain("刚接手的是");
     }
+  });
+
+  it("keeps every live status sentence visible (DSH long-turn shape)", () => {
+    const segs: MessageSegment[] = [
+      { kind: "thought", text: "Look at both projects" },
+      tool("t1", "Read a"),
+      tool("t2", "Read b"),
+      { kind: "content", text: "我先查看工作区里 DSH_CLIAPI 和 DSH_api 的目录。" },
+      bash("b1"),
+      { kind: "content", text: "两个项目都在，接着核对 git 历史。" },
+      bash("b2"),
+      { kind: "content", text: "测试都过了。接下来分别提交两个仓库并推到 GitHub。" },
+    ];
+    const live = buildAssistantTimeline(segs, { streaming: true });
+    expect(live.map((u) => u.kind)).toEqual([
+      "thought",
+      "phase",
+      "content",
+      "content",
+      "content",
+    ]);
+    const texts = live
+      .filter((u): u is Extract<typeof u, { kind: "content" }> => u.kind === "content")
+      .map((u) => u.text);
+    expect(texts).toEqual([
+      "我先查看工作区里 DSH_CLIAPI 和 DSH_api 的目录。",
+      "两个项目都在，接着核对 git 历史。",
+      "测试都过了。接下来分别提交两个仓库并推到 GitHub。",
+    ]);
+    const phase = live.find((u) => u.kind === "phase");
+    expect(
+      phase &&
+        phase.kind === "phase" &&
+        phase.items.every((i) => i.kind === "tool"),
+    ).toBe(true);
   });
 });

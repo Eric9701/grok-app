@@ -119,7 +119,7 @@ import { BackBottom } from "./BackBottom";
 import { InlineUserEdit } from "./InlineUserEdit";
 import { SkillChip } from "@/components/SkillChip";
 import { HighlightedText } from "@/components/HighlightedText";
-import { findChatMatches, findMatchesBeforeVisible } from "@/lib/chatFind";
+import { findChatMatches } from "@/lib/chatFind";
 import { hydrateDisplayContent, parseStoredContent } from "@/lib/draftDoc";
 import { parseScheduledUserContent } from "@/lib/automations";
 import {
@@ -1383,22 +1383,10 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
             />
           ) : null}
           {(() => {
-            // Running occurrence base across content segments so
+            // Running occurrence base across visible content segments so
             // find marks stay aligned with message-level match index.
-            // Hits in the folded process prefix of m.content must be skipped
-            // so the conclusion highlight uses the same occurrence as Cmd+F.
-            const lastVisibleContent = (() => {
-              for (let i = timelineUnits.length - 1; i >= 0; i--) {
-                const u = timelineUnits[i]!;
-                if (u.kind === "content") return u.text;
-              }
-              return "";
-            })();
-            let contentOccBase = findMatchesBeforeVisible({
-              full: m.content ?? "",
-              visible: lastVisibleContent,
-              query: findQuery,
-            });
+            // Mid-turn body is no longer folded away, so start at 0.
+            let contentOccBase = 0;
             // First bare thought uses a stable live key for the whole episode
             // (placeholder → tokens → done) so the wall clock does not reset.
             const primaryThoughtSi = (() => {
@@ -1498,7 +1486,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                   </div>
                 );
               }
-              // content — conclusion stays outside the work fold
+              // content — assistant body stays visible (not folded into 工作了)
               const segBase = contentOccBase;
               if (findQuery.trim()) {
                 contentOccBase += findChatMatches(findQuery, [
