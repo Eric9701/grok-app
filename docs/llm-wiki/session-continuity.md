@@ -251,7 +251,7 @@ the turn is how answers got truncated mid-sentence while the chat kept spinning.
 
 When the **App host** dies mid-turn (Windows cold start, no shutdown log), the stdio agent dies with it. `session/load` cannot resume at the permission / tool boundary (`docs/SPIKE-ACP.md` in-flight continuity gap).
 
-Host persists `{app_data}/sessions/<id>/turn_lease.json` while `prompt_in_flight` is true. On boot and after `session/load` / journal reconcile:
+Host persists `{app_data}/sessions/<id>/turn_lease.json` while `prompt_in_flight` is true. On **process start** (dirty active leases) and after a successful **session connect** (not during journal reconcile, which can run mid-turn):
 
 1. If the lease is `active`, **or** the agent trail shows unresolved `permission_requested` / last assistant `tool_calls` without `tool_result` and no `turn_completed`
 2. **and** the journal has no end-of-turn marker after the last user
