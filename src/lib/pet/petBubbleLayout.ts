@@ -16,12 +16,18 @@ export { PET_BUBBLE_SHADOW_PAD };
 export const PET_BUBBLE_EDGE_PAD = 16;
 
 /** Extra width on each side of the mark so chips can slide without flipping. */
-export function petOverlayWidth(sizePx: number): number {
-  return sizePx + 96 + PET_BUBBLE_WIDTH + PET_BUBBLE_SHADOW_PAD * 2;
+export function petOverlayWidth(sizePx: number, bubbles = true): number {
+  return sizePx + 96 + (bubbles ? PET_BUBBLE_WIDTH + PET_BUBBLE_SHADOW_PAD * 2 : 0);
 }
 
-export function petOverlayHeight(sizePx: number): number {
-  return sizePx + 96 + petBubbleViewportHeight();
+export function petOverlayHeight(sizePx: number, bubbles = true): number {
+  return sizePx + 96 + (bubbles ? petBubbleViewportHeight() : 0);
+}
+
+export function petBubblesEnabled(
+  prefs: { bubblesEnabled?: boolean } | null | undefined,
+): boolean {
+  return prefs?.bubblesEnabled !== false;
 }
 
 /**

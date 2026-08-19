@@ -21,4 +21,9 @@ describe("PetSection visibility switch", () => {
     expect(src).toContain("pet://prefs");
     expect(src).toContain("onToggleWindow");
   });
+
+  it("lets the user toggle task bubbles", () => {
+    expect(src).toContain("settings.pet.bubbles");
+    expect(src).toContain("bubblesEnabled");
+  });
 });

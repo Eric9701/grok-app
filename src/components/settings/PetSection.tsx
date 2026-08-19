@@ -1,7 +1,7 @@
 /**
  * Settings → 宠物 (first-class nav).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
 import { UiSwitch } from "./shared";
 import { PetMark } from "@/components/pet/PetMark";
@@ -35,6 +35,7 @@ const DEFAULT_PREFS: PetPrefs = {
   shape: "hex",
   color: "green",
   eyeColor: "auto",
+  bubblesEnabled: true,
   sizePx: 128,
 };
 
@@ -48,6 +49,7 @@ export function PetSection() {
   const rowHighlight = s.rowHighlight ?? ((_id: string) => "");
   const [prefs, setPrefs] = useState<PetPrefs>(DEFAULT_PREFS);
   const [busy, setBusy] = useState(false);
+  const toggleGen = useRef(0);
 
   useEffect(() => {
     let gone = false;
@@ -79,19 +81,22 @@ export function PetSection() {
   }, []);
 
   const onToggleWindow = useCallback(async (next: boolean) => {
-    setPrefs((p) => ({ ...p, enabled: next || p.enabled, visible: next }));
+    const gen = ++toggleGen.current;
+    setPrefs((p) => ({ ...p, enabled: next ? true : p.enabled, visible: next }));
     setBusy(true);
     try {
       const saved = next ? await petShow() : await petHide();
+      if (gen !== toggleGen.current) return;
       setPrefs(saved);
     } catch {
+      if (gen !== toggleGen.current) return;
       try {
         setPrefs(await petPrefsGet());
       } catch {
         /* keep optimistic state */
       }
     } finally {
-      setBusy(false);
+      if (gen === toggleGen.current) setBusy(false);
     }
   }, []);
 
@@ -123,6 +128,18 @@ export function PetSection() {
             disabled={busy}
             label={t("settings.pet.enabled")}
             onChange={(next) => void onToggleWindow(next)}
+          />
+        </div>
+        <div className="settings-row" id="settings-anchor-pet-bubbles">
+          <div className="settings-row__text">
+            <div className="settings-row__label">{t("settings.pet.bubbles")}</div>
+            <div className="settings-row__desc">{t("settings.pet.bubblesDesc")}</div>
+          </div>
+          <UiSwitch
+            checked={prefs.bubblesEnabled !== false}
+            disabled={busy}
+            label={t("settings.pet.bubbles")}
+            onChange={(next) => void commit({ ...prefs, bubblesEnabled: next })}
           />
         </div>
       </div>
@@ -181,7 +198,10 @@ export function PetSection() {
                 onClick={() => void commit({ ...prefs, color: c })}
               >
                 <span
-                  className="pet-settings-swatch"
+                  className={
+                    "pet-settings-swatch" +
+                    (c === "white" ? " pet-settings-swatch--light" : "")
+                  }
                   style={{ background: PET_COLOR_SWATCH[c].value }}
                 />
               </button>
@@ -219,7 +239,10 @@ export function PetSection() {
                 onClick={() => void commit({ ...prefs, eyeColor: c })}
               >
                 <span
-                  className="pet-settings-swatch"
+                  className={
+                    "pet-settings-swatch" +
+                    (c === "white" ? " pet-settings-swatch--light" : "")
+                  }
                   style={{ background: PET_COLOR_SWATCH[c].value }}
                 />
               </button>

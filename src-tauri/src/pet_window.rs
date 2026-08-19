@@ -15,6 +15,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+#[cfg(not(target_os = "macos"))]
+use tauri::menu::Menu;
 use tauri::{
     webview::PageLoadEvent, AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl,
     WebviewWindowBuilder,
@@ -29,6 +31,7 @@ static WATCH_STARTED: AtomicBool = AtomicBool::new(false);
 static WEBVIEW_READY: AtomicBool = AtomicBool::new(false);
 static WANT_SHOW: AtomicBool = AtomicBool::new(false);
 static CACHED_SIZE_PX: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(128);
+static SHOW_LOCK: Mutex<()> = Mutex::new(());
 
 const PET_INIT_SCRIPT: &str = r#"(function(){try{document.documentElement.setAttribute("data-pet-shell","1");var s=document.createElement("style");s.setAttribute("data-pet-boot","1");s.textContent="html,html[data-theme],body,#root,.boot-gate{background:transparent!important;background-image:none!important;background-color:transparent!important;} .boot-gate{display:none!important;visibility:hidden!important;opacity:0!important;}";document.documentElement.appendChild(s);}catch(e){}})();"#;
 
@@ -47,6 +50,8 @@ pub struct PetPrefs {
     pub eye_color: String,
     #[serde(default = "default_size")]
     pub size_px: u32,
+    #[serde(default = "default_bubbles")]
+    pub bubbles_enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub x: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -65,6 +70,9 @@ fn default_eye_color() -> String {
 fn default_size() -> u32 {
     128
 }
+fn default_bubbles() -> bool {
+    true
+}
 
 impl Default for PetPrefs {
     fn default() -> Self {
@@ -75,6 +83,7 @@ impl Default for PetPrefs {
             color: default_color(),
             eye_color: default_eye_color(),
             size_px: default_size(),
+            bubbles_enabled: default_bubbles(),
             x: None,
             y: None,
         }
@@ -253,11 +262,19 @@ const PET_BUBBLE_VIEWPORT_H: f64 = 176.0;
 const PET_MARK_BOTTOM_PAD: f64 = 16.0;
 
 fn overlay_extent(size_px: u32) -> (f64, f64) {
+    overlay_extent_for(size_px, true)
+}
+
+fn overlay_extent_for(size_px: u32, bubbles: bool) -> (f64, f64) {
     let mark = window_logical_size(size_px);
-    (
-        mark + PET_BUBBLE_WIDTH_PX + PET_BUBBLE_SHADOW_PAD * 2.0,
-        mark + PET_BUBBLE_VIEWPORT_H,
-    )
+    if bubbles {
+        (
+            mark + PET_BUBBLE_WIDTH_PX + PET_BUBBLE_SHADOW_PAD * 2.0,
+            mark + PET_BUBBLE_VIEWPORT_H,
+        )
+    } else {
+        (mark, mark)
+    }
 }
 
 fn mark_center_physical(
@@ -351,6 +368,72 @@ fn apply_window_chrome(win: &tauri::WebviewWindow) {
     let _ = win.set_shadow(false);
     // Must stay false: show() / always-on-top must not make this the key window.
     let _ = win.set_focusable(false);
+    detach_native_menu(win);
+}
+
+/// Keep a window-local empty menu so `AppHandle::set_menu` (locale refresh)
+/// does not re-attach File / Edit / Window / Help to this overlay.
+fn detach_native_menu(#[allow(unused_variables)] win: &tauri::WebviewWindow) {
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Ok(empty) = Menu::new(win.app_handle()) {
+            let _ = win.set_menu(empty);
+        }
+        let _ = win.hide_menu();
+    }
+    #[cfg(windows)]
+    crate::win_shell::strip_overlay_native_menu(win);
+}
+
+/// Re-apply overlay chrome after the app-wide menu is installed or refreshed.
+pub fn reassert_overlay_chrome(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
+        apply_window_chrome(&win);
+    }
+}
+
+/// True when the overlay HWND is actually up. Prefs can lag after File>Close.
+pub fn overlay_is_up(app: &AppHandle) -> bool {
+    app.get_webview_window(PET_WINDOW_LABEL)
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false)
+}
+
+/// After hide(), a leftover visible HWND would need a second hide (Windows
+/// transparent always-on-top windows can report success while staying painted).
+#[cfg(test)]
+pub fn hide_needs_destroy(hide_reported_ok: bool, still_visible: bool) -> bool {
+    still_visible || !hide_reported_ok
+}
+
+fn lock_show() -> std::sync::MutexGuard<'static, ()> {
+    SHOW_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// `None` on platforms where we cannot read the physical mouse button.
+fn primary_mouse_down() -> Option<bool> {
+    #[cfg(windows)]
+    {
+        Some(crate::win_shell::primary_mouse_button_down())
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+/// Clear drag when the OS took the mouse and never delivered pointerup.
+pub fn drag_should_clear(dragging: bool, button_down: Option<bool>) -> bool {
+    dragging && button_down == Some(false)
+}
+
+fn finish_os_drag(app: &AppHandle) {
+    if DRAGGING.swap(false, Ordering::Relaxed) {
+        persist_window_pos(app);
+        if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
+            apply_window_chrome(&win);
+        }
+    }
 }
 
 /// Give the workbench key/activation back when the overlay stole it.
@@ -400,7 +483,7 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
         return Ok(existing);
     }
     let prefs = normalize_prefs(load_prefs());
-    let (side_w, side_h) = overlay_extent(prefs.size_px);
+    let (side_w, side_h) = overlay_extent_for(prefs.size_px, prefs.bubbles_enabled);
     WEBVIEW_READY.store(false, Ordering::SeqCst);
     let mut builder = WebviewWindowBuilder::new(
         app,
@@ -426,8 +509,14 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
             return;
         }
         WEBVIEW_READY.store(true, Ordering::SeqCst);
+        apply_window_chrome(&win);
         reveal_if_wanted(&win);
     });
+    // Own an empty menu so the app-wide File/Edit/Window/Help bar is not inherited.
+    #[cfg(not(target_os = "macos"))]
+    if let Ok(empty) = Menu::new(app) {
+        builder = builder.menu(empty);
+    }
 
     if let (Some(x), Some(y)) = (prefs.x, prefs.y) {
         builder = builder.position(x, y);
@@ -452,6 +541,17 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
                     yield_key_to_main(&handle);
                 }
             }
+            tauri::WindowEvent::Destroyed => {
+                WEBVIEW_READY.store(false, Ordering::SeqCst);
+                if WANT_SHOW.swap(false, Ordering::SeqCst) {
+                    let mut prefs = load_prefs();
+                    if prefs.visible {
+                        prefs.visible = false;
+                        let _ = save_prefs(&prefs);
+                        emit_prefs(&handle, &prefs);
+                    }
+                }
+            }
             _ => {}
         }
     });
@@ -460,13 +560,14 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
 }
 
 pub fn show_pet(app: &AppHandle) -> Result<(), String> {
+    let _guard = lock_show();
     let mut prefs = normalize_prefs(load_prefs());
     prefs.enabled = true;
     prefs.visible = true;
     save_prefs(&prefs)?;
     let win = ensure_pet_window(app)?;
     apply_window_chrome(&win);
-    let (side_w, side_h) = overlay_extent(prefs.size_px);
+    let (side_w, side_h) = overlay_extent_for(prefs.size_px, prefs.bubbles_enabled);
     let _ = win.set_size(LogicalSize::new(side_w, side_h));
     if let (Some(x), Some(y)) = (prefs.x, prefs.y) {
         let _ = win.set_position(LogicalPosition::new(x, y));
@@ -477,17 +578,28 @@ pub fn show_pet(app: &AppHandle) -> Result<(), String> {
     // while the pet bundle was still booting.
     win.show().map_err(|e| e.to_string())?;
     apply_window_chrome(&win);
+    if !win.is_visible().unwrap_or(false) {
+        let _ = win.show();
+        apply_window_chrome(&win);
+    }
     yield_key_to_main(app);
     Ok(())
 }
 
 pub fn hide_pet(app: &AppHandle) -> Result<(), String> {
+    let _guard = lock_show();
     WANT_SHOW.store(false, Ordering::SeqCst);
     let mut prefs = normalize_prefs(load_prefs());
     prefs.visible = false;
     save_prefs(&prefs)?;
     if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
+        let _ = win.set_ignore_cursor_events(true);
         win.hide().map_err(|e| e.to_string())?;
+        // Do not destroy() here: CloseRequested (File>Close) also calls hide_pet,
+        // and destroy-from-that-handler can deadlock the window event loop.
+        if win.is_visible().unwrap_or(false) {
+            let _ = win.hide();
+        }
     }
     Ok(())
 }
@@ -502,7 +614,17 @@ pub fn start_cursor_watch(app: AppHandle) {
             let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) else {
                 continue;
             };
-            if DRAGGING.load(Ordering::Relaxed) || MENU_OPEN.load(Ordering::Relaxed) {
+            if DRAGGING.load(Ordering::Relaxed) {
+                // startDragging() often eats WebView pointerup. If the button is
+                // already up, the whole padded overlay would stay a hit target.
+                if drag_should_clear(true, primary_mouse_down()) {
+                    finish_os_drag(&app);
+                } else {
+                    let _ = win.set_ignore_cursor_events(false);
+                    continue;
+                }
+            }
+            if MENU_OPEN.load(Ordering::Relaxed) {
                 let _ = win.set_ignore_cursor_events(false);
                 continue;
             }
@@ -594,7 +716,7 @@ pub fn pet_prefs_set(app: AppHandle, prefs: PetPrefs) -> Result<PetPrefs, String
     if next.enabled && next.visible {
         show_pet(&app)?;
         if let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) {
-            let (side_w, side_h) = overlay_extent(next.size_px);
+            let (side_w, side_h) = overlay_extent_for(next.size_px, next.bubbles_enabled);
             let _ = win.set_size(LogicalSize::new(side_w, side_h));
         }
     } else {
@@ -623,8 +745,9 @@ pub fn pet_hide(app: AppHandle) -> Result<PetPrefs, String> {
 
 #[tauri::command]
 pub fn pet_toggle(app: AppHandle) -> Result<PetPrefs, String> {
-    let prefs = normalize_prefs(load_prefs());
-    if prefs.enabled && prefs.visible {
+    // Follow the real HWND, not just prefs — File>Close / failed hide used to
+    // invert the next /pet click so the overlay looked stuck.
+    if overlay_is_up(&app) {
         hide_pet(&app)?;
     } else {
         show_pet(&app)?;
@@ -731,16 +854,19 @@ pub fn pet_get_tasks() -> Vec<PetTaskPayload> {
 
 #[tauri::command]
 pub fn pet_set_hit_chrome(chrome: PetHitChromeIn) {
+    let size = f64::from(CACHED_SIZE_PX.load(Ordering::Relaxed).max(64));
+    let max_r = size * 0.52 * 1.2;
+    let (max_w, max_h) = overlay_extent(CACHED_SIZE_PX.load(Ordering::Relaxed).max(64));
     if let Ok(mut g) = HIT_CHROME.lock() {
         *g = PetHitChrome {
             valid: chrome.mark_r > 0.0 || chrome.bubble_w > 0.0,
             mark_cx: chrome.mark_cx,
             mark_cy: chrome.mark_cy,
-            mark_r: chrome.mark_r.max(0.0),
+            mark_r: chrome.mark_r.max(0.0).min(max_r),
             bubble_x: chrome.bubble_x,
             bubble_y: chrome.bubble_y,
-            bubble_w: chrome.bubble_w.max(0.0),
-            bubble_h: chrome.bubble_h.max(0.0),
+            bubble_w: chrome.bubble_w.max(0.0).min(max_w),
+            bubble_h: chrome.bubble_h.max(0.0).min(max_h),
             window_w: chrome.window_w.max(0.0),
             window_h: chrome.window_h.max(0.0),
         };
@@ -795,6 +921,24 @@ mod tests {
         let (w, h) = overlay_extent(128);
         assert_eq!(w, 128.0 + 96.0 + 216.0 + 40.0);
         assert_eq!(h, 128.0 + 96.0 + 176.0);
+        let (w0, h0) = overlay_extent_for(128, false);
+        assert_eq!(w0, 128.0 + 96.0);
+        assert_eq!(h0, 128.0 + 96.0);
+    }
+
+    #[test]
+    fn hide_needs_destroy_when_hwnd_stays_up() {
+        assert!(hide_needs_destroy(true, true));
+        assert!(hide_needs_destroy(false, false));
+        assert!(!hide_needs_destroy(true, false));
+    }
+
+    #[test]
+    fn drag_clears_only_when_button_is_known_up() {
+        assert!(drag_should_clear(true, Some(false)));
+        assert!(!drag_should_clear(true, Some(true)));
+        assert!(!drag_should_clear(true, None));
+        assert!(!drag_should_clear(false, Some(false)));
     }
 
     #[test]

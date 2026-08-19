@@ -110,6 +110,10 @@ html[data-pet-shell] .boot-gate {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
 }
 
+.pet-settings-swatch--light {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
 .pet-bubbles {
   display: flex;
   flex-direction: column;

@@ -39,11 +39,19 @@ export {
 export {
   PET_BUBBLE_EDGE_PAD,
   petBubbleOffsetX,
+  petBubblesEnabled,
   petOverlayHeight,
   petOverlayWidth,
 } from "./petBubbleLayout";
 
 export { placePetContextMenu, type PetWorkRect } from "./petMenuPlace";
+
+export {
+  clampPetMarkHitRadius,
+  expectedPetMarkHitRadius,
+  hitChromeCssScale,
+  scaleHitLen,
+} from "./petHitChrome";
 
 export {
   PET_SETTINGS_HASH,

@@ -11,11 +11,27 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Added
+- **Pet eye color, white body, and celebrate spin**: Settings → Pet can pick eyes independently of the body (body palette + Auto). White stays pale in both themes. The mark spins when a focused task finishes, or from the pet menu.
+- **Pet task bubbles can be turned off (#696)**: Settings → Pet and the pet context menu can hide the session chips above the mark. The overlay shrinks when they are off.
+
+**中文 · 新增**
+- **宠物可改眼睛颜色、白色身体、完成转圈**：设置 → 宠物里眼睛和身体分开选（身体色板 + 自动）。白色在两种主题下都保持浅色。聚焦任务完成时（或右键菜单）会转圈。
+- **桌宠提示框可关（#696）**：设置 → 宠物，以及宠物右键菜单，都能关掉任务气泡；关掉后浮层会收小。
+
 ### Fixed
 - **Finished turns no longer stay on 思考中 / 连接中**: After the last assistant body is painted, leftover streaming or a leaked connect claim kept Stop and blocked the next send. Client heal unlocks the composer (reply stays) when Host is idle, or after 90s if Host itself went stale.
+- **Late tool-turn answers paint without remount (#697 / #698)**: Stream text that arrives after a tool-only (or thinking-only) bubble can now fill that bubble in place. A ready→ready skip no longer hides the final answer.
+- **Permission bars and journal flush after live lock**: A remounted WebView can recover the full approval card instead of looking stuck thinking. The stream journal flushes after the live lock is released.
+- **User images no longer echo as broken assistant cards**: Pasted / attached user files are not re-attached onto the assistant turn. Outside-project paths 403 after restart no longer lock the card as a corrupt blob.
+- **Windows pet overlay no longer inherits File / Edit / Window / Help; toggle follows real window visibility; hit target shrinks after drag (#696)**: The overlay keeps a window-local empty menu and strips the native bar. Hide retries if the HWND stays painted; File → Close hides instead of destroying. Host clears drag when the left button is up, and measured hit radius is clamped to the mark size.
 
 **中文 · 修复**
 - **回合结束后不再一直「思考中 / 连接中」**：正文已经出来，UI 还停在停止键、发不了下一句。Host 已空闲（或卡住超过 90 秒）时自动解锁，回复保留。
+- **工具回合的晚到正文不再要重挂才出现（#697 / #698）**：只有工具（或只有思考）的气泡，后到的流式文字会填进同一条。ready→ready 跳过状态时也不再把最终答案藏掉。
+- **权限条和日记在解开 live lock 后会补上**：WebView 重挂后能恢复完整审批卡，不再看起来卡在思考。流式日记在释放锁之后再刷盘。
+- **用户图片不再回显成损坏的助手图卡**：用户粘贴/附图不会再挂到助手回合上。项目外路径重启后 403 也不再把卡片钉成坏图。
+- **Windows 宠物不再继承 File / Edit / Window / Help；开关跟真实窗口走；拖完热区会收回（#696）**：浮层用自己的空菜单并卸掉原生菜单栏。关掉后若仍显示会再 hide 一次；File → 关闭只会收起。松开鼠标后 Host 清掉拖拽状态，热区半径按标记尺寸封顶。
 
 ## [0.2.22] - 2026-08-19
 

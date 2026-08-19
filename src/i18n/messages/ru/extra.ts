@@ -376,6 +376,11 @@ export const ruExtra: Partial<Record<MessageKey, string>> = {
   "kanban.unboundProject": "Другие чаты",
 
   "pet.menu.spin": "Крутись",
+  "pet.menu.hideBubbles": "Скрыть подсказки",
+  "pet.menu.showBubbles": "Показать подсказки",
+  "settings.pet.bubbles": "Подсказки питомца",
+  "settings.pet.bubblesDesc":
+    "Показывать карточки сессий над питомцем, когда чат ждёт вас, работает или только что закончил.",
   "settings.pet.eyeColor": "Глаза",
   "settings.pet.eyeColorDesc":
     "Авто сохраняет контраст (светлые глаза на чёрном теле). Можно выбрать любой цвет.",

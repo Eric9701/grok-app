@@ -17,14 +17,15 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_SERVER, COINIT_APARTMENTTHREADED,
 };
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 use windows::Win32::UI::Shell::{
     ITaskbarList, SetCurrentProcessExplicitAppUserModelID, TaskbarList,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetWindow, GetWindowLongPtrW, GetWindowLongW, SetWindowLongPtrW, SetWindowLongW, SetWindowPos,
-    GWLP_HWNDPARENT, GWL_EXSTYLE, GWL_STYLE, GW_OWNER, HWND_NOTOPMOST, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_MINIMIZEBOX,
+    DrawMenuBar, GetWindow, GetWindowLongPtrW, GetWindowLongW, SetMenu, SetWindowLongPtrW,
+    SetWindowLongW, SetWindowPos, GWLP_HWNDPARENT, GWL_EXSTYLE, GWL_STYLE, GW_OWNER,
+    HWND_NOTOPMOST, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+    WS_EX_APPWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_MINIMIZEBOX,
 };
 
 /// Product AUMID — must match `identifier` in tauri.conf.json / NSIS shortcuts.
@@ -40,6 +41,38 @@ pub fn set_process_app_user_model_id() {
         if let Err(e) = SetCurrentProcessExplicitAppUserModelID(PCWSTR(wide.as_ptr())) {
             tracing::warn!("SetCurrentProcessExplicitAppUserModelID: {e}");
         }
+    }
+}
+
+/// True while the physical left mouse button is down.
+///
+/// Used by the pet overlay: `startDragging()` often swallows WebView `pointerup`,
+/// so the host must notice the button release itself.
+pub fn primary_mouse_button_down() -> bool {
+    unsafe { GetAsyncKeyState(i32::from(VK_LBUTTON.0)) < 0 }
+}
+
+/// Desktop-pet overlay: drop the Win32 menu bar (File / Edit / Window / Help).
+///
+/// Tauri `app.set_menu` attaches the app-wide menu to every window that did not
+/// install its own. `SetMenu(NULL)` + `DrawMenuBar` collapses the extra strip
+/// even when `decorations(false)` left the muda bar painted.
+pub fn strip_overlay_native_menu(window: &WebviewWindow) {
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    unsafe {
+        let _ = SetMenu(hwnd, None);
+        let _ = DrawMenuBar(hwnd);
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED,
+        );
     }
 }
 
