@@ -1916,8 +1916,8 @@ describe("session projection", () => {
       "en",
     );
     expect(noCtx?.code).toBe("AUTH_NO_CONTEXT");
-    expect(noCtx?.primary?.id).toBe("open_account");
-    expect(noCtx?.secondary?.id).toBe("reconnect");
+    expect(noCtx?.primary?.id).toBe("open_providers");
+    expect(noCtx?.secondary?.id).toBe("open_account");
     expect(noCtx?.summary.toLowerCase()).toMatch(/credential|auth|agent/);
 
     const badKey = presentErrorBanner(

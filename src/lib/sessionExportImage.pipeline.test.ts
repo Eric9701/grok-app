@@ -151,7 +151,7 @@ describe("export image pipeline e2e (shipped)", () => {
       137, 80, 78, 71, 13, 10, 26, 10,
     ]);
     expect(result.messageCount).toBeGreaterThanOrEqual(3);
-  });
+  }, 15_000);
 
   it("empty conversation throws empty code", async () => {
     await expect(

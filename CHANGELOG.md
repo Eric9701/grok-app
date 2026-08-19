@@ -11,33 +11,11 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
-### Fixed
-- **Sidebar session drag needs a clearer move**: Opening a chat no longer turns into a drag from an 8px twitch, the first-click synthetic jump, or the pet overlay stealing key / remapping the cursor. The gesture waits for 16px after an 80ms hold. Showing the pet gives the workbench key back so the first click after launch still selects a chat.
-- **Shift+Enter no longer wipes composer text**: Newlines split the live line in place. The editor no longer rebuilds from a lagging React snapshot, which deleted what you had just typed.
-- **Chat timeline keeps think → tools → body cycles**: Mid-turn status no longer gets hoisted into the thinking fold, and the next “思考中” no longer starts while tools from the previous round are still running. Live interleave stays in stream order after the turn ends (v0.2.19 honesty; the 0.2.20/0.2.21 process-fold had mashed the whole turn).
-- **Thinking timer is per episode**: The first “思考中” no longer keeps counting through later tool rounds, and the next thinking row starts from zero instead of continuing the previous clock. Work-phase “工作中” uses this phase’s tool times, not the assistant bubble’s send time.
-- **Live work stays expanded**: The “工作中” rail stays open so you can see which tools are running. It auto-collapses when that burst finishes with no errors, and stays open if any tool failed.
-- **Live tools no longer look stuck on the first reads**: Journal completion now settles in-progress reads even after later tools arrive, and the work rail follows the currently running step so later bash/polls are not clipped off-screen.
-- **STREAM_STALL after send is this-turn only**: A new prompt no longer inherits the previous answer as “output paused”. The empty first-token wait is 90s (was 45s) so Grok 4.x high-effort thinking is less likely to look like a dead gateway.
-- **Relative chat images resolve from curl dest and journal tail**: Markdown basenames like `foo.png` no longer miss when the real file was written with `curl -o` (or similar) into an absolute path. Rehydrate after journal ready so first-paint does not lock an empty card. `/workspace/` is not matched inside `/Users/…/Documents/workspace`.
+## [0.2.23] - 2026-08-20
 
-**中文 · 修复**
-- **侧栏会话拖动不再一碰就触发**：点开会话时 8px 的轻微移动、按下后第一次虚假位移、以及宠物窗口抢焦点/重映射指针，都不会立刻变成拖动。启动后第一次点击会话会选中，不会被宠物 `show()` 吃掉。
-- **Shift+Enter 不再删掉输入框文字**：换行在当前行原地拆开，不再用滞后的 React 草稿整页重绘（那会把刚打的字清掉）。
-- **对话时间线恢复「思考 → 工具 → 正文」循环**：过程旁白不再被折进思考折叠里；上一轮工具还没跑完时，也不会在下面先画出新的「思考中」。回合结束后仍保持流式顺序（回到 0.2.19；0.2.20/0.2.21 的过程折叠把整轮揉成一团）。
-- **思考计时按轮次清零**：第一轮「思考中」不再把后面的工具时间算进去；下一轮思考从 0 开始，而不是接着上一轮的秒数。工作阶段的「工作中」只用本阶段工具时间，不用整条气泡的发送时刻。
-- **进行中的工作不折叠**：「工作中」保持展开，能看到正在跑哪些工具；这一段跑完且没有报错再自动折叠，有报错则保持展开。
-- **进行中的工具不再卡在第一条读取**：后面又来新工具时，前面已完成的读取会从「进行中」结算掉；工作列表会跟到当前正在跑的那一步，后面的命令/轮询不会被截在视口外。
-- **发消息后的 STREAM_STALL 只看本轮**：新 prompt 不会因为上一轮已有正文而显示「输出暂时停住了」。尚未出首 token 的等待窗口改为 90 秒（原 45 秒），减少高思考模型被误判成网关挂死。
-- **相对路径聊天图片能对上 curl 落盘和日记尾**：`foo.png` 这类 markdown 文件名不再漏掉 `curl -o` 写到绝对路径的文件。日记 ready 后再解析一次，避免首屏把卡片钉成空图。`/Users/…/Documents/workspace` 里的 `/workspace/` 不会被误当成工作区根。
-
-### Changed
-- **Remaining UI locales filled**: German, Spanish, French, Korean, Brazilian Portuguese, Indonesian, Filipino, Ukrainian, Tamil, and Russian catalogs now cover essentially the full key set (product names and symbols stay English). Russian leftovers after that pass were filled again. Korean leftovers after the first pass were filled again.
-- **Italian catalog is now fully translated**: Remaining settings / Doctor / extensions copy that still fell back to English is Italian.
-
-**中文 · 变更**
-- **其余界面语言补全**：德、西、法、韩、巴西葡、印尼、菲、乌克兰、泰米尔、俄语目录覆盖完整 key 集（品牌名和符号仍可保持英文）。
-- **意大利语目录补全**：原先回落英文的设置、Doctor、扩展文案改为意大利语。
+> **Highlight:** Fifteen UI locales; attach another chat as context; custom STT; think → tools timeline stays honest; sidebar drag no longer fires on a twitch.
+>
+> **中文 · 亮点：** 十五种界面语言；可附加另一段对话；自定义听写端点；思考/工具时间线恢复诚实；侧栏拖动不再一碰就触发。
 
 ### Added
 - **Fifteen UI locales with complete catalogs (#708)**: Settings and OS language detection include German, Spanish, Filipino, French, Indonesian, Italian, Japanese, Korean, Brazilian Portuguese, Tamil, and Ukrainian (plus existing English, Russian, Simplified and Traditional Chinese). Every new catalog has the full English key set. Japanese is nearly fully translated; the others cover chrome plus expanded surfaces (remaining deep settings stay English, like Russian). Dates, compact counts, heatmap labels, and tray/menu copy follow the locale instead of forking on Chinese-vs-English. Russian `tray.*` keys are filled. Latin and Sanskrit are not shipped.
@@ -63,7 +41,23 @@ See `docs/llm-wiki/release.md`.
 - **把另一段对话当作上下文加入**：`/attach-chat`、输入框 `+`、或右键「加入目前对话」可加入本地对话；把侧栏会话拖到输入框也会附加。chip 挂在输入框；日记只存 `[[chat:id]]`；Host 只给 Agent 加一段压缩记录（最多 3 段；来源对话不改）。拖行身到项目仍是移动会话。
 - **Composer 听写支持自定义 OpenAI 兼容 STT 端点（#700）**：设置 → Voice 可选用任意 `/audio/transcriptions` 端点（Groq / OpenAI / Mistral / 本地服务），API Key 按提供方独立存入系统钥匙串，明文不出 webview；官方 xAI 听写与 Live Voice 不变。中文听写支持简体 / 繁体引导，「跟随系统」语言提示跟随界面实际语言。
 
+### Changed
+- **Remaining UI locales filled**: German, Spanish, French, Korean, Brazilian Portuguese, Indonesian, Filipino, Ukrainian, Tamil, and Russian catalogs now cover essentially the full key set (product names and symbols stay English). Russian leftovers after that pass were filled again. Korean leftovers after the first pass were filled again.
+- **Italian catalog is now fully translated**: Remaining settings / Doctor / extensions copy that still fell back to English is Italian.
+
+**中文 · 变更**
+- **其余界面语言补全**：德、西、法、韩、巴西葡、印尼、菲、乌克兰、泰米尔、俄语目录覆盖完整 key 集（品牌名和符号仍可保持英文）。
+- **意大利语目录补全**：原先回落英文的设置、Doctor、扩展文案改为意大利语。
+
 ### Fixed
+- **Sidebar session drag needs a clearer move**: Opening a chat no longer turns into a drag from an 8px twitch, the first-click synthetic jump, or the pet overlay stealing key / remapping the cursor. The gesture waits for 16px after an 80ms hold. Showing the pet gives the workbench key back so the first click after launch still selects a chat.
+- **Shift+Enter no longer wipes composer text**: Newlines split the live line in place. The editor no longer rebuilds from a lagging React snapshot, which deleted what you had just typed.
+- **Chat timeline keeps think → tools → body cycles**: Mid-turn status no longer gets hoisted into the thinking fold, and the next “思考中” no longer starts while tools from the previous round are still running. Live interleave stays in stream order after the turn ends (v0.2.19 honesty; the 0.2.20/0.2.21 process-fold had mashed the whole turn).
+- **Thinking timer is per episode**: The first “思考中” no longer keeps counting through later tool rounds, and the next thinking row starts from zero instead of continuing the previous clock. Work-phase “工作中” uses this phase’s tool times, not the assistant bubble’s send time.
+- **Live work stays expanded**: The “工作中” rail stays open so you can see which tools are running. It auto-collapses when that burst finishes with no errors, and stays open if any tool failed.
+- **Live tools no longer look stuck on the first reads**: Journal completion now settles in-progress reads even after later tools arrive, and the work rail follows the currently running step so later bash/polls are not clipped off-screen.
+- **STREAM_STALL after send is this-turn only**: A new prompt no longer inherits the previous answer as “output paused”. The empty first-token wait is 90s (was 45s) so Grok 4.x high-effort thinking is less likely to look like a dead gateway.
+- **Relative chat images resolve from curl dest and journal tail**: Markdown basenames like `foo.png` no longer miss when the real file was written with `curl -o` (or similar) into an absolute path. Rehydrate after journal ready so first-paint does not lock an empty card. `/workspace/` is not matched inside `/Users/…/Documents/workspace`.
 - **Pet bubble body wraps 2–3 lines; session title stays readable on light chips**: Stage text is no longer a single ellipsis line. The session title under it uses contrast-safe muted color (paper/white no longer hides it). With the progress bar off, the chip does not keep an empty track gap.
 - **“No credentials on the agent” points to Providers, not only official Sign in (#705)**: The banner now explains that a terminal CC Switch / custom relay is unused until you click Use in Settings, and the primary action opens Custom providers.
 - **Chat no longer jitters when scrolling up from the bottom (#703)**: Stick-to-bottom only snaps rubber-band past max; a 10px trackpad nudge can leave the pin. Sending after reading history force-sticks once in layout (not a double rAF + busy-edge bump).
@@ -77,6 +71,14 @@ See `docs/llm-wiki/release.md`.
 - Attach is drag-onto-composer or the row menu (no ⋮⋮ grip-drag). Host compact keeps the newest turns; chips-only missing/empty sources return typed errors; recycle bootstrap keeps a stub or re-expanded attach context.
 
 **中文 · 修复**
+- **侧栏会话拖动不再一碰就触发**：点开会话时 8px 的轻微移动、按下后第一次虚假位移、以及宠物窗口抢焦点/重映射指针，都不会立刻变成拖动。启动后第一次点击会话会选中，不会被宠物 `show()` 吃掉。
+- **Shift+Enter 不再删掉输入框文字**：换行在当前行原地拆开，不再用滞后的 React 草稿整页重绘（那会把刚打的字清掉）。
+- **对话时间线恢复「思考 → 工具 → 正文」循环**：过程旁白不再被折进思考折叠里；上一轮工具还没跑完时，也不会在下面先画出新的「思考中」。回合结束后仍保持流式顺序（回到 0.2.19；0.2.20/0.2.21 的过程折叠把整轮揉成一团）。
+- **思考计时按轮次清零**：第一轮「思考中」不再把后面的工具时间算进去；下一轮思考从 0 开始，而不是接着上一轮的秒数。工作阶段的「工作中」只用本阶段工具时间，不用整条气泡的发送时刻。
+- **进行中的工作不折叠**：「工作中」保持展开，能看到正在跑哪些工具；这一段跑完且没有报错再自动折叠，有报错则保持展开。
+- **进行中的工具不再卡在第一条读取**：后面又来新工具时，前面已完成的读取会从「进行中」结算掉；工作列表会跟到当前正在跑的那一步，后面的命令/轮询不会被截在视口外。
+- **发消息后的 STREAM_STALL 只看本轮**：新 prompt 不会因为上一轮已有正文而显示「输出暂时停住了」。尚未出首 token 的等待窗口改为 90 秒（原 45 秒），减少高思考模型被误判成网关挂死。
+- **相对路径聊天图片能对上 curl 落盘和日记尾**：`foo.png` 这类 markdown 文件名不再漏掉 `curl -o` 写到绝对路径的文件。日记 ready 后再解析一次，避免首屏把卡片钉成空图。`/Users/…/Documents/workspace` 里的 `/workspace/` 不会被误当成工作区根。
 - **宠物气泡正文可折 2–3 行；浅色底上也能看见会话标题**：阶段性回复不再只挤一行省略。下面的会话标题用对比色，纸张/白色背景不再把标题隐成空行。关掉进度条时不再留那条空白。
 - **「Agent 侧没有可用凭据」不再只叫人官方登录（#705）**：文案说明终端 CC Switch / 中转要在设置里点「使用」才会进 App；主按钮打开自定义服务商。
 - **贴底后再轻微上滑不再抖动（#703）**：贴底锁只回弹越过底部的橡皮筋；10px 触控板轻拨即可离开。先上滑再发送只会在 layout 里吸一次底，不会双 rAF + busy 再吸一次。
