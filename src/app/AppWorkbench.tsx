@@ -7461,7 +7461,6 @@ export function AppWorkbench() {
       untitled: tr("session.untitled"),
       renameLabel: tr("session.renamePrompt"),
       renamePlaceholder: tr("session.renamePlaceholder"),
-      attach: tr("attachChat.hoverAdd"),
     }),
     [tr],
   );
@@ -12289,7 +12288,6 @@ export function AppWorkbench() {
     closeAttachChat,
     openAttachChat,
     applyAttachedChat,
-    onSidebarSessionAttach,
     cycleAttachedChatScope,
     attachedChatLookup,
     attachScopeLabel,
@@ -13483,6 +13481,11 @@ export function AppWorkbench() {
         ? tr("session.move.ghostMany", { n: String(count) })
         : title || tr("session.untitled"),
     onDrop: requestMove,
+    onAttach: (rows) => {
+      for (const row of rows) {
+        applyAttachedChat(row.id, row.title, row.updatedAt);
+      }
+    },
   });
 
   /**
@@ -19647,7 +19650,6 @@ export function AppWorkbench() {
                                         onArchive={onSidebarSessionArchive}
                                         onMenu={onSidebarSessionMenu}
                                         onRename={onSidebarSessionRename}
-                                        onAttach={onSidebarSessionAttach}
                                       />
                                     );
                                   }}
@@ -19798,7 +19800,6 @@ export function AppWorkbench() {
                               onArchive={onSidebarSessionArchive}
                               onMenu={onSidebarSessionMenu}
                               onRename={onSidebarSessionRename}
-                              onAttach={onSidebarSessionAttach}
                             />
                           );
                         }}
@@ -21522,6 +21523,7 @@ export function AppWorkbench() {
                 "composer" +
                 (dragZone === "main" ? " composer--drop-ready" : "")
               }
+              data-session-attach=""
             >
               {sendQueueStrip.visible && (
                 <div
@@ -26612,7 +26614,7 @@ export function AppWorkbench() {
             items = [
               {
                 id: "attach-chat",
-                label: tr("attachChat.menu"),
+                label: tr("chat.selectionAddToInput"),
                 icon: <IconChat size={16} />,
                 disabled: s.id === session.sessionId,
                 onClick: () => {

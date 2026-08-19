@@ -184,13 +184,6 @@ export function useAttachChat(opts: {
     ],
   );
 
-  const onSidebarSessionAttach = useCallback(
-    (s: { id: string; title: string; updatedAt?: string }) => {
-      applyAttachedChat(s.id, s.title, s.updatedAt);
-    },
-    [applyAttachedChat],
-  );
-
   const cycleAttachedChatScope = useCallback(
     (id: string) => {
       setChatAttachments((prev) => {
@@ -240,7 +233,6 @@ export function useAttachChat(opts: {
     closeAttachChat,
     openAttachChat,
     applyAttachedChat,
-    onSidebarSessionAttach,
     cycleAttachedChatScope,
     attachedChatLookup,
     attachScopeLabel,

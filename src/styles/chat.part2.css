@@ -425,7 +425,8 @@ button.composer__context-item {
 }
 
 /* Subtle composer focus while main is drop-target (not a second frame) */
-.composer--drop-ready {
+.composer--drop-ready,
+.composer.is-session-drop {
   border-color: rgba(80, 140, 255, 0.45);
   box-shadow: 0 0 0 2px rgba(80, 140, 255, 0.12);
 }
@@ -438,23 +439,6 @@ button.composer__context-item {
 .tree-l3__title * {
   -webkit-user-select: none;
   user-select: none;
-}
-.tree-l3__attach-tools {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  min-width: 0;
-  /* Left of title so the hover pin/archive overlay cannot cover these. */
-  z-index: 3;
-}
-.tree-l3__attach-btn {
-  flex-shrink: 0;
-  color: var(--text-secondary);
-}
-.tree-l3:hover .tree-l3__attach-btn,
-.tree-l3__attach-btn:focus-visible {
-  color: var(--text-primary);
 }
 
 .skill-chip--chat.is-missing,

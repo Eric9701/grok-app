@@ -16,7 +16,6 @@ import type { Locale } from "@/i18n";
 import {
   IconArchive,
   IconBellOff,
-  IconChat,
   IconCheck,
   IconClock,
   IconMore,
@@ -67,7 +66,6 @@ export type SidebarSessionRowLabels = {
   untitled: string;
   renameLabel: string;
   renamePlaceholder: string;
-  attach?: string;
 };
 
 export type SidebarSessionRowProps = {
@@ -106,8 +104,6 @@ export type SidebarSessionRowProps = {
   onMenu: (e: MouseEvent, session: SidebarSessionRowSession) => void;
   /** Persist a committed in-row title (already trimmed, non-empty, changed). */
   onRename: (session: SidebarSessionRowSession, title: string) => void;
-  /** Attach this row to the current composer (icon button). */
-  onAttach?: (session: SidebarSessionRowSession) => void;
 };
 
 function SidebarSessionRowInner({
@@ -132,7 +128,6 @@ function SidebarSessionRowInner({
   onArchive,
   onMenu,
   onRename,
-  onAttach,
 }: SidebarSessionRowProps) {
   const displayTitle = session.title || labels.untitled;
   const [editing, setEditing] = useState(false);
@@ -227,10 +222,6 @@ function SidebarSessionRowInner({
     variant === "project" && session.archived
       ? labels.unarchive
       : labels.archive;
-  // Keep the attach icon out of the hover overlay so it is not covered
-  // by pin/archive/menu. Hide on the open row (cannot attach self).
-  const showAttach = !!onAttach && !!labels.attach && !selectMode && !working && !active;
-
   const menuButton = (
     <button
       type="button"
@@ -265,24 +256,6 @@ function SidebarSessionRowInner({
           aria-hidden
         >
           {checked ? <IconCheck size={11} stroke={2.4} /> : null}
-        </span>
-      ) : null}
-      {showAttach ? (
-        <span className="tree-l3__attach-tools">
-          <Tip label={labels.attach}>
-            <button
-              type="button"
-              className="tree-icon-btn tree-l3__attach-btn"
-              aria-label={labels.attach}
-              data-testid="sidebar-session-attach"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAttach?.(session);
-              }}
-            >
-              <IconChat size={13} />
-            </button>
-          </Tip>
         </span>
       ) : null}
       <span className="tree-l3__title">
@@ -486,7 +459,6 @@ function sidebarSessionRowPropsEqual(
     prev.onArchive === next.onArchive &&
     prev.onMenu === next.onMenu &&
     prev.onRename === next.onRename &&
-    prev.onAttach === next.onAttach &&
     worktreeBadgeEqual(prev.worktreeBadge, next.worktreeBadge)
   );
 }

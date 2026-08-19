@@ -1,8 +1,10 @@
 /**
- * Pointer-drag a sidebar session onto a project folder (or Other sessions).
+ * Pointer-drag a sidebar session onto a project folder (or Other sessions),
+ * or onto the composer to attach it as chat context.
  *
  * Chrome is pure DOM — no React setState during the gesture — so VirtualList
- * / Tip trees stay stable. Drop always goes through the confirmed move path.
+ * / Tip trees stay stable. Capture and grab-cursor wait until the pointer
+ * actually moves past the threshold, so a click cannot arm a drag.
  */
 import { useEffect, useRef } from "react";
 import type { SessionRow } from "@/lib/app/sidebarModels";
@@ -12,12 +14,24 @@ import {
   sessionIdsForDrag,
 } from "@/lib/sessionMoveProject";
 
-const DRAG_THRESHOLD_PX = 4;
+/** Click jitter on trackpads often exceeds 4px; only a real drag should arm. */
+export const SESSION_DRAG_THRESHOLD_PX = 8;
 const SIDEBAR_MOVING = "sidebar--session-moving";
 const ROW_DRAGGING = "tree-l3--dragging";
 const DROP_TARGET = "is-session-drop";
+const DRAG_GHOST = "tree-l3--drag-ghost";
 
-/** Row-body move must not start from the attach grip or other row chrome. */
+export type SessionDragDrop =
+  | { kind: "attach"; node: HTMLElement }
+  | { kind: "move"; node: HTMLElement; projectId: string | null }
+  | { kind: "none" };
+
+type ArmedDrop =
+  | { kind: "attach" }
+  | { kind: "move"; projectId: string | null }
+  | { kind: "none" };
+
+/** Row-body move must not start from row chrome (pin / archive / menu / rename). */
 export function isSessionMoveIgnoredTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return true;
   if (
@@ -28,6 +42,47 @@ export function isSessionMoveIgnoredTarget(target: EventTarget | null): boolean 
     return true;
   }
   return false;
+}
+
+export function isPastSessionDragThreshold(dx: number, dy: number): boolean {
+  return Math.hypot(dx, dy) >= SESSION_DRAG_THRESHOLD_PX;
+}
+
+/** Prefer composer attach over project-move when both appear in the hit stack. */
+export function sessionDragDropFromElements(
+  stack: ArrayLike<Element>,
+): SessionDragDrop {
+  let attach: HTMLElement | null = null;
+  let move: HTMLElement | null = null;
+  for (let i = 0; i < stack.length; i++) {
+    const el = stack[i];
+    if (!(el instanceof Element)) continue;
+    if (el.classList.contains(DRAG_GHOST)) continue;
+    if (!attach) {
+      const hit = el.closest<HTMLElement>("[data-session-attach]");
+      if (hit) attach = hit;
+    }
+    if (!move) {
+      const hit = el.closest<HTMLElement>("[data-session-drop]");
+      if (hit) move = hit;
+    }
+    if (attach && move) break;
+  }
+  if (attach) return { kind: "attach", node: attach };
+  if (move) {
+    const parsed = parseSessionDropId(move.dataset.sessionDrop);
+    if (parsed.hit) {
+      return { kind: "move", node: move, projectId: parsed.projectId };
+    }
+  }
+  return { kind: "none" };
+}
+
+export function sessionDragDropFromPoint(
+  clientX: number,
+  clientY: number,
+): SessionDragDrop {
+  return sessionDragDropFromElements(document.elementsFromPoint(clientX, clientY));
 }
 
 function removeGhost(ghost: HTMLElement | null) {
@@ -71,7 +126,7 @@ function createSessionDragGhost(
   clientY: number,
 ): { ghost: HTMLElement; offsetX: number; offsetY: number } {
   const ghost = document.createElement("div");
-  ghost.className = "tree-l3 tree-l3--drag-ghost";
+  ghost.className = `tree-l3 ${DRAG_GHOST}`;
   ghost.setAttribute("aria-hidden", "true");
   ghost.textContent = label;
   const offsetX = 16;
@@ -85,17 +140,6 @@ function createSessionDragGhost(
   return { ghost, offsetX, offsetY };
 }
 
-function dropNodeFromPoint(clientX: number, clientY: number): HTMLElement | null {
-  const stack = document.elementsFromPoint(clientX, clientY);
-  for (const el of stack) {
-    if (!(el instanceof Element)) continue;
-    if (el.classList.contains("tree-l3--drag-ghost")) continue;
-    const hit = el.closest<HTMLElement>("[data-session-drop]");
-    if (hit) return hit;
-  }
-  return null;
-}
-
 export function useSidebarSessionMoveDrag(opts: {
   enabled: boolean;
   sessions: SessionRow[];
@@ -103,9 +147,17 @@ export function useSidebarSessionMoveDrag(opts: {
   selectMode: boolean;
   formatGhost: (count: number, title: string) => string;
   onDrop: (rows: SessionRow[], targetProjectId: string | null) => void;
+  onAttach?: (rows: SessionRow[]) => void;
 }): void {
-  const { enabled, sessions, selectedIds, selectMode, formatGhost, onDrop } =
-    opts;
+  const {
+    enabled,
+    sessions,
+    selectedIds,
+    selectMode,
+    formatGhost,
+    onDrop,
+    onAttach,
+  } = opts;
 
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
@@ -117,6 +169,8 @@ export function useSidebarSessionMoveDrag(opts: {
   formatGhostRef.current = formatGhost;
   const onDropRef = useRef(onDrop);
   onDropRef.current = onDrop;
+  const onAttachRef = useRef(onAttach);
+  onAttachRef.current = onAttach;
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
 
@@ -131,7 +185,7 @@ export function useSidebarSessionMoveDrag(opts: {
     ghost: HTMLElement | null;
     ghostOffsetX: number;
     ghostOffsetY: number;
-    drop: { hit: true; projectId: string | null } | { hit: false };
+    drop: ArmedDrop;
   } | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
@@ -153,14 +207,9 @@ export function useSidebarSessionMoveDrag(opts: {
           /* ignore */
         }
       }
-      if (!commit || !s?.active || !s.drop.hit) return;
+      if (!s?.active) return;
 
-      const rows = s.rowIds
-        .map((id) => sessionsRef.current.find((x) => x.id === id))
-        .filter((x): x is SessionRow => Boolean(x));
-      if (!rows.length) return;
-      if (isSameProjectDrop(rows, s.drop.projectId)) return;
-
+      // A real drag must not open the row via the trailing click.
       const blockClick = (ev: Event) => {
         ev.stopPropagation();
         ev.preventDefault();
@@ -171,12 +220,26 @@ export function useSidebarSessionMoveDrag(opts: {
         window.removeEventListener("click", blockClick, true);
       }, 400);
 
+      if (!commit) return;
+
+      const rows = s.rowIds
+        .map((id) => sessionsRef.current.find((x) => x.id === id))
+        .filter((x): x is SessionRow => Boolean(x));
+      if (!rows.length) return;
+
+      if (s.drop.kind === "attach") {
+        onAttachRef.current?.(rows);
+        return;
+      }
+      if (s.drop.kind !== "move") return;
+      if (isSameProjectDrop(rows, s.drop.projectId)) return;
       onDropRef.current(rows, s.drop.projectId);
     };
 
     const onDown = (e: PointerEvent) => {
       if (!enabledRef.current) return;
       if (e.button !== 0) return;
+      if (sessionRef.current) return;
       if (isSessionMoveIgnoredTarget(e.target)) return;
       const raw = e.target;
       if (!(raw instanceof Element)) return;
@@ -192,13 +255,10 @@ export function useSidebarSessionMoveDrag(opts: {
         selectMode: selectModeRef.current,
       });
       const pointerId = e.pointerId;
-      try {
-        row.setPointerCapture?.(pointerId);
-      } catch {
-        /* older WebView */
-      }
-      row.closest(".sidebar")?.classList.add(SIDEBAR_MOVING);
 
+      // Do not capture or paint grab-cursor until the pointer actually moves.
+      // Immediate capture + a 4px threshold was arming drags on ordinary clicks
+      // (trackpad jitter / synthetic pointermove after setPointerCapture).
       sessionRef.current = {
         draggedId,
         rowIds,
@@ -210,7 +270,7 @@ export function useSidebarSessionMoveDrag(opts: {
         ghost: null,
         ghostOffsetX: 0,
         ghostOffsetY: 0,
-        drop: { hit: false },
+        drop: { kind: "none" },
       };
 
       const onMove = (ev: PointerEvent) => {
@@ -219,8 +279,15 @@ export function useSidebarSessionMoveDrag(opts: {
         const dx = ev.clientX - s.startX;
         const dy = ev.clientY - s.startY;
         if (!s.active) {
-          if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+          if (ev.buttons === 0) return;
+          if (!isPastSessionDragThreshold(dx, dy)) return;
           s.active = true;
+          try {
+            row.setPointerCapture?.(pointerId);
+          } catch {
+            /* older WebView */
+          }
+          row.closest(".sidebar")?.classList.add(SIDEBAR_MOVING);
           try {
             ev.preventDefault();
           } catch {
@@ -257,19 +324,23 @@ export function useSidebarSessionMoveDrag(opts: {
           }
         }
 
-        const node = dropNodeFromPoint(ev.clientX, ev.clientY);
-        const parsed = parseSessionDropId(node?.dataset.sessionDrop);
-        const rows = s.rowIds
-          .map((id) => sessionsRef.current.find((x) => x.id === id))
-          .filter((x): x is SessionRow => Boolean(x));
-        const usable =
-          parsed.hit && rows.length > 0 && !isSameProjectDrop(rows, parsed.projectId)
-            ? parsed
-            : ({ hit: false } as const);
-        s.drop = usable;
+        const hit = sessionDragDropFromPoint(ev.clientX, ev.clientY);
         clearDropClasses();
-        if (usable.hit && node) {
-          node.classList.add(DROP_TARGET);
+        if (hit.kind === "attach") {
+          s.drop = { kind: "attach" };
+          hit.node.classList.add(DROP_TARGET);
+        } else if (hit.kind === "move") {
+          const rows = s.rowIds
+            .map((id) => sessionsRef.current.find((x) => x.id === id))
+            .filter((x): x is SessionRow => Boolean(x));
+          const usable =
+            rows.length > 0 && !isSameProjectDrop(rows, hit.projectId);
+          s.drop = usable
+            ? { kind: "move", projectId: hit.projectId }
+            : { kind: "none" };
+          if (usable) hit.node.classList.add(DROP_TARGET);
+        } else {
+          s.drop = { kind: "none" };
         }
       };
 
@@ -285,13 +356,13 @@ export function useSidebarSessionMoveDrag(opts: {
         endSession(false);
       };
 
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-      window.addEventListener("pointercancel", onCancel);
+      window.addEventListener("pointermove", onMove, true);
+      window.addEventListener("pointerup", onUp, true);
+      window.addEventListener("pointercancel", onCancel, true);
       cleanupRef.current = () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-        window.removeEventListener("pointercancel", onCancel);
+        window.removeEventListener("pointermove", onMove, true);
+        window.removeEventListener("pointerup", onUp, true);
+        window.removeEventListener("pointercancel", onCancel, true);
       };
     };
 
