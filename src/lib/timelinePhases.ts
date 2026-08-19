@@ -18,10 +18,6 @@
 import type { MessageSegment, MessageToolSegment } from "./session";
 import { hostToolFamilyKey } from "./session";
 import { extractThinkingSummary } from "./thinkingSummary";
-import {
-  processSpeechParagraphs,
-  splitAssistantAnswer,
-} from "./assistantAnswerSplit";
 import { classifyToolKind } from "./toolDisplay";
 
 /** Ordered work unit inside a phase (Grok activity rail). */
@@ -436,20 +432,6 @@ export function phaseTitleModel(phase: TimelinePhase): {
   };
 }
 
-function lastContentIndex(units: TimelineUnit[]): number {
-  for (let i = units.length - 1; i >= 0; i--) {
-    if (units[i]!.kind === "content") return i;
-  }
-  return -1;
-}
-
-function speechItemsFromText(text: string): TimelinePhaseItem[] {
-  return processSpeechParagraphs(text).map((t) => ({
-    kind: "speech" as const,
-    text: t,
-  }));
-}
-
 function toolFamilyKey(tool: MessageToolSegment): string {
   const b = classifyToolKind(tool.toolKind, tool.title, tool.toolCallId);
   if (b === "read" || b === "search") return "explore";
@@ -591,17 +573,17 @@ function phaseItemsOf(phase: TimelinePhase): TimelinePhaseItem[] {
 }
 
 /**
- * Display contract (confirmed mock):
+ * Display contract:
  * - Journal CoT → one 思考了 row (never dumped as body text).
- * - Mid-turn speech + folded tools → one 工作了 fold (default collapsed).
- * - Last-content conclusion stays visible below the fold.
+ * - Tools → one 工作了 fold (default collapsed).
+ * - Assistant content stays visible body. Mid-turn status is still content —
+ *   do not fold it into 工作了 as speech or keep only the last sentence.
  */
 export function foldProcessIntoTimeline(
   units: TimelineUnit[],
   options: { streaming?: boolean } = {},
 ): TimelineUnit[] {
   const streaming = !!options.streaming;
-  const lastCi = lastContentIndex(units);
   const hoisted: string[] = [];
   let hoistSi = 0;
   let hoistStreaming = false;
@@ -610,7 +592,7 @@ export function foldProcessIntoTimeline(
   let workEndSi = 0;
   let workLive = false;
   let workStarted = false;
-  let answer: Extract<TimelineUnit, { kind: "content" }> | null = null;
+  const contents: Extract<TimelineUnit, { kind: "content" }>[] = [];
   const suffix: TimelineUnit[] = [];
   let sawAnswerSlot = false;
 
@@ -685,30 +667,14 @@ export function foldProcessIntoTimeline(
       }
       continue;
     }
-    // content
-    const isLast = i === lastCi;
-    // Only earlier content bodies are mid-turn chatter. The last content is
-    // the conclusion slot even when tools (open Finder, screenshot) follow.
-    if (!isLast) {
-      for (const s of speechItemsFromText(u.text)) {
-        pushWork(s, u.si, false);
-      }
-      continue;
-    }
-    const split = splitAssistantAnswer(u.text);
-    const keepVisible = streaming && u.streaming && !split.cut;
-    if (!keepVisible && split.process) {
-      for (const s of speechItemsFromText(split.process)) {
-        pushWork(s, u.si, false);
-      }
-    }
+    // content — always visible body, including mid-turn status sentences.
     sawAnswerSlot = true;
-    answer = {
+    contents.push({
       kind: "content",
-      text: keepVisible || !split.process ? u.text : split.answer,
+      text: u.text,
       si: u.si,
       streaming: u.streaming,
-    };
+    });
   }
 
   const out: TimelineUnit[] = [];
@@ -724,12 +690,12 @@ export function foldProcessIntoTimeline(
       }),
     );
   }
-  if (answer) out.push(answer);
+  for (const content of contents) out.push(content);
   out.push(...suffix);
   return out;
 }
 
-/** Phase projection + process/conclusion fold (what the transcript renders). */
+/** Phase projection + thought/tool hoist (what the transcript renders). */
 export function buildAssistantTimeline(
   segs: MessageSegment[],
   options: { streaming?: boolean } = {},

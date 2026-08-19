@@ -1734,8 +1734,16 @@ pub fn try_reconcile_linked_session(app_session_id: &str) -> u32 {
             .find(|p| p.id == pid)
             .map(|p| p.path)
     });
-    reconcile_journal_from_chat_history(app_session_id, agent_id, cwd_hint.as_deref(), &mode)
-        .unwrap_or(0)
+    let changed = reconcile_journal_from_chat_history(
+        app_session_id,
+        agent_id,
+        cwd_hint.as_deref(),
+        &mode,
+    )
+    .unwrap_or(0);
+    // Do not heal here: session_messages / post-turn reconcile can run while
+    // this process still has a live prompt. Boot + connect heal instead.
+    changed
 }
 
 /// Import one CLI session into the App journal (independent App session row).

@@ -24,4 +24,15 @@ describe("PetOverlay drag hit target", () => {
     expect(src).toContain("shouldTriggerPetSpin");
     expect(src).toContain("pet.menu.spin");
   });
+
+  it("exposes a rest-face emote from the pet menu", () => {
+    expect(src).toContain("emoteSignal");
+    expect(src).toContain("pet.menu.emote");
+  });
+
+  it("nudges on Wayland instead of startDragging after slop", () => {
+    expect(src).toContain("petShouldManualDrag");
+    expect(src).toContain("petPointerStep");
+    expect(src).toContain("petNudge");
+  });
 });

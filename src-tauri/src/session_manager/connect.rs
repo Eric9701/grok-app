@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
 use crate::acp_client::{AcpClient, AcpEvent};
@@ -17,6 +17,22 @@ use crate::session_fsm::{SessionFsm, SessionState};
 use crate::store::{self};
 
 use super::*;
+
+fn emit_host_exit_heal(app: &AppHandle, session_id: &str) {
+    let Some(message_id) = crate::turn_interrupt::heal_interrupted_turn(session_id) else {
+        return;
+    };
+    let _ = app.emit(
+        "session://turn_marker",
+        serde_json::json!({
+            "sessionId": session_id,
+            "messageId": message_id,
+            "marker": "turn_cancelled",
+            "reason": "host_exit",
+            "content": "turn_cancelled|host_exit",
+        }),
+    );
+}
 
 impl SessionManager {
     pub async fn connect(
@@ -814,6 +830,7 @@ impl SessionManager {
                             resumed,
                             "connect warm-reuse ok"
                         );
+                        emit_host_exit_heal(&app, &meta.id);
                         // Refresh the prewarm slot with a FRESH process: the
                         // one we just consumed now hosts this session's actor,
                         // and the CLI has no public unload API — a second load
@@ -1092,6 +1109,7 @@ impl SessionManager {
                 } else if let Err(e) = client.set_mode(&prefs.mode).await {
                     tracing::warn!("acp set_mode after session open soft-fail: {e}");
                 }
+                emit_host_exit_heal(&app, &meta.id);
                 Ok(self.snapshot())
             }
             Err(e) => {

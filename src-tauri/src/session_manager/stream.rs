@@ -375,6 +375,8 @@ impl SessionManager {
             journal_suggests_permission_reject,
         ) {
             Self::journal_turn_cancelled(s, app, &reason);
+        } else {
+            crate::turn_lease::clear_lease(&s.app_session_id);
         }
         s.stream_buf.clear();
         s.stream_thought.clear();
@@ -413,6 +415,11 @@ impl SessionManager {
         }
         Self::maybe_flush_stream_journal(s, true, false);
         let reason = normalize_hard_end_reason(reason);
+        if reason == "host_exit" || reason == "agent_exit" {
+            crate::turn_lease::mark_interrupted(&s.app_session_id);
+        } else {
+            crate::turn_lease::clear_lease(&s.app_session_id);
+        }
         let mid = Uuid::new_v4().to_string();
         let content = format!("turn_cancelled|{reason}");
         // Neutral chips: user stop + generic mid-run cancel. Infra / permission
@@ -1203,6 +1210,7 @@ pub(crate) fn normalize_hard_end_reason(raw: &str) -> &str {
     match r {
         "user_stop" | "user" | "cancelled_by_user" | "user_cancel" => "user_stop",
         "agent_exit" | "agent" | "process_exit" => "agent_exit",
+        "host_exit" => "host_exit",
         "permission_denied"
         | "permission_rejected"
         | "permission_deny"
@@ -1294,6 +1302,7 @@ mod hard_end_tests {
             "permission_denied"
         );
         assert_eq!(normalize_hard_end_reason("user_stop"), "user_stop");
+        assert_eq!(normalize_hard_end_reason("host_exit"), "host_exit");
         assert_eq!(normalize_hard_end_reason(""), "cancelled");
     }
 

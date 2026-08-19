@@ -247,6 +247,20 @@ The agent fires `_x.ai/session/prompt_complete` **early** — while tools are op
 or with many seconds of answer text still to come. Treating that as the end of
 the turn is how answers got truncated mid-sentence while the chat kept spinning.
 
+### Host process death (false-complete heal)
+
+When the **App host** dies mid-turn (Windows cold start, no shutdown log), the stdio agent dies with it. `session/load` cannot resume at the permission / tool boundary (`docs/SPIKE-ACP.md` in-flight continuity gap).
+
+Host persists `{app_data}/sessions/<id>/turn_lease.json` while `prompt_in_flight` is true. On **process start** (dirty active leases) and after a successful **session connect** (not during journal reconcile, which can run mid-turn):
+
+1. If the lease is `active`, **or** the agent trail shows unresolved `permission_requested` / last assistant `tool_calls` without `tool_result` and no `turn_completed`
+2. **and** the journal has no end-of-turn marker after the last user
+3. Host appends `turn_cancelled|host_exit` and sets the lease to `interrupted`
+
+The transcript must not look idle-complete. **Continue** on that chip (and on `agent_exit`) starts a **new** `session/prompt`: journal is the short i18n continue phrase; the agent text includes the unfinished command when known. The old `session/request_permission` RPC is **not** replayed.
+
+A previous host that did not mark `logs/host_runtime.json` `shutdown: true` is recorded in `logs/unclean-restart.log`. Windows native exceptions write `logs/last_crash.txt`. These files ship in the session diagnostic zip when present.
+
 `LiveSession.prompt_in_flight` is the authoritative "this chat is working" flag.
 It is set when `session/prompt` is dispatched and cleared **only** by:
 

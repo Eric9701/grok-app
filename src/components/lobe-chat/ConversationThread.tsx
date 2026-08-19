@@ -43,6 +43,7 @@ import {
 } from "@/lib/messageNodeDeepLink";
 import { MessageNodeRail } from "./MessageNodeRail";
 import { isEndOfTurnMarker } from "@/lib/endOfTurn";
+import { latestContinuableEndMessageId } from "@/lib/continueInterruptedTurn";
 import type { Attachment } from "@/lib/attachments";
 import {
   buildInlineMediaPathMap,
@@ -122,7 +123,7 @@ import { SkillChip } from "@/components/SkillChip";
 import { ChatRefChip } from "@/components/ChatRefChip";
 import { useAttachedChatLookup } from "@/components/AttachedChatLookup";
 import { HighlightedText } from "@/components/HighlightedText";
-import { findChatMatches, findMatchesBeforeVisible } from "@/lib/chatFind";
+import { findChatMatches } from "@/lib/chatFind";
 import { hydrateDisplayContent, parseStoredContent } from "@/lib/draftDoc";
 import { parseScheduledUserContent } from "@/lib/automations";
 import {
@@ -647,6 +648,8 @@ export interface ConversationThreadProps {
     comment: string;
     sourceMessageId?: string;
   }) => void;
+  /** Resume after host_exit / agent_exit (new prompt; not permission RPC). */
+  onContinueInterrupted?: () => void;
   attachLabels: {
     open: string;
     reveal: string;
@@ -807,6 +810,8 @@ type TranscriptMessageRowProps = {
   onOpenError?: ConversationThreadProps["onOpenError"];
   onOpenExternalLink?: ConversationThreadProps["onOpenExternalLink"];
   onAddAttachmentToComposer?: ConversationThreadProps["onAddAttachmentToComposer"];
+  onContinueInterrupted?: ConversationThreadProps["onContinueInterrupted"];
+  latestContinuableEndId?: string | null;
   /**
    * Epoch ms for live thinking on the active streaming assistant
    * (turn / post-steer clock). Null for finished rows.
@@ -837,6 +842,8 @@ function transcriptRowPropsEqual(
   if (a.editAttachments !== b.editAttachments) return false;
   if (a.canEditLastUser !== b.canEditLastUser) return false;
   if (a.canRegenerate !== b.canRegenerate) return false;
+  if (a.onContinueInterrupted !== b.onContinueInterrupted) return false;
+  if (a.latestContinuableEndId !== b.latestContinuableEndId) return false;
   if (a.turnLive !== b.turnLive) return false;
   if (a.canRewindSession !== b.canRewindSession) return false;
   if (a.regenerableAssistantId !== b.regenerableAssistantId) return false;
@@ -913,6 +920,8 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   onOpenError,
   onOpenExternalLink,
   onAddAttachmentToComposer,
+  onContinueInterrupted,
+  latestContinuableEndId,
 }: TranscriptMessageRowProps) {
   void _timeTick;
   const wrap = (node: ReactNode) =>
@@ -936,7 +945,17 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
         m.content?.startsWith("turn_end|")))
   ) {
     return wrap(
-      <EndOfTurnChip key={m.id} message={m} locale={locale} />,
+      <EndOfTurnChip
+        key={m.id}
+        message={m}
+        locale={locale}
+        onContinue={
+          m.id === latestContinuableEndId
+            ? onContinueInterrupted
+            : undefined
+        }
+        continueDisabled={turnLive}
+      />,
     );
   }
 
@@ -1407,22 +1426,10 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
             />
           ) : null}
           {(() => {
-            // Running occurrence base across content segments so
+            // Running occurrence base across visible content segments so
             // find marks stay aligned with message-level match index.
-            // Hits in the folded process prefix of m.content must be skipped
-            // so the conclusion highlight uses the same occurrence as Cmd+F.
-            const lastVisibleContent = (() => {
-              for (let i = timelineUnits.length - 1; i >= 0; i--) {
-                const u = timelineUnits[i]!;
-                if (u.kind === "content") return u.text;
-              }
-              return "";
-            })();
-            let contentOccBase = findMatchesBeforeVisible({
-              full: m.content ?? "",
-              visible: lastVisibleContent,
-              query: findQuery,
-            });
+            // Mid-turn body is no longer folded away, so start at 0.
+            let contentOccBase = 0;
             // First bare thought uses a stable live key for the whole episode
             // (placeholder → tokens → done) so the wall clock does not reset.
             const primaryThoughtSi = (() => {
@@ -1522,7 +1529,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                   </div>
                 );
               }
-              // content — conclusion stays outside the work fold
+              // content — assistant body stays visible (not folded into 工作了)
               const segBase = contentOccBase;
               if (findQuery.trim()) {
                 contentOccBase += findChatMatches(findQuery, [
@@ -1746,6 +1753,7 @@ export function ConversationThread({
   onOpenExternalLink,
   onAddAttachmentToComposer,
   onAddQuote,
+  onContinueInterrupted,
   attachLabels,
   findQuery = "",
   findHitMessageIds,
@@ -2116,6 +2124,10 @@ export function ConversationThread({
   const transcriptMessages = useMemo(
     () => filterMessagesForTranscript(wovenMessages, transcriptFilter),
     [wovenMessages, transcriptFilter],
+  );
+  const latestContinuableEndId = useMemo(
+    () => latestContinuableEndMessageId(transcriptMessages),
+    [transcriptMessages],
   );
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   const [locateTargetId, setLocateTargetId] = useState<string | null>(null);
@@ -2727,6 +2739,8 @@ export function ConversationThread({
               onOpenError={onOpenError}
               onOpenExternalLink={onOpenExternalLink}
               onAddAttachmentToComposer={onAddAttachmentToComposer}
+              onContinueInterrupted={onContinueInterrupted}
+              latestContinuableEndId={latestContinuableEndId}
             />
           ))}
 

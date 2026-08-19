@@ -12,6 +12,7 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- **Interrupted turns after an app restart**: If the host process dies mid-turn, reopening the chat journals `turn_cancelled|host_exit` instead of looking finished. Continue sends a new prompt (with the unfinished command when known). Unclean host exits and Windows last-crash notes go into the session diagnostic zip.
 - **File preview refresh (#711)**: The files toolbar can re-read the open file from disk after the agent edits it. Unsaved drafts keep the button disabled so a refresh cannot wipe the editor.
 - **Type-to-focus composer (#704)**: With the chat in the foreground, typing while focus is not in an input focuses the composer and inserts the character. IME composition, sidebar j/k, terminals/editors, overlays, and Space-on-button are left alone.
 - **Double-click a sidebar chat to rename (#702)**: Project and Other-session rows edit the title in place. Enter / blur save when the name changed; Escape cancels. F2 on a focused row does the same. Right-click Rename still uses the existing prompt. Multi-select does not start rename.
@@ -20,6 +21,7 @@ See `docs/llm-wiki/release.md`.
 - **Attach another chat as context**: `/attach-chat`, composer `+`, sidebar attach icon, or right-click **Attach to current chat** picks a local conversation; chips sit on the composer; the journal stores `[[chat:id]]` tokens; the host prefixes a compact transcript for the agent only (max 3; source chat unchanged). Row-body drag still moves the chat between projects.
 
 **中文 · 新增**
+- **应用重启后的中断回合**：宿主进程中途死掉再打开会话，会记 `turn_cancelled|host_exit`，不再看起来像做完了。芯片上的「继续」发新 prompt（有未跑完的命令会带上）。非干净退出和 Windows 崩溃摘要会进会话诊断包。
 - **文件预览可刷新（#711）**：文件工具栏能从磁盘重新读取当前打开的文件，agent 改完不必关 tab。有未保存草稿时按钮禁用，避免冲掉编辑。
 - **打字自动聚焦输入框（#704）**：对话在前台、光标不在输入框时，敲键盘会聚焦 composer 并写入该字符。中文输入法、侧栏 j/k、终端/编辑器、弹层、按钮上的空格不受影响。
 - **双击侧栏对话可重命名（#702）**：项目里和其他会话的行内直接改标题。Enter / 失焦在标题有改动时保存，Esc 取消。聚焦行按 F2 同样进入。右键「重命名」仍走原来的弹窗。多选模式不会进入重命名。

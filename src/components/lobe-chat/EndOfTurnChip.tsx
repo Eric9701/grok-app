@@ -44,7 +44,8 @@ function EndOfTurnMark({ reason }: { reason: EndOfTurnReason }): ReactNode {
     reason === "app_update" ||
     reason === "account_auth" ||
     reason === "provider_route" ||
-    reason === "session_data_mode"
+    reason === "session_data_mode" ||
+    reason === "host_exit"
   ) {
     return <IconAlertTriangle size={14} stroke={1.75} />;
   }
@@ -56,15 +57,22 @@ export const EndOfTurnChip = memo(function EndOfTurnChip({
   message,
   locale,
   reasonOverride,
+  onContinue,
+  continueDisabled,
 }: {
   message?: ChatMessage;
   locale: Locale;
   reasonOverride?: EndOfTurnReason | string | null;
+  onContinue?: () => void;
+  continueDisabled?: boolean;
 }) {
   const tr = useMemo(() => createT(locale), [locale]);
   const raw = resolveRawReason(reasonOverride, message);
   const model = mapEndOfTurnReason(String(raw));
   const label = tr(model.messageKey as MessageKey);
+  const showContinue =
+    !!onContinue &&
+    (model.reason === "host_exit" || model.reason === "agent_exit");
 
   return (
     <div
@@ -77,6 +85,16 @@ export const EndOfTurnChip = memo(function EndOfTurnChip({
         <EndOfTurnMark reason={model.reason} />
       </span>
       <span className="lobe-end-turn__title">{label}</span>
+      {showContinue ? (
+        <button
+          type="button"
+          className="lobe-end-turn__continue"
+          disabled={continueDisabled}
+          onClick={onContinue}
+        >
+          {tr("endOfTurn.continue")}
+        </button>
+      ) : null}
     </div>
   );
 });

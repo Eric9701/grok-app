@@ -70,6 +70,7 @@ import {
   shouldSkipHtml5AfterNative,
 } from "@/lib/fileDrop";
 import { writeOpenTargetStorage } from "@/lib/openEditorHonesty";
+import { buildContinueAgentPrompt } from "@/lib/continueInterruptedTurn";
 import {
   APP_CLOSE_REQUESTED_EVENT,
   APP_CLOSE_TAB_OR_WINDOW_EVENT,
@@ -8126,6 +8127,7 @@ export function AppWorkbench() {
     goalMode: boolean;
     fromQueue?: boolean;
     targetSessionId?: string | null;
+    agentTextOverride?: string;
   }): Promise<boolean> => {
     // Session-keyed pool: secondary may send via shared Host (session-targeted).
     if (!canLiveParticipate(isSecondaryWindowRef.current)) {
@@ -8175,7 +8177,9 @@ export function AppWorkbench() {
       quotesForSend,
       serializeForAgent(segments, { goalMode: useGoal }),
     );
-    let agentText = buildAgentPrompt(agentBody, att);
+    let agentText = opts.agentTextOverride?.trim()
+      ? opts.agentTextOverride
+      : buildAgentPrompt(agentBody, att);
     const schemaForSend = sessionJsonSchemaRef.current?.trim() || "";
     if (schemaForSend && isActiveJsonSchema(schemaForSend)) {
       agentText = wrapAgentTextWithJsonSchema(agentText, schemaForSend);
@@ -20914,6 +20918,28 @@ export function AppWorkbench() {
             }}
           >
           <ConversationThreadLive
+            onContinueInterrupted={() => {
+              const sid = session.sessionId;
+              if (!sid) return;
+              if (
+                session.state === "streaming" ||
+                session.state === "awaiting_permission" ||
+                session.state === "connecting"
+              ) {
+                return;
+              }
+              void (async () => {
+                const ctx = await api.sessionInterruptContext(sid);
+                const journal = tr("endOfTurn.continuePrompt");
+                await executeSend({
+                  storedDisplay: journal,
+                  att: [],
+                  goalMode: false,
+                  targetSessionId: sid,
+                  agentTextOverride: buildContinueAgentPrompt(ctx),
+                });
+              })();
+            }}
             onAddQuote={(quote) => {
               setQuotes((prev) => [
                 ...prev,

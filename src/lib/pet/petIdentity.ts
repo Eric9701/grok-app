@@ -3,12 +3,22 @@
 export const PET_SHAPES = [
   "blob",
   "pebble",
+  "bean",
+  "egg",
   "squircle",
   "tablet",
-  "wedge",
+  "capsule",
+  "cylinder",
   "hex",
+  "gem",
+  "crystal",
+  "wedge",
+  "shield",
+  "dome",
+  "arch",
   "cloud",
   "teardrop",
+  "leaf",
 ] as const;
 
 export type PetShape = (typeof PET_SHAPES)[number];

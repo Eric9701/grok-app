@@ -67,6 +67,22 @@ export function sessionPrewarm(): void {
   });
 }
 
+/** Unfinished command from an interrupted-turn lease (Continue chip). */
+export async function sessionInterruptContext(
+  sessionId: string,
+): Promise<{
+  command: string;
+  title: string;
+  toolName: string;
+} | null> {
+  if (!sessionId.trim()) return null;
+  if (isMirrorClient()) {
+    return invoke("session_interrupt_context", { sessionId });
+  }
+  if (!isTauri()) return null;
+  return invoke("session_interrupt_context", { sessionId });
+}
+
 /**
  * Send a turn to the agent.
  * @param text Agent prompt (skills as `/name`, attachments as `@path`, etc.)

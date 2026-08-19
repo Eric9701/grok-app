@@ -30,6 +30,11 @@ describe("endOfTurn", () => {
     expect(mapEndOfTurnReason("session_data_mode").messageKey).toBe(
       "endOfTurn.sessionDataMode",
     );
+    expect(mapEndOfTurnReason("host_exit").messageKey).toBe(
+      "endOfTurn.hostExit",
+    );
+    expect(mapEndOfTurnReason("host_exit").tone).toBe("warning");
+    expect(mapEndOfTurnReason("host_exit").reason).toBe("host_exit");
   });
 
   it("maps permission_rejected alias to permission_denied", () => {
@@ -66,6 +71,7 @@ describe("endOfTurn", () => {
     expect(parseEndOfTurnContent("turn_cancelled|agent_exit")).toBe(
       "agent_exit",
     );
+    expect(parseEndOfTurnContent("turn_cancelled|host_exit")).toBe("host_exit");
     expect(parseEndOfTurnContent("turn_end|stall")).toBe("stall");
   });
 
@@ -75,6 +81,7 @@ describe("endOfTurn", () => {
       ["turn_cancelled|permission_denied", "permission_denied"],
       ["turn_cancelled|cancelled", "cancelled"],
       ["turn_cancelled|account_auth", "account_auth"],
+      ["turn_cancelled|host_exit", "host_exit"],
       ["turn_end|provider_route", "provider_route"],
     ];
     for (const [content, reason] of cases) {
