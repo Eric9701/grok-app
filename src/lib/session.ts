@@ -495,10 +495,9 @@ function toolSegmentFromMessageRow(row: ChatMessage): MessageToolSegment | null 
  * Place journal tools into a legacy [thought…, content…] timeline.
  * Host often finalizes the assistant row *before* appending tool_step rows, and
  * assistant.createdAt is often *after* tool timestamps — so tools must not sit
- * only after the answer. Prefer: thoughts → tools → content for history reload.
- * If segments already contain tools (live interleave), only fill missing ids;
- * finished-turn reorder is applied by {@link reorderSegmentsToHistoryLayout}
- * after weave (streaming rows keep interleave).
+ * only after the answer. Prefer: thoughts → tools → content for journals that
+ * never stored live interleave. If segments already contain tools, only fill
+ * missing ids and keep stream order (do not flatten at turn end).
  */
 export function mergeToolsIntoAssistantSegments(
   segs: MessageSegment[],
@@ -553,46 +552,27 @@ export function mergeToolsIntoAssistantSegments(
 }
 
 /**
- * Finished-turn display layout (matches journal reload):
- * all thoughts → all tools → all content.
+ * Finished-turn hygiene only: clear leftover tool `streaming` flags.
  *
- * Live streaming keeps true interleave (thought ↔ tool ↔ content). Once the
- * assistant is no longer streaming, collapse work above the answer so the
- * bubble matches history reopen without requiring a full app remount.
+ * Live think → tool → body → think loops must stay in stream order after the
+ * turn ends. Flattening to thought* → tool* → content* was the 0.2.21 jumble
+ * (next-round thinking under a still-open tool fold). Journals without stored
+ * interleave still get thought → tools → content from
+ * {@link mergeToolsIntoAssistantSegments}.
  */
 export function reorderSegmentsToHistoryLayout(
   segs: MessageSegment[],
 ): MessageSegment[] {
-  if (segs.length < 2) return segs;
-
-  // Detect whether kinds already follow thought* → tool* → content*.
-  let phase: 0 | 1 | 2 = 0; // 0 thought, 1 tool, 2 content
-  let outOfOrder = false;
-  for (const s of segs) {
-    const rank: 0 | 1 | 2 =
-      s.kind === "thought" ? 0 : s.kind === "tool" ? 1 : 2;
-    if (rank < phase) {
-      outOfOrder = true;
-      break;
+  if (!segs.length) return segs;
+  let changed = false;
+  const next: MessageSegment[] = segs.map((s) => {
+    if (s.kind === "tool" && s.streaming) {
+      changed = true;
+      return { ...s, streaming: false };
     }
-    phase = rank;
-  }
-  if (!outOfOrder) return segs;
-
-  const thoughts: MessageSegment[] = [];
-  const tools: MessageSegment[] = [];
-  const contents: MessageSegment[] = [];
-  for (const s of segs) {
-    if (s.kind === "thought") {
-      thoughts.push({ kind: "thought", text: s.text });
-    } else if (s.kind === "tool") {
-      // Turn is finished at the call site — never leave a live stream flag.
-      tools.push({ ...s, streaming: false });
-    } else if (s.kind === "content") {
-      contents.push({ kind: "content", text: s.text });
-    }
-  }
-  return compactMessageSegments([...thoughts, ...tools, ...contents]);
+    return s;
+  });
+  return changed ? compactMessageSegments(next) : segs;
 }
 
 /**
@@ -603,8 +583,8 @@ export function reorderSegmentsToHistoryLayout(
  * row — Host journal is often U → A → tools). Rebuilds display order as
  * thought → tools → content when segments have no live tool interleave yet.
  *
- * For finished (non-streaming) assistants that already have live-interleaved
- * tools, also force the same history layout so turn-end matches reopen.
+ * Finished assistants that already interleave thought/tool/body keep that
+ * stream order (turn-end must not jump to a mashed thought→tools→content).
  */
 export function weaveToolsIntoAssistantSegments(
   messages: ChatMessage[],
@@ -712,8 +692,8 @@ export function weaveToolsIntoAssistantSegments(
     i = turnEnd > i ? turnEnd : i + 1;
   }
 
-  // Turn-end / history paint: force thought → tools → content on finished
-  // assistants. Live streaming rows keep interleave (stream honesty).
+  // Turn-end hygiene: drop leftover tool streaming flags. Do not flatten
+  // live interleave — that destroyed think → tool → body → think cycles.
   for (let k = 0; k < out.length; k++) {
     const m = out[k]!;
     if (m.role !== "assistant" || m.isError || m.streaming) continue;

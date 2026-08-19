@@ -8250,6 +8250,7 @@ export function AppWorkbench() {
           role: "assistant",
           content: "",
           streaming: true,
+          createdAt: nowIso,
         },
       ];
     };
@@ -17200,6 +17201,7 @@ export function AppWorkbench() {
             role: "assistant",
             content: "",
             streaming: true,
+            createdAt: nowIso,
           },
         ];
         messagesBySessionRef.current.set(cacheKey, next);

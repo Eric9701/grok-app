@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   clampThinkingStartToMessage,
+  freezeThinkingDurationMs,
+  isLeadingThoughtUnit,
   nextThinkingStartAnchor,
   parseCreatedAtMs,
+  thinkingUnitStartedAt,
 } from "./thinkingStartAnchor";
 
 const MIN = 60_000;
@@ -103,6 +106,94 @@ describe("clampThinkingStartToMessage", () => {
       clampThinkingStartToMessage({
         turnStartedAt: null,
         messageCreatedAtMs: null,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("isLeadingThoughtUnit", () => {
+  it("is true when the thought is the first timeline unit", () => {
+    expect(
+      isLeadingThoughtUnit(
+        [
+          { kind: "thought", si: 0 },
+          { kind: "content", si: 1 },
+        ],
+        0,
+      ),
+    ).toBe(true);
+  });
+
+  it("is false when a work phase or body already happened", () => {
+    expect(
+      isLeadingThoughtUnit(
+        [
+          { kind: "phase", si: 0 },
+          { kind: "content", si: 3 },
+          { kind: "thought", si: 4 },
+        ],
+        4,
+      ),
+    ).toBe(false);
+    expect(
+      isLeadingThoughtUnit(
+        [
+          { kind: "content", si: 0 },
+          { kind: "thought", si: 1 },
+        ],
+        1,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("thinkingUnitStartedAt", () => {
+  it("gives the turn clock only to the leading live thought", () => {
+    expect(
+      thinkingUnitStartedAt({
+        turnStartedAt: 1_000,
+        leading: true,
+        unitStreaming: true,
+      }),
+    ).toBe(1_000);
+  });
+
+  it("does not inherit the turn clock for a later thinking episode", () => {
+    expect(
+      thinkingUnitStartedAt({
+        turnStartedAt: 1_000,
+        leading: false,
+        unitStreaming: true,
+      }),
+    ).toBeNull();
+  });
+
+  it("does not keep a live clock on a finished thought", () => {
+    expect(
+      thinkingUnitStartedAt({
+        turnStartedAt: 1_000,
+        leading: true,
+        unitStreaming: false,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("freezeThinkingDurationMs", () => {
+  it("freezes from the episode origin, not a stale turn clock", () => {
+    expect(
+      freezeThinkingDurationMs({
+        originMs: 8_000,
+        nowMs: 11_000,
+      }),
+    ).toBe(3_000);
+  });
+
+  it("does not invent a duration from a leftover startedAt", () => {
+    expect(
+      freezeThinkingDurationMs({
+        originMs: null,
+        nowMs: 51 * MIN,
       }),
     ).toBeNull();
   });

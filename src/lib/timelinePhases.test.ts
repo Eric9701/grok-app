@@ -278,6 +278,26 @@ describe("timelinePhases", () => {
       hasRunningTool: false,
     })).toBe(false);
   });
+
+  it("does not paint trailing thinking while an earlier work phase still has running tools", () => {
+    const segs: MessageSegment[] = [
+      { kind: "thought", text: "round1" },
+      tool("t1", "Read a", "running"),
+      { kind: "content", text: "正在调用接口。" },
+    ];
+    const units = buildTimelineUnits(segs, { streaming: true });
+    const phase = units[0]!;
+    expect(phase.kind).toBe("phase");
+    if (phase.kind === "phase") {
+      expect(phase.runningCount).toBe(1);
+    }
+    expect(
+      shouldShowTrailingLiveThinking(units, {
+        messageStreaming: true,
+        hasRunningTool: false,
+      }),
+    ).toBe(false);
+  });
 });
 
 function bash(id: string): MessageToolSegment {
@@ -325,20 +345,15 @@ describe("foldProcessIntoTimeline", () => {
       },
     ];
     const units = buildAssistantTimeline(segs, { streaming: false });
-    expect(units.map((u) => u.kind)).toEqual(["thought", "phase", "content"]);
-    const thought = units[0]!;
-    expect(thought.kind).toBe("thought");
-    if (thought.kind === "thought") {
-      expect(thought.text).toContain("decode eight");
-    }
-    const phase = units[1]!;
+    expect(units.map((u) => u.kind)).toEqual(["phase", "content"]);
+    const phase = units[0]!;
     expect(phase.kind).toBe("phase");
     if (phase.kind === "phase") {
-      expect(phase.thoughts).toEqual([]);
-      expect(phase.items.every((i) => i.kind === "tool")).toBe(true);
+      expect(phase.thoughts[0]).toContain("decode eight");
       expect(phase.items.some((i) => i.kind === "speech")).toBe(false);
+      expect(phase.tools.length).toBe(7);
     }
-    const answer = units[2]!;
+    const answer = units[1]!;
     expect(answer.kind).toBe("content");
     if (answer.kind === "content") {
       expect(answer.text).toContain("先把 8 张");
@@ -367,16 +382,21 @@ describe("foldProcessIntoTimeline", () => {
     ];
     const units = buildAssistantTimeline(segs, { streaming: false });
     expect(units.map((u) => u.kind)).toEqual([
-      "thought",
       "phase",
       "content",
+      "phase",
       "content",
     ]);
-    const phase = units[1]!;
+    const phase = units[0]!;
     expect(phase.kind).toBe("phase");
     if (phase.kind === "phase") {
-      expect(phase.items.every((i) => i.kind === "tool")).toBe(true);
-      expect(phase.items).toHaveLength(4);
+      expect(phase.thoughts).toEqual(["round1"]);
+      expect(phase.tools).toHaveLength(2);
+    }
+    const later = units[2]!;
+    expect(later.kind).toBe("phase");
+    if (later.kind === "phase") {
+      expect(later.tools).toHaveLength(2);
     }
     const bodies = units.filter((u) => u.kind === "content");
     expect(bodies.map((u) => (u.kind === "content" ? u.text : ""))).toEqual([
@@ -420,8 +440,8 @@ describe("foldProcessIntoTimeline", () => {
       buildTimelineUnits(segs, { streaming: true }),
       { streaming: true },
     );
-    expect(live.map((u) => u.kind)).toEqual(["thought", "phase", "content"]);
-    const content = live[2]!;
+    expect(live.map((u) => u.kind)).toEqual(["phase", "content"]);
+    const content = live[1]!;
     expect(content.kind).toBe("content");
     if (content.kind === "content") {
       expect(content.text).toContain("正在写结论");
@@ -451,9 +471,11 @@ describe("foldProcessIntoTimeline", () => {
       "先把 8 张",
     );
     const phase = units.find((u) => u.kind === "phase");
-    expect(phase && phase.kind === "phase" && phase.items.every((i) => i.kind === "tool")).toBe(
-      true,
-    );
+    expect(phase && phase.kind === "phase").toBe(true);
+    if (phase && phase.kind === "phase") {
+      expect(phase.items.some((i) => i.kind === "speech")).toBe(false);
+      expect(phase.thoughts[0]).toContain("plan");
+    }
   });
 
   it("does not swallow a streaming last content when a later tool arrives", () => {
@@ -499,6 +521,78 @@ describe("foldProcessIntoTimeline", () => {
     }
   });
 
+  it("keeps think → tools → body → think → tools → answer in stream order", () => {
+    const segs: MessageSegment[] = [
+      { kind: "thought", text: "round1" },
+      tool("t1", "Read a"),
+      tool("t2", "Read b"),
+      { kind: "content", text: "先核对技能目录，再下载压缩包。" },
+      { kind: "thought", text: "round2" },
+      bash("b1"),
+      { kind: "content", text: "安装完成。" },
+    ];
+    const units = buildAssistantTimeline(segs, { streaming: false });
+    expect(units.map((u) => u.kind)).toEqual([
+      "phase",
+      "content",
+      "phase",
+      "content",
+    ]);
+    const p0 = units[0]!;
+    expect(p0.kind).toBe("phase");
+    if (p0.kind === "phase") {
+      expect(p0.thoughts).toEqual(["round1"]);
+      expect(p0.tools.map((t) => t.toolCallId)).toEqual(["t1", "t2"]);
+      expect(p0.items.some((i) => i.kind === "speech")).toBe(false);
+    }
+    expect(units[1]).toMatchObject({
+      kind: "content",
+      text: "先核对技能目录，再下载压缩包。",
+    });
+    const p1 = units[2]!;
+    expect(p1.kind).toBe("phase");
+    if (p1.kind === "phase") {
+      expect(p1.thoughts).toEqual(["round2"]);
+      expect(p1.tools.map((t) => t.toolCallId)).toEqual(["b1"]);
+    }
+    expect(units[3]).toMatchObject({
+      kind: "content",
+      text: "安装完成。",
+    });
+  });
+
+  it("does not hoist later thinking above unfinished tools after a mid-turn body", () => {
+    const segs: MessageSegment[] = [
+      { kind: "thought", text: "round1" },
+      tool("t1", "Read a", "running"),
+      { kind: "content", text: "正在调用生图接口。" },
+      { kind: "thought", text: "round2" },
+    ];
+    const units = buildAssistantTimeline(segs, { streaming: true });
+    expect(units.map((u) => u.kind)).toEqual([
+      "phase",
+      "content",
+      "thought",
+    ]);
+    const phase = units[0]!;
+    expect(phase.kind).toBe("phase");
+    if (phase.kind === "phase") {
+      expect(phase.tools[0]?.toolCallId).toBe("t1");
+    }
+    const last = units[2]!;
+    expect(last.kind).toBe("thought");
+    if (last.kind === "thought") {
+      expect(last.text).toBe("round2");
+      expect(last.streaming).toBe(true);
+    }
+    expect(
+      shouldShowTrailingLiveThinking(units, {
+        messageStreaming: true,
+        hasRunningTool: true,
+      }),
+    ).toBe(false);
+  });
+
   it("keeps every live status sentence visible (DSH long-turn shape)", () => {
     const segs: MessageSegment[] = [
       { kind: "thought", text: "Look at both projects" },
@@ -512,10 +606,11 @@ describe("foldProcessIntoTimeline", () => {
     ];
     const live = buildAssistantTimeline(segs, { streaming: true });
     expect(live.map((u) => u.kind)).toEqual([
-      "thought",
       "phase",
       "content",
+      "tool",
       "content",
+      "tool",
       "content",
     ]);
     const texts = live
@@ -527,10 +622,10 @@ describe("foldProcessIntoTimeline", () => {
       "测试都过了。接下来分别提交两个仓库并推到 GitHub。",
     ]);
     const phase = live.find((u) => u.kind === "phase");
-    expect(
-      phase &&
-        phase.kind === "phase" &&
-        phase.items.every((i) => i.kind === "tool"),
-    ).toBe(true);
+    expect(phase && phase.kind === "phase").toBe(true);
+    if (phase && phase.kind === "phase") {
+      expect(phase.thoughts[0]).toContain("Look at both projects");
+      expect(phase.tools).toHaveLength(2);
+    }
   });
 });

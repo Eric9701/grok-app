@@ -11,6 +11,14 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Fixed
+- **Chat timeline keeps think → tools → body cycles**: Mid-turn status no longer gets hoisted into the thinking fold, and the next “思考中” no longer starts while tools from the previous round are still running. Live interleave stays in stream order after the turn ends (v0.2.19 honesty; the 0.2.20/0.2.21 process-fold had mashed the whole turn).
+- **Thinking timer is per episode**: The first “思考中” no longer keeps counting through later tool rounds, and the next thinking row starts from zero instead of continuing the previous clock. Work-phase “工作中” uses this phase’s tool times, not the assistant bubble’s send time.
+
+**中文 · 修复**
+- **对话时间线恢复「思考 → 工具 → 正文」循环**：过程旁白不再被折进思考折叠里；上一轮工具还没跑完时，也不会在下面先画出新的「思考中」。回合结束后仍保持流式顺序（回到 0.2.19；0.2.20/0.2.21 的过程折叠把整轮揉成一团）。
+- **思考计时按轮次清零**：第一轮「思考中」不再把后面的工具时间算进去；下一轮思考从 0 开始，而不是接着上一轮的秒数。工作阶段的「工作中」只用本阶段工具时间，不用整条气泡的发送时刻。
+
 ### Changed
 - **Remaining UI locales filled**: German, Spanish, French, Korean, Brazilian Portuguese, Indonesian, Filipino, Ukrainian, Tamil, and Russian catalogs now cover essentially the full key set (product names and symbols stay English). Russian leftovers after that pass were filled again. Korean leftovers after the first pass were filled again.
 - **Italian catalog is now fully translated**: Remaining settings / Doctor / extensions copy that still fell back to English is Italian.

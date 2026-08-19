@@ -403,6 +403,16 @@ export function shouldShowTrailingLiveThinking(
 ): boolean {
   if (!opts.messageStreaming || opts.hasRunningTool) return false;
   if (units.length === 0) return false;
+  // A work phase still running above a mid-turn body must not grow a second
+  // “思考中” under the answer — that was the 0.2.21 fold: tools unfinished
+  // on top, thinking already started below.
+  if (
+    units.some(
+      (u) => u.kind === "phase" && (u.live || u.runningCount > 0),
+    )
+  ) {
+    return false;
+  }
   const last = units[units.length - 1]!;
   if (
     (last.kind === "thought" || last.kind === "thought-group") &&
@@ -498,204 +508,25 @@ export function weaveSpeechAndTools(
   return out;
 }
 
-function emitThoughtUnit(
-  texts: string[],
-  si: number,
-  streaming: boolean,
-): TimelineUnit | null {
-  const cleaned = texts.map((t) => t.trim()).filter(Boolean);
-  if (!cleaned.length && !streaming) return null;
-  if (cleaned.length <= 1) {
-    return {
-      kind: "thought",
-      text: cleaned[0] ?? "",
-      si,
-      streaming,
-    };
-  }
-  return {
-    kind: "thought-group",
-    texts: cleaned,
-    si,
-    streaming,
-  };
-}
-
-function emitWorkUnits(
-  items: TimelinePhaseItem[],
-  meta: {
-    startSi: number;
-    endSi: number;
-    live: boolean;
-    streaming: boolean;
-  },
-): TimelineUnit[] {
-  const woven = weaveSpeechAndTools(items.filter((i) => i.kind !== "thought"));
-  const tools = woven
-    .filter(
-      (i): i is { kind: "tool"; tool: MessageToolSegment } => i.kind === "tool",
-    )
-    .map((i) => i.tool);
-  const speechCount = woven.filter((i) => i.kind === "speech").length;
-  if (!woven.length) return [];
-  if (speechCount === 0 && !isPhaseWorthy([], tools)) {
-    return tools.map((tool, idx) => ({
-      kind: "tool" as const,
-      tool,
-      si: meta.startSi + idx,
-    }));
-  }
-  const stats = phaseStats(tools);
-  return [
-    {
-      kind: "phase",
-      id: `p-${meta.startSi}`,
-      items: woven,
-      thoughts: [],
-      tools,
-      startSi: meta.startSi,
-      endSi: meta.endSi,
-      live: meta.live,
-      errorCount: stats.errorCount,
-      runningCount: meta.streaming ? stats.runningCount : 0,
-    },
-  ];
-}
-
-function phaseItemsOf(phase: TimelinePhase): TimelinePhaseItem[] {
-  if (phase.items?.length) return phase.items;
-  return [
-    ...phase.thoughts
-      .filter((t) => t.trim())
-      .map((text) => ({ kind: "thought" as const, text })),
-    ...phase.tools.map((tool) => ({ kind: "tool" as const, tool })),
-  ];
-}
-
 /**
- * Display contract:
- * - Journal CoT → one 思考了 row (never dumped as body text).
- * - Tools → one 工作了 fold (default collapsed).
- * - Assistant content stays visible body. Mid-turn status is still content —
- *   do not fold it into 工作了 as speech or keep only the last sentence.
+ * Display contract (v0.2.19 stream honesty):
+ * - thought + tools stay a work phase in stream order.
+ * - Mid-turn body is visible content and splits phases.
+ * - A later think→tool round starts a new phase after that body.
+ * Do not hoist every thought to the top or dump every tool into one fold —
+ * that mashed the cycle into “思考 / 全部工具 / 全部正文”.
+ *
+ * Kept as a named pass so existing tests can pin the identity; the 0.2.20
+ * speech-fold rewrite is no longer applied.
  */
 export function foldProcessIntoTimeline(
   units: TimelineUnit[],
-  options: { streaming?: boolean } = {},
+  _options: { streaming?: boolean } = {},
 ): TimelineUnit[] {
-  const streaming = !!options.streaming;
-  const hoisted: string[] = [];
-  let hoistSi = 0;
-  let hoistStreaming = false;
-  const workItems: TimelinePhaseItem[] = [];
-  let workStartSi = 0;
-  let workEndSi = 0;
-  let workLive = false;
-  let workStarted = false;
-  const contents: Extract<TimelineUnit, { kind: "content" }>[] = [];
-  const suffix: TimelineUnit[] = [];
-  let sawAnswerSlot = false;
-
-  const hoistThought = (text: string, si: number, thoughtStreaming: boolean) => {
-    if (!text.trim() && !thoughtStreaming) return;
-    if (!hoisted.length) hoistSi = si;
-    if (text.trim()) hoisted.push(text);
-    if (thoughtStreaming) hoistStreaming = true;
-  };
-
-  const pushWork = (item: TimelinePhaseItem, si: number, live: boolean) => {
-    if (!workStarted) {
-      workStarted = true;
-      workStartSi = si;
-      workEndSi = si;
-    }
-    workItems.push(item);
-    workEndSi = Math.max(workEndSi, si);
-    if (live) workLive = true;
-  };
-
-  for (let i = 0; i < units.length; i++) {
-    const u = units[i]!;
-    if (u.kind === "thought") {
-      if (sawAnswerSlot) suffix.push(u);
-      else hoistThought(u.text, u.si, u.streaming);
-      continue;
-    }
-    if (u.kind === "thought-group") {
-      if (sawAnswerSlot) {
-        suffix.push(u);
-      } else {
-        for (const t of u.texts) hoistThought(t, u.si, u.streaming);
-      }
-      continue;
-    }
-    if (u.kind === "tool") {
-      pushWork({ kind: "tool", tool: u.tool }, u.si, false);
-      continue;
-    }
-    if (u.kind === "phase") {
-      const items = phaseItemsOf(u);
-      let lastThoughtIdx = -1;
-      for (let k = items.length - 1; k >= 0; k--) {
-        if (items[k]!.kind === "thought") {
-          lastThoughtIdx = k;
-          break;
-        }
-      }
-      const thoughtLive =
-        streaming &&
-        u.live &&
-        lastThoughtIdx >= 0 &&
-        items
-          .slice(lastThoughtIdx + 1)
-          .every((x) => x.kind === "thought");
-      if (thoughtLive) hoistStreaming = true;
-      for (const it of items) {
-        if (it.kind === "thought") {
-          hoistThought(it.text, u.startSi, false);
-        } else {
-          pushWork(it, u.startSi, u.live);
-        }
-      }
-      if (u.live) {
-        if (!workStarted) {
-          workStarted = true;
-          workStartSi = u.startSi;
-        }
-        workEndSi = Math.max(workEndSi, u.endSi);
-        workLive = true;
-      }
-      continue;
-    }
-    // content — always visible body, including mid-turn status sentences.
-    sawAnswerSlot = true;
-    contents.push({
-      kind: "content",
-      text: u.text,
-      si: u.si,
-      streaming: u.streaming,
-    });
-  }
-
-  const out: TimelineUnit[] = [];
-  const thoughtU = emitThoughtUnit(hoisted, hoistSi, hoistStreaming);
-  if (thoughtU) out.push(thoughtU);
-  if (workStarted) {
-    out.push(
-      ...emitWorkUnits(workItems, {
-        startSi: workStartSi,
-        endSi: workEndSi,
-        live: workLive,
-        streaming,
-      }),
-    );
-  }
-  for (const content of contents) out.push(content);
-  out.push(...suffix);
-  return out;
+  return units;
 }
 
-/** Phase projection + thought/tool hoist (what the transcript renders). */
+/** Phase projection (stream order). What the transcript renders. */
 export function buildAssistantTimeline(
   segs: MessageSegment[],
   options: { streaming?: boolean } = {},

@@ -18,7 +18,10 @@ import { createT, type Locale } from "@/i18n";
 import { COLLAPSE_ALL_ACTIVITY_EVENT } from "@/lib/collapseAllActivity";
 import { formatWorkDuration } from "@/lib/formatWorkDuration";
 import { resolveThinkingChromeLabel } from "@/lib/thinkingChromeLabel";
-import { nextThinkingStartAnchor } from "@/lib/thinkingStartAnchor";
+import {
+  freezeThinkingDurationMs,
+  nextThinkingStartAnchor,
+} from "@/lib/thinkingStartAnchor";
 
 export const Thinking = memo(function Thinking({
   content,
@@ -98,19 +101,15 @@ export const Thinking = memo(function Thinking({
         document.removeEventListener("visibilitychange", onVis);
       };
     }
-    // Episode ended — freeze once (do not keep advancing via startedAt).
+    // Episode ended — freeze once from this row’s origin. Do not invent a
+    // duration from a leftover turn `startedAt` (that showed “思考了 51分”).
     if (!frozenRef.current) {
-      if (startRef.current != null) {
-        setLocalDuration(Math.max(0, Date.now() - startRef.current));
-        startRef.current = null;
-      } else if (
-        typeof startedAt === "number" &&
-        Number.isFinite(startedAt) &&
-        durationMs == null
-      ) {
-        // Remounted already-finished thought with only an anchor.
-        setLocalDuration(Math.max(0, Date.now() - startedAt));
-      }
+      const frozen = freezeThinkingDurationMs({
+        originMs: startRef.current,
+        nowMs: Date.now(),
+      });
+      if (frozen != null) setLocalDuration(frozen);
+      startRef.current = null;
       frozenRef.current = true;
     }
     // Collapse when not live — mirrors the work/phase block. The keep-open pref

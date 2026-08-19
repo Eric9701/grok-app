@@ -1330,7 +1330,7 @@ describe("session projection", () => {
     ]);
   });
 
-  it("reorderSegmentsToHistoryLayout collapses live interleave to thought→tools→content", () => {
+  it("reorderSegmentsToHistoryLayout keeps think/tool/body interleave", () => {
     const segs = reorderSegmentsToHistoryLayout([
       { kind: "thought", text: "plan A" },
       {
@@ -1354,20 +1354,24 @@ describe("session projection", () => {
     expect(segs.map((s) => s.kind)).toEqual([
       "thought",
       "tool",
+      "content",
+      "thought",
       "tool",
       "content",
     ]);
-    expect(segs[0]).toMatchObject({ kind: "thought", text: "plan A\n\nplan B" });
+    expect(segs[0]).toMatchObject({ kind: "thought", text: "plan A" });
     expect(segs[1]).toMatchObject({ kind: "tool", toolCallId: "t1" });
-    expect(segs[2]).toMatchObject({
+    expect(segs[2]).toMatchObject({ kind: "content", text: "partial…" });
+    expect(segs[3]).toMatchObject({ kind: "thought", text: "plan B" });
+    expect(segs[4]).toMatchObject({
       kind: "tool",
       toolCallId: "t2",
       streaming: false,
     });
-    expect(segs[3]).toMatchObject({ kind: "content", text: "partial… final" });
+    expect(segs[5]).toMatchObject({ kind: "content", text: " final" });
   });
 
-  it("weaveToolsIntoAssistantSegments reorders finished live interleave without remount", () => {
+  it("weaveToolsIntoAssistantSegments keeps finished live interleave without remount", () => {
     // Live turn left thought/tool interleaved with content; streaming=false.
     const woven = weaveToolsIntoAssistantSegments([
       { id: "u1", role: "user", content: "q" },
@@ -1399,10 +1403,12 @@ describe("session projection", () => {
     expect(segs.map((s) => s.kind)).toEqual([
       "thought",
       "tool",
+      "content",
       "tool",
       "content",
     ]);
-    expect(segs[3]).toMatchObject({ kind: "content", text: "hello world" });
+    expect(segs[2]).toMatchObject({ kind: "content", text: "hello " });
+    expect(segs[4]).toMatchObject({ kind: "content", text: "world" });
   });
 
   it("weaveToolsIntoAssistantSegments keeps live interleave while streaming", () => {

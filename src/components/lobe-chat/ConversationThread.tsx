@@ -84,7 +84,9 @@ import {
 import { setDraft } from "@/lib/composerDraftStore";
 import {
   clampThinkingStartToMessage,
+  isLeadingThoughtUnit,
   parseCreatedAtMs,
+  thinkingUnitStartedAt,
 } from "@/lib/thinkingStartAnchor";
 import { formatMessageTime, formatRelativeTime } from "@/lib/accountUi";
 import type { MessageTimeFormat } from "@/lib/messageTimeFormatPref";
@@ -1430,16 +1432,9 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
             // find marks stay aligned with message-level match index.
             // Mid-turn body is no longer folded away, so start at 0.
             let contentOccBase = 0;
-            // First bare thought uses a stable live key for the whole episode
-            // (placeholder → tokens → done) so the wall clock does not reset.
-            const primaryThoughtSi = (() => {
-              for (const u of timelineUnits) {
-                if (u.kind === "thought" || u.kind === "thought-group") {
-                  return u.si;
-                }
-              }
-              return null;
-            })();
+            // First bare thought shares the placeholder key so send → tokens
+            // does not remount. Later think rounds after tools/body must NOT
+            // reuse that key or the turn clock — they start a fresh episode.
             return timelineUnits.map((unit) => {
               if (unit.kind === "phase") {
                 // Always paint Grok Worked-for rail (tools + thought steps).
@@ -1452,10 +1447,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                     locale={locale}
                     messageStreaming={!!m.streaming}
                     autoCollapse={toolStepsAutoCollapse}
-                    historyTimestamps={[
-                      m.createdAt,
-                      ...unit.tools.map((t) => t.createdAt),
-                    ]}
+                    historyTimestamps={unit.tools.map((t) => t.createdAt)}
                     findQuery={findQuery}
                     findActiveOccurrence={
                       isFindCurrent
@@ -1503,11 +1495,12 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                 ) {
                   return null;
                 }
-                // Stable live key for the primary thought: empty placeholder →
-                // tokens → done must not remount (that reset the clock to “1s”).
-                const isPrimary =
-                  primaryThoughtSi != null && unit.si === primaryThoughtSi;
-                const thinkKey = isPrimary
+                // Leading episode shares the placeholder key (send → tokens).
+                // Later rounds after a work phase / body get their own key so
+                // React does not keep the first episode’s startRef ticking.
+                const leading = isLeadingThoughtUnit(timelineUnits, unit.si);
+                const live = !!m.streaming && !!streaming;
+                const thinkKey = leading
                   ? `${m.id}-thinking-live`
                   : `${m.id}-th-${unit.si}`;
                 return (
@@ -1517,13 +1510,13 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                   >
                     <Thinking
                       locale={locale}
-                      // Live = this episode is still the trailing stream
-                      // (unit.streaming). Earlier body text must not freeze it.
-                      thinking={!!m.streaming && !!streaming}
+                      thinking={live}
                       content={joined}
-                      startedAt={
-                        isPrimary || streaming ? thinkingStartedAt : null
-                      }
+                      startedAt={thinkingUnitStartedAt({
+                        turnStartedAt: thinkingStartedAt,
+                        leading,
+                        unitStreaming: live,
+                      })}
                       onOpenExternalLink={onOpenExternalLink}
                     />
                   </div>
@@ -1582,7 +1575,10 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
               <Thinking
                 locale={locale}
                 thinking
-                startedAt={thinkingStartedAt}
+                // New episode after a body/work phase — do not inherit
+                // the turn send clock (that kept “思考中” counting from
+                // the first round).
+                startedAt={null}
               />
             </div>
           ) : null}

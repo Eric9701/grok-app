@@ -63,3 +63,64 @@ export function clampThinkingStartToMessage(opts: {
   if (created == null) return turn;
   return Math.max(turn, created);
 }
+
+/** Minimal timeline unit shape for episode-clock decisions. */
+export type TimelineClockUnit = {
+  kind: string;
+  si?: number;
+};
+
+/**
+ * First bare thought in the bubble (placeholder → first CoT tokens).
+ * A thought after a work phase or mid-turn body is a *new* episode and
+ * must not inherit the turn clock.
+ */
+export function isLeadingThoughtUnit(
+  units: TimelineClockUnit[],
+  unitSi: number,
+): boolean {
+  for (const u of units) {
+    if (u.kind === "thought" || u.kind === "thought-group") {
+      return u.si === unitSi;
+    }
+    if (u.kind === "phase" || u.kind === "content" || u.kind === "tool") {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Wall-clock origin for a thinking row.
+ *
+ * Only the leading live episode may use the turn send clock (so placeholder
+ * → tokens does not reset to “1s”). Later episodes return null and start
+ * from `Date.now()` on mount.
+ */
+export function thinkingUnitStartedAt(opts: {
+  turnStartedAt: number | null | undefined;
+  leading: boolean;
+  unitStreaming: boolean;
+}): number | null {
+  if (!opts.unitStreaming || !opts.leading) return null;
+  const turn = opts.turnStartedAt;
+  return typeof turn === "number" && Number.isFinite(turn) ? turn : null;
+}
+
+/**
+ * Freeze a finished thinking row from the episode origin that was ticking.
+ * Do not fall back to a leftover turn clock — that painted “思考了 51分”
+ * for a 10s thought after remount.
+ */
+export function freezeThinkingDurationMs(opts: {
+  originMs: number | null | undefined;
+  nowMs: number;
+}): number | null {
+  if (
+    typeof opts.originMs !== "number" ||
+    !Number.isFinite(opts.originMs)
+  ) {
+    return null;
+  }
+  return Math.max(0, opts.nowMs - opts.originMs);
+}
