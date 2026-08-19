@@ -113,6 +113,17 @@ export function extractAbsoluteFilePathsFromText(content: string): string[] {
     ) {
       continue;
     }
+    // Mid-path rematch: `/Users/…/Documents/workspace/grok/a.png` must not
+    // also yield `/workspace/grok/a.png` (that stolen basename 404s ImageUi
+    // until a session remount resolves the real project file).
+    if (sm.index > 0) {
+      const prev = content[sm.index - 1]!;
+      const delim =
+        /[\s`"'<>|*?()[\]{}=，。；：、！？）】》〈《「『【（,;:!?+]/.test(prev);
+      if (!delim && /[A-Za-z0-9_./~%+\-@\\]/.test(prev)) {
+        continue;
+      }
+    }
     const start = sm.index;
     let i = start;
     let built = "";
@@ -162,8 +173,10 @@ export function extractAbsoluteFilePathsFromText(content: string): string[] {
       built += c;
       i += 1;
     }
-    if (FILE_EXT_RE.test(built)) push(built);
-    // Avoid re-matching mid-path; rootRe already advanced via lastIndex.
+    if (FILE_EXT_RE.test(built)) {
+      push(built);
+      rootRe.lastIndex = Math.max(rootRe.lastIndex, start + built.length);
+    }
   }
 
   return out;
@@ -178,12 +191,24 @@ export function collectAbsolutePathsFromMessage(m: ChatMessage): string[] {
     if (!isPlausibleAbsFile(t)) return;
     out.push(normAbs(t));
   };
+  /** Whole field if it is a single path, else scan embedded abs paths (curl -o). */
+  const pushFromText = (raw?: string | null) => {
+    if (!raw) return;
+    push(raw);
+    if (!isPlausibleAbsFile(raw.trim())) {
+      for (const p of extractAbsoluteFilePathsFromText(raw)) {
+        push(p);
+      }
+    }
+  };
 
-  push(m.toolPath);
+  pushFromText(m.toolPath);
   // Host journals file targets as `input:` → toolInput (read_file / write / edit).
   // Without this, short tokens like `04-正文/正文.md` never see the real abs path
   // when the article folder name contains spaces (Mac Studio…).
-  push(m.toolInput);
+  // Live shell tools keep the full command here (`curl -o "/abs/out.png"`).
+  pushFromText(m.toolInput);
+  pushFromText(m.toolOutput);
   // Media / file cards attached to the message (image_gen, drops, etc.)
   // so short tokens like `images/1.jpg` resolve in every content segment.
   if (m.attachments?.length) {
@@ -198,8 +223,8 @@ export function collectAbsolutePathsFromMessage(m: ChatMessage): string[] {
     const parsed = raw.startsWith("tool_step|")
       ? parseToolStepContent(raw)
       : null;
-    push(parsed?.path);
-    push(parsed?.input);
+    pushFromText(parsed?.path);
+    pushFromText(parsed?.input);
     // Title / detail often embed `Read `/abs/path``
     if (parsed?.title) {
       for (const hit of parsed.title.matchAll(/`([^`]+)`/g)) {
@@ -223,8 +248,10 @@ export function collectAbsolutePathsFromMessage(m: ChatMessage): string[] {
       for (const seg of m.segments) {
         if (seg.kind === "tool") {
           const tool = seg as Extract<MessageSegment, { kind: "tool" }>;
-          push(tool.path);
-          push(tool.input);
+          pushFromText(tool.path);
+          pushFromText(tool.input);
+          pushFromText(tool.output);
+          pushFromText(tool.detail);
         }
       }
     }
@@ -235,8 +262,10 @@ export function collectAbsolutePathsFromMessage(m: ChatMessage): string[] {
     for (const seg of m.segments) {
       if (seg.kind === "tool") {
         const tool = seg as Extract<MessageSegment, { kind: "tool" }>;
-        push(tool.path);
-        push(tool.input);
+        pushFromText(tool.path);
+        pushFromText(tool.input);
+        pushFromText(tool.output);
+        pushFromText(tool.detail);
       }
     }
   }

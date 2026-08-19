@@ -337,6 +337,43 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
     void (async () => {
       try {
         /**
+         * Resolve `![](puppy.png)` / `images/N.jpg` against session + project
+         * roots and attach the real abs path. Ready often fires before the
+         * journal tail (and the markdown image) lands — openSession already
+         * does this, which is why a session switch "fixes" missing cards.
+         */
+        const applyResolvedRelativeMedia = (
+          sid: string | null | undefined,
+          rows: ChatMessage[],
+        ) => {
+          if (!sid) return;
+          const rels = collectSessionRelativeMediaRefs(rows);
+          if (!rels.length) return;
+          void api
+            .sessionResolveRelativeMedia(sid, rels)
+            .then((list) => {
+              if (
+                cancelled ||
+                !list.length ||
+                c.viewingSessionIdRef.current !== sid
+              ) {
+                return;
+              }
+              const resolved = list.map((a) => ({
+                path: a.path,
+                name: a.name || a.path.split(/[/\\]/).pop() || a.path,
+                isDir: !!a.isDir,
+              }));
+              c.patchSessionMessages(sid, (cur) =>
+                applyResolvedSessionMedia(cur, resolved),
+              );
+            })
+            .catch(() => {
+              /* best-effort — pathMap / next remount still apply */
+            });
+        };
+
+        /**
          * Heal missed stream tail from Host journal after early ready.
          * Upgrade is pure against the session cache; React state is set from
          * the same result.
@@ -395,6 +432,7 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
               // truncated stream. Apply must run post-rehydrate for the
               // *viewed* session too (stream `done` alone is not enough).
               void c.tryApplyAutomationFromSession(sid);
+              applyResolvedRelativeMedia(sid, next);
               const gap = JOURNAL_REHYDRATE_RETRY_GAPS_MS[attempt];
               if (gap != null) {
                 window.setTimeout(() => {
@@ -649,36 +687,10 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
                 ) {
                   scheduleJournalRehydrate(sid, 0);
                 }
-                c.setMessages((prev) => {
-                  const rels = collectSessionRelativeMediaRefs(prev);
-                  if (!rels.length) return prev;
-                  void api
-                    .sessionResolveRelativeMedia(sid, rels)
-                    .then((list) => {
-                      if (
-                        cancelled ||
-                        !list.length ||
-                        c.viewingSessionIdRef.current !== sid
-                      ) {
-                        return;
-                      }
-                      const resolved = list.map((a) => ({
-                        path: a.path,
-                        name:
-                          a.name ||
-                          a.path.split(/[/\\]/).pop() ||
-                          a.path,
-                        isDir: !!a.isDir,
-                      }));
-                      c.setMessages((cur) =>
-                        applyResolvedSessionMedia(cur, resolved),
-                      );
-                    })
-                    .catch(() => {
-                      /* ignore */
-                    });
-                  return prev;
-                });
+                applyResolvedRelativeMedia(
+                  sid,
+                  c.messagesBySessionRef.current.get(sid) ?? [],
+                );
               }
             } else if (!isSessionBusy(s.state)) {
               if (c.viewingSessionIdRef.current === s.sessionId) {

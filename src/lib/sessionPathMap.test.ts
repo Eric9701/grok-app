@@ -220,4 +220,95 @@ describe("sessionPathMap", () => {
       resolveFileToken("~/.grok/docs/user-guide/05-configuration.md"),
     ).toBe("~/.grok/docs/user-guide/05-configuration.md");
   });
+
+  it("does not rematch /workspace/ inside a /Users/…/Documents/workspace path", () => {
+    const dest =
+      "/Users/ronglecat/Documents/workspace/grok/puppy-soda-pixel.png";
+    expect(extractAbsoluteFilePathsFromText(dest)).toEqual([dest]);
+    expect(
+      extractAbsoluteFilePathsFromText(`Read image file: ${dest}`),
+    ).toEqual([dest]);
+  });
+
+  it("extracts dest png from a live curl command toolInput", () => {
+    // Live session://tool keeps title-only content + the full command on
+    // toolInput. The dest path must still enter the session map so
+    // `![x](puppy-soda-pixel.png)` can mount ImageUi when the turn ends.
+    const dest =
+      "/Users/ronglecat/Documents/workspace/grok/puppy-soda-pixel.png";
+    const m: ChatMessage = {
+      id: "tool-curl",
+      role: "tool",
+      marker: "tool_step",
+      content: "Run Command",
+      toolKind: "run_terminal_command",
+      toolInput: `curl -L --fail --show-error -o "${dest}" "https://cdn.example/x.png"`,
+    };
+    expect(collectAbsolutePathsFromMessage(m)).toContain(dest);
+    expect(
+      buildSessionFilePathMap([m], "/Users/ronglecat/Documents/workspace/grok")[
+        "puppy-soda-pixel.png"
+      ],
+    ).toBe(dest);
+  });
+
+  it("maps markdown basename from live assistant tool segments (curl input)", () => {
+    const dest =
+      "/Users/ronglecat/Documents/workspace/grok/kitten-watermelon-pixel.png";
+    const messages: ChatMessage[] = [
+      {
+        id: "a",
+        role: "assistant",
+        content: "![小猫](kitten-watermelon-pixel.png)",
+        segments: [
+          {
+            kind: "tool",
+            toolCallId: "t-curl",
+            title: "Run Command",
+            toolKind: "run_terminal_command",
+            status: "completed",
+            input: `mkdir -p "/Users/ronglecat/Documents/workspace/grok" && curl -L -o "${dest}" "https://cdn.example/k.png"`,
+          },
+        ],
+      },
+    ];
+    const map = buildSessionFilePathMap(
+      messages,
+      "/Users/ronglecat/Documents/workspace/grok",
+    );
+    expect(map["kitten-watermelon-pixel.png"]).toBe(dest);
+  });
+
+  it("session 60b14957 journal shape maps relative markdown image via later tool_step", () => {
+    const dest =
+      "/Users/ronglecat/Documents/workspace/grok/puppy-soda-pixel.png";
+    const messages: ChatMessage[] = [
+      {
+        id: "asst",
+        role: "assistant",
+        content: [
+          "像素风小狗喝汽水已经生成。",
+          "",
+          "![小狗喝汽水像素风](puppy-soda-pixel.png)",
+          "",
+          "| 本地文件 | `puppy-soda-pixel.png` |",
+        ].join("\n"),
+      },
+      {
+        id: "tool-call-read",
+        role: "tool",
+        marker: "tool_step",
+        content: [
+          "tool_step|completed|read_file|Read",
+          `input:${dest}`,
+          `Read image file: ${dest}`,
+        ].join("\n"),
+      },
+    ];
+    const map = buildSessionFilePathMap(
+      messages,
+      "/Users/ronglecat/Documents/workspace/grok",
+    );
+    expect(map["puppy-soda-pixel.png"]).toBe(dest);
+  });
 });
