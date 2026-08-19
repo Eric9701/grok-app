@@ -296,8 +296,10 @@ impl SessionManager {
                 Self::emit_process_limit(&app, Some(&meta.id), max_concurrent);
                 return Err(format!("{}: {}", e.code.as_str(), e.message));
             }
-            if let Some(live) = self.background.lock().remove(&meta.id) {
-                *self.inner.lock() = Some(live);
+            // Lock discipline: promote helper releases `background` before it
+            // takes `inner` (the old inline if-let held both — ABBA deadlock
+            // against try_park_live's inner→background order).
+            if self.promote_background_to_live(&meta.id) {
                 let snap = self.snapshot();
                 Self::emit_state(&app, &snap);
                 tracing::info!("acp promoted background session to live sid={}", meta.id);
@@ -471,6 +473,7 @@ impl SessionManager {
                 pending_permission_rpc_id: None,
                 pending_permission_options: None,
                 pending_permission_tool_name: None,
+                pending_permission_ui: None,
                 pending_ask_user_rpc_id: None,
                 last_activity: now,
                 last_stream_progress: now,
@@ -1159,6 +1162,7 @@ impl SessionManager {
             pending_permission_rpc_id: None,
             pending_permission_options: None,
             pending_permission_tool_name: None,
+            pending_permission_ui: None,
             pending_ask_user_rpc_id: None,
             last_activity: now,
             last_stream_progress: now,
@@ -1655,6 +1659,7 @@ mod connect_preserve_tests {
             pending_permission_rpc_id: None,
             pending_permission_options: None,
             pending_permission_tool_name: None,
+            pending_permission_ui: None,
             pending_ask_user_rpc_id: None,
             last_activity: now,
             last_stream_progress: now,

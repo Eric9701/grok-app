@@ -57,7 +57,7 @@ impl SessionManager {
                 message_id,
                 done,
             } => {
-                let need_schedule = {
+                let (need_schedule, pending_journal) = {
                     let mut bg = self.background.lock();
                     let Some(s) = bg.get_mut(app_session_id) else {
                         return;
@@ -109,17 +109,24 @@ impl SessionManager {
                         }
                     };
                     let para = is_paragraph_break(&text);
-                    Self::maybe_flush_stream_journal(s, done, para);
+                    // Prepare only — disk write runs after `background` is
+                    // released so a contended store file lock can't stall
+                    // every other session command (same rule as the live path).
+                    let pending_journal = Self::prepare_stream_journal_flush(s, done, para);
                     let mid = s.streaming_message_id.clone().unwrap_or_default();
                     let need =
                         Self::queue_stream_emit(s, app, kind, mid, text, thought_phase, done);
-                    if need {
+                    let need_schedule = if need {
                         s.stream_emit_flush_gen = s.stream_emit_flush_gen.wrapping_add(1);
                         Some((s.app_session_id.clone(), s.stream_emit_flush_gen))
                     } else {
                         None
-                    }
+                    };
+                    (need_schedule, pending_journal)
                 };
+                if let Some(pending) = pending_journal {
+                    Self::commit_stream_journal_flush(pending);
+                }
                 if let Some((sid, gen)) = need_schedule {
                     self.schedule_stream_emit_flush(app.clone(), sid, gen);
                 }
@@ -285,24 +292,27 @@ impl SessionManager {
                         &tool_name,
                         Some(&title),
                     );
-                    {
-                        let mut bg = self.background.lock();
-                        if let Some(s) = bg.get_mut(app_session_id) {
-                            s.pending_permission_rpc_id = Some(rpc_id);
-                            s.pending_permission_options = Some(options.clone());
-                            s.pending_permission_tool_name = Some(tool_name.clone());
-                        }
-                    }
                     let req = UiPermissionRequest {
                         rpc_id,
                         session_id: session_id.clone(),
                         tool_call_id,
-                        tool_name,
+                        tool_name: tool_name.clone(),
                         title,
                         preview: preview.chars().take(2000).collect(),
                         scope_key: sk,
-                        options,
+                        options: options.clone(),
                     };
+                    // Keep the full UI payload so a remounted WebView can
+                    // recover the card (one-shot emit below can be missed).
+                    {
+                        let mut bg = self.background.lock();
+                        if let Some(s) = bg.get_mut(app_session_id) {
+                            s.pending_permission_rpc_id = Some(rpc_id);
+                            s.pending_permission_options = Some(options);
+                            s.pending_permission_tool_name = Some(tool_name);
+                            s.pending_permission_ui = Some(req.clone());
+                        }
+                    }
                     let _ = app.emit("session://permission", &req);
                     // Tell UI this permission belongs to a non-focused session.
                     let _ = app.emit(

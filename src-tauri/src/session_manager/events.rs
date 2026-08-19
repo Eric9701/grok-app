@@ -159,7 +159,7 @@ impl SessionManager {
                 done,
             } => {
                 // Host stream backpressure: coalesce high-frequency tokens.
-                let need_schedule = {
+                let (need_schedule, pending_journal) = {
                     let mut guard = self.inner.lock();
                     if let Some(s) = guard.as_mut() {
                         // Replay guard: on session resume (`session/load`) the CLI
@@ -235,7 +235,12 @@ impl SessionManager {
                                 s.pending_ask_user_rpc_id.is_some(),
                                 s.open_tool_ids.len(),
                             );
-                        Self::maybe_flush_stream_journal(s, emit_done, para);
+                        // Prepare only — the disk write happens after `inner`
+                        // is released. Journal appends poll a cross-process
+                        // file lock (shared GROK_HOME); holding `inner` across
+                        // that stall blocked every session command for seconds.
+                        let pending_journal =
+                            Self::prepare_stream_journal_flush(s, emit_done, para);
                         let mid = s.streaming_message_id.clone().unwrap_or_default();
                         let need = Self::queue_stream_emit(
                             s,
@@ -246,16 +251,20 @@ impl SessionManager {
                             thought_phase,
                             emit_done,
                         );
-                        if need {
+                        let need_schedule = if need {
                             s.stream_emit_flush_gen = s.stream_emit_flush_gen.wrapping_add(1);
                             Some((s.app_session_id.clone(), s.stream_emit_flush_gen))
                         } else {
                             None
-                        }
+                        };
+                        (need_schedule, pending_journal)
                     } else {
                         return;
                     }
                 };
+                if let Some(pending) = pending_journal {
+                    Self::commit_stream_journal_flush(pending);
+                }
                 if let Some((sid, gen)) = need_schedule {
                     self.schedule_stream_emit_flush(app.clone(), sid, gen);
                 }
@@ -437,26 +446,28 @@ impl SessionManager {
                         &tool_name,
                         Some(&title),
                     );
-                    // Track pending permission + process generation so recycle
-                    // can invalidate stale UI bars (#524).
-                    {
-                        let mut guard = self.inner.lock();
-                        if let Some(s) = guard.as_mut() {
-                            s.pending_permission_rpc_id = Some(rpc_id);
-                            s.pending_permission_options = Some(options.clone());
-                            s.pending_permission_tool_name = Some(tool_name.clone());
-                        }
-                    }
                     let req = UiPermissionRequest {
                         rpc_id,
                         session_id,
                         tool_call_id,
-                        tool_name,
+                        tool_name: tool_name.clone(),
                         title,
                         preview: preview.chars().take(2000).collect(),
                         scope_key: sk,
-                        options,
+                        options: options.clone(),
                     };
+                    // Track pending permission + process generation so recycle
+                    // can invalidate stale UI bars (#524). Keep the full UI
+                    // payload so a remounted WebView can recover the card.
+                    {
+                        let mut guard = self.inner.lock();
+                        if let Some(s) = guard.as_mut() {
+                            s.pending_permission_rpc_id = Some(rpc_id);
+                            s.pending_permission_options = Some(options);
+                            s.pending_permission_tool_name = Some(tool_name);
+                            s.pending_permission_ui = Some(req.clone());
+                        }
+                    }
                     let _ = app.emit("session://permission", &req);
                     Self::emit_state(app, &self.snapshot());
                 }

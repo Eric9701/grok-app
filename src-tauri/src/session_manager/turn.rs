@@ -376,12 +376,15 @@ impl SessionManager {
                             "kind": "assistant"
                         }),
                     );
-                    mgr.with_session_mut(&turn_sid, |s| {
+                    let pending_journal = mgr.with_session_mut(&turn_sid, |s| {
                         SessionManager::touch_stream_progress_locked(s);
                         s.stream_buf.push_str(&chunk.text);
                         // I04: throttle mid-stream; force on terminal done.
+                        // Prepare under the lock, commit after it drops —
+                        // same lock-vs-disk split as the real ACP stream path.
                         let para = is_paragraph_break(&chunk.text);
-                        SessionManager::maybe_flush_stream_journal(s, chunk.done, para);
+                        let pending =
+                            SessionManager::prepare_stream_journal_flush(s, chunk.done, para);
                         if chunk.done {
                             s.stream_buf.clear();
                             s.journal_throttle.reset();
@@ -396,7 +399,11 @@ impl SessionManager {
                                 s.stream_message_id_locked = false;
                             }
                         }
+                        pending
                     });
+                    if let Some(pending) = pending_journal.flatten() {
+                        SessionManager::commit_stream_journal_flush(pending);
+                    }
                     if chunk.done {
                         mgr.emit_for_session(&app_done, &turn_sid);
                     }
@@ -826,6 +833,7 @@ impl SessionManager {
                 let pending_perm = s.pending_permission_rpc_id.take();
                 s.pending_permission_options = None;
                 s.pending_permission_tool_name = None;
+                s.pending_permission_ui = None;
                 let was_busy = s.fsm.state() == SessionState::Streaming
                     || s.fsm.state() == SessionState::AwaitingPermission
                     || s.streaming_message_id.is_some()

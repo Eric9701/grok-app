@@ -345,6 +345,7 @@ impl SessionManager {
         s.pending_permission_rpc_id = None;
         s.pending_permission_options = None;
         s.pending_permission_tool_name = None;
+        s.pending_permission_ui = None;
         s.pending_plan_rpc_id = None;
         s.pending_ask_user_rpc_id = None;
         Some(row)
@@ -407,6 +408,7 @@ impl SessionManager {
                 s.pending_permission_rpc_id = None;
                 s.pending_permission_options = None;
                 s.pending_permission_tool_name = None;
+                s.pending_permission_ui = None;
                 s.provider_retry_attempt = 0;
                 s.provider_retry_aborted = false;
                 // Leave AwaitingPermission / Streaming so UI busy clears after recycle.
@@ -445,6 +447,7 @@ impl SessionManager {
             s.pending_permission_rpc_id = None;
             s.pending_permission_options = None;
             s.pending_permission_tool_name = None;
+            s.pending_permission_ui = None;
             s.pending_plan_rpc_id = None;
             s.pending_ask_user_rpc_id = None;
             s.prompt_in_flight = false;
@@ -937,6 +940,7 @@ impl SessionManager {
                     s.pending_permission_rpc_id = None;
                     s.pending_permission_options = None;
                     s.pending_permission_tool_name = None;
+                    s.pending_permission_ui = None;
                 }
                 if let Some(sk) = scope_to_cache {
                     s.allow_cache.allow(sk);
@@ -975,6 +979,28 @@ impl SessionManager {
                 .map(|s| s.app_session_id.clone())
                 .ok_or_else(|| "no session".to_string()),
         }
+    }
+
+    /// Still-pending permission card for a chat (live or background slot).
+    ///
+    /// `session://permission` is a one-shot emit: a WebView that reloads or a
+    /// window that remounts while a turn waits on approval misses it, and the
+    /// chat looks stuck "thinking" with no way to answer (diag f1daa64c). The
+    /// frontend pulls this on session open to restore the approval bar.
+    pub fn pending_permission(
+        &self,
+        session_id: Option<String>,
+    ) -> Option<UiPermissionRequest> {
+        let target = self.resolve_target_session(session_id).ok()?;
+        self.with_session_mut(&target, |s| {
+            // Gate on rpc_id: it is the field every invalidation path clears.
+            if s.pending_permission_rpc_id.is_some() {
+                s.pending_permission_ui.clone()
+            } else {
+                None
+            }
+        })
+        .flatten()
     }
 
     /// Resolve pending `_x.ai/exit_plan_mode` (Approve & build / request changes / abandon).
@@ -1120,6 +1146,12 @@ impl SessionManager {
     }
 
     pub async fn disconnect(self: &Arc<Self>, app: AppHandle) -> Result<SessionSnapshot, String> {
+        // Serialize with connect / send focus windows: disconnect parks or
+        // demotes the live slot (inner→background/parked lock order) and must
+        // never interleave with a background→live promote in `connect_inner`
+        // / `focus_session`. All callers are top-level commands, so no caller
+        // already holds `connect_lock`.
+        let _connect_guard = self.connect_lock.lock().await;
         // Clear live focus without aborting background/parked multi-session work.
         self.disconnect_inner(&app).await;
         Ok(self.snapshot())

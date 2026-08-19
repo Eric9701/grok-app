@@ -205,6 +205,11 @@ pub(crate) struct LiveSession {
     /// Tool name for the pending permission (empty-options session fallback
     /// needs family-aware wire ids — shell → allow-always-command, #542).
     pub(super) pending_permission_tool_name: Option<String>,
+    /// Full UI payload of the pending permission. `session://permission` is a
+    /// one-shot emit — a WebView that reloads/remounts while a turn waits on
+    /// approval misses it and the chat looks stuck "thinking" forever. The
+    /// frontend pulls this on session open to restore the approval bar.
+    pub(super) pending_permission_ui: Option<UiPermissionRequest>,
     /// Last user/agent activity (send, stream, permission, connect).
     pub(super) last_activity: Instant,
     /// Last stream chunk or tool event (I06 stall watchdog). Permission waits do not update this.

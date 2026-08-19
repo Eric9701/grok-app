@@ -2,7 +2,7 @@
 
 #![allow(dead_code)] // residual-clippy: snapshot_from_parked
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
@@ -165,11 +165,21 @@ impl SessionManager {
                 return true;
             }
         }
-        self.background.lock().values().any(|s| {
-            s.app_session_id != except_session_id
-                && s.process_id == process_id
-                && s.acp.as_ref().is_some_and(|c| c.is_alive())
-        }) || self.parked.lock().values().any(|p| {
+        // One map lock at a time: chaining both `.lock()`s in a single `||`
+        // expression kept the `background` guard alive while taking `parked`
+        // (expression temporaries drop at statement end), which is the reverse
+        // of `try_park_live`'s parked→background order — an ABBA deadlock.
+        {
+            let bg = self.background.lock();
+            if bg.values().any(|s| {
+                s.app_session_id != except_session_id
+                    && s.process_id == process_id
+                    && s.acp.as_ref().is_some_and(|c| c.is_alive())
+            }) {
+                return true;
+            }
+        }
+        self.parked.lock().values().any(|p| {
             p.app_session_id != except_session_id && p.process_id == process_id && p.acp.is_alive()
         })
     }
@@ -413,20 +423,28 @@ impl SessionManager {
                     let sid = s.app_session_id.clone();
                     let pid = s.process_id.clone();
                     let agent_sid = s.meta.agent_session_id.clone();
+                    // Release `inner` before touching the other session maps.
+                    // Holding it across `parked`/`background` formed an ABBA
+                    // pair with the background→inner promote path (deadlock:
+                    // thinking froze and every session command hung until
+                    // force-quit).
+                    let _ = guard.take();
+                    drop(guard);
                     // Shared process (other sessions still reference it): just
                     // drop our reference; the CLI stays for co-tenants.
-                    let shared = self
+                    // One map lock at a time — never chain `.lock()`s inside a
+                    // single expression (the first guard lives to statement end).
+                    let shared_parked = self
                         .parked
                         .lock()
                         .values()
-                        .any(|p| p.process_id == pid && p.app_session_id != sid)
+                        .any(|p| p.process_id == pid && p.app_session_id != sid);
+                    let shared = shared_parked
                         || self
                             .background
                             .lock()
                             .values()
                             .any(|b| b.process_id == pid && b.app_session_id != sid);
-                    let _ = guard.take();
-                    drop(guard);
                     if !shared {
                         // Exclusive: kill — the CLI accumulates a session actor
                         // per load and has no public unload API (internal evict
@@ -607,6 +625,7 @@ impl SessionManager {
             pending_permission_rpc_id: None,
             pending_permission_options: None,
             pending_permission_tool_name: None,
+            pending_permission_ui: None,
             pending_ask_user_rpc_id: None,
             last_activity: now,
             last_stream_progress: now,
@@ -625,6 +644,23 @@ impl SessionManager {
             stream_emit_flush_gen: 0,
             last_tool_heartbeat_emit: None,
         })
+    }
+
+    /// Move a background session into the (already cleared) live focus slot.
+    ///
+    /// Lock discipline: `background` is released **before** `inner` is taken.
+    /// The old inline `if let Some(live) = self.background.lock().remove(..)`
+    /// kept the `background` guard alive across the body (edition-2021 if-let
+    /// temporaries), locking background→inner while `try_park_live` locked
+    /// inner→background — an ABBA deadlock that froze streaming ("thinking"
+    /// stuck) and every session command (export, stop, state) until force-quit.
+    pub(super) fn promote_background_to_live(&self, target_sid: &str) -> bool {
+        let removed = self.background.lock().remove(target_sid);
+        let Some(live) = removed else {
+            return false;
+        };
+        *self.inner.lock() = Some(live);
+        true
     }
 
     /// Run `f` on a session's runtime state wherever it currently sits —
@@ -722,13 +758,10 @@ impl SessionManager {
         }
         let _ = self.inner.lock().take();
 
-        if in_background {
-            if let Some(live) = self.background.lock().remove(target_sid) {
-                *self.inner.lock() = Some(live);
-                tracing::info!("acp focus: background → live sid={target_sid}");
-                Self::emit_state(app, &self.snapshot());
-                return Ok(true);
-            }
+        if in_background && self.promote_background_to_live(target_sid) {
+            tracing::info!("acp focus: background → live sid={target_sid}");
+            Self::emit_state(app, &self.snapshot());
+            return Ok(true);
         }
         if let Some(live) = self.unpark_to_live(target_sid) {
             *self.inner.lock() = Some(live);
@@ -1104,9 +1137,17 @@ impl SessionManager {
 
     /// Runtime diagnostics for a session export package (live, background, or parked).
     /// Returns `None` when the session is not currently attached to a process.
+    ///
+    /// Bounded lock waits: the diagnostic export is exactly what users reach
+    /// for when the app is wedged. If a session-map lock cannot be acquired
+    /// within budget, record which lock was busy instead of hanging the export
+    /// forever behind the very deadlock it is meant to diagnose.
     pub fn diagnostic_runtime_for(&self, app_session_id: &str) -> Option<serde_json::Value> {
+        const LOCK_BUDGET: Duration = Duration::from_secs(2);
         {
-            let guard = self.inner.lock();
+            let Some(guard) = self.inner.try_lock_for(LOCK_BUDGET) else {
+                return Some(Self::lock_busy_runtime_json("inner"));
+            };
             if let Some(s) = guard.as_ref() {
                 if s.app_session_id == app_session_id {
                     return Some(Self::live_runtime_json(s, "live"));
@@ -1114,13 +1155,17 @@ impl SessionManager {
             }
         }
         {
-            let bg = self.background.lock();
+            let Some(bg) = self.background.try_lock_for(LOCK_BUDGET) else {
+                return Some(Self::lock_busy_runtime_json("background"));
+            };
             if let Some(s) = bg.get(app_session_id) {
                 // Overnight / demoted busy turns live here — export must see them.
                 return Some(Self::live_runtime_json(s, "background"));
             }
         }
-        let parked = self.parked.lock();
+        let Some(parked) = self.parked.try_lock_for(LOCK_BUDGET) else {
+            return Some(Self::lock_busy_runtime_json("parked"));
+        };
         if let Some(p) = parked.get(app_session_id) {
             return Some(serde_json::json!({
                 "slot": "parked",
@@ -1144,6 +1189,18 @@ impl SessionManager {
             }));
         }
         None
+    }
+
+    /// Placeholder runtime snapshot when a session-map lock stayed busy past
+    /// the export budget. Landing in `host/runtime.json`, this is direct
+    /// evidence of a wedged lock holder (deadlock or long store write).
+    fn lock_busy_runtime_json(lock: &str) -> serde_json::Value {
+        serde_json::json!({
+            "slot": "unknown",
+            "state": "LockBusy",
+            "lockBusy": lock,
+            "note": "session manager lock not acquired within budget during export; runtime snapshot skipped (possible deadlock or long store write)",
+        })
     }
 
     pub(super) fn live_runtime_json(s: &LiveSession, slot: &str) -> serde_json::Value {

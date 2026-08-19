@@ -5,7 +5,7 @@ import {
   isTauri,
   isMirrorClient,
 } from "./host";
-import type { SessionSnapshot } from "../session";
+import type { PermissionPayload, SessionSnapshot } from "../session";
 import { IDLE_SNAPSHOT } from "../session";
 
 export async function sessionGetState(): Promise<SessionSnapshot> {
@@ -239,6 +239,17 @@ export async function sessionResolvePermission(args: {
     options: args.options ?? null,
     toolName: args.toolName ?? null,
   });
+}
+
+/**
+ * Still-pending permission card for a chat, if any. Recovers an approval bar
+ * whose one-shot `session://permission` event was missed (WebView reload /
+ * window remount) — otherwise the turn looks stuck "thinking" forever.
+ */
+export async function sessionPendingPermission(
+  sessionId: string,
+): Promise<PermissionPayload | null> {
+  return invoke("session_pending_permission", { sessionId });
 }
 
 /** Approve / revise / abandon pending `_x.ai/exit_plan_mode`. */

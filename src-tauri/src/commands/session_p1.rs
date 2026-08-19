@@ -273,6 +273,18 @@ pub async fn session_resolve_permission(
     .await
 }
 
+/// Still-pending permission card for a chat, if any. Frontend calls this on
+/// session open to recover an approval bar whose one-shot
+/// `session://permission` emit was missed (WebView reload / window remount) —
+/// otherwise the turn looks stuck "thinking" with no way to answer.
+#[tauri::command]
+pub async fn session_pending_permission(
+    mgr: State<'_, Arc<SessionManager>>,
+    session_id: Option<String>,
+) -> Result<Option<crate::session_manager::UiPermissionRequest>, String> {
+    Ok(mgr.pending_permission(session_id))
+}
+
 #[tauri::command]
 pub async fn probe_cli(manual_path: Option<String>) -> Result<CliProbeResult, String> {
     // probe_cli runs `grok --version` (sync I/O). Never block a Tokio worker —

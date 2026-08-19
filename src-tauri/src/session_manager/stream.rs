@@ -113,6 +113,15 @@ pub(crate) fn resolve_turn_event_route(
     TurnEventRoute::Drop
 }
 
+/// Disk payload for one stream journal flush, prepared under the session
+/// lock (`prepare_stream_journal_flush`) and committed to disk outside it
+/// (`commit_stream_journal_flush`).
+pub(super) struct PendingStreamJournalFlush {
+    pub(super) session_id: String,
+    pub(super) message: ChatMessageStored,
+    pub(super) meta: store::SessionMeta,
+}
+
 impl SessionManager {
     pub(super) fn touch_activity_locked(s: &mut LiveSession) {
         s.last_activity = Instant::now();
@@ -698,20 +707,52 @@ impl SessionManager {
     }
 
     /// Persist accumulated assistant stream (I04). `force` bypasses the throttle.
+    ///
+    /// Inline prepare + commit: the disk write runs on the caller's thread,
+    /// usually while it still holds a session-map lock. Turn-boundary (force)
+    /// flushes keep this deliberately — the buffered text must be durable
+    /// *before* cancel / interject markers append their own rows, or a
+    /// reloaded transcript shows the marker above the answer. High-frequency
+    /// mid-stream flushes must NOT use this: call
+    /// `prepare_stream_journal_flush` under the lock and
+    /// `commit_stream_journal_flush` after dropping it.
     pub(super) fn maybe_flush_stream_journal(
         s: &mut LiveSession,
         force: bool,
         paragraph_break: bool,
     ) {
+        if let Some(pending) = Self::prepare_stream_journal_flush(s, force, paragraph_break) {
+            Self::commit_stream_journal_flush(pending);
+        }
+    }
+
+    /// Lock-side half of a stream journal flush: throttle decision + payload
+    /// snapshot, no disk IO. Commit the returned payload with
+    /// [`Self::commit_stream_journal_flush`] after releasing the session-map
+    /// lock — `store::append_message` polls a cross-process file lock for up
+    /// to ~3s in shared `GROK_HOME` mode, and holding `inner` / `background`
+    /// across that stall blocked every session command (second-long UI
+    /// freezes while thinking).
+    ///
+    /// The throttle is advanced optimistically here. A failed or delayed
+    /// commit is self-healing: the stream buffers are cumulative and the row
+    /// id stays stable, so the next flush rewrites the full content, and the
+    /// `created_at` revision guard in `store::append_message` stops a late
+    /// stale commit from rolling newer text back.
+    pub(super) fn prepare_stream_journal_flush(
+        s: &mut LiveSession,
+        force: bool,
+        paragraph_break: bool,
+    ) -> Option<PendingStreamJournalFlush> {
         let has_content = !s.stream_buf.is_empty()
             || !s.stream_thought.is_empty()
             || !s.stream_attachments.is_empty();
         if !has_content {
-            return;
+            return None;
         }
         let now = Instant::now();
         if !s.journal_throttle.should_flush(now, force, paragraph_break) {
-            return;
+            return None;
         }
         let mid = s
             .streaming_message_id
@@ -739,26 +780,42 @@ impl SessionManager {
             attachments: atts,
             marker: None,
         };
-        if let Err(e) = store::append_message(&s.app_session_id, message) {
-            // Keep the throttle watermark untouched so the next chunk retries
-            // the durable write instead of silently advancing past a lost
+        s.meta.updated_at = chrono::Utc::now();
+        s.journal_throttle.mark_flushed(now);
+        if force {
+            s.journal_throttle.reset();
+        }
+        Some(PendingStreamJournalFlush {
+            session_id: s.app_session_id.clone(),
+            message,
+            meta: s.meta.clone(),
+        })
+    }
+
+    /// Disk half of a stream journal flush: journal upsert + session meta
+    /// bump. Callers on hot paths must not hold `inner` / `background` /
+    /// `parked` here (see `prepare_stream_journal_flush`).
+    pub(super) fn commit_stream_journal_flush(pending: PendingStreamJournalFlush) {
+        let PendingStreamJournalFlush {
+            session_id,
+            message,
+            meta,
+        } = pending;
+        if let Err(e) = store::append_message(&session_id, message) {
+            // Row id is stable and buffers are cumulative — the next flush
+            // retries the durable write instead of advancing past a lost
             // assistant tail.
             tracing::error!(
-                session = %s.app_session_id,
+                session = %session_id,
                 "stream journal append failed: {e}"
             );
             return;
         }
-        s.meta.updated_at = chrono::Utc::now();
-        if let Err(e) = store::update_session_meta(&s.meta) {
+        if let Err(e) = store::update_session_meta(&meta) {
             tracing::warn!(
-                session = %s.app_session_id,
+                session = %session_id,
                 "stream session metadata update failed after journal append: {e}"
             );
-        }
-        s.journal_throttle.mark_flushed(now);
-        if force {
-            s.journal_throttle.reset();
         }
     }
 

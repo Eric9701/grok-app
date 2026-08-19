@@ -827,6 +827,7 @@ pub fn run() {
             commands::session_reattach,
 
             commands::session_resolve_permission,
+            commands::session_pending_permission,
 
             commands::session_resolve_plan,
 

@@ -5026,7 +5026,24 @@ export function AppWorkbench() {
     setLocalError(null);
     // Gates are session-scoped: restore any unanswered request for this chat
     // (it may have been raised while demoted to background), else clear chrome.
-    setPerm(pendingPermBySessionRef.current.get(s.id) ?? null);
+    const parkedPerm = pendingPermBySessionRef.current.get(s.id) ?? null;
+    setPerm(parkedPerm);
+    if (!parkedPerm && api.isTauri()) {
+      // `session://permission` is a one-shot emit — a WebView reload or window
+      // remount while a turn waits on approval misses it, leaving the chat
+      // stuck "thinking" with no approval bar (diag f1daa64c). Pull the
+      // still-pending gate from Host so the user can answer.
+      void api
+        .sessionPendingPermission(s.id)
+        .then((p) => {
+          if (!p || !stillThisOpen()) return;
+          // Event listener may have raced us with a fresh request — keep it.
+          if (pendingPermBySessionRef.current.has(s.id)) return;
+          pendingPermBySessionRef.current.set(s.id, p);
+          setPerm(p);
+        })
+        .catch(() => {});
+    }
     setAskUser(pendingAskUserBySessionRef.current.get(s.id) ?? null);
     // The turn clock is session-scoped too: a chat still mid-turn keeps counting
     // from when *its* turn started, instead of restarting at zero on every open.
