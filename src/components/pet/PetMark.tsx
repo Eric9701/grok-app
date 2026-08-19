@@ -4,8 +4,8 @@
  */
 import { useEffect, useId, useRef } from "react";
 import { listen } from "@/lib/api/host";
-import type { PetColor, PetShape, PetVerb } from "@/lib/pet";
-import { PET_INK } from "@/lib/pet";
+import type { PetColor, PetEyeColor, PetShape, PetVerb } from "@/lib/pet";
+import { isPetColor, resolvePetBodyInk, resolvePetEyeInk } from "@/lib/pet";
 import shapes from "@/lib/pet/data/shapes.json";
 import eyes from "@/lib/pet/data/eyes.json";
 import {
@@ -27,12 +27,23 @@ import {
   stepSpring,
   type Spring,
 } from "@/lib/pet/markMath";
+import { createMarkOrbit } from "@/lib/pet/markOrbit";
+import {
+  beginPetSpin,
+  petSpinWantsBurst,
+  pickPetSpinKind,
+  stepPetSpin,
+  type PetSpinKind,
+  type PetSpinRun,
+} from "@/lib/pet/markSpin";
+
 
 type ShapeRec = {
   path: string;
   face: { x: number; y: number; sx: number; sy: number; eye: number; leftDX?: number };
   top: number;
   bottom: number;
+  beltRadius?: number;
 };
 
 const SHAPES = shapes as Record<string, ShapeRec>;
@@ -118,6 +129,12 @@ function applyPose(state: string, tSec: number, age: number, pose: {
       pose.bob.t = -1;
       pose.scale.t = 1 + 0.05 * Math.exp(-Dt * 3);
       break;
+    case "celebrate":
+      pose.turn.t = 0;
+      pose.tilt.t = 0;
+      pose.bob.t = -Math.abs(Math.sin(mt * 1.6)) * 2.5;
+      pose.scale.t = 1;
+      break;
     case "dragging":
       pose.turn.t = Math.sin(mt * 2.6) * 6;
       pose.tilt.t = 16;
@@ -140,19 +157,28 @@ export function PetMark({
   sizePx = 128,
   title,
   paused = false,
+  spinSignal = 0,
+  eyeColor = "auto",
 }: {
   shape?: PetShape | string;
   color?: PetColor;
+  eyeColor?: PetEyeColor;
   verb?: PetVerb | string;
   sizePx?: number;
   title?: string;
   paused?: boolean;
+  /** Increment to replay a random Grok Bot spin (`Sn` / `spinWild`). */
+  spinSignal?: number;
 }) {
   const rec = SHAPES[shape] ?? SHAPES.hex;
-  const ink = PET_INK[color] ?? PET_INK.green;
+  const fill = resolvePetBodyInk(isPetColor(color) ? color : "green");
+  const eyeInk = resolvePetEyeInk(isPetColor(color) ? color : "green", eyeColor);
   const uid = useId().replace(/:/g, "");
   const svgRef = useRef<SVGSVGElement>(null);
+  const rootRef = useRef<SVGGElement>(null);
   const bodyRef = useRef<SVGGElement>(null);
+  const backRef = useRef<SVGGElement>(null);
+  const frontRef = useRef<SVGGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
   const eye0Ref = useRef<SVGPathElement>(null);
   const eye1Ref = useRef<SVGPathElement>(null);
@@ -161,9 +187,16 @@ export function PetMark({
   const shapeRef = useRef(shape);
   const pausedRef = useRef(paused);
   const startedRef = useRef(0);
+  const wantSpinRef = useRef(0);
+  const playedSpinRef = useRef(0);
+  const fillRef = useRef(fill);
+  const eyeInkRef = useRef(eyeInk);
   stateRef.current = verbToMarkState(verb);
   shapeRef.current = shape;
   pausedRef.current = paused;
+  fillRef.current = fill;
+  eyeInkRef.current = eyeInk;
+  if (spinSignal > 0) wantSpinRef.current = spinSignal;
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -217,6 +250,23 @@ export function PetMark({
     let last = performance.now();
     startedRef.current = last;
     let lastState = "";
+    let beltRadius = SHAPES[shapeRef.current]?.beltRadius ?? Re;
+    const orbit = createMarkOrbit({
+      back: backRef.current,
+      front: frontRef.current,
+      idPrefix: uid,
+      reduceMotion: reduce,
+      radius: () => beltRadius,
+    });
+    let spin: PetSpinRun | null = null;
+    let lastSpinKind: PetSpinKind | null = null;
+    const startSpin = () => {
+      if (pausedRef.current) return;
+      const kind = pickPetSpinKind(lastSpinKind);
+      lastSpinKind = kind;
+      spin = beginPetSpin(kind, performance.now());
+      if (petSpinWantsBurst(kind)) orbit.burst(16, 0.95, 0.3);
+    };
 
     const pickTopo = (state: string, hop = false) => {
       const list = STATE_TOPOLOGIES[state] ?? STATE_TOPOLOGIES.idle;
@@ -251,7 +301,15 @@ export function PetMark({
         blinkingUntil = 0;
       }
 
-      applyPose(state, now / 1000, age, pose);
+      if (wantSpinRef.current !== playedSpinRef.current) {
+        playedSpinRef.current = wantSpinRef.current;
+        startSpin();
+      }
+
+      const spinning = spin != null;
+      const celebrate =
+        spin?.kind === "spinWild" || spin?.kind === "spinDizzy";
+      applyPose(celebrate ? "celebrate" : state, now / 1000, age, pose);
 
       if (now >= nextTopoAt) {
         pickTopo(state, true);
@@ -268,7 +326,11 @@ export function PetMark({
         pose.lid.t = u < 0.45 ? 0.06 : pose.lid.t;
       }
       const tracking =
-        look.at > 0 && now - look.at < 280 && state !== "sleeping" && state !== "dragging";
+        !spinning &&
+        look.at > 0 &&
+        now - look.at < 280 &&
+        state !== "sleeping" &&
+        state !== "dragging";
       if (tracking) {
         const g = look.fromScreen
           ? gazeFromDelta(look.dx, look.dy, look.localR)
@@ -280,7 +342,7 @@ export function PetMark({
         pose.turn.t = g.x * 0.32;
         pose.tilt.t = g.y * 0.22;
         gazeUntil = now + 640;
-      } else if (now >= gazeUntil) {
+      } else if (!spinning && now >= gazeUntil) {
         gazeX.t = randBetween(-0.4, 0.4) * 15;
         gazeY.t = randBetween(-0.3, 0.3) * 9;
         gazeUntil = now + randBetween(1800, 4200);
@@ -319,13 +381,48 @@ export function PetMark({
       };
       eye0Ref.current?.setAttribute("d", polyPath(place(e0, 0)));
       eye1Ref.current?.setAttribute("d", polyPath(place(e1, 1)));
+      eye0Ref.current?.setAttribute("fill", eyeInkRef.current);
+      eye1Ref.current?.setAttribute("fill", eyeInkRef.current);
       pathRef.current?.setAttribute("d", recNow.path);
+      pathRef.current?.setAttribute("fill", fillRef.current);
       clipRef.current?.setAttribute("d", recNow.path);
 
+      let spinAngle = 0;
+      let extraRot = 0;
+      let wobbleTurn = 0;
+      let wobbleTilt = 0;
+      let wobbleBob = 0;
+      let bounceY = 0;
+      let wideStyle = false;
+      if (spin) {
+        const sw = stepPetSpin(spin, now, dt);
+        if (sw.done) {
+          spin = null;
+        } else {
+          spinAngle = sw.spinAngle;
+          extraRot = sw.bodyRotDeg;
+          wobbleTurn = sw.wobbleTurn;
+          wobbleTilt = sw.wobbleTilt;
+          wobbleBob = sw.wobbleBob;
+          bounceY = sw.bounceY;
+          wideStyle = sw.wideStyle;
+          if (sw.lid != null) pose.lid.t = sw.lid;
+        }
+      }
+      beltRadius = recNow.beltRadius ?? Re;
+      const markPx = svgRef.current?.getBoundingClientRect().width ?? 128;
+      const sizeScale = clamp((340 / Math.max(markPx, 1)) ** 0.7, 1, 2.6);
+      orbit.update(now, dt, {
+        spinAngle,
+        sizeScale,
+        wideStyle,
+        sustainBelts: false,
+      });
+
       if (bodyRef.current) {
-        const tx = pose.tilt.x;
-        const ty = pose.bob.x;
-        const rot = pose.turn.x;
+        const tx = pose.tilt.x + wobbleTilt;
+        const ty = pose.bob.x + wobbleBob + bounceY;
+        const rot = pose.turn.x + wobbleTurn + extraRot;
         const sc = pose.scale.x;
         bodyRef.current.setAttribute(
           "transform",
@@ -339,13 +436,12 @@ export function PetMark({
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
+      orbit.clear();
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerleave", onPointerLeave);
       unlistenCursor?.();
     };
-  }, [shape, verb, paused]);
-
-  const fill = `light-dark(${ink.light}, ${ink.dark})`;
+  }, [shape, verb, paused, uid]);
 
   return (
     <svg
@@ -365,17 +461,21 @@ export function PetMark({
         ["--pet-ink" as string]: fill,
       }}
     >
-      <defs>
-        <clipPath id={`pet-clip-${uid}`}>
-          <path ref={clipRef} d={rec.path} />
-        </clipPath>
-      </defs>
-      <g ref={bodyRef}>
-        <path ref={pathRef} d={rec.path} fill={fill} />
-        <g clipPath={`url(#pet-clip-${uid})`}>
-          <path ref={eye0Ref} d={polyPath(EYES[0][0])} fill="var(--bg, #161616)" />
-          <path ref={eye1Ref} d={polyPath(EYES[0][1])} fill="var(--bg, #161616)" />
+      <g ref={rootRef}>
+        <g ref={backRef} aria-hidden="true" />
+        <defs>
+          <clipPath id={`pet-clip-${uid}`}>
+            <path ref={clipRef} d={rec.path} />
+          </clipPath>
+        </defs>
+        <g ref={bodyRef}>
+          <path ref={pathRef} d={rec.path} fill={fill} />
+          <g clipPath={`url(#pet-clip-${uid})`}>
+            <path ref={eye0Ref} d={polyPath(EYES[0][0])} fill={eyeInk} />
+            <path ref={eye1Ref} d={polyPath(EYES[0][1])} fill={eyeInk} />
+          </g>
         </g>
+        <g ref={frontRef} aria-hidden="true" />
       </g>
     </svg>
   );

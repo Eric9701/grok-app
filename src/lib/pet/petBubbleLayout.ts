@@ -5,13 +5,19 @@
  * push the mark or make it jump when they appear/disappear.
  */
 
-import { PET_BUBBLE_WIDTH, petBubbleViewportHeight } from "./petTasks";
+import {
+  PET_BUBBLE_SHADOW_PAD,
+  PET_BUBBLE_WIDTH,
+  petBubbleViewportHeight,
+} from "./petTasks";
+
+export { PET_BUBBLE_SHADOW_PAD };
 
 export const PET_BUBBLE_EDGE_PAD = 16;
 
 /** Extra width on each side of the mark so chips can slide without flipping. */
 export function petOverlayWidth(sizePx: number): number {
-  return sizePx + 96 + PET_BUBBLE_WIDTH;
+  return sizePx + 96 + PET_BUBBLE_WIDTH + PET_BUBBLE_SHADOW_PAD * 2;
 }
 
 export function petOverlayHeight(sizePx: number): number {

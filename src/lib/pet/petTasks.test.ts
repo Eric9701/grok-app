@@ -3,6 +3,7 @@ import { emptyLiveSnapshot, type SessionLiveMap } from "@/lib/sessionLiveStore";
 import type { PetFocusInput } from "./petFocus";
 import {
   collectPetTasks,
+  PET_BUBBLE_SHADOW_PAD,
   PET_BUBBLE_VISIBLE,
   PET_TASK_LIMIT,
   petBubbleStackHeight,
@@ -171,7 +172,9 @@ describe("pet task helpers", () => {
     expect(petBubbleStackHeight(1)).toBeGreaterThan(0);
     expect(petBubbleStackHeight(3)).toBeGreaterThan(petBubbleStackHeight(1));
     expect(petBubbleStackHeight(9)).toBe(petBubbleStackHeight(3));
-    expect(petBubbleViewportHeight()).toBe(petBubbleStackHeight(PET_BUBBLE_VISIBLE));
+    expect(petBubbleViewportHeight()).toBe(
+      petBubbleStackHeight(PET_BUBBLE_VISIBLE) + PET_BUBBLE_SHADOW_PAD * 2,
+    );
   });
 
   it("samePetTasks ignores progress jitter", () => {

@@ -374,4 +374,10 @@ export const ruExtra: Partial<Record<MessageKey, string>> = {
   "kanban.clearFilters": "Очистить все фильтры",
   "kanban.mapEmpty": "В этом представлении нет агентов",
   "kanban.unboundProject": "Другие чаты",
+
+  "pet.menu.spin": "Крутись",
+  "settings.pet.eyeColor": "Глаза",
+  "settings.pet.eyeColorDesc":
+    "Авто сохраняет контраст (светлые глаза на чёрном теле). Можно выбрать любой цвет.",
+  "settings.pet.eyeColor.auto": "Авто",
 };

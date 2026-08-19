@@ -20,6 +20,7 @@ export {
 export {
   PET_BUBBLE_GAP,
   PET_BUBBLE_ROW_H,
+  PET_BUBBLE_SHADOW_PAD,
   PET_BUBBLE_STACK_PAD,
   PET_BUBBLE_VISIBLE,
   PET_BUBBLE_WIDTH,
@@ -59,9 +60,16 @@ export {
   PET_SHAPES,
   PET_SIZES,
   isPetColor,
+  isPetEyeColor,
   isPetShape,
+  normalizePetEyeColor,
   normalizePetSize,
+  resolvePetBodyInk,
+  resolvePetEyeInk,
   type PetColor,
+  type PetEyeColor,
   type PetShape,
   type PetSizePx,
 } from "./petIdentity";
+
+export { petDoneTaskIds, shouldTriggerPetSpin } from "./petCelebrate";

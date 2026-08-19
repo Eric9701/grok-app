@@ -43,6 +43,8 @@ pub struct PetPrefs {
     pub shape: String,
     #[serde(default = "default_color")]
     pub color: String,
+    #[serde(default = "default_eye_color")]
+    pub eye_color: String,
     #[serde(default = "default_size")]
     pub size_px: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -57,6 +59,9 @@ fn default_shape() -> String {
 fn default_color() -> String {
     "green".into()
 }
+fn default_eye_color() -> String {
+    "auto".into()
+}
 fn default_size() -> u32 {
     128
 }
@@ -68,6 +73,7 @@ impl Default for PetPrefs {
             visible: false,
             shape: default_shape(),
             color: default_color(),
+            eye_color: default_eye_color(),
             size_px: default_size(),
             x: None,
             y: None,
@@ -212,11 +218,14 @@ fn normalize_prefs(mut p: PetPrefs) -> PetPrefs {
         p.shape = default_shape();
     }
     let colors = [
-        "black", "brown", "red", "orange", "yellow", "green", "cyan", "blue", "violet", "magenta",
-        "gray",
+        "black", "white", "brown", "red", "orange", "yellow", "green", "cyan", "blue", "violet",
+        "magenta", "gray",
     ];
     if !colors.contains(&p.color.as_str()) {
         p.color = default_color();
+    }
+    if p.eye_color != "auto" && !colors.contains(&p.eye_color.as_str()) {
+        p.eye_color = default_eye_color();
     }
     p.size_px = if p.size_px <= 112 {
         96
@@ -236,14 +245,19 @@ fn window_logical_size(size_px: u32) -> f64 {
 
 /// Must match `petOverlayWidth` / `petBubbleViewportHeight` in JS.
 const PET_BUBBLE_WIDTH_PX: f64 = 216.0;
-/// 3 visible rows: 3*38 + 2*6 + 10. Always reserved so the mark does not jump.
-const PET_BUBBLE_VIEWPORT_H: f64 = 136.0;
+/// Chip drop-shadow pad (matches JS `PET_BUBBLE_SHADOW_PAD`).
+const PET_BUBBLE_SHADOW_PAD: f64 = 20.0;
+/// 3 visible rows + shadow pad: 3*38 + 2*6 + 10 + 40. Always reserved so the mark does not jump.
+const PET_BUBBLE_VIEWPORT_H: f64 = 176.0;
 /// Matches `.pet-overlay` padding-bottom — mark sits on the bottom, not centered.
 const PET_MARK_BOTTOM_PAD: f64 = 16.0;
 
 fn overlay_extent(size_px: u32) -> (f64, f64) {
     let mark = window_logical_size(size_px);
-    (mark + PET_BUBBLE_WIDTH_PX, mark + PET_BUBBLE_VIEWPORT_H)
+    (
+        mark + PET_BUBBLE_WIDTH_PX + PET_BUBBLE_SHADOW_PAD * 2.0,
+        mark + PET_BUBBLE_VIEWPORT_H,
+    )
 }
 
 fn mark_center_physical(
@@ -755,14 +769,32 @@ mod tests {
         });
         assert_eq!(p.shape, "hex");
         assert_eq!(p.color, "green");
+        assert_eq!(p.eye_color, "auto");
         assert_eq!(p.size_px, 96);
+        let eyes = normalize_prefs(PetPrefs {
+            eye_color: "neon".into(),
+            ..Default::default()
+        });
+        assert_eq!(eyes.eye_color, "auto");
+        let black_eyes = normalize_prefs(PetPrefs {
+            eye_color: "black".into(),
+            ..Default::default()
+        });
+        assert_eq!(black_eyes.eye_color, "black");
+        let white = normalize_prefs(PetPrefs {
+            color: "white".into(),
+            eye_color: "white".into(),
+            ..Default::default()
+        });
+        assert_eq!(white.color, "white");
+        assert_eq!(white.eye_color, "white");
     }
 
     #[test]
     fn overlay_extent_matches_js_width_and_does_not_use_hit_chrome() {
         let (w, h) = overlay_extent(128);
-        assert_eq!(w, 128.0 + 96.0 + 216.0);
-        assert_eq!(h, 128.0 + 96.0 + 136.0);
+        assert_eq!(w, 128.0 + 96.0 + 216.0 + 40.0);
+        assert_eq!(h, 128.0 + 96.0 + 176.0);
     }
 
     #[test]

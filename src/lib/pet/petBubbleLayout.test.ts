@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { PET_BUBBLE_WIDTH, petBubbleViewportHeight } from "./petTasks";
+import {
+  PET_BUBBLE_SHADOW_PAD,
+  PET_BUBBLE_WIDTH,
+  petBubbleViewportHeight,
+} from "./petTasks";
 import { petBubbleOffsetX, petOverlayHeight, petOverlayWidth } from "./petBubbleLayout";
 
 describe("petBubbleOffsetX", () => {
@@ -44,7 +48,9 @@ describe("petBubbleOffsetX", () => {
 
 describe("petOverlayWidth", () => {
   it("leaves room to slide a chip beside the mark", () => {
-    expect(petOverlayWidth(128)).toBe(128 + 96 + PET_BUBBLE_WIDTH);
+    expect(petOverlayWidth(128)).toBe(
+      128 + 96 + PET_BUBBLE_WIDTH + PET_BUBBLE_SHADOW_PAD * 2,
+    );
   });
 });
 
@@ -52,5 +58,6 @@ describe("petOverlayHeight", () => {
   it("always reserves the 3-chip viewport so the mark does not jump", () => {
     expect(petOverlayHeight(128)).toBe(128 + 96 + petBubbleViewportHeight());
     expect(petOverlayHeight(160)).toBe(160 + 96 + petBubbleViewportHeight());
+    expect(petBubbleViewportHeight()).toBeGreaterThan(136);
   });
 });

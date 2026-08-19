@@ -1,13 +1,23 @@
 /* Desktop pet overlay — transparent shell + low-distraction motion. */
 
 html[data-pet-shell],
+html[data-pet-shell][data-theme],
 html[data-pet-shell] body,
 html[data-pet-shell] #root {
   background: transparent !important;
+  background-image: none !important;
+  background-color: transparent !important;
   overflow: hidden;
   margin: 0;
   width: 100%;
   height: 100%;
+}
+
+html[data-pet-shell]::before,
+html[data-pet-shell] body::before,
+html[data-pet-shell] #root::before {
+  content: none !important;
+  display: none !important;
 }
 
 html[data-pet-shell] .boot-gate {
@@ -24,6 +34,7 @@ html[data-pet-shell] .boot-gate {
   justify-content: flex-end;
   padding-bottom: 16px;
   box-sizing: border-box;
+  overflow: visible;
   user-select: none;
   -webkit-user-select: none;
   cursor: grab;
@@ -52,7 +63,7 @@ html[data-pet-shell] .boot-gate {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  overflow: visible;
 }
 
 .pet-mark {
@@ -94,11 +105,18 @@ html[data-pet-shell] .boot-gate {
   display: block;
 }
 
+.pet-settings-swatch--auto {
+  background: conic-gradient(#111 0 180deg, #f4f4f5 180deg 360deg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
 .pet-bubbles {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 0;
+  padding: 16px 20px 22px;
+  box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -133,7 +151,7 @@ html[data-pet-shell] .boot-gate {
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
   background: var(--bg-elevated, #1c1c1e);
   color: var(--text-primary, #f4f4f5);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
   text-align: left;
   cursor: pointer;
   appearance: none;

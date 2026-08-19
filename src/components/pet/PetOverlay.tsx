@@ -10,13 +10,16 @@ import { createT, type Locale } from "@/i18n";
 import {
   isPetColor,
   isPetShape,
+  normalizePetEyeColor,
   PET_BUBBLE_WIDTH,
   petBubbleViewportHeight,
+  petDoneTaskIds,
   petOverlayHeight,
   petOverlayWidth,
   petSettingsHash,
   petVerbFor,
   placePetContextMenu,
+  shouldTriggerPetSpin,
   type PetFocus,
   type PetTask,
 } from "@/lib/pet";
@@ -40,6 +43,8 @@ export { petSettingsHash };
 
 const DRAG_SLOP = 6;
 const DBLCLICK_MS = 280;
+const MENU_W = 148;
+const MENU_H = 120;
 
 export function PetOverlay({
   focus,
@@ -55,12 +60,19 @@ export function PetOverlay({
   const t = useMemo(() => createT(locale), [locale]);
   const shape = isPetShape(prefs.shape) ? prefs.shape : "hex";
   const color = isPetColor(prefs.color) ? prefs.color : "green";
+  const eyeColor = normalizePetEyeColor(prefs.eyeColor);
   const verb = petVerbFor(focus.kind, focus.toolTitle);
   const sizePx = prefs.sizePx || 128;
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const menuOpen = menu != null;
   const [dragging, setDragging] = useState(false);
   const [bubbleDx, setBubbleDx] = useState(0);
+  const [spinSignal, setSpinSignal] = useState(0);
+  const spinWatchRef = useRef<{
+    primed: boolean;
+    kind: PetFocus["kind"] | null;
+    done: Set<string>;
+  }>({ primed: false, kind: null, done: new Set() });
   const originRef = useRef<{ x: number; y: number } | null>(null);
   const draggedRef = useRef(false);
   const pendingClickRef = useRef<number | null>(null);
@@ -163,6 +175,23 @@ export function PetOverlay({
     };
   }, []);
 
+  useEffect(() => {
+    const nextDone = new Set(petDoneTaskIds(tasks));
+    const prev = spinWatchRef.current;
+    if (
+      shouldTriggerPetSpin({
+        primed: prev.primed,
+        prevKind: prev.kind,
+        nextKind: focus.kind,
+        prevDoneIds: prev.done,
+        nextDoneIds: nextDone,
+      })
+    ) {
+      setSpinSignal((n) => n + 1);
+    }
+    spinWatchRef.current = { primed: true, kind: focus.kind, done: nextDone };
+  }, [focus.kind, tasks]);
+
   const closeMenu = useCallback(() => {
     setMenu(null);
     void petSetMenuOpen(false);
@@ -188,8 +217,8 @@ export function PetOverlay({
       overlayH,
       clickX,
       clickY,
-      menuW: 128,
-      menuH: 80,
+      menuW: MENU_W,
+      menuH: MENU_H,
       winX: 0,
       winY: 0,
       work: { x: 0, y: 0, w: overlayW, h: overlayH },
@@ -205,8 +234,8 @@ export function PetOverlay({
         overlayH: frame.overlayH,
         clickX,
         clickY,
-        menuW: 128,
-        menuH: 80,
+        menuW: MENU_W,
+        menuH: MENU_H,
         winX: frame.winX,
         winY: frame.winY,
         work: frame.work,
@@ -328,9 +357,11 @@ export function PetOverlay({
         <PetMark
           shape={shape}
           color={color}
+          eyeColor={eyeColor}
           verb={verb}
           sizePx={sizePx}
           title={title}
+          spinSignal={spinSignal}
         />
       </div>
       <ContextMenu
@@ -338,9 +369,17 @@ export function PetOverlay({
         x={menu?.x ?? 0}
         y={menu?.y ?? 0}
         onClose={closeMenu}
-        estimatedWidth={128}
-        estimatedHeight={80}
+        estimatedWidth={MENU_W}
+        estimatedHeight={MENU_H}
         items={[
+          {
+            id: "pet-spin",
+            label: t("pet.menu.spin"),
+            onClick: () => {
+              setSpinSignal((n) => n + 1);
+            },
+          },
+          { id: "pet-sep-spin", separator: true },
           {
             id: "pet-settings",
             label: t("pet.menu.settings"),

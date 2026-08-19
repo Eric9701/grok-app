@@ -36,6 +36,7 @@ export function PetApp() {
     visible: true,
     shape: "hex",
     color: "green",
+    eyeColor: "auto",
     sizePx: 128,
   });
   const [locale, setLocale] = useState<Locale>(readLocale);

@@ -6,7 +6,11 @@ import type { Ref } from "react";
 import { IconAlertTriangle, IconCheck } from "@/components/icons";
 import { createT } from "@/i18n";
 import type { PetTask } from "@/lib/pet";
-import { PET_BUBBLE_WIDTH, petBubbleViewportHeight } from "@/lib/pet";
+import {
+  PET_BUBBLE_SHADOW_PAD,
+  PET_BUBBLE_WIDTH,
+  petBubbleViewportHeight,
+} from "@/lib/pet";
 
 export function PetTaskBubbles({
   tasks,
@@ -26,7 +30,10 @@ export function PetTaskBubbles({
       className="pet-bubbles"
       role="list"
       aria-label={t("pet.bubble.list")}
-      style={{ width: PET_BUBBLE_WIDTH, maxHeight: petBubbleViewportHeight() }}
+      style={{
+        width: PET_BUBBLE_WIDTH + PET_BUBBLE_SHADOW_PAD * 2,
+        maxHeight: petBubbleViewportHeight(),
+      }}
       onWheel={(e) => e.stopPropagation()}
     >
       {tasks.map((task) => {

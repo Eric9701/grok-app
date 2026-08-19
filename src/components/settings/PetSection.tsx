@@ -14,8 +14,10 @@ import {
   PET_SIZES,
   isPetColor,
   isPetShape,
+  normalizePetEyeColor,
   normalizePetSize,
   type PetColor,
+  type PetEyeColor,
   type PetShape,
 } from "@/lib/pet";
 import {
@@ -32,6 +34,7 @@ const DEFAULT_PREFS: PetPrefs = {
   visible: false,
   shape: "hex",
   color: "green",
+  eyeColor: "auto",
   sizePx: 128,
 };
 
@@ -95,6 +98,7 @@ export function PetSection() {
   const shown = petWindowOn(prefs);
   const shape: PetShape = isPetShape(prefs.shape) ? prefs.shape : "hex";
   const color: PetColor = isPetColor(prefs.color) ? prefs.color : "green";
+  const eyeColor: PetEyeColor = normalizePetEyeColor(prefs.eyeColor);
   const sizePx = normalizePetSize(prefs.sizePx);
 
   return (
@@ -132,7 +136,7 @@ export function PetSection() {
             <div className="settings-row__label">{t("settings.pet.identity")}</div>
             <div className="settings-row__desc">{t("settings.pet.identityDesc")}</div>
           </div>
-          <PetMark shape={shape} color={color} verb="idle" sizePx={72} />
+          <PetMark shape={shape} color={color} eyeColor={eyeColor} verb="idle" sizePx={72} />
         </div>
         <div className="settings-row settings-row--stack">
           <div className="settings-row__label">{t("settings.pet.shape")}</div>
@@ -149,7 +153,14 @@ export function PetSection() {
                 disabled={busy}
                 onClick={() => void commit({ ...prefs, shape: sh })}
               >
-                <PetMark shape={sh} color={color} verb="idle" sizePx={28} paused />
+                <PetMark
+                  shape={sh}
+                  color={color}
+                  eyeColor={eyeColor}
+                  verb="idle"
+                  sizePx={28}
+                  paused
+                />
               </button>
             ))}
           </div>
@@ -168,6 +179,44 @@ export function PetSection() {
                 aria-label={PET_COLOR_SWATCH[c].label}
                 disabled={busy}
                 onClick={() => void commit({ ...prefs, color: c })}
+              >
+                <span
+                  className="pet-settings-swatch"
+                  style={{ background: PET_COLOR_SWATCH[c].value }}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+        <div
+          className="settings-row settings-row--stack"
+          id="settings-anchor-pet-eye"
+        >
+          <div className="settings-row__label">{t("settings.pet.eyeColor")}</div>
+          <div className="pet-settings-grid" role="group" aria-label={t("settings.pet.eyeColor")}>
+            <button
+              type="button"
+              className={
+                "pet-settings-grid__btn" + (eyeColor === "auto" ? " is-on" : "")
+              }
+              aria-pressed={eyeColor === "auto"}
+              aria-label={t("settings.pet.eyeColor.auto")}
+              disabled={busy}
+              onClick={() => void commit({ ...prefs, eyeColor: "auto" })}
+            >
+              <span className="pet-settings-swatch pet-settings-swatch--auto" />
+            </button>
+            {PET_COLORS.map((c) => (
+              <button
+                key={`eye-${c}`}
+                type="button"
+                className={
+                  "pet-settings-grid__btn" + (eyeColor === c ? " is-on" : "")
+                }
+                aria-pressed={eyeColor === c}
+                aria-label={PET_COLOR_SWATCH[c].label}
+                disabled={busy}
+                onClick={() => void commit({ ...prefs, eyeColor: c })}
               >
                 <span
                   className="pet-settings-swatch"

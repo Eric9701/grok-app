@@ -15,6 +15,7 @@ export type PetPrefs = {
   visible: boolean;
   shape: string;
   color: string;
+  eyeColor?: string;
   sizePx: number;
   x?: number | null;
   y?: number | null;
@@ -27,6 +28,7 @@ export async function petPrefsGet(): Promise<PetPrefs> {
       visible: false,
       shape: "hex",
       color: "green",
+      eyeColor: "auto",
       sizePx: 128,
     };
   }

@@ -23,6 +23,8 @@ export const PET_BUBBLE_WIDTH = 216;
 export const PET_BUBBLE_ROW_H = 38;
 export const PET_BUBBLE_GAP = 6;
 export const PET_BUBBLE_STACK_PAD = 10;
+/** Inner padding so chip drop-shadows are not square-clipped by overflow. */
+export const PET_BUBBLE_SHADOW_PAD = 20;
 
 export type PetTaskPhase = "active" | "done";
 
@@ -70,7 +72,7 @@ export function petBubbleStackHeight(count: number): number {
 
 /** Reserved slot above the mark. Always this tall so the pet never jumps. */
 export function petBubbleViewportHeight(): number {
-  return petBubbleStackHeight(PET_BUBBLE_VISIBLE);
+  return petBubbleStackHeight(PET_BUBBLE_VISIBLE) + PET_BUBBLE_SHADOW_PAD * 2;
 }
 
 function collectIds(input: PetFocusInput): string[] {

@@ -15,6 +15,7 @@ export type PetShape = (typeof PET_SHAPES)[number];
 
 export const PET_COLORS = [
   "black",
+  "white",
   "brown",
   "red",
   "orange",
@@ -33,7 +34,8 @@ export const PET_COLOR_SWATCH: Record<
   PetColor,
   { label: string; value: string }
 > = {
-  black: { label: "Black", value: "#000000" },
+  black: { label: "Black", value: "#111111" },
+  white: { label: "White", value: "#F4F4F5" },
   brown: { label: "Brown", value: "#936439" },
   red: { label: "Red", value: "#FF263C" },
   orange: { label: "Orange", value: "#FF6700" },
@@ -48,7 +50,8 @@ export const PET_COLOR_SWATCH: Record<
 
 /** Light / dark body fills (CSS light-dark). */
 export const PET_INK: Record<PetColor, { light: string; dark: string }> = {
-  black: { light: "#000000", dark: "#FFFFFF" },
+  black: { light: "#111111", dark: "#111111" },
+  white: { light: "#F4F4F5", dark: "#F4F4F5" },
   brown: { light: "#A27952", dark: "#855C36" },
   red: { light: "#FF3E51", dark: "#E02135" },
   orange: { light: "#FF781C", dark: "#FF6700" },
@@ -70,6 +73,36 @@ export function isPetShape(v: string | null | undefined): v is PetShape {
 
 export function isPetColor(v: string | null | undefined): v is PetColor {
   return !!v && (PET_COLORS as readonly string[]).includes(v);
+}
+
+export type PetEyeColor = PetColor | "auto";
+
+export function isPetEyeColor(v: string | null | undefined): v is PetEyeColor {
+  return v === "auto" || isPetColor(v);
+}
+
+export function normalizePetEyeColor(v: string | null | undefined): PetEyeColor {
+  return isPetEyeColor(v) ? v : "auto";
+}
+
+/** Body fill is the picker swatch — no light-dark flip (black stayed white in dark UI). */
+export function resolvePetBodyInk(color: PetColor): string {
+  return PET_COLOR_SWATCH[color]?.value ?? PET_COLOR_SWATCH.green.value;
+}
+
+function hexLuma(hex: string): number {
+  const raw = hex.replace("#", "");
+  if (raw.length !== 6) return 0.5;
+  const r = parseInt(raw.slice(0, 2), 16) / 255;
+  const g = parseInt(raw.slice(2, 4), 16) / 255;
+  const b = parseInt(raw.slice(4, 6), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Explicit black/white must paint as picked. Auto only picks a readable contrast. */
+export function resolvePetEyeInk(body: PetColor, eye: PetEyeColor = "auto"): string {
+  if (eye !== "auto") return resolvePetBodyInk(eye);
+  return hexLuma(resolvePetBodyInk(body)) < 0.45 ? "#F4F4F5" : "#161616";
 }
 
 export function normalizePetSize(n: unknown): PetSizePx {
