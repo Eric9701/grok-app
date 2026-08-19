@@ -24,4 +24,9 @@ describe("PetOverlay drag hit target", () => {
     expect(src).toContain("shouldTriggerPetSpin");
     expect(src).toContain("pet.menu.spin");
   });
+
+  it("exposes a rest-face emote from the pet menu", () => {
+    expect(src).toContain("emoteSignal");
+    expect(src).toContain("pet.menu.emote");
+  });
 });

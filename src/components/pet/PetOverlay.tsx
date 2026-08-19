@@ -49,7 +49,7 @@ export { petSettingsHash };
 const DRAG_SLOP = 6;
 const DBLCLICK_MS = 280;
 const MENU_W = 148;
-const MENU_H = 156;
+const MENU_H = 188;
 
 export function PetOverlay({
   focus,
@@ -74,6 +74,7 @@ export function PetOverlay({
   const [dragging, setDragging] = useState(false);
   const [bubbleDx, setBubbleDx] = useState(0);
   const [spinSignal, setSpinSignal] = useState(0);
+  const [emoteSignal, setEmoteSignal] = useState(0);
   const spinWatchRef = useRef<{
     primed: boolean;
     kind: PetFocus["kind"] | null;
@@ -358,6 +359,7 @@ export function PetOverlay({
       }
       pendingClickRef.current = window.setTimeout(() => {
         pendingClickRef.current = null;
+        setEmoteSignal((n) => n + 1);
         if (focus.sessionId) void petFocusSession(focus.sessionId);
         else void petShowMain();
       }, DBLCLICK_MS);
@@ -405,7 +407,9 @@ export function PetOverlay({
           verb={verb}
           sizePx={sizePx}
           title={title}
+          dragging={dragging}
           spinSignal={spinSignal}
+          emoteSignal={emoteSignal}
         />
       </div>
       <ContextMenu
@@ -421,6 +425,13 @@ export function PetOverlay({
             label: t("pet.menu.spin"),
             onClick: () => {
               setSpinSignal((n) => n + 1);
+            },
+          },
+          {
+            id: "pet-emote",
+            label: t("pet.menu.emote"),
+            onClick: () => {
+              setEmoteSignal((n) => n + 1);
             },
           },
           { id: "pet-sep-spin", separator: true },

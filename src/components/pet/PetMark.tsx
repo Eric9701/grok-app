@@ -36,6 +36,7 @@ import {
   type PetSpinKind,
   type PetSpinRun,
 } from "@/lib/pet/markSpin";
+import { pickRestEmote, resolveLivingMood } from "@/lib/pet/petMood";
 
 
 type ShapeRec = {
@@ -123,6 +124,110 @@ function applyPose(state: string, tSec: number, age: number, pose: {
       pose.scale.t = 0.97;
       lid = 0.7;
       break;
+    case "happy":
+      pose.turn.t = Math.sin(mt * 0.7) * 2;
+      pose.tilt.t = Math.sin(mt * 0.4) * 2;
+      pose.bob.t = -Math.abs(Math.sin(mt * 1.4)) * 3;
+      pose.scale.t = 1.02;
+      lid = 0.72;
+      break;
+    case "curious":
+      pose.turn.t = 10 + Math.sin(mt * 0.6) * 2;
+      pose.tilt.t = -6;
+      pose.bob.t = Math.sin(mt * 1.1) * 1.4;
+      pose.scale.t = 1.02;
+      lid = 1.08;
+      break;
+    case "confused":
+      pose.turn.t = Math.sin(mt * 1.1) * 8;
+      pose.tilt.t = 8 + Math.sin(mt * 0.9) * 4;
+      pose.bob.t = Math.sin(mt * 0.7) * 1.6;
+      pose.scale.t = 1;
+      lid = 0.9;
+      break;
+    case "playful":
+      pose.turn.t = Math.sin(mt * 2.1) * 10;
+      pose.tilt.t = Math.sin(mt * 1.7) * 8;
+      pose.bob.t = -Math.abs(Math.sin(mt * 2.4)) * 4;
+      pose.scale.t = 1.03 + Math.sin(mt * 2.4) * 0.02;
+      break;
+    case "shy":
+      pose.turn.t = -12 + Math.sin(mt * 0.4) * 2;
+      pose.tilt.t = 6;
+      pose.bob.t = 5 + Math.sin(mt * 0.5);
+      pose.scale.t = 0.96;
+      lid = 0.78;
+      break;
+    case "proud":
+      pose.turn.t = Math.sin(mt * 0.35) * 1.5;
+      pose.tilt.t = -3;
+      pose.bob.t = -4;
+      pose.scale.t = 1.05;
+      lid = 0.68;
+      break;
+    case "bored":
+      pose.turn.t = -8 + Math.sin(mt * 0.2) * 1;
+      pose.tilt.t = 3;
+      pose.bob.t = 3 + Math.sin(mt * 0.3);
+      pose.scale.t = 0.98;
+      lid = 0.48;
+      break;
+    case "drowsy":
+      pose.turn.t = Math.sin(mt * 0.22) * 2;
+      pose.tilt.t = 4;
+      pose.bob.t = 6 + Math.sin(mt * 0.35) * 2;
+      pose.scale.t = 0.97;
+      lid = 0.32;
+      break;
+    case "excited":
+      pose.turn.t = Math.sin(mt * 2.4) * 6;
+      pose.tilt.t = Math.sin(mt * 1.8) * 5;
+      pose.bob.t = -Math.abs(Math.sin(mt * 2.8)) * 5;
+      pose.scale.t = 1.04 + Math.sin(mt * 2.8) * 0.03;
+      lid = 1.12;
+      break;
+    case "surprised":
+      pose.turn.t = 0;
+      pose.tilt.t = -2;
+      pose.bob.t = -6;
+      pose.scale.t = 1.08;
+      lid = 1.2;
+      break;
+    case "laughing":
+      pose.turn.t = Math.sin(mt * 3.2) * 4;
+      pose.tilt.t = Math.sin(mt * 2.6) * 3;
+      pose.bob.t = -Math.abs(Math.sin(mt * 3.6)) * 3.5;
+      pose.scale.t = 1.03;
+      lid = 0.22;
+      break;
+    case "scared":
+      pose.turn.t = Math.sin(mt * 18) * 3;
+      pose.tilt.t = Math.sin(mt * 14) * 2;
+      pose.bob.t = -3;
+      pose.scale.t = 0.94;
+      lid = 1.18;
+      break;
+    case "angry":
+      pose.turn.t = 4 + Math.sin(mt * 1.4) * 2;
+      pose.tilt.t = -4;
+      pose.bob.t = Math.sin(mt * 1.1) * 1.2;
+      pose.scale.t = 1.02;
+      lid = 0.55;
+      break;
+    case "suspicious":
+      pose.turn.t = 11;
+      pose.tilt.t = 3;
+      pose.bob.t = Math.sin(mt * 0.5) * 0.8;
+      pose.scale.t = 1;
+      lid = 0.62;
+      break;
+    case "writing":
+      pose.turn.t = -6 + Math.sin(mt * 0.45) * 3;
+      pose.tilt.t = 5 + Math.sin(mt * 0.55) * 2;
+      pose.bob.t = Math.sin(mt * 0.7) * 1.4;
+      pose.scale.t = 1;
+      lid = 0.92;
+      break;
     case "notifying":
       pose.turn.t = 3;
       pose.tilt.t = 2;
@@ -158,6 +263,8 @@ export function PetMark({
   title,
   paused = false,
   spinSignal = 0,
+  emoteSignal = 0,
+  dragging = false,
   eyeColor = "auto",
 }: {
   shape?: PetShape | string;
@@ -167,8 +274,11 @@ export function PetMark({
   sizePx?: number;
   title?: string;
   paused?: boolean;
+  dragging?: boolean;
   /** Increment to replay a random Grok Bot spin (`Sn` / `spinWild`). */
   spinSignal?: number;
+  /** Increment to flash a random rest expression. */
+  emoteSignal?: number;
 }) {
   const rec = SHAPES[shape] ?? SHAPES.hex;
   const fill = resolvePetBodyInk(isPetColor(color) ? color : "green");
@@ -189,14 +299,19 @@ export function PetMark({
   const startedRef = useRef(0);
   const wantSpinRef = useRef(0);
   const playedSpinRef = useRef(0);
+  const wantEmoteRef = useRef(0);
+  const playedEmoteRef = useRef(0);
+  const draggingRef = useRef(dragging);
   const fillRef = useRef(fill);
   const eyeInkRef = useRef(eyeInk);
   stateRef.current = verbToMarkState(verb);
   shapeRef.current = shape;
   pausedRef.current = paused;
+  draggingRef.current = dragging;
   fillRef.current = fill;
   eyeInkRef.current = eyeInk;
   if (spinSignal > 0) wantSpinRef.current = spinSignal;
+  if (emoteSignal > 0) wantEmoteRef.current = emoteSignal;
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -250,6 +365,12 @@ export function PetMark({
     let last = performance.now();
     startedRef.current = last;
     let lastState = "";
+    let hoverSince = 0;
+    let emoteMood = "";
+    let emoteUntil = 0;
+    let idleBurstMood = "";
+    let idleBurstUntil = 0;
+    let idleBurstNextAt = 0;
     let beltRadius = SHAPES[shapeRef.current]?.beltRadius ?? Re;
     const orbit = createMarkOrbit({
       back: backRef.current,
@@ -288,7 +409,51 @@ export function PetMark({
     const tick = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
-      const state = stateRef.current;
+      const session = stateRef.current;
+      if (wantEmoteRef.current !== playedEmoteRef.current) {
+        playedEmoteRef.current = wantEmoteRef.current;
+        emoteMood = pickRestEmote(emoteMood);
+        emoteUntil = now + 2600;
+      }
+      const lookFresh = look.at > 0 && now - look.at < 280;
+      const nearMark = look.fromScreen
+        ? Math.hypot(look.dx, look.dy) <= (look.localR || 64) * 1.35
+        : lookFresh;
+      const trackingLook =
+        lookFresh &&
+        nearMark &&
+        session !== "sleeping" &&
+        session !== "dragging" &&
+        !draggingRef.current;
+      if (trackingLook && session === "idle") {
+        if (!hoverSince) hoverSince = now;
+      } else {
+        hoverSince = 0;
+      }
+      if (
+        session === "idle" &&
+        !draggingRef.current &&
+        emoteUntil <= now
+      ) {
+        if (!idleBurstNextAt) {
+          idleBurstNextAt = now + randBetween(8000, 16000);
+        } else if (now >= idleBurstNextAt) {
+          idleBurstMood = pickRestEmote(idleBurstMood);
+          idleBurstUntil = now + randBetween(2200, 4000);
+          idleBurstNextAt = idleBurstUntil + randBetween(8000, 16000);
+        }
+      }
+      const state = resolveLivingMood({
+        sessionVerb: session,
+        now,
+        dragging: draggingRef.current,
+        hovering: hoverSince > 0,
+        hoverMs: hoverSince > 0 ? now - hoverSince : 0,
+        emoteMood,
+        emoteUntil,
+        idleBurstMood,
+        idleBurstUntil,
+      });
       const age = (now - startedRef.current) / 1000;
       if (state !== lastState) {
         lastState = state;

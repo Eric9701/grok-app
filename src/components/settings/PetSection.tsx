@@ -166,7 +166,7 @@ export function PetSection() {
                   "pet-settings-grid__btn" + (shape === sh ? " is-on" : "")
                 }
                 aria-pressed={shape === sh}
-                aria-label={sh}
+                aria-label={t(`settings.pet.shape.${sh}`)}
                 disabled={busy}
                 onClick={() => void commit({ ...prefs, shape: sh })}
               >

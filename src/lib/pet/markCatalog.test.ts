@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import shapes from "@/lib/pet/data/shapes.json";
 import eyes from "@/lib/pet/data/eyes.json";
 import { STATE_TOPOLOGIES, verbToMarkState } from "@/lib/pet/markTables";
+import { PET_SHAPES } from "@/lib/pet/petIdentity";
 import {
   gazeFromDelta,
   gazeFromPointer,
@@ -13,7 +14,9 @@ import {
 
 describe("ported Sand mark catalog", () => {
   it("ships official Jo paths for picker shapes", () => {
-    for (const id of ["blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop"]) {
+    expect(PET_SHAPES).toContain("bean");
+    expect(PET_SHAPES).toContain("leaf");
+    for (const id of PET_SHAPES) {
       const rec = (shapes as Record<string, { path: string }>)[id];
       expect(rec?.path.startsWith("M"), id).toBe(true);
       expect(rec.path.length).toBeGreaterThan(40);

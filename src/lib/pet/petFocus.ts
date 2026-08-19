@@ -222,10 +222,27 @@ export type PetVerb =
   | "thinking"
   | "searching"
   | "working"
+  | "writing"
   | "waiting"
   | "notifying"
   | "sad"
-  | "waking";
+  | "waking"
+  | "happy"
+  | "curious"
+  | "confused"
+  | "playful"
+  | "shy"
+  | "proud"
+  | "bored"
+  | "drowsy"
+  | "excited"
+  | "surprised"
+  | "laughing"
+  | "scared"
+  | "angry"
+  | "suspicious"
+  | "celebrate"
+  | "dragging";
 
 export function petVerbFor(
   kind: PetKind,
@@ -244,6 +261,11 @@ export function petVerbFor(
       const t = (toolTitle ?? "").toLowerCase();
       if (/\b(search|web_search|browse|fetch)\b/.test(t)) return "searching";
       if (/\b(think|reason)\b/.test(t)) return "thinking";
+      if (
+        /\b(write|edit|apply_patch|str_replace|strreplace|create_file)\b/.test(t)
+      ) {
+        return "writing";
+      }
       return "working";
     }
     default:

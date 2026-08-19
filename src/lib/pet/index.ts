@@ -81,3 +81,13 @@ export {
 } from "./petIdentity";
 
 export { petDoneTaskIds, shouldTriggerPetSpin } from "./petCelebrate";
+
+export {
+  PET_HOVER_LISTEN_MS,
+  PET_REST_MOODS,
+  isPetRestMood,
+  pickRestEmote,
+  resolveLivingMood,
+  type LivingMoodInput,
+  type PetRestMood,
+} from "./petMood";

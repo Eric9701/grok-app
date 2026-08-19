@@ -221,7 +221,9 @@ pub fn save_prefs(prefs: &PetPrefs) -> Result<(), String> {
 
 fn normalize_prefs(mut p: PetPrefs) -> PetPrefs {
     let shapes = [
-        "blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop",
+        "blob", "pebble", "bean", "egg", "squircle", "tablet", "capsule", "cylinder",
+        "hex", "gem", "crystal", "wedge", "shield", "dome", "arch", "cloud", "teardrop",
+        "leaf",
     ];
     if !shapes.contains(&p.shape.as_str()) {
         p.shape = default_shape();
@@ -289,6 +291,83 @@ fn mark_center_physical(
     let cx = win_x + win_w / 2.0;
     let cy = win_y + win_h - (PET_MARK_BOTTOM_PAD + f64::from(size_px) / 2.0) * scale;
     (cx, cy)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct WorkRect {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+const PET_SCREEN_PAD: f64 = 24.0;
+const PET_MIN_VISIBLE: f64 = 48.0;
+
+fn overlay_overlaps_work(x: f64, y: f64, w: f64, h: f64, work: WorkRect) -> bool {
+    let x1 = x.max(work.x);
+    let y1 = y.max(work.y);
+    let x2 = (x + w).min(work.x + work.w);
+    let y2 = (y + h).min(work.y + work.h);
+    x2 - x1 >= PET_MIN_VISIBLE && y2 - y1 >= PET_MIN_VISIBLE
+}
+
+fn default_pet_pos(work: WorkRect, overlay_w: f64, overlay_h: f64) -> (f64, f64) {
+    (
+        (work.x + work.w - overlay_w - PET_SCREEN_PAD).max(work.x),
+        (work.y + work.h - overlay_h - PET_SCREEN_PAD).max(work.y),
+    )
+}
+
+/// Keep a saved overlay on a still-connected display. A disconnected monitor
+/// used to park the pet at prefs x/y forever (invisible, prefs still "on").
+fn clamp_pet_overlay_pos(
+    x: f64,
+    y: f64,
+    overlay_w: f64,
+    overlay_h: f64,
+    works: &[WorkRect],
+    primary: WorkRect,
+) -> (f64, f64) {
+    if works
+        .iter()
+        .any(|work| overlay_overlaps_work(x, y, overlay_w, overlay_h, *work))
+    {
+        return (x, y);
+    }
+    default_pet_pos(primary, overlay_w, overlay_h)
+}
+
+fn work_rect_from_monitor(m: &tauri::Monitor) -> WorkRect {
+    let scale = m.scale_factor().max(0.1);
+    let wa = m.work_area();
+    WorkRect {
+        x: f64::from(wa.position.x) / scale,
+        y: f64::from(wa.position.y) / scale,
+        w: f64::from(wa.size.width) / scale,
+        h: f64::from(wa.size.height) / scale,
+    }
+}
+
+fn monitor_work_rects(app: &AppHandle) -> (Vec<WorkRect>, WorkRect) {
+    let works: Vec<WorkRect> = app
+        .available_monitors()
+        .ok()
+        .map(|ms| ms.iter().map(work_rect_from_monitor).collect())
+        .unwrap_or_default();
+    let primary = app
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .map(|m| work_rect_from_monitor(&m))
+        .or_else(|| works.first().copied())
+        .unwrap_or(WorkRect {
+            x: 0.0,
+            y: 0.0,
+            w: 1280.0,
+            h: 800.0,
+        });
+    (works, primary)
 }
 
 fn persist_window_pos(app: &AppHandle) {
@@ -519,6 +598,8 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
     }
 
     if let (Some(x), Some(y)) = (prefs.x, prefs.y) {
+        let (works, primary) = monitor_work_rects(app);
+        let (x, y) = clamp_pet_overlay_pos(x, y, side_w, side_h, &works, primary);
         builder = builder.position(x, y);
     }
 
@@ -570,7 +651,14 @@ pub fn show_pet(app: &AppHandle) -> Result<(), String> {
     let (side_w, side_h) = overlay_extent_for(prefs.size_px, prefs.bubbles_enabled);
     let _ = win.set_size(LogicalSize::new(side_w, side_h));
     if let (Some(x), Some(y)) = (prefs.x, prefs.y) {
+        let (works, primary) = monitor_work_rects(app);
+        let (x, y) = clamp_pet_overlay_pos(x, y, side_w, side_h, &works, primary);
         let _ = win.set_position(LogicalPosition::new(x, y));
+        if prefs.x != Some(x) || prefs.y != Some(y) {
+            prefs.x = Some(x);
+            prefs.y = Some(y);
+            let _ = save_prefs(&prefs);
+        }
     }
     WANT_SHOW.store(true, Ordering::SeqCst);
     // Transparent boot (index.html + init script) already hides the splash.
@@ -914,6 +1002,16 @@ mod tests {
         });
         assert_eq!(white.color, "white");
         assert_eq!(white.eye_color, "white");
+        let bean = normalize_prefs(PetPrefs {
+            shape: "bean".into(),
+            ..Default::default()
+        });
+        assert_eq!(bean.shape, "bean");
+        let leaf = normalize_prefs(PetPrefs {
+            shape: "leaf".into(),
+            ..Default::default()
+        });
+        assert_eq!(leaf.shape, "leaf");
     }
 
     #[test]
@@ -1037,6 +1135,46 @@ mod tests {
         assert!(
             !should_return_main_key(true, true, true),
             "minimized workbench must not be raised"
+        );
+    }
+
+    #[test]
+    fn clamp_returns_saved_pos_when_still_on_a_display() {
+        let laptop = WorkRect {
+            x: 0.0,
+            y: 0.0,
+            w: 1680.0,
+            h: 1050.0,
+        };
+        assert_eq!(
+            clamp_pet_overlay_pos(1200.0, 650.0, 448.0, 368.0, &[laptop], laptop),
+            (1200.0, 650.0)
+        );
+        let external = WorkRect {
+            x: 1680.0,
+            y: -200.0,
+            w: 1920.0,
+            h: 1080.0,
+        };
+        assert_eq!(
+            clamp_pet_overlay_pos(2100.0, 400.0, 448.0, 368.0, &[laptop, external], laptop),
+            (2100.0, 400.0),
+            "a pet parked on a still-connected second display must stay there"
+        );
+    }
+
+    #[test]
+    fn clamp_relocates_when_saved_pos_is_off_every_display() {
+        // Live bug: prefs x=2673 y=1287 after the external monitor went away.
+        let laptop = WorkRect {
+            x: 0.0,
+            y: 0.0,
+            w: 1680.0,
+            h: 1050.0,
+        };
+        assert_eq!(
+            clamp_pet_overlay_pos(2673.0, 1287.0, 448.0, 368.0, &[laptop], laptop),
+            (1680.0 - 448.0 - 24.0, 1050.0 - 368.0 - 24.0)
         );
     }
 }

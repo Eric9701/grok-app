@@ -376,6 +376,7 @@ export const ruExtra: Partial<Record<MessageKey, string>> = {
   "kanban.unboundProject": "Другие чаты",
 
   "pet.menu.spin": "Крутись",
+  "pet.menu.emote": "Скорчить рожицу",
   "pet.menu.hideBubbles": "Скрыть подсказки",
   "pet.menu.showBubbles": "Показать подсказки",
   "settings.pet.bubbles": "Подсказки питомца",
