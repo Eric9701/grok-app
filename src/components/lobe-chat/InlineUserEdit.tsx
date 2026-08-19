@@ -15,6 +15,8 @@ import { isImagePath } from "@/lib/attachments";
 import { AttachmentCard } from "@/components/AttachmentCard";
 import type { AttachmentCardLabels } from "@/components/AttachmentCard";
 import { SkillChip } from "@/components/SkillChip";
+import { ChatRefChip } from "@/components/ChatRefChip";
+import { useAttachedChatLookup } from "@/components/AttachedChatLookup";
 import { cn } from "@/lib/utils";
 
 export function InlineUserEdit({
@@ -46,6 +48,14 @@ export function InlineUserEdit({
       .map((s) => s.name);
   }, [content]);
 
+  const chatLookup = useAttachedChatLookup();
+  const chats = useMemo(() => {
+    return parseUserMessageContent(content).filter(
+      (s): s is { type: "chat"; sessionId: string; scope?: "recent" | "user" | "full" } =>
+        s.type === "chat",
+    );
+  }, [content]);
+
   const initialText = useMemo(
     () => plainTextOf(parseUserMessageContent(content)),
     [content],
@@ -71,6 +81,11 @@ export function InlineUserEdit({
   const canSubmit =
     !busy &&
     (!isDraftEmpty([
+      ...chats.map((c) => ({
+        type: "chat" as const,
+        sessionId: c.sessionId,
+        scope: c.scope,
+      })),
       ...skills.map((name) => ({ type: "skill" as const, name })),
       { type: "text" as const, text },
     ]) ||
@@ -79,6 +94,11 @@ export function InlineUserEdit({
   const submit = () => {
     if (!canSubmit) return;
     const segs = [
+      ...chats.map((c) => ({
+        type: "chat" as const,
+        sessionId: c.sessionId,
+        scope: c.scope,
+      })),
       ...skills.map((name) => ({ type: "skill" as const, name })),
       { type: "text" as const, text },
     ];
@@ -109,8 +129,16 @@ export function InlineUserEdit({
           ))}
         </div>
       ) : null}
-      {skills.length > 0 ? (
+      {chats.length > 0 || skills.length > 0 ? (
         <div className="lobe-inline-edit__skills">
+          {chats.map((c) => (
+            <ChatRefChip
+              key={c.sessionId}
+              title={chatLookup.titleOf(c.sessionId)}
+              status={chatLookup.statusOf(c.sessionId)}
+              size="sm"
+            />
+          ))}
           {skills.map((name) => (
             <SkillChip key={name} name={name} size="sm" />
           ))}

@@ -606,6 +606,20 @@ import {
   mergeAttachments,
   type Attachment
 } from "@/lib/attachments";
+import {
+  addChatRef,
+  chatHasUpdate,
+  loadRecentAttachIds,
+  lookupChatStatus,
+  lookupChatTitle,
+  parseChatTokens,
+  prependChatTokens,
+  stripChatTokens,
+} from "@/lib/chatAttach";
+import { AttachChatPanel } from "@/components/AttachChatPanel";
+import { ChatRefChip } from "@/components/ChatRefChip";
+import { AttachedChatLookupContext } from "@/components/AttachedChatLookup";
+import { useAttachChat } from "@/hooks/useAttachChat";
 import { mapStoredMessagesToChat } from "@/lib/mapStoredMessages";
 import {
   detectAtQueryFromEditor,
@@ -1576,6 +1590,16 @@ export function AppWorkbench() {
     attachments,
     attachmentsRef,
     setAttachments,
+    chatAttachments,
+    setChatAttachments,
+    attachChatOpen,
+    setAttachChatOpen,
+    attachChatFilter,
+    setAttachChatFilter,
+    attachChatActive,
+    setAttachChatActive,
+    attachChatPanelRef,
+    attachChatOpenRef,
     quotes,
     quotesRef,
     setQuotes,
@@ -4579,6 +4603,7 @@ export function AppWorkbench() {
       saveComposerProjectDraft(projectDraftKey(activeProject?.id ?? null), {
         text: getDraft(),
         attachments,
+        chatAttachments,
         quotes,
         goalMode,
       });
@@ -4586,6 +4611,7 @@ export function AppWorkbench() {
       saveComposerSessionDraft(leavingBeforeOpen, {
         text: getDraft(),
         attachments,
+        chatAttachments,
         quotes,
         goalMode,
       });
@@ -4669,6 +4695,7 @@ export function AppWorkbench() {
       if (saved) {
         setDraft(saved.text || "");
         setAttachments(saved.attachments ?? []);
+        setChatAttachments(saved.chatAttachments ?? []);
         setQuotes(saved.quotes ?? []);
         if (typeof saved.goalMode === "boolean") {
           setGoalMode(saved.goalMode);
@@ -4676,6 +4703,7 @@ export function AppWorkbench() {
       } else {
         setDraft("");
         setAttachments([]);
+        setChatAttachments([]);
         setQuotes([]);
       }
       requestAnimationFrame(() => {
@@ -5205,10 +5233,12 @@ export function AppWorkbench() {
       if (seedText != null) {
         setDraft(seedText);
         setAttachments([]);
+        setChatAttachments([]);
         setQuotes([]);
       } else if (saved) {
         setDraft(saved.text || "");
         setAttachments(saved.attachments ?? []);
+        setChatAttachments(saved.chatAttachments ?? []);
         setQuotes(saved.quotes ?? []);
         if (typeof saved.goalMode === "boolean") {
           setGoalMode(saved.goalMode);
@@ -5216,6 +5246,7 @@ export function AppWorkbench() {
       } else {
         setDraft("");
         setAttachments([]);
+        setChatAttachments([]);
         setQuotes([]);
       }
       // Allow debounced persist again after React commits the load.
@@ -5262,6 +5293,7 @@ export function AppWorkbench() {
       saveComposerProjectDraft(key, {
         text: getComposerDraft(),
         attachments,
+        chatAttachments,
         quotes,
         goalMode,
       });
@@ -5280,7 +5312,7 @@ export function AppWorkbench() {
       window.clearTimeout(t);
       unsub();
     };
-  }, [attachments, quotes, goalMode, activeProject?.id, session.sessionId]);
+  }, [attachments, chatAttachments, quotes, goalMode, activeProject?.id, session.sessionId]);
 
   /**
    * While viewing a real thread, keep the per-session follow-up buffer in sync
@@ -5297,6 +5329,7 @@ export function AppWorkbench() {
       saveComposerSessionDraft(id, {
         text: getComposerDraft(),
         attachments,
+        chatAttachments,
         quotes,
         goalMode,
       });
@@ -5313,7 +5346,7 @@ export function AppWorkbench() {
       window.clearTimeout(t);
       unsub();
     };
-  }, [attachments, quotes, goalMode, session.sessionId]);
+  }, [attachments, chatAttachments, quotes, goalMode, session.sessionId]);
 
   useEffect(() => {
     if (appGate !== "ready") return;
@@ -5525,6 +5558,7 @@ export function AppWorkbench() {
       saveComposerProjectDraft(prevKey, {
         text: getDraft(),
         attachments,
+        chatAttachments,
         quotes,
         goalMode,
       });
@@ -5532,6 +5566,7 @@ export function AppWorkbench() {
       saveComposerSessionDraft(leavingId, {
         text: getDraft(),
         attachments,
+        chatAttachments,
         quotes,
         goalMode,
       });
@@ -7412,6 +7447,7 @@ export function AppWorkbench() {
       untitled: tr("session.untitled"),
       renameLabel: tr("session.renamePrompt"),
       renamePlaceholder: tr("session.renamePlaceholder"),
+      attach: tr("attachChat.hoverAdd"),
     }),
     [tr],
   );
@@ -8512,6 +8548,8 @@ export function AppWorkbench() {
     setPromptHistoryScope("session");
     setSlashQuery(null);
     setAttachments([]);
+    setChatAttachments([]);
+    setAttachChatOpen(false);
     requestAnimationFrame(() => {
       const el = composerInputRef.current;
       if (el) el.style.height = "auto";
@@ -8555,6 +8593,7 @@ export function AppWorkbench() {
     const hasBody =
       !isDraftEmpty(parseStoredContent(draft)) ||
       attachments.length > 0 ||
+      chatAttachments.length > 0 ||
       quotes.length > 0;
     if (!hasBody) return;
     if (countDraftChars(draft) > 200) {
@@ -8569,7 +8608,7 @@ export function AppWorkbench() {
       return;
     }
     applyClearComposerDraft();
-  }, [applyClearComposerDraft, attachments.length, quotes.length, getDraft, tr]);
+  }, [applyClearComposerDraft, attachments.length, chatAttachments.length, quotes.length, getDraft, tr]);
 
   /** Enqueue when agent is busy; otherwise send immediately. */
   const send = async () => {
@@ -8592,8 +8631,15 @@ export function AppWorkbench() {
         /* keep getDraft() */
       }
     }
-    const segments = parseStoredContent(draft);
-    const storedDisplay = draft;
+    const fromDraft = parseChatTokens(draft, (id) =>
+      lookupChatTitle(id, sessions, ""),
+    );
+    let refs = chatAttachments;
+    for (const extra of fromDraft) {
+      refs = addChatRef(refs, extra, { currentId: session.sessionId }).refs;
+    }
+    const storedDisplay = prependChatTokens(stripChatTokens(draft), refs);
+    const segments = parseStoredContent(storedDisplay);
     const att = attachments;
     const sendQuotes = quotesRef.current;
     if (isDraftEmpty(segments) && !att.length && !sendQuotes.length) return;
@@ -8662,6 +8708,16 @@ export function AppWorkbench() {
       quotes: sendQuotes,
       goalMode,
     });
+    if (sent && refs.length) {
+      showToast(
+        tr("attachChat.sentWith", {
+          titles: refs
+            .map((r) => r.title.trim() || r.sessionId.slice(0, 8))
+            .join(" · "),
+        }),
+        2600,
+      );
+    }
     const action = nextComposerSubmitSettlement({
       sendSucceeded: sent,
       sentText: storedDisplay,
@@ -8685,6 +8741,7 @@ export function AppWorkbench() {
       else if (action === "restore") {
         setDraft(storedDisplay);
         setAttachments(att);
+        setChatAttachments(refs);
         setQuotes(sendQuotes);
       }
       return;
@@ -8711,6 +8768,7 @@ export function AppWorkbench() {
         saveComposerSessionDraft(clearDraftOpts.sessionDraftId, {
           text: storedDisplay,
           attachments: att,
+          chatAttachments: refs,
           quotes: sendQuotes,
           goalMode,
         });
@@ -8722,6 +8780,7 @@ export function AppWorkbench() {
       saveComposerProjectDraft(projectDraftKey(activeProject?.id ?? null), {
         text: storedDisplay,
         attachments: att,
+        chatAttachments: refs,
         quotes: sendQuotes,
         goalMode,
       });
@@ -8736,6 +8795,8 @@ export function AppWorkbench() {
     () => ({
       filesCount: (n: number) =>
         tr("composer.queueFilesCount", { n: String(n) }),
+      chatsCount: (n: number) =>
+        tr("composer.queueChatsCount", { n: String(n) }),
       empty: tr("composer.queueEmptyPreview"),
     }),
     [tr],
@@ -9207,7 +9268,6 @@ export function AppWorkbench() {
             dragPathsRef.current = [];
             lastNativeDropAtRef.current = Date.now();
             if (!paths.length) {
-              setLocalError(tr("attach.droppedNone"));
               return;
             }
             if (zone === "sidebar") {
@@ -9232,7 +9292,6 @@ export function AppWorkbench() {
     addProjectsFromPaths,
     hitDragZone,
     platform,
-    tr,
   ]);
 
   // HTML5 fallback. Windows sets dragDropEnabled:false so WebView2 actually
@@ -9240,26 +9299,34 @@ export function AppWorkbench() {
   // drops). Capture phase so contenteditable cannot cancel the drop.
   useEffect(() => {
     const onDragEnter = (e: DragEvent) => {
-      if (!isFileDrag(e.dataTransfer)) return;
+      if (!isFileDrag(e.dataTransfer)) {
+        return;
+      }
       e.preventDefault();
       html5DragDepthRef.current += 1;
       setDragZone(hitDragZone(e.clientX, e.clientY));
     };
     const onDragOver = (e: DragEvent) => {
-      if (!isFileDrag(e.dataTransfer)) return;
+      if (!isFileDrag(e.dataTransfer)) {
+        return;
+      }
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
       setDragZone(hitDragZone(e.clientX, e.clientY));
     };
     const onDragLeave = (e: DragEvent) => {
-      if (!isFileDrag(e.dataTransfer)) return;
+      if (!isFileDrag(e.dataTransfer)) {
+        return;
+      }
       html5DragDepthRef.current = Math.max(0, html5DragDepthRef.current - 1);
       if (html5DragDepthRef.current === 0) setDragZone(null);
     };
     const onDrop = (e: DragEvent) => {
       html5DragDepthRef.current = 0;
       setDragZone(null);
-      if (!isFileDrag(e.dataTransfer)) return;
+      if (!isFileDrag(e.dataTransfer)) {
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       if (shouldSkipHtml5AfterNative(lastNativeDropAtRef.current, Date.now())) {
@@ -12186,6 +12253,50 @@ export function AppWorkbench() {
     });
   }, [slashQuery, tr]);
 
+  const onBeforeOpenAttachPicker = useCallback(() => {
+    setShowComposerPlus(false);
+    setSlashQuery(null);
+    setLiveSlash({ present: false, query: "", start: 0, end: 0 });
+    liveSlashRef.current = { present: false, query: "", start: 0, end: 0 };
+    setPromptHistoryOpen(false);
+  }, [setShowComposerPlus, setSlashQuery, setLiveSlash, setPromptHistoryOpen]);
+
+  const {
+    closeAttachChat,
+    openAttachChat,
+    applyAttachedChat,
+    onSidebarSessionAttach,
+    cycleAttachedChatScope,
+    attachedChatLookup,
+    attachScopeLabel,
+    attachableSessions,
+    attachChatPos,
+    attachChatStyle,
+    removeAttachedChat,
+  } = useAttachChat({
+    sessions,
+    currentSessionId: session.sessionId,
+    currentProjectId: activeProject?.id ?? null,
+    chatAttachments,
+    setChatAttachments,
+    attachChatOpen,
+    setAttachChatOpen,
+    attachChatFilter,
+    setAttachChatFilter,
+    attachChatActive,
+    setAttachChatActive,
+    attachChatPanelRef,
+    composerShellRef,
+    composerInputRef,
+    showToast,
+    tr,
+    onBeforeOpenPicker: onBeforeOpenAttachPicker,
+    openSession: (row) => {
+      const full = sessions.find((s) => s.id === row.id);
+      if (full) void openSession(full);
+    },
+  });
+
   const applySlashItem = useCallback(
     (item: SlashItem) => {
       const live = liveSlashRef.current;
@@ -12351,6 +12462,9 @@ export function AppWorkbench() {
           case "history":
             openPromptHistory({ focusFilter: true, seedDraft: false });
             return;
+          case "attach-chat":
+            openAttachChat();
+            return;
           case "extensions":
             navigateSettings("extensions");
             return;
@@ -12382,6 +12496,7 @@ export function AppWorkbench() {
       showToast,
       openPromptHistory,
       openWorkflowsSettings,
+      openAttachChat,
     ],
   );
 
@@ -17989,7 +18104,8 @@ export function AppWorkbench() {
       const draftNow = getDraft();
       const hasBody =
         !isDraftEmpty(parseStoredContent(draftNow)) ||
-        attachments.length > 0;
+        attachments.length > 0 ||
+        chatAttachments.length > 0;
       if (hasBody && session.state !== "awaiting_permission") {
         void send();
       }
@@ -17997,6 +18113,10 @@ export function AppWorkbench() {
     if (e.key === "Escape") {
       if (promptHistoryOpenRef.current) {
         closePromptHistory();
+        return;
+      }
+      if (attachChatOpenRef.current) {
+        closeAttachChat();
         return;
       }
       closeComposerMenu();
@@ -19463,6 +19583,7 @@ export function AppWorkbench() {
                                         onArchive={onSidebarSessionArchive}
                                         onMenu={onSidebarSessionMenu}
                                         onRename={onSidebarSessionRename}
+                                        onAttach={onSidebarSessionAttach}
                                       />
                                     );
                                   }}
@@ -19613,6 +19734,7 @@ export function AppWorkbench() {
                               onArchive={onSidebarSessionArchive}
                               onMenu={onSidebarSessionMenu}
                               onRename={onSidebarSessionRename}
+                              onAttach={onSidebarSessionAttach}
                             />
                           );
                         }}
@@ -19889,6 +20011,7 @@ export function AppWorkbench() {
               </div>
             </div>
           )}
+
           {toast && (
             <div className="app-toast" role="status">
               {toast}
@@ -20781,6 +20904,7 @@ export function AppWorkbench() {
           <div className="sr-only" aria-live="polite" aria-atomic="true">
             {streamA11yNote}
           </div>
+          <AttachedChatLookupContext.Provider value={attachedChatLookup}>
           <UiErrorBoundary
             resetKey={session.sessionId ?? `draft-${session.title ?? "new"}`}
             labels={{
@@ -20932,6 +21056,7 @@ export function AppWorkbench() {
             }}
           />
           </UiErrorBoundary>
+          </AttachedChatLookupContext.Provider>
 
           {(() => {
             const composerNode = (
@@ -20969,6 +21094,7 @@ export function AppWorkbench() {
                     }
                   />
                 )}
+
               </div>
             ) : null}
             {perm ? (
@@ -21485,13 +21611,43 @@ export function AppWorkbench() {
                   }}
                 />
               )}
-              {attachments.length > 0 && (
+              {(attachments.length > 0 || chatAttachments.length > 0) && (
                 <div
                   className="composer__attachments"
                   aria-label={tr("composer.attachCount", {
-                    n: String(attachments.length),
+                    n: String(attachments.length + chatAttachments.length),
                   })}
                 >
+                  {chatAttachments.map((c) => (
+                    <ChatRefChip
+                      key={c.sessionId}
+                      title={
+                        c.title.trim() ||
+                        lookupChatTitle(
+                          c.sessionId,
+                          sessions,
+                          tr("attachChat.missing"),
+                        )
+                      }
+                      status={lookupChatStatus(c.sessionId, sessions)}
+                      meta={attachScopeLabel(c.scope)}
+                      metaTitle={tr("attachChat.scopeHint")}
+                      stale={chatHasUpdate(c, sessions)}
+                      onOpen={() => {
+                        const row = sessions.find((s) => s.id === c.sessionId);
+                        if (!row) {
+                          showToast(tr("attachChat.missing"), 2400);
+                          return;
+                        }
+                        void openSession(row);
+                      }}
+                      onCycleScope={() => cycleAttachedChatScope(c.sessionId)}
+                      onRemove={() => removeAttachedChat(c.sessionId)}
+                      removeLabel={tr("attachChat.chipRemove")}
+                      staleLabel={tr("attachChat.staleAria")}
+                      archivedLabel={tr("attachChat.archived")}
+                    />
+                  ))}
                   {attachments.map((a) => (
                     <AttachmentCard
                       key={a.path}
@@ -21574,6 +21730,41 @@ export function AppWorkbench() {
                     onSelect={applyAtFile}
                     style={{
                       ...composerAtStyle,
+                      zIndex: 10050,
+                    }}
+                  />,
+                  document.body,
+                )}
+              {attachChatOpen &&
+                attachChatPos &&
+                typeof document !== "undefined" &&
+                createPortal(
+                  <AttachChatPanel
+                    open
+                    panelRef={attachChatPanelRef}
+                    sessions={attachableSessions}
+                    query={attachChatFilter}
+                    activeIndex={attachChatActive}
+                    focusFilter
+                    labels={{
+                      title: tr("attachChat.title"),
+                      placeholder: tr("attachChat.placeholder"),
+                      empty: tr("attachChat.empty"),
+                      emptyFilter: tr("attachChat.emptyFilter"),
+                      aria: tr("attachChat.aria"),
+                      recentBadge: tr("attachChat.pickerRecent"),
+                      projectBadge: tr("attachChat.pickerProject"),
+                    }}
+                    recentIds={loadRecentAttachIds()}
+                    currentProjectId={activeProject?.id ?? null}
+                    onQueryChange={setAttachChatFilter}
+                    onActiveIndexChange={setAttachChatActive}
+                    onSelect={(s) => {
+                      applyAttachedChat(s.id, s.title, s.updatedAt);
+                    }}
+                    onClose={closeAttachChat}
+                    style={{
+                      ...attachChatStyle,
                       zIndex: 10050,
                     }}
                   />,
@@ -26333,6 +26524,15 @@ export function AppWorkbench() {
             })();
 
             items = [
+              {
+                id: "attach-chat",
+                label: tr("attachChat.menu"),
+                icon: <IconChat size={16} />,
+                disabled: s.id === session.sessionId,
+                onClick: () => {
+                  applyAttachedChat(s.id, s.title, s.updatedAt);
+                },
+              },
               ...(sessionSelectMode
                 ? []
                 : [

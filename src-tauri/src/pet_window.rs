@@ -299,10 +299,7 @@ fn overlay_expanded_now(bubbles: bool) -> bool {
     if !bubbles {
         return false;
     }
-    LAST_TASKS
-        .lock()
-        .map(|g| !g.is_empty())
-        .unwrap_or(false)
+    LAST_TASKS.lock().map(|g| !g.is_empty()).unwrap_or(false)
 }
 
 fn overlay_extent_now(size_px: u32, bubbles: bool) -> (f64, f64) {
@@ -752,8 +749,7 @@ pub fn start_cursor_watch(app: AppHandle) {
                 // Tao stubs global cursor at (0, 0) on Wayland. Polling that
                 // would set ignore_cursor_events(true) forever. Compact window
                 // + local pointer events instead.
-                if DRAGGING.load(Ordering::Relaxed)
-                    && drag_should_clear(true, primary_mouse_down())
+                if DRAGGING.load(Ordering::Relaxed) && drag_should_clear(true, primary_mouse_down())
                 {
                     finish_os_drag(&app);
                 }
@@ -955,12 +951,7 @@ pub fn pet_nudge(app: AppHandle, dx: f64, dy: f64) {
             return;
         };
         let scale = scale.max(0.1);
-        let (x, y) = pet_nudge_origin(
-            f64::from(pos.x) / scale,
-            f64::from(pos.y) / scale,
-            dx,
-            dy,
-        );
+        let (x, y) = pet_nudge_origin(f64::from(pos.x) / scale, f64::from(pos.y) / scale, dx, dy);
         let _ = win.set_position(LogicalPosition::new(x, y));
     });
 }

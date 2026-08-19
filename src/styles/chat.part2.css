@@ -430,6 +430,118 @@ button.composer__context-item {
   box-shadow: 0 0 0 2px rgba(80, 140, 255, 0.12);
 }
 
+.tree-l3,
+.tree-l3 * {
+  -webkit-user-drag: none;
+}
+.tree-l3__title,
+.tree-l3__title * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.tree-l3__attach-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  min-width: 0;
+  /* Left of title so the hover pin/archive overlay cannot cover these. */
+  z-index: 3;
+}
+.tree-l3__attach-btn {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+.tree-l3:hover .tree-l3__attach-btn,
+.tree-l3__attach-btn:focus-visible {
+  color: var(--text-primary);
+}
+
+.skill-chip--chat.is-missing,
+.skill-chip--chat.is-archived {
+  opacity: 0.62;
+}
+.skill-chip__meta {
+  margin-left: 2px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 10px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.skill-chip__meta:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.prompt-history__item-meta {
+  margin-left: 8px;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.skill-chip--chat.is-stale {
+  border-color: color-mix(in srgb, var(--text-primary) 28%, var(--border-subtle));
+}
+.skill-chip__chat-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+button.skill-chip__chat-main--btn {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.skill-chip__refresh,
+.skill-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+  cursor: pointer;
+}
+.skill-chip__refresh:hover,
+.skill-chip__remove:hover {
+  opacity: 1;
+  background: var(--bg-hover);
+}
+
+.composer__chat-stale {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px dashed var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.composer__chat-stale:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
 .composer__editing-bar {
   display: flex;
   align-items: center;

@@ -119,6 +119,8 @@ import { LeadFragmentsStrip } from "./LeadFragmentsStrip";
 import { BackBottom } from "./BackBottom";
 import { InlineUserEdit } from "./InlineUserEdit";
 import { SkillChip } from "@/components/SkillChip";
+import { ChatRefChip } from "@/components/ChatRefChip";
+import { useAttachedChatLookup } from "@/components/AttachedChatLookup";
 import { HighlightedText } from "@/components/HighlightedText";
 import { findChatMatches, findMatchesBeforeVisible } from "@/lib/chatFind";
 import { hydrateDisplayContent, parseStoredContent } from "@/lib/draftDoc";
@@ -389,9 +391,10 @@ function UserBodyText({
   findQuery?: string;
   findActiveOccurrence?: number | null;
 }) {
+  const chatLookup = useAttachedChatLookup();
   const hydrated = hydrateDisplayContent(content);
   const segs = parseStoredContent(hydrated);
-  if (!segs.some((s) => s.type === "skill")) {
+  if (!segs.some((s) => s.type === "skill" || s.type === "chat")) {
     if (findQuery?.trim()) {
       return (
         <span className="user-msg-body">
@@ -407,22 +410,42 @@ function UserBodyText({
   }
   return (
     <span className="user-msg-body">
-      {segs.map((s, i) =>
-        s.type === "skill" ? (
-          <SkillChip key={`sk-${i}-${s.name}`} name={s.name} size="sm" />
-        ) : findQuery?.trim() && s.text ? (
-          <HighlightedText
-            key={`t-${i}`}
-            text={s.text}
-            query={findQuery}
-            activeOccurrence={findActiveOccurrence ?? null}
-          />
-        ) : (
+      {segs.map((s, i) => {
+        if (s.type === "skill") {
+          return <SkillChip key={`sk-${i}-${s.name}`} name={s.name} size="sm" />;
+        }
+        if (s.type === "chat") {
+          const status = chatLookup.statusOf(s.sessionId);
+          return (
+            <ChatRefChip
+              key={`ch-${i}-${s.sessionId}`}
+              title={chatLookup.titleOf(s.sessionId)}
+              status={status}
+              size="sm"
+              onOpen={
+                chatLookup.onOpen
+                  ? () => chatLookup.onOpen?.(s.sessionId)
+                  : undefined
+              }
+            />
+          );
+        }
+        if (findQuery?.trim() && s.text) {
+          return (
+            <HighlightedText
+              key={`t-${i}`}
+              text={s.text}
+              query={findQuery}
+              activeOccurrence={findActiveOccurrence ?? null}
+            />
+          );
+        }
+        return (
           <span key={`t-${i}`} className="user-msg-body__text">
             {s.text}
           </span>
-        ),
-      )}
+        );
+      })}
     </span>
   );
 }
