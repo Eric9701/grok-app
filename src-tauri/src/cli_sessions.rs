@@ -1722,11 +1722,9 @@ pub fn try_reconcile_linked_session(app_session_id: &str) -> u32 {
         .into_iter()
         .find(|s| s.id == app_session_id);
     let Some(meta) = meta else {
-        crate::turn_interrupt::heal_interrupted_turn(app_session_id);
         return 0;
     };
     let Some(agent_id) = meta.agent_session_id.as_deref().filter(|s| !s.is_empty()) else {
-        crate::turn_interrupt::heal_interrupted_turn(app_session_id);
         return 0;
     };
     let mode = store::load_settings().session_data_mode;
@@ -1743,7 +1741,8 @@ pub fn try_reconcile_linked_session(app_session_id: &str) -> u32 {
         &mode,
     )
     .unwrap_or(0);
-    crate::turn_interrupt::heal_interrupted_turn(app_session_id);
+    // Do not heal here: session_messages / post-turn reconcile can run while
+    // this process still has a live prompt. Boot + connect heal instead.
     changed
 }
 

@@ -142,7 +142,6 @@ impl SessionManager {
                         Self::touch_stream_progress_locked(s);
                         if authoritative {
                             s.prompt_in_flight = false;
-                            crate::turn_lease::clear_lease(&s.app_session_id);
                         }
                         s.deferred_prompt_complete = Some(stop_reason.clone());
                         // Keep turn open while tools still running (long find / subagent).

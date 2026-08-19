@@ -46,7 +46,6 @@ pub fn parse_json_stream(text: &str) -> Vec<Value> {
 pub fn inspect_agent_trail(agent_dir: &Path) -> TrailVerdict {
     let mut requested = 0u32;
     let mut resolved = 0u32;
-    let mut turn_completed = false;
     let mut last_tool: Option<PendingTool> = None;
 
     let events_path = agent_dir.join("events.jsonl");
@@ -68,7 +67,13 @@ pub fn inspect_agent_trail(agent_dir: &Path) -> TrailVerdict {
                     }));
                 }
                 "permission_resolved" => resolved += 1,
-                "turn_completed" => turn_completed = true,
+                "turn_completed" => {
+                    // Only the last turn matters. An earlier completed turn
+                    // must not hide a later abandoned permission/tool.
+                    requested = 0;
+                    resolved = 0;
+                    last_tool = None;
+                }
                 "tool_started" => {
                     if let Some(t) = pending_from_event(&v) {
                         last_tool = Some(t);
@@ -120,7 +125,7 @@ pub fn inspect_agent_trail(agent_dir: &Path) -> TrailVerdict {
 
     let permission_open = requested > resolved;
     let tools_open = !open_calls.is_empty();
-    let abandoned = !turn_completed && (permission_open || tools_open);
+    let abandoned = permission_open || tools_open;
     TrailVerdict {
         abandoned,
         pending_tool: last_tool.filter(|_| abandoned),
@@ -391,6 +396,19 @@ mod tests {
         );
         let v = inspect_agent_trail(&dir);
         assert!(!v.abandoned);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn later_unresolved_permission_after_turn_completed_is_abandoned() {
+        let dir = std::env::temp_dir().join(format!("trail-later-{}", Uuid::new_v4()));
+        write_trail(
+            &dir,
+            r#"{"type":"permission_requested","tool_name":"read_file"} {"type":"permission_resolved"} {"type":"turn_completed"} {"type":"permission_requested","tool_name":"run_terminal_command"}"#,
+            r#"{"type":"assistant","tool_calls":[{"id":"call-later","name":"run_terminal_command","arguments":"{\"command\":\"git log\"}"}]}"#,
+        );
+        let v = inspect_agent_trail(&dir);
+        assert!(v.abandoned, "a later unfinished turn must not be hidden by an earlier turn_completed");
         let _ = fs::remove_dir_all(&dir);
     }
 

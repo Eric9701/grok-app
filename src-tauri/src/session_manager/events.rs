@@ -283,7 +283,6 @@ impl SessionManager {
                         // every chunk, so clearing here cannot truncate output.
                         if authoritative {
                             s.prompt_in_flight = false;
-                            crate::turn_lease::clear_lease(&s.app_session_id);
                         }
                         s.deferred_prompt_complete = Some(stop_reason.clone());
                         // #52: do not Ready the UI while tools / permission / ask_user / plan

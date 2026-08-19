@@ -375,6 +375,8 @@ impl SessionManager {
             journal_suggests_permission_reject,
         ) {
             Self::journal_turn_cancelled(s, app, &reason);
+        } else {
+            crate::turn_lease::clear_lease(&s.app_session_id);
         }
         s.stream_buf.clear();
         s.stream_thought.clear();
@@ -413,7 +415,9 @@ impl SessionManager {
         }
         Self::maybe_flush_stream_journal(s, true, false);
         let reason = normalize_hard_end_reason(reason);
-        if reason != "host_exit" {
+        if reason == "host_exit" || reason == "agent_exit" {
+            crate::turn_lease::mark_interrupted(&s.app_session_id);
+        } else {
             crate::turn_lease::clear_lease(&s.app_session_id);
         }
         let mid = Uuid::new_v4().to_string();
