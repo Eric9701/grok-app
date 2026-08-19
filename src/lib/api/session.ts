@@ -54,18 +54,7 @@ export function sessionPrewarm(): void {
   });
 }
 
-/**
- * Send a turn to the agent.
- * @param text Agent prompt (skills as `/name`, attachments as `@path`, etc.)
- * @param displayText Optional user-bubble text for journal (e.g. `[[skill:name]]` chips).
- *                    When omitted, journal stores `text`.
- * @param sessionId Chat this turn belongs to. Always pass it in multi-session
- *   flows: Host re-focuses that chat (background/parked → live) before
- *   prompting, so a concurrent connect cannot deliver the turn to another chat.
- *   Fails with `CONNECT_FAILED` when the chat has no warm agent process.
- * @param attachments Optional local file/image cards persisted on the user journal
- *   row so history reloads AttachmentCard UI (agent text still includes `@path`).
- */
+/** Unfinished command from an interrupted-turn lease (Continue chip). */
 export async function sessionInterruptContext(
   sessionId: string,
 ): Promise<{
@@ -81,6 +70,18 @@ export async function sessionInterruptContext(
   return invoke("session_interrupt_context", { sessionId });
 }
 
+/**
+ * Send a turn to the agent.
+ * @param text Agent prompt (skills as `/name`, attachments as `@path`, etc.)
+ * @param displayText Optional user-bubble text for journal (e.g. `[[skill:name]]` chips).
+ *                    When omitted, journal stores `text`.
+ * @param sessionId Chat this turn belongs to. Always pass it in multi-session
+ *   flows: Host re-focuses that chat (background/parked → live) before
+ *   prompting, so a concurrent connect cannot deliver the turn to another chat.
+ *   Fails with `CONNECT_FAILED` when the chat has no warm agent process.
+ * @param attachments Optional local file/image cards persisted on the user journal
+ *   row so history reloads AttachmentCard UI (agent text still includes `@path`).
+ */
 export async function sessionSend(
   text: string,
   displayText?: string | null,

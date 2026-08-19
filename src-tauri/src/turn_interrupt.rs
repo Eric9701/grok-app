@@ -205,12 +205,13 @@ fn resolve_agent_dir(session_id: &str) -> Option<std::path::PathBuf> {
 
 /// Journal `turn_cancelled|host_exit` when the last user turn was abandoned.
 /// Idempotent: skips when an end-of-turn chip already exists.
-pub fn heal_interrupted_turn(session_id: &str) -> bool {
+/// Returns the new chip message id when a row was written.
+pub fn heal_interrupted_turn(session_id: &str) -> Option<String> {
     if session_id.trim().is_empty() {
-        return false;
+        return None;
     }
     if has_turn_end_marker_after_last_user(session_id) {
-        return false;
+        return None;
     }
     let lease = read_lease(session_id);
     let lease_active = matches!(
@@ -221,9 +222,9 @@ pub fn heal_interrupted_turn(session_id: &str) -> bool {
         .map(|d| inspect_agent_trail(&d))
         .unwrap_or_default();
     if !lease_active && !trail.abandoned {
-        return false;
+        return None;
     }
-    append_host_exit_chip(session_id);
+    let chip_id = append_host_exit_chip(session_id);
     if let Some(mut lease) = lease {
         if let Some(tool) = trail.pending_tool.clone() {
             if lease.pending_tool.is_none() {
@@ -254,15 +255,15 @@ pub fn heal_interrupted_turn(session_id: &str) -> bool {
         session = %session_id,
         "healed interrupted turn after host exit"
     );
-    true
+    Some(chip_id)
 }
 
-fn append_host_exit_chip(session_id: &str) {
+fn append_host_exit_chip(session_id: &str) -> String {
     let mid = Uuid::new_v4().to_string();
     let _ = store::append_message(
         session_id,
         ChatMessageStored {
-            id: mid,
+            id: mid.clone(),
             role: "tool".into(),
             content: "turn_cancelled|host_exit".into(),
             thought: None,
@@ -272,6 +273,7 @@ fn append_host_exit_chip(session_id: &str) {
             marker: Some("turn_cancelled".into()),
         },
     );
+    mid
 }
 
 pub fn heal_all_active_leases() {
@@ -426,7 +428,7 @@ mod tests {
             let sid = "heal-active-lease";
             seed_user(sid);
             begin_active(sid, Some("agent-1"), Some("turn-1"));
-            assert!(heal_interrupted_turn(sid));
+            assert!(heal_interrupted_turn(sid).is_some());
             assert_eq!(host_exit_count(sid), 1);
             assert_eq!(
                 read_lease(sid).unwrap().status,
@@ -455,7 +457,7 @@ mod tests {
             )
             .unwrap();
             begin_active(sid, None, None);
-            assert!(!heal_interrupted_turn(sid));
+            assert!(heal_interrupted_turn(sid).is_none());
             assert_eq!(host_exit_count(sid), 1);
         });
     }
@@ -483,7 +485,7 @@ mod tests {
                 }),
             })
             .unwrap();
-            assert!(heal_interrupted_turn(sid));
+            assert!(heal_interrupted_turn(sid).is_some());
             assert_eq!(host_exit_count(sid), 1);
         });
     }
@@ -494,8 +496,8 @@ mod tests {
             let sid = "heal-twice";
             seed_user(sid);
             begin_active(sid, None, None);
-            assert!(heal_interrupted_turn(sid));
-            assert!(!heal_interrupted_turn(sid));
+            assert!(heal_interrupted_turn(sid).is_some());
+            assert!(heal_interrupted_turn(sid).is_none());
             assert_eq!(host_exit_count(sid), 1);
         });
     }
@@ -505,7 +507,7 @@ mod tests {
         with_home(|_| {
             let sid = "heal-clean";
             seed_user(sid);
-            assert!(!heal_interrupted_turn(sid));
+            assert!(heal_interrupted_turn(sid).is_none());
             assert_eq!(host_exit_count(sid), 0);
         });
     }

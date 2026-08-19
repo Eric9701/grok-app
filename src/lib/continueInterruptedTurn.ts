@@ -42,3 +42,42 @@ export function isContinuableEndReason(reason: string | null | undefined): boole
   const r = (reason || "").toLowerCase();
   return r === "host_exit" || r === "agent_exit";
 }
+
+/** Last host_exit / agent_exit chip after the last user prompt (or null). */
+export function latestContinuableEndMessageId(
+  messages: Array<{
+    id: string;
+    role?: string;
+    marker?: string | null;
+    content?: string | null;
+    toolStatus?: string | null;
+  }>,
+): string | null {
+  let lastUser = -1;
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i]?.role === "user") lastUser = i;
+  }
+  const start = lastUser + 1;
+  for (let i = messages.length - 1; i >= start; i--) {
+    const m = messages[i];
+    if (!m) continue;
+    const marker = (m.marker || "").toLowerCase();
+    const isEnd =
+      marker === "turn_cancelled" ||
+      marker === "turn_end" ||
+      marker === "end_of_turn" ||
+      (m.role === "tool" &&
+        (m.content?.startsWith("turn_cancelled") ||
+          m.content?.startsWith("turn_end|")));
+    if (!isEnd) continue;
+    const reason =
+      (m.toolStatus || "").toLowerCase() ||
+      (m.content?.startsWith("turn_cancelled|")
+        ? m.content.slice("turn_cancelled|".length).split("|")[0]
+        : m.content?.startsWith("turn_end|")
+          ? m.content.slice("turn_end|".length).split("|")[0]
+          : "");
+    if (isContinuableEndReason(reason)) return m.id;
+  }
+  return null;
+}

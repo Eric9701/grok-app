@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildContinueAgentPrompt,
   isContinuableEndReason,
+  latestContinuableEndMessageId,
 } from "./continueInterruptedTurn";
 
 describe("continueInterruptedTurn", () => {
@@ -28,5 +29,28 @@ describe("continueInterruptedTurn", () => {
     expect(isContinuableEndReason("host_exit")).toBe(true);
     expect(isContinuableEndReason("agent_exit")).toBe(true);
     expect(isContinuableEndReason("user_stop")).toBe(false);
+  });
+});
+
+describe("latestContinuableEndMessageId", () => {
+  it("returns only the last host_exit after the last user", () => {
+    const id = latestContinuableEndMessageId([
+      { id: "u1", role: "user" },
+      { id: "old", role: "tool", marker: "turn_cancelled", content: "turn_cancelled|host_exit", toolStatus: "host_exit" },
+      { id: "u2", role: "user" },
+      { id: "a2", role: "assistant" },
+      { id: "new", role: "tool", marker: "turn_cancelled", content: "turn_cancelled|host_exit", toolStatus: "host_exit" },
+    ]);
+    expect(id).toBe("new");
+  });
+
+  it("ignores older chips once a later user turn exists", () => {
+    const id = latestContinuableEndMessageId([
+      { id: "u1", role: "user" },
+      { id: "old", role: "tool", marker: "turn_cancelled", content: "turn_cancelled|agent_exit", toolStatus: "agent_exit" },
+      { id: "u2", role: "user" },
+      { id: "a2", role: "assistant" },
+    ]);
+    expect(id).toBeNull();
   });
 });

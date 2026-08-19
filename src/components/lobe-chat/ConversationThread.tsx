@@ -43,6 +43,7 @@ import {
 } from "@/lib/messageNodeDeepLink";
 import { MessageNodeRail } from "./MessageNodeRail";
 import { isEndOfTurnMarker } from "@/lib/endOfTurn";
+import { latestContinuableEndMessageId } from "@/lib/continueInterruptedTurn";
 import type { Attachment } from "@/lib/attachments";
 import {
   buildInlineMediaPathMap,
@@ -786,6 +787,7 @@ type TranscriptMessageRowProps = {
   onOpenExternalLink?: ConversationThreadProps["onOpenExternalLink"];
   onAddAttachmentToComposer?: ConversationThreadProps["onAddAttachmentToComposer"];
   onContinueInterrupted?: ConversationThreadProps["onContinueInterrupted"];
+  latestContinuableEndId?: string | null;
   /**
    * Epoch ms for live thinking on the active streaming assistant
    * (turn / post-steer clock). Null for finished rows.
@@ -817,6 +819,7 @@ function transcriptRowPropsEqual(
   if (a.canEditLastUser !== b.canEditLastUser) return false;
   if (a.canRegenerate !== b.canRegenerate) return false;
   if (a.onContinueInterrupted !== b.onContinueInterrupted) return false;
+  if (a.latestContinuableEndId !== b.latestContinuableEndId) return false;
   if (a.turnLive !== b.turnLive) return false;
   if (a.canRewindSession !== b.canRewindSession) return false;
   if (a.regenerableAssistantId !== b.regenerableAssistantId) return false;
@@ -894,6 +897,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   onOpenExternalLink,
   onAddAttachmentToComposer,
   onContinueInterrupted,
+  latestContinuableEndId,
 }: TranscriptMessageRowProps) {
   void _timeTick;
   const wrap = (node: ReactNode) =>
@@ -921,7 +925,11 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
         key={m.id}
         message={m}
         locale={locale}
-        onContinue={onContinueInterrupted}
+        onContinue={
+          m.id === latestContinuableEndId
+            ? onContinueInterrupted
+            : undefined
+        }
         continueDisabled={turnLive}
       />,
     );
@@ -2083,6 +2091,10 @@ export function ConversationThread({
     () => filterMessagesForTranscript(wovenMessages, transcriptFilter),
     [wovenMessages, transcriptFilter],
   );
+  const latestContinuableEndId = useMemo(
+    () => latestContinuableEndMessageId(transcriptMessages),
+    [transcriptMessages],
+  );
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   const [locateTargetId, setLocateTargetId] = useState<string | null>(null);
   const [focusMessageId, setFocusMessageId] = useState<string | null>(null);
@@ -2694,6 +2706,7 @@ export function ConversationThread({
               onOpenExternalLink={onOpenExternalLink}
               onAddAttachmentToComposer={onAddAttachmentToComposer}
               onContinueInterrupted={onContinueInterrupted}
+              latestContinuableEndId={latestContinuableEndId}
             />
           ))}
 
