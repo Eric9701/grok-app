@@ -15,6 +15,7 @@ export type EndOfTurnReason =
   | "account_auth"
   | "provider_route"
   | "session_data_mode"
+  | "host_exit"
   | "error"
   | "cancelled"
   | "unknown";
@@ -33,6 +34,7 @@ export interface EndOfTurnChipModel {
     | "endOfTurn.accountAuth"
     | "endOfTurn.providerRoute"
     | "endOfTurn.sessionDataMode"
+    | "endOfTurn.hostExit"
     | "endOfTurn.error"
     | "endOfTurn.unknown";
   tone: "neutral" | "warning" | "error";
@@ -116,6 +118,13 @@ export function mapEndOfTurnReason(
     return {
       reason: "session_data_mode",
       messageKey: "endOfTurn.sessionDataMode",
+      tone: "warning",
+    };
+  }
+  if (r === "host_exit" || r === "host" || r === "host_restart") {
+    return {
+      reason: "host_exit",
+      messageKey: "endOfTurn.hostExit",
       tone: "warning",
     };
   }

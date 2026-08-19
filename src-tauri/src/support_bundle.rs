@@ -318,6 +318,19 @@ pub fn write_session_bundle(
         write_zip_str(&mut zip, opts, "host/runtime.json", &pretty_json(&rt)?)?;
     }
 
+    // ── host/turn_lease.json (interrupted-turn forensics) ──────────────────
+    let lease_path = crate::turn_lease::lease_path(session_id);
+    if lease_path.is_file() {
+        if let Ok(raw) = fs::read_to_string(&lease_path) {
+            write_zip_str(
+                &mut zip,
+                opts,
+                "host/turn_lease.json",
+                &store::redact_text(&raw),
+            )?;
+        }
+    }
+
     // ── host/project.json ──────────────────────────────────────────────────
     if let Some(p) = project.as_ref() {
         let safe = serde_json::json!({
@@ -905,6 +918,14 @@ mod tests {
         )
         .expect("append");
 
+        crate::turn_lease::begin_active(&session.id, Some("agent-1"), Some("turn-1"));
+        fs::write(
+            tmp.join("logs").join("host_runtime.json"),
+            r#"{"schema":1,"pid":1,"startedAt":"t","heartbeatAt":"t","shutdown":false,"appVersion":"0","os":"test"}"#,
+        )
+        .unwrap();
+        fs::write(tmp.join("logs").join("last_crash.txt"), "code=0xC0000005\n").unwrap();
+
         let zip_path = write_session_bundle(
             &session.id,
             Some(serde_json::json!({ "slot": "live", "state": "Ready" })),
@@ -918,6 +939,14 @@ mod tests {
         // Zip central directory should list expected entries
         assert!(as_str.contains("host/messages.json") || as_str.contains("messages.json"));
         assert!(as_str.contains("README.txt") || as_str.contains("meta.json"));
+        assert!(
+            as_str.contains("host/turn_lease.json"),
+            "bundle must include turn lease"
+        );
+        assert!(
+            as_str.contains("host_runtime.json") || as_str.contains("last_crash.txt"),
+            "bundle must include host forensic logs"
+        );
         let _ = fs::remove_file(&zip_path);
         std::env::remove_var("GROK_APP_HOME");
         let _ = fs::remove_dir_all(&tmp);

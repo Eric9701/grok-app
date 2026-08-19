@@ -66,6 +66,21 @@ export function sessionPrewarm(): void {
  * @param attachments Optional local file/image cards persisted on the user journal
  *   row so history reloads AttachmentCard UI (agent text still includes `@path`).
  */
+export async function sessionInterruptContext(
+  sessionId: string,
+): Promise<{
+  command: string;
+  title: string;
+  toolName: string;
+} | null> {
+  if (!sessionId.trim()) return null;
+  if (isMirrorClient()) {
+    return invoke("session_interrupt_context", { sessionId });
+  }
+  if (!isTauri()) return null;
+  return invoke("session_interrupt_context", { sessionId });
+}
+
 export async function sessionSend(
   text: string,
   displayText?: string | null,

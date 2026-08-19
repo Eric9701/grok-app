@@ -12,10 +12,12 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- **Interrupted turns after an app restart**: If the host process dies mid-turn, reopening the chat journals `turn_cancelled|host_exit` instead of looking finished. Continue sends a new prompt (with the unfinished command when known). Unclean host exits and Windows last-crash notes go into the session diagnostic zip.
 - **Pet eye color, white body, and celebrate spin**: Settings → Pet can pick eyes independently of the body (body palette + Auto). White stays pale in both themes. The mark spins when a focused task finishes, or from the pet menu.
 - **Pet task bubbles can be turned off (#696)**: Settings → Pet and the pet context menu can hide the session chips above the mark. The overlay shrinks when they are off.
 
 **中文 · 新增**
+- **应用重启后的中断回合**：宿主进程中途死掉再打开会话，会记 `turn_cancelled|host_exit`，不再看起来像做完了。芯片上的「继续」发新 prompt（有未跑完的命令会带上）。非干净退出和 Windows 崩溃摘要会进会话诊断包。
 - **宠物可改眼睛颜色、白色身体、完成转圈**：设置 → 宠物里眼睛和身体分开选（身体色板 + 自动）。白色在两种主题下都保持浅色。聚焦任务完成时（或右键菜单）会转圈。
 - **桌宠提示框可关（#696）**：设置 → 宠物，以及宠物右键菜单，都能关掉任务气泡；关掉后浮层会收小。
 

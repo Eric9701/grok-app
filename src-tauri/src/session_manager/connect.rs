@@ -764,6 +764,7 @@ impl SessionManager {
                             resumed,
                             "connect warm-reuse ok"
                         );
+                        crate::turn_interrupt::heal_interrupted_turn(&meta.id);
                         // Refresh the prewarm slot with a FRESH process: the
                         // one we just consumed now hosts this session's actor,
                         // and the CLI has no public unload API — a second load
@@ -1042,6 +1043,7 @@ impl SessionManager {
                 } else if let Err(e) = client.set_mode(&prefs.mode).await {
                     tracing::warn!("acp set_mode after session open soft-fail: {e}");
                 }
+                crate::turn_interrupt::heal_interrupted_turn(&meta.id);
                 Ok(self.snapshot())
             }
             Err(e) => {

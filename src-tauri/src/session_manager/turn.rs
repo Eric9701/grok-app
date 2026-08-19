@@ -110,6 +110,11 @@ impl SessionManager {
             Self::touch_stream_progress_locked(s);
             let turn_id = Uuid::new_v4().to_string();
             s.active_turn_id = Some(turn_id.clone());
+            crate::turn_lease::begin_active(
+                &s.app_session_id,
+                s.meta.agent_session_id.as_deref(),
+                Some(turn_id.as_str()),
+            );
             s.stream_message_id_locked = false;
             let mid = Uuid::new_v4().to_string();
             s.streaming_message_id = Some(mid.clone());
@@ -164,6 +169,7 @@ impl SessionManager {
             ) {
                 let _ = s.fsm.end_stream();
                 s.prompt_in_flight = false;
+                crate::turn_lease::clear_lease(&s.app_session_id);
                 s.sent_prompt_this_visit = false;
                 s.active_turn_id = None;
                 s.streaming_message_id = None;

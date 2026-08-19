@@ -623,6 +623,8 @@ export interface ConversationThreadProps {
     comment: string;
     sourceMessageId?: string;
   }) => void;
+  /** Resume after host_exit / agent_exit (new prompt; not permission RPC). */
+  onContinueInterrupted?: () => void;
   attachLabels: {
     open: string;
     reveal: string;
@@ -783,6 +785,7 @@ type TranscriptMessageRowProps = {
   onOpenError?: ConversationThreadProps["onOpenError"];
   onOpenExternalLink?: ConversationThreadProps["onOpenExternalLink"];
   onAddAttachmentToComposer?: ConversationThreadProps["onAddAttachmentToComposer"];
+  onContinueInterrupted?: ConversationThreadProps["onContinueInterrupted"];
   /**
    * Epoch ms for live thinking on the active streaming assistant
    * (turn / post-steer clock). Null for finished rows.
@@ -813,6 +816,7 @@ function transcriptRowPropsEqual(
   if (a.editAttachments !== b.editAttachments) return false;
   if (a.canEditLastUser !== b.canEditLastUser) return false;
   if (a.canRegenerate !== b.canRegenerate) return false;
+  if (a.onContinueInterrupted !== b.onContinueInterrupted) return false;
   if (a.turnLive !== b.turnLive) return false;
   if (a.canRewindSession !== b.canRewindSession) return false;
   if (a.regenerableAssistantId !== b.regenerableAssistantId) return false;
@@ -889,6 +893,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   onOpenError,
   onOpenExternalLink,
   onAddAttachmentToComposer,
+  onContinueInterrupted,
 }: TranscriptMessageRowProps) {
   void _timeTick;
   const wrap = (node: ReactNode) =>
@@ -912,7 +917,13 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
         m.content?.startsWith("turn_end|")))
   ) {
     return wrap(
-      <EndOfTurnChip key={m.id} message={m} locale={locale} />,
+      <EndOfTurnChip
+        key={m.id}
+        message={m}
+        locale={locale}
+        onContinue={onContinueInterrupted}
+        continueDisabled={turnLive}
+      />,
     );
   }
 
@@ -1710,6 +1721,7 @@ export function ConversationThread({
   onOpenExternalLink,
   onAddAttachmentToComposer,
   onAddQuote,
+  onContinueInterrupted,
   attachLabels,
   findQuery = "",
   findHitMessageIds,
@@ -2681,6 +2693,7 @@ export function ConversationThread({
               onOpenError={onOpenError}
               onOpenExternalLink={onOpenExternalLink}
               onAddAttachmentToComposer={onAddAttachmentToComposer}
+              onContinueInterrupted={onContinueInterrupted}
             />
           ))}
 

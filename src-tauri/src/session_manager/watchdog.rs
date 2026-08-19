@@ -21,6 +21,7 @@ impl SessionManager {
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
                 ticker.tick().await;
+                crate::host_runtime::touch_heartbeat();
                 mgr.tick_idle_recycle(&app).await;
                 // Prewarm processes left un-consumed expire after a few minutes.
                 mgr.sweep_expired_prewarm(Duration::from_secs(10 * 60))

@@ -283,6 +283,7 @@ impl SessionManager {
                         // every chunk, so clearing here cannot truncate output.
                         if authoritative {
                             s.prompt_in_flight = false;
+                            crate::turn_lease::clear_lease(&s.app_session_id);
                         }
                         s.deferred_prompt_complete = Some(stop_reason.clone());
                         // #52: do not Ready the UI while tools / permission / ask_user / plan
@@ -449,7 +450,7 @@ impl SessionManager {
                     let req = UiPermissionRequest {
                         rpc_id,
                         session_id,
-                        tool_call_id,
+                        tool_call_id: tool_call_id.clone(),
                         tool_name: tool_name.clone(),
                         title,
                         preview: preview.chars().take(2000).collect(),
@@ -464,8 +465,21 @@ impl SessionManager {
                         if let Some(s) = guard.as_mut() {
                             s.pending_permission_rpc_id = Some(rpc_id);
                             s.pending_permission_options = Some(options);
-                            s.pending_permission_tool_name = Some(tool_name);
+                            s.pending_permission_tool_name = Some(tool_name.clone());
                             s.pending_permission_ui = Some(req.clone());
+                            let command = crate::session_manager::extract_tool_input(&raw)
+                                .unwrap_or_default();
+                            crate::turn_lease::update_active(
+                                &s.app_session_id,
+                                "permission_prompt",
+                                true,
+                                Some(crate::turn_lease::PendingTool {
+                                    tool_call_id: tool_call_id.clone(),
+                                    tool_name: tool_name.clone(),
+                                    title: req.title.clone(),
+                                    command,
+                                }),
+                            );
                         }
                     }
                     let _ = app.emit("session://permission", &req);

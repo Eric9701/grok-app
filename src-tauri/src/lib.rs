@@ -188,6 +188,14 @@ mod desktop_notify;
 
 mod turn_complete;
 
+mod turn_interrupt;
+
+mod turn_lease;
+
+mod host_runtime;
+
+mod win_crash;
+
 mod updater;
 
 mod image_thumb;
@@ -225,6 +233,9 @@ pub fn run() {
     let _ = paths::ensure_app_dirs();
 
     logging::init();
+
+    crate::host_runtime::on_process_start();
+    crate::win_crash::install();
 
     // Windows: AppUserModelID before window/taskbar so Show Desktop / jump lists
 
@@ -974,6 +985,8 @@ pub fn run() {
 
             commands::session_messages,
 
+            commands::session_interrupt_context,
+
             commands::session_media_root,
 
             commands::session_resolve_relative_media,
@@ -1535,6 +1548,8 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
 
                 use tauri::Manager;
+
+                crate::host_runtime::on_process_shutdown();
 
                 if let Some(host) = app.try_state::<Arc<MirrorHost>>() {
 

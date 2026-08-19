@@ -73,6 +73,14 @@ pub async fn session_send(
         .await
 }
 
+/// Pending command from an interrupted turn lease (Continue chip).
+#[tauri::command]
+pub fn session_interrupt_context(
+    session_id: String,
+) -> Option<crate::turn_interrupt::InterruptContext> {
+    crate::turn_interrupt::interrupt_context(&session_id)
+}
+
 /// Inject guidance into the active turn without cancelling the running prompt.
 /// `session_id` binds the interjection to a chat (live or background).
 #[tauri::command]

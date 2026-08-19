@@ -924,6 +924,28 @@
 .lobe-end-turn--neutral {
   color: var(--chat-text-3, #6e6e73);
 }
+.lobe-end-turn__continue {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.lobe-end-turn__continue:disabled {
+  opacity: 0.45;
+  cursor: default;
+  text-decoration: none;
+}
+.lobe-end-turn__continue:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+}
 
 /* Legacy class kept for any residual markers */
 .lobe-chat-tool {

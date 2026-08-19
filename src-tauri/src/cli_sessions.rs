@@ -1722,9 +1722,11 @@ pub fn try_reconcile_linked_session(app_session_id: &str) -> u32 {
         .into_iter()
         .find(|s| s.id == app_session_id);
     let Some(meta) = meta else {
+        crate::turn_interrupt::heal_interrupted_turn(app_session_id);
         return 0;
     };
     let Some(agent_id) = meta.agent_session_id.as_deref().filter(|s| !s.is_empty()) else {
+        crate::turn_interrupt::heal_interrupted_turn(app_session_id);
         return 0;
     };
     let mode = store::load_settings().session_data_mode;
@@ -1734,8 +1736,15 @@ pub fn try_reconcile_linked_session(app_session_id: &str) -> u32 {
             .find(|p| p.id == pid)
             .map(|p| p.path)
     });
-    reconcile_journal_from_chat_history(app_session_id, agent_id, cwd_hint.as_deref(), &mode)
-        .unwrap_or(0)
+    let changed = reconcile_journal_from_chat_history(
+        app_session_id,
+        agent_id,
+        cwd_hint.as_deref(),
+        &mode,
+    )
+    .unwrap_or(0);
+    crate::turn_interrupt::heal_interrupted_turn(app_session_id);
+    changed
 }
 
 /// Import one CLI session into the App journal (independent App session row).
