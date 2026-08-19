@@ -1504,6 +1504,52 @@ pub(super) fn extract_generated_media_path(raw: &serde_json::Value) -> Option<St
     extract_structured_media_path(raw).or_else(|| extract_freeform_media_path(raw))
 }
 
+/// Decide whether a completed tool should persist a chat image/video card.
+///
+/// - Structured `rawOutput.path` (image_gen / image_edit / ChatCut thumbs):
+///   force-grant, even outside the project.
+/// - Freeform text: only media-capable tools (not read / list / terminal).
+/// - `path_hint` (`locations` / `target_file`): same gate as freeform.
+///   A `read_file` of a user-attached image is already on the user bubble;
+///   attaching it again paints a leftover ImageUi that 403s outside the
+///   project (`~/Documents/图片/…`).
+pub(super) fn completed_tool_media_attachment(
+    raw: &serde_json::Value,
+    name: &str,
+    kind: &str,
+    title: &str,
+    project_path: Option<&str>,
+    status: &str,
+) -> Option<String> {
+    if status != "completed" {
+        return None;
+    }
+    let capable = tool_is_media_capable(name, kind, title, raw);
+    let structured = extract_structured_media_path(raw);
+    let freeform = if structured.is_none() && capable {
+        extract_freeform_media_path(raw)
+    } else {
+        None
+    };
+    if let Some(p) = structured.as_deref() {
+        if let Some(out) = prepare_media_attachment_path(p, project_path, true) {
+            return Some(out);
+        }
+    }
+    if let Some(p) = freeform.as_deref() {
+        if let Some(out) = prepare_media_attachment_path(p, project_path, false) {
+            return Some(out);
+        }
+    }
+    if capable {
+        let (_, hint) = extract_tool_ui_fields(raw);
+        if let Some(p) = hint.as_deref().filter(|s| !s.is_empty()) {
+            return prepare_media_attachment_path(p, project_path, false);
+        }
+    }
+    None
+}
+
 /// Normalize + gate a media path before persisting as a chat attachment.
 ///
 /// - Remote `http(s)` media: always ok when it looks like media.

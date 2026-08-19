@@ -857,3 +857,21 @@ export function filterAttachmentsNotInlined(
   });
   return out.length ? out : undefined;
 }
+
+/**
+ * Drop assistant attachments that merely echo the previous user turn's files.
+ *
+ * `read_file` of a user-picked image used to path_hint-attach the same path
+ * onto the assistant. That leftover ImageUi sits at the end of the reply and
+ * 403s when the file is outside the project (Documents / Desktop).
+ */
+export function filterEchoedUserAttachments(
+  assistantAtts: Attachment[] | undefined | null,
+  userAtts: Attachment[] | undefined | null,
+): Attachment[] | undefined {
+  if (!assistantAtts?.length) return assistantAtts ?? undefined;
+  if (!userAtts?.length) return assistantAtts;
+  const echo = new Set(userAtts.map((a) => a.path));
+  const out = assistantAtts.filter((a) => !echo.has(a.path));
+  return out.length ? out : undefined;
+}

@@ -263,6 +263,59 @@ fn prepare_rejects_missing_and_single_segment() {
 }
 
 #[test]
+fn read_file_path_hint_does_not_attach_granted_image() {
+    // Session 14cca5e6: read_file of the user-attached 三视图 was path_hint
+    // attached onto the assistant (soft, because composer had granted it).
+    // That painted a leftover ImageUi that 403'd outside the project root.
+    let dir = std::env::temp_dir().join(format!("grok-read-echo-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let file = dir.join("IP shot.png");
+    std::fs::write(&file, b"fake-png").expect("write");
+    let path = file.to_string_lossy().to_string();
+    crate::path_scope::grant_path(std::path::Path::new(&path));
+    let raw = json!({
+        "status": "completed",
+        "title": format!("Read `{path}`"),
+        "rawInput": { "target_file": path },
+        "locations": [{ "path": path }],
+    });
+    assert!(!tool_is_media_capable("read_file", "read", "Read", &raw));
+    assert_eq!(
+        completed_tool_media_attachment(&raw, "read_file", "read", "Read", None, "completed"),
+        None
+    );
+    let _ = std::fs::remove_file(&file);
+    let _ = std::fs::remove_dir(&dir);
+}
+
+#[test]
+fn image_edit_structured_path_still_attaches() {
+    let dir = std::env::temp_dir().join(format!("grok-edit-att-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let file = dir.join("1.jpg");
+    std::fs::write(&file, b"fake-jpg").expect("write");
+    let path = file.to_string_lossy().to_string();
+    let raw = json!({
+        "status": "completed",
+        "rawOutput": { "path": path },
+    });
+    assert_eq!(
+        completed_tool_media_attachment(
+            &raw,
+            "image_edit",
+            "other",
+            "imagine-edit",
+            None,
+            "completed"
+        )
+        .as_deref(),
+        Some(path.as_str())
+    );
+    let _ = std::fs::remove_file(&file);
+    let _ = std::fs::remove_dir(&dir);
+}
+
+#[test]
 fn prepare_force_grants_existing_temp_media() {
     let dir = std::env::temp_dir().join(format!("grok-media-attach-test-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);

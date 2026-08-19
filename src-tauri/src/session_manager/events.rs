@@ -548,14 +548,14 @@ impl SessionManager {
                 // Real tool output (ACP `content[]`) — powers the expandable body.
                 let output = extract_tool_output(&raw);
 
-                let prepared = structured_media
-                    .as_deref()
-                    .and_then(|p| prepare_media_attachment_path(p, project_path.as_deref(), true))
-                    .or_else(|| {
-                        freeform_media.as_deref().and_then(|p| {
-                            prepare_media_attachment_path(p, project_path.as_deref(), false)
-                        })
-                    });
+                let prepared = completed_tool_media_attachment(
+                    &raw,
+                    &name_id,
+                    &kind_enr_id,
+                    &title_enr_id,
+                    project_path.as_deref(),
+                    &status,
+                );
 
                 if let Some(path) = prepared {
                     // Local file (granted) or remote https media (ChatCut S3).
@@ -587,19 +587,6 @@ impl SessionManager {
                             "kind": if is_video_fs_path(&att.path) { "video" } else { "image" },
                         }),
                     );
-                } else if let Some(path) = path_out.as_ref().and_then(|p| {
-                    // Write / copy of workspace media only (soft): persist so
-                    // history reload can render bare basenames after session switch.
-                    // Does not attach incidental reads outside path_scope/project.
-                    prepare_media_attachment_path(p, project_path.as_deref(), false)
-                }) {
-                    let att = attachment_from_path(&path);
-                    let mut guard = self.inner.lock();
-                    if let Some(s) = guard.as_mut() {
-                        if !s.stream_attachments.iter().any(|a| a.path == att.path) {
-                            s.stream_attachments.push(att);
-                        }
-                    }
                 }
 
                 let (app_sid, project_path, empty_run, open_changed, already_terminal) = {

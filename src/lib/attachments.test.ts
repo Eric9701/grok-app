@@ -7,6 +7,7 @@ import {
   extractMediaPathsFromContent,
   extractSessionRelativeMediaRefs,
   filterAttachmentsNotInlined,
+  filterEchoedUserAttachments,
   mediaTailFromPath,
   isDisplayableAttachmentPath,
   isImagePath,
@@ -397,6 +398,30 @@ also /tmp/other.png and /tmp/clip.mp4 and not a file.`;
     );
     expect(out).toHaveLength(1);
     expect(out![0]!.name).toBe("notes.txt");
+  });
+
+  it("filterEchoedUserAttachments drops assistant copies of the user's own files", () => {
+    const user = [
+      {
+        path: "/Users/me/Documents/图片/IP 三视图.png",
+        name: "IP 三视图.png",
+        isDir: false,
+      },
+    ];
+    const assistant = [
+      ...user,
+      {
+        path: "/tmp/agent-home/sessions/%2Fproj/images/1.jpg",
+        name: "1.jpg",
+        isDir: false,
+      },
+    ];
+    const out = filterEchoedUserAttachments(assistant, user);
+    expect(out?.map((a) => a.path)).toEqual([
+      "/tmp/agent-home/sessions/%2Fproj/images/1.jpg",
+    ]);
+    expect(filterEchoedUserAttachments(user, user)).toBeUndefined();
+    expect(filterEchoedUserAttachments(assistant, undefined)?.length).toBe(2);
   });
 
   it("filterAttachmentsNotInlined drops false-extract single-segment abs media", () => {

@@ -332,13 +332,29 @@ describe("classifyMediaSrcFailure — fused query keys & loopback URLs", () => {
     ).toBe("media_server_unavailable");
   });
 
-  it("normal loopback media URL with real path stays broken_blob on decode failure", () => {
+  it("loopback <img> onError on a real local path is retryable untrusted (grant race / 403)", () => {
+    // <img> does not expose HTTP status. A path_scope 403 (Desktop /
+    // Documents image after restart, before paths_classify grants) looks
+    // identical to a corrupt decode. Prefer retryable untrusted so
+    // ImageUi re-classifies instead of locking broken_blob.
+    expect(
+      classifyMediaSrcFailure({
+        pathOrUrl: "/Users/me/Documents/图片/IP 三视图.png",
+        resolvedSrc:
+          "http://127.0.0.1:52193/v1/media?t=tok&p=%2FUsers%2Fme%2FDocuments%2F%E5%9B%BE%E7%89%87%2FIP%20%E4%B8%89%E8%A7%86%E5%9B%BE.png",
+        loadFailed: true,
+      }),
+    ).toBe("untrusted");
+  });
+
+  it("loopback decode error stays broken_blob (bytes will not change)", () => {
     expect(
       classifyMediaSrcFailure({
         pathOrUrl: "/Users/me/pic.png",
         resolvedSrc:
           "http://127.0.0.1:52193/v1/media?t=tok&p=%2FUsers%2Fme%2Fpic.png",
         loadFailed: true,
+        mediaElementError: "decode",
       }),
     ).toBe("broken_blob");
   });
@@ -351,6 +367,16 @@ describe("mediaUrlPathParam", () => {
         "http://127.0.0.1:52193/v1/media?t=tok&p=%2FUsers%2Fme%2Fa%20b.png",
       ),
     ).toBe("/Users/me/a b.png");
+  });
+
+  it("keeps literal %2F in agent-home session folder names", () => {
+    const path =
+      "/Users/me/Library/Application Support/com.grokapp.grok-app/agent-home/sessions/%2FUsers%2Fme%2Fproj/images/6.jpg";
+    expect(
+      mediaUrlPathParam(
+        `http://127.0.0.1:9/v1/media?t=tok&p=${encodeURIComponent(path)}`,
+      ),
+    ).toBe(path);
   });
 
   it("returns null for non-loopback or pathless URLs", () => {

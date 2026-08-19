@@ -47,6 +47,7 @@ import type { Attachment } from "@/lib/attachments";
 import {
   buildInlineMediaPathMap,
   filterAttachmentsNotInlined,
+  filterEchoedUserAttachments,
   isImagePath,
   isMediaPath,
   pathBasename,
@@ -1289,6 +1290,18 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
 
   // Assistant — thought / tool / body in true stream order.
   const segs = messageSegments(m);
+  let precedingUserAtts: typeof m.attachments;
+  for (let i = msgIndex - 1; i >= 0; i--) {
+    const row = wovenMessages[i];
+    if (row?.role === "user") {
+      precedingUserAtts = row.attachments;
+      break;
+    }
+  }
+  const displayAttachments = filterEchoedUserAttachments(
+    m.attachments,
+    precedingUserAtts,
+  );
   const isActiveAssistant = activeAssistantId === m.id;
   const hasInlinedRunningTool = segs.some(
     (s) => s.kind === "tool" && toolSegmentIsRunning(s),
@@ -1503,7 +1516,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                   content={unit.text}
                   // Always pass attachments so every content segment can
                   // resolve `images/N.jpg` → ImageUi at stream position.
-                  attachments={m.attachments}
+                  attachments={displayAttachments}
                   // Bottom leftover strip only once (end of turn body).
                   showBottomAttachments={unit.si === lastContentSi}
                   fullContentForInlineFilter={m.content}
@@ -1543,11 +1556,11 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
             </div>
           ) : null}
           {/* Body-less turn with only attachments */}
-          {!contentSegCount && m.attachments?.length ? (
+          {!contentSegCount && displayAttachments?.length ? (
             <AssistantMessageBody
               content=""
               messageId={m.id}
-              attachments={m.attachments}
+              attachments={displayAttachments}
               showBottomAttachments
               fullContentForInlineFilter={m.content}
               streaming={!!m.streaming}

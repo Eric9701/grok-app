@@ -9,7 +9,10 @@
  * (`127.0.0.1` / `localhost` / `::1`). Never treat non-local hosts as media delivery.
  */
 
-import { isFusedQueryKeyPath } from "@/lib/pathNormalize";
+import {
+  isFusedQueryKeyPath,
+  isRealLocalAbsolutePath,
+} from "@/lib/pathNormalize";
 
 /** Stable failure modes for chat images, resource preview, and media players. */
 export type MediaLoadErrorKind =
@@ -422,6 +425,12 @@ export function classifyMediaSrcFailure(input: {
         const mediaPath = mediaUrlPathParam(input.resolvedSrc);
         if (mediaPath == null) return "media_server_unavailable";
         if (isFusedQueryKeyPath(mediaPath)) return "untrusted";
+        // <img onError> has no HTTP status. A path_scope 403 (user-picked
+        // Desktop/Documents file after restart, before paths_classify grants)
+        // is indistinguishable from a corrupt decode. Known decode codes stay
+        // broken_blob; otherwise treat a real local p= as retryable untrusted.
+        if (input.mediaElementError === "decode") return "broken_blob";
+        if (isRealLocalAbsolutePath(mediaPath)) return "untrusted";
       }
       // Remote CDN / markdown images: honest decode failure, not allowlist.
       // (Untrusted is reserved for Host path_scope / media-server 403.)
