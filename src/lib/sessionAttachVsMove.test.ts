@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   isPastSessionDragThreshold,
   isSessionMoveIgnoredTarget,
+  SESSION_DRAG_HOLD_MS,
   SESSION_DRAG_THRESHOLD_PX,
+  sessionDragArmDecision,
   sessionDragDropFromElements,
 } from "@/hooks/useSidebarSessionMoveDrag";
 
@@ -38,11 +40,44 @@ describe("sidebar attach vs move gestures", () => {
   it("does not treat a click-sized jitter as a drag", () => {
     expect(isPastSessionDragThreshold(0, 0)).toBe(false);
     expect(isPastSessionDragThreshold(3, 3)).toBe(false);
+    // 8px used to arm; ordinary clicks / trackpad jitter still reach that.
+    expect(isPastSessionDragThreshold(8, 0)).toBe(false);
     expect(isPastSessionDragThreshold(SESSION_DRAG_THRESHOLD_PX - 1, 0)).toBe(
       false,
     );
     expect(isPastSessionDragThreshold(SESSION_DRAG_THRESHOLD_PX, 0)).toBe(true);
     expect(isPastSessionDragThreshold(0, SESSION_DRAG_THRESHOLD_PX)).toBe(true);
+  });
+
+  it("does not arm drag chrome on the first-click synthetic jump", () => {
+    const jump = {
+      dx: SESSION_DRAG_THRESHOLD_PX,
+      dy: 0,
+      buttons: 1,
+    };
+    // Immediate pointermove after pointerdown (WKWebView / trackpad press).
+    expect(
+      sessionDragArmDecision({ ...jump, elapsedMs: 0 }),
+    ).toBe("rebase");
+    expect(
+      sessionDragArmDecision({
+        ...jump,
+        elapsedMs: SESSION_DRAG_HOLD_MS - 1,
+      }),
+    ).toBe("rebase");
+    expect(sessionDragArmDecision({ ...jump, elapsedMs: SESSION_DRAG_HOLD_MS })).toBe(
+      "arm",
+    );
+    expect(
+      sessionDragArmDecision({ dx: 0, dy: 0, elapsedMs: 200, buttons: 1 }),
+    ).toBe("ignore");
+    expect(
+      sessionDragArmDecision({
+        ...jump,
+        elapsedMs: SESSION_DRAG_HOLD_MS,
+        buttons: 0,
+      }),
+    ).toBe("ignore");
   });
 
   it("prefers composer attach over project move in the hit stack", () => {

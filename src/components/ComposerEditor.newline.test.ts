@@ -1,7 +1,15 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   storedTextToEditorNodes,
 } from "./ComposerEditor";
+
+const composerEditorSrc = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "ComposerEditor.tsx"),
+  "utf8",
+);
 
 describe("storedTextToEditorNodes", () => {
   it("keeps a single line as one text node", () => {
@@ -40,5 +48,16 @@ describe("storedTextToEditorNodes", () => {
       { type: "br" },
       { type: "text", value: "b" },
     ]);
+  });
+});
+
+describe("Shift+Enter must not rewrite the editor from a stale snapshot", () => {
+  it("does not take lastValue as the Enter document then re-project", () => {
+    // Production bug: preventDefault + lastValue + renderSegmentsInto wiped
+    // live typed text that had not been committed to React yet.
+    expect(composerEditorSrc).not.toMatch(
+      /const draft = lastValue\.current;\s*\n\s*const caret = getComposerCaretIndex/,
+    );
+    expect(composerEditorSrc).toMatch(/insertComposerLineBreakInPlace/);
   });
 });

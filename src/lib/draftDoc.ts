@@ -359,7 +359,10 @@ export function serializeEditorLineContent(el: HTMLElement): string {
  *   lines joined with `\n`. Empty block ⇒ blank line (keeps `\n\n`).
  * - **Flat** (text + `<br>` + chips, no line boxes): br/text walk, keep every `\n`.
  */
-export function serializeEditorDomWalk(root: HTMLElement): string {
+export function serializeEditorDomWalk(
+  root: HTMLElement,
+  opts?: { preserveWhitespaceOnly?: boolean },
+): string {
   const kids = Array.from(root.childNodes);
   const hasBlockChild = kids.some(
     (n) =>
@@ -445,7 +448,11 @@ export function serializeEditorDomWalk(root: HTMLElement): string {
     t = parts.join("");
   }
 
-  if (!t.replace(/\n/g, "").trim() && !/\[\[skill:/.test(t)) {
+  if (
+    !opts?.preserveWhitespaceOnly &&
+    !t.replace(/\n/g, "").trim() &&
+    !/\[\[skill:/.test(t)
+  ) {
     return "";
   }
   return t;
@@ -481,6 +488,18 @@ export function joinEditorBlockLines(
 export function insertNewlineAt(stored: string, caret: number): string {
   const i = Math.max(0, Math.min(caret, stored.length));
   return stored.slice(0, i) + "\n" + stored.slice(i);
+}
+
+/**
+ * Next stored draft after Enter / Shift+Enter.
+ * `liveStored` must be the serialized **live editor**, never a lagging React
+ * snapshot — rewriting the contenteditable from `lastValue` deleted typed text.
+ */
+export function composerEnterNextStored(
+  liveStored: string,
+  caret: number,
+): string {
+  return insertNewlineAt(liveStored, caret);
 }
 
 /**
@@ -562,7 +581,9 @@ export function getStoredTextBeforeCaret(
   const frag = pre.cloneContents();
   const tmp = document.createElement("div");
   tmp.appendChild(frag);
-  return serializeEditorDomWalk(tmp);
+  // Caret-prefix clones are often newline-only (`\n\n` before later text).
+  // Collapsing those to "" made Enter insert at offset 0 and rewrite the body.
+  return serializeEditorDomWalk(tmp, { preserveWhitespaceOnly: true });
 }
 
 /**

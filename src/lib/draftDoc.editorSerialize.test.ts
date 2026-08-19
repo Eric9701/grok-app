@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   applySkillAtSlash,
   detectSlashRangeOnStored,
+  composerEnterNextStored,
   insertNewlineAt,
   joinEditorBlockLines,
   parseStoredContent,
@@ -38,6 +39,22 @@ describe("as-is draft + insertNewlineAt", () => {
     s = insertNewlineAt(s, s.length);
     s += "提示词";
     expect(s).toBe("这是\n\n一条\n\n测试的\n提示词");
+  });
+
+  it("Enter must apply to live editor text, not a lagging React snapshot", () => {
+    // Shift+Enter used lastValue then re-projected the whole contenteditable.
+    // If the snapshot lagged the DOM, that rewrite deleted the live sentence.
+    const live = "第一行\n第二行还在输入框里";
+    const staleSnapshot = "第一行";
+    const fromLive = composerEnterNextStored(live, live.length);
+    const fromStale = composerEnterNextStored(staleSnapshot, staleSnapshot.length);
+    expect(fromLive).toBe("第一行\n第二行还在输入框里\n");
+    expect(fromLive).toContain("第二行还在输入框里");
+    expect(fromStale).not.toContain("第二行还在输入框里");
+  });
+
+  it("inserts a newline at the live caret without dropping the tail", () => {
+    expect(composerEnterNextStored("hello world", 5)).toBe("hello\n world");
   });
 
   it("skill convert does not touch body newlines", () => {

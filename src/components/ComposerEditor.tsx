@@ -29,8 +29,9 @@ import {
   readClipboardMediaFiles,
 } from "@/lib/clipboardPaste";
 import {
+  composerEnterNextStored,
   detectSlashRangeOnStored,
-  insertNewlineAt,
+  getStoredTextBeforeCaret,
   joinEditorBlockLines,
   parseStoredContent,
   readStoredEditorText,
@@ -407,17 +408,7 @@ function serializeComposerDraft(el: HTMLElement): string {
 }
 
 function getTextBeforeCaret(el: HTMLElement): string | null {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return null;
-  const range = sel.getRangeAt(0);
-  if (!el.contains(range.startContainer)) return null;
-  const pre = document.createRange();
-  pre.selectNodeContents(el);
-  pre.setEnd(range.startContainer, range.startOffset);
-  const frag = pre.cloneContents();
-  const tmp = document.createElement("div");
-  tmp.appendChild(frag);
-  return serializeDom(tmp);
+  return getStoredTextBeforeCaret(el);
 }
 
 /**
@@ -451,6 +442,104 @@ function lineDivsOf(el: HTMLElement): HTMLElement[] {
       !c.dataset?.skill &&
       !c.hasAttribute("data-skill"),
   );
+}
+
+function padEmptyComposerLine(div: HTMLElement) {
+  const hasChip = !!div.querySelector("[data-skill]");
+  if (hasChip || serializeEditorLineContent(div)) return;
+  while (div.firstChild) div.removeChild(div.firstChild);
+  div.appendChild(document.createElement("br"));
+}
+
+function markTrailingEmptyComposerLine(el: HTMLElement) {
+  const lines = lineDivsOf(el);
+  for (const d of lines) d.removeAttribute(COMPOSER_NL_ATTR);
+  const last = lines[lines.length - 1];
+  if (last && serializeEditorLineContent(last) === "") {
+    last.setAttribute(COMPOSER_NL_ATTR, "1");
+  }
+}
+
+/** Wrap flat text/`<br>` children into one line DIV without copying text. */
+function ensureComposerLineDivs(el: HTMLElement) {
+  if (lineDivsOf(el).length > 0) return;
+  const wrap = document.createElement("div");
+  if (!el.firstChild) {
+    wrap.appendChild(document.createElement("br"));
+  } else {
+    while (el.firstChild) wrap.appendChild(el.firstChild);
+  }
+  el.appendChild(wrap);
+}
+
+function lineDivForCaret(el: HTMLElement, range: Range): HTMLElement | null {
+  const lines = lineDivsOf(el);
+  if (lines.length === 0) return null;
+  const node = range.startContainer;
+  if (node === el) {
+    const last = Math.max(0, el.childNodes.length - 1);
+    const child = el.childNodes[Math.min(range.startOffset, last)] ?? null;
+    if (child instanceof HTMLElement && lines.includes(child)) return child;
+    return lines[Math.min(range.startOffset, lines.length - 1)]!;
+  }
+  for (const d of lines) {
+    if (d === node || d.contains(node)) return d;
+  }
+  return lines[lines.length - 1]!;
+}
+
+/**
+ * Split the current line DIV at the caret. Does **not** clear the editor —
+ * rewriting from a React snapshot was deleting live typed text on Shift+Enter.
+ */
+export function insertComposerLineBreakInPlace(el: HTMLElement): boolean {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return false;
+  let range = sel.getRangeAt(0);
+  if (!el.contains(range.startContainer) && range.startContainer !== el) {
+    return false;
+  }
+
+  ensureComposerLineDivs(el);
+  if (sel.rangeCount === 0) return false;
+  range = sel.getRangeAt(0);
+  if (!range.collapsed) {
+    range.deleteContents();
+    if (sel.rangeCount === 0) return false;
+    range = sel.getRangeAt(0);
+  }
+
+  const line = lineDivForCaret(el, range);
+  if (!line) return false;
+
+  const tail = document.createRange();
+  try {
+    if (line.contains(range.startContainer) || range.startContainer === line) {
+      tail.setStart(range.startContainer, range.startOffset);
+    } else if (range.startContainer === el) {
+      // Offset at the editor root: end of last line vs start of this line.
+      if (range.startOffset >= el.childNodes.length) {
+        tail.setStart(line, line.childNodes.length);
+      } else {
+        tail.setStart(line, 0);
+      }
+    } else {
+      return false;
+    }
+    tail.setEnd(line, line.childNodes.length);
+  } catch {
+    return false;
+  }
+
+  const contents = tail.extractContents();
+  const next = document.createElement("div");
+  next.appendChild(contents);
+  padEmptyComposerLine(line);
+  padEmptyComposerLine(next);
+  line.insertAdjacentElement("afterend", next);
+  markTrailingEmptyComposerLine(el);
+  placeCaretInLine(next, true);
+  return true;
 }
 
 function placeCaretInLine(div: HTMLElement, atStart: boolean) {
@@ -1427,19 +1516,26 @@ export const ComposerEditor = memo(function ComposerEditor({
           }
 
           // Newline path (Shift+Enter, or plain Enter when send-key is mod-enter).
-          // Draft is SoT. Each line is a DIV; a trailing empty line is marked
-          // so serialize keeps the \n and the caret stays on that line.
+          // Split the live line in place. Never rebuild from lastValue — that
+          // snapshot can lag IME/input and the rewrite deleted typed text.
           if (e.key === "Enter" && !e.altKey && !e.metaKey && !e.ctrlKey) {
             try {
               e.preventDefault();
               if (!el) return;
-              const draft = lastValue.current;
-              const caret = getComposerCaretIndex(el, draft);
-              const next = insertNewlineAt(draft, caret);
-              lastValue.current = next;
-              onChange(next);
-              renderSegmentsInto(el, parseStoredContent(next));
-              placeCaretAtStoredOffset(el, caret + 1);
+              const split = insertComposerLineBreakInPlace(el);
+              if (!split) {
+                const live = serializeComposerDraft(el);
+                const caret = getComposerCaretIndex(el, live);
+                const next = composerEnterNextStored(live, caret);
+                lastValue.current = next;
+                onChange(next);
+                renderSegmentsInto(el, parseStoredContent(next));
+                placeCaretAtStoredOffset(el, caret + 1);
+              } else {
+                const stored = serializeComposerDraft(el);
+                lastValue.current = stored;
+                onChange(stored);
+              }
               syncDomEmpty(el);
               emitSlash();
               resizeComposerInput(el);

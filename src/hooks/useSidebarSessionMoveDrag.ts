@@ -14,8 +14,13 @@ import {
   sessionIdsForDrag,
 } from "@/lib/sessionMoveProject";
 
-/** Click jitter on trackpads often exceeds 4px; only a real drag should arm. */
-export const SESSION_DRAG_THRESHOLD_PX = 8;
+/** Click jitter on trackpads often exceeds 8px; only a real drag should arm. */
+export const SESSION_DRAG_THRESHOLD_PX = 16;
+/** First pointermove after down is often a synthetic jump; rebase, don't arm. */
+export const SESSION_DRAG_HOLD_MS = 80;
+
+export type SessionDragArm = "ignore" | "rebase" | "arm";
+
 const SIDEBAR_MOVING = "sidebar--session-moving";
 const ROW_DRAGGING = "tree-l3--dragging";
 const DROP_TARGET = "is-session-drop";
@@ -46,6 +51,19 @@ export function isSessionMoveIgnoredTarget(target: EventTarget | null): boolean 
 
 export function isPastSessionDragThreshold(dx: number, dy: number): boolean {
   return Math.hypot(dx, dy) >= SESSION_DRAG_THRESHOLD_PX;
+}
+
+/** Decide whether this sample should start drag chrome. */
+export function sessionDragArmDecision(input: {
+  dx: number;
+  dy: number;
+  elapsedMs: number;
+  buttons: number;
+}): SessionDragArm {
+  if (input.buttons === 0) return "ignore";
+  if (!isPastSessionDragThreshold(input.dx, input.dy)) return "ignore";
+  if (input.elapsedMs < SESSION_DRAG_HOLD_MS) return "rebase";
+  return "arm";
 }
 
 /** Prefer composer attach over project-move when both appear in the hit stack. */
@@ -180,6 +198,7 @@ export function useSidebarSessionMoveDrag(opts: {
     pointerId: number;
     startX: number;
     startY: number;
+    startTime: number;
     active: boolean;
     captureEl: HTMLElement | null;
     ghost: HTMLElement | null;
@@ -257,14 +276,15 @@ export function useSidebarSessionMoveDrag(opts: {
       const pointerId = e.pointerId;
 
       // Do not capture or paint grab-cursor until the pointer actually moves.
-      // Immediate capture + a 4px threshold was arming drags on ordinary clicks
-      // (trackpad jitter / synthetic pointermove after setPointerCapture).
+      // Immediate capture + a distance-only threshold still armed drags on the
+      // first click (synthetic pointermove / trackpad press jump).
       sessionRef.current = {
         draggedId,
         rowIds,
         pointerId,
         startX: e.clientX,
         startY: e.clientY,
+        startTime: e.timeStamp,
         active: false,
         captureEl: row,
         ghost: null,
@@ -279,8 +299,18 @@ export function useSidebarSessionMoveDrag(opts: {
         const dx = ev.clientX - s.startX;
         const dy = ev.clientY - s.startY;
         if (!s.active) {
-          if (ev.buttons === 0) return;
-          if (!isPastSessionDragThreshold(dx, dy)) return;
+          const decision = sessionDragArmDecision({
+            dx,
+            dy,
+            elapsedMs: ev.timeStamp - s.startTime,
+            buttons: ev.buttons,
+          });
+          if (decision === "ignore") return;
+          if (decision === "rebase") {
+            s.startX = ev.clientX;
+            s.startY = ev.clientY;
+            return;
+          }
           s.active = true;
           try {
             row.setPointerCapture?.(pointerId);
