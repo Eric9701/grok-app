@@ -17,14 +17,22 @@
  * Live: steps + “Working for …s” footer
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Locale, MessageKey } from "@/i18n";
 import { createT } from "@/i18n";
 import { COLLAPSE_ALL_ACTIVITY_EVENT } from "@/lib/collapseAllActivity";
 import type { TimelinePhase } from "@/lib/timelinePhases";
 import {
   loadToolStepsAutoCollapsePref,
-  toolStepDefaultOpen,
+  workPhaseDefaultOpen,
   TOOL_STEPS_AUTO_COLLAPSE_CHANGE_EVENT,
 } from "@/lib/toolStepsAutoCollapsePref";
 import {
@@ -49,6 +57,7 @@ import {
   applyActivityStepUserToggle,
   emptyActivityStepExpandState,
   grokActivityVirtualMaxHeightPx,
+  liveActivityFollowKey,
   shouldCapMappedGrokActivitySteps,
   shouldVirtualizeActivityWithExpand,
   type ActivityStepExpandState,
@@ -371,6 +380,7 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
         className={"grok-act__step grok-act__step--speech" + (isLast ? " is-last" : "")}
         role="listitem"
         data-step-type="speech"
+        data-step-key={step.key}
         data-testid="timeline-process-speech"
       >
         <div className="grok-act__speech">
@@ -400,6 +410,7 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
       }
       role="listitem"
       data-step-type={step.type}
+      data-step-key={step.key}
       data-expanded={hasBody ? (open ? "1" : "0") : undefined}
     >
       <div className="grok-act__icon-col" aria-hidden>
@@ -539,6 +550,24 @@ export function GrokActivitySteps({
       liveBodyCount,
     );
   const lastKey = total > 0 ? steps[total - 1]!.key : null;
+  const followKey = live ? liveActivityFollowKey(steps) : lastKey;
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const stickToLiveRef = useRef(true);
+
+  useLayoutEffect(() => {
+    if (!live || !followKey) return;
+    const root = scrollerRef.current;
+    if (!root) return;
+    if (!stickToLiveRef.current) return;
+    const el = root.querySelector(
+      `[data-step-key="${CSS.escape(followKey)}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+      return;
+    }
+    root.scrollTop = root.scrollHeight;
+  }, [live, followKey, total]);
 
   const getKey = useCallback((step: GrokActivityStep) => step.key, []);
   const renderItem = useCallback(
@@ -583,10 +612,17 @@ export function GrokActivitySteps({
     const cap = shouldCapMappedGrokActivitySteps(total);
     return (
       <div
+        ref={scrollerRef}
         className={
           "grok-act__steps" + (cap ? " grok-act__steps--capped" : "")
         }
         role="list"
+        onScroll={(e) => {
+          if (!live) return;
+          const el = e.currentTarget;
+          stickToLiveRef.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+        }}
       >
         {steps.map((step, idx) => (
           <GrokActivityStepRow
@@ -610,6 +646,7 @@ export function GrokActivitySteps({
 
   return (
     <div
+      ref={scrollerRef}
       className="grok-act__steps grok-act__steps--virtual"
       role="list"
       style={{ maxHeight: grokActivityVirtualMaxHeightPx(total) }}
@@ -621,7 +658,7 @@ export function GrokActivitySteps({
         rowHeight={GROK_ACTIVITY_STEP_ROW_PX}
         gap={0}
         threshold={0}
-        scrollToKey={live ? lastKey : null}
+        scrollToKey={live ? followKey : null}
       />
     </div>
   );
@@ -680,25 +717,18 @@ export const TimelinePhaseBlock = memo(function TimelinePhaseBlock({
   // must not keep "Working for …" forever once the turn is done.
   const phaseRunning =
     !!messageStreaming && (phase.live || phase.runningCount > 0);
-  const wantOpen = toolStepDefaultOpen(phaseRunning, autoCollapse);
-  const [open, setOpen] = useState(() =>
-    // Live + autoCollapse starts collapsed — same as the effect. Using
-    // wantOpen here flashed the full step list for one paint.
-    phaseRunning ? !autoCollapse : wantOpen,
-  );
+  const wantOpen = workPhaseDefaultOpen({
+    running: phaseRunning,
+    errorCount: phase.errorCount,
+    autoCollapse,
+  });
+  const [open, setOpen] = useState(() => wantOpen);
   const userToggled = useRef(false);
 
   useEffect(() => {
     if (userToggled.current) return;
-    if (phaseRunning) {
-      // Respect auto-collapse while live. Auto-opening the full step list
-      // on every streaming=true flicker was the mid-steer transcript flash
-      // (collapsed “工作了” ↔ hundreds of tool rows).
-      setOpen(!autoCollapse);
-      return;
-    }
     setOpen(wantOpen);
-  }, [phaseRunning, wantOpen, autoCollapse, phase.id]);
+  }, [wantOpen, phase.id]);
 
   useEffect(() => {
     const onCollapseAll = () => {

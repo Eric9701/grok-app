@@ -7,6 +7,7 @@ import {
   parseToolStepsAutoCollapsePref,
   saveToolStepsAutoCollapsePref,
   toolStepDefaultOpen,
+  workPhaseDefaultOpen,
   type ToolStepsAutoCollapseStorage,
 } from "./toolStepsAutoCollapsePref";
 
@@ -65,6 +66,44 @@ describe("toolStepsAutoCollapsePref", () => {
     // Default arg uses DEFAULT_TOOL_STEPS_AUTO_COLLAPSE (true)
     expect(toolStepDefaultOpen(false)).toBe(false);
     expect(toolStepDefaultOpen(true)).toBe(true);
+  });
+
+  it("workPhaseDefaultOpen: live stays expanded; done collapses unless errors", () => {
+    expect(
+      workPhaseDefaultOpen({
+        running: true,
+        errorCount: 0,
+        autoCollapse: true,
+      }),
+    ).toBe(true);
+    expect(
+      workPhaseDefaultOpen({
+        running: true,
+        errorCount: 2,
+        autoCollapse: true,
+      }),
+    ).toBe(true);
+    expect(
+      workPhaseDefaultOpen({
+        running: false,
+        errorCount: 0,
+        autoCollapse: true,
+      }),
+    ).toBe(false);
+    expect(
+      workPhaseDefaultOpen({
+        running: false,
+        errorCount: 1,
+        autoCollapse: true,
+      }),
+    ).toBe(true);
+    expect(
+      workPhaseDefaultOpen({
+        running: false,
+        errorCount: 0,
+        autoCollapse: false,
+      }),
+    ).toBe(true);
   });
 
   it("dispatches change event on save when window exists", () => {

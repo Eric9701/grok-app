@@ -12,12 +12,22 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Fixed
+- **Sidebar session drag needs a clearer move**: Opening a chat no longer turns into a drag from an 8px twitch or the first-click synthetic jump. The gesture waits for 16px after an 80ms hold, and rebases the origin if that jump happens too early.
+- **Shift+Enter no longer wipes composer text**: Newlines split the live line in place. The editor no longer rebuilds from a lagging React snapshot, which deleted what you had just typed.
 - **Chat timeline keeps think → tools → body cycles**: Mid-turn status no longer gets hoisted into the thinking fold, and the next “思考中” no longer starts while tools from the previous round are still running. Live interleave stays in stream order after the turn ends (v0.2.19 honesty; the 0.2.20/0.2.21 process-fold had mashed the whole turn).
 - **Thinking timer is per episode**: The first “思考中” no longer keeps counting through later tool rounds, and the next thinking row starts from zero instead of continuing the previous clock. Work-phase “工作中” uses this phase’s tool times, not the assistant bubble’s send time.
+- **Live work stays expanded**: The “工作中” rail stays open so you can see which tools are running. It auto-collapses when that burst finishes with no errors, and stays open if any tool failed.
+- **Live tools no longer look stuck on the first reads**: Journal completion now settles in-progress reads even after later tools arrive, and the work rail follows the currently running step so later bash/polls are not clipped off-screen.
+- **STREAM_STALL after send is this-turn only**: A new prompt no longer inherits the previous answer as “output paused”. The empty first-token wait is 90s (was 45s) so Grok 4.x high-effort thinking is less likely to look like a dead gateway.
 
 **中文 · 修复**
+- **侧栏会话拖动不再一碰就触发**：点开会话时 8px 的轻微移动、以及按下后第一次虚假位移，都不会立刻变成拖动。需要按住 80ms 且再移动 16px 才出现幽灵行。
+- **Shift+Enter 不再删掉输入框文字**：换行在当前行原地拆开，不再用滞后的 React 草稿整页重绘（那会把刚打的字清掉）。
 - **对话时间线恢复「思考 → 工具 → 正文」循环**：过程旁白不再被折进思考折叠里；上一轮工具还没跑完时，也不会在下面先画出新的「思考中」。回合结束后仍保持流式顺序（回到 0.2.19；0.2.20/0.2.21 的过程折叠把整轮揉成一团）。
 - **思考计时按轮次清零**：第一轮「思考中」不再把后面的工具时间算进去；下一轮思考从 0 开始，而不是接着上一轮的秒数。工作阶段的「工作中」只用本阶段工具时间，不用整条气泡的发送时刻。
+- **进行中的工作不折叠**：「工作中」保持展开，能看到正在跑哪些工具；这一段跑完且没有报错再自动折叠，有报错则保持展开。
+- **进行中的工具不再卡在第一条读取**：后面又来新工具时，前面已完成的读取会从「进行中」结算掉；工作列表会跟到当前正在跑的那一步，后面的命令/轮询不会被截在视口外。
+- **发消息后的 STREAM_STALL 只看本轮**：新 prompt 不会因为上一轮已有正文而显示「输出暂时停住了」。尚未出首 token 的等待窗口改为 90 秒（原 45 秒），减少高思考模型被误判成网关挂死。
 
 ### Changed
 - **Remaining UI locales filled**: German, Spanish, French, Korean, Brazilian Portuguese, Indonesian, Filipino, Ukrainian, Tamil, and Russian catalogs now cover essentially the full key set (product names and symbols stay English). Russian leftovers after that pass were filled again. Korean leftovers after the first pass were filled again.

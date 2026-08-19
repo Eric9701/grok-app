@@ -117,6 +117,38 @@ fn streaming_session(now: Instant, mut patch: impl FnMut(&mut LiveSession)) -> L
 }
 
 #[test]
+fn new_turn_pre_token_uses_short_window_and_this_turn_tier() {
+    // Grok 4.x high-effort first token is often 40–70s with an empty
+    // thinking placeholder. Soft stall must stay pre_first_token (not
+    // post_output from a prior answer) and must not fire at 45s.
+    with_temp_app_home(|| {
+        let t0 = Instant::now();
+        let mut s = streaming_session(t0, |s| {
+            s.prompt_in_flight = true;
+            s.last_stream_progress = t0;
+        });
+        let at_45 = t0 + Duration::from_secs(45);
+        assert!(
+            SessionManager::tick_stream_stall_on_session(&mut s, None, 600, at_45).is_none(),
+            "45s is inside the 90s pre-token window"
+        );
+        let at_90 = t0 + Duration::from_secs(90);
+        match SessionManager::tick_stream_stall_on_session(&mut s, None, 600, at_90) {
+            Some(StallTickAction::SoftStall {
+                tier: crate::stream_stall::StallTier::PreFirstToken,
+                stall_seconds: 90,
+                saw_model_output: false,
+                saw_tool_activity: false,
+                ..
+            }) => {}
+            other => panic!("expected pre_first_token @ 90s, got {other:?}"),
+        }
+        assert_eq!(s.fsm.state(), SessionState::Streaming);
+        assert!(s.prompt_in_flight);
+    });
+}
+
+#[test]
 fn maybe_done_soft_silence_prompts_never_auto_ends() {
     // Tools finished + partial assistant text; model may still be hung with
     // prompt_in_flight=true. Soft silence must only banner — never force-end.

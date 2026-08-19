@@ -169,7 +169,7 @@ export const koSettings = {
   "settings.agentIdleMinutes": "유휴 회수(분)",
   "settings.agentIdleMinutesDesc": "이 시간(분) 동안 활동이 없으면 에이전트 프로세스가 회수됩니다. 채팅 기록은 유지되며 다음 메시지가 다시 연결됩니다.",
   "settings.streamStallSeconds": "스트림 정체 타임아웃(초)",
-  "settings.streamStallSecondsDesc": "턴에 이 시간 동안 스트림 청크나 도구 활동이 없으면, 앱은 먼저 이미 끝난 호스트 상태를 조용히 복구한 뒤 계속 기다리기 / 턴 종료를 표시합니다(기본 600 = 10분). 토큰도 도구도 없는 턴은 더 짧은 창(~45초)을 써서 죽은 게이트웨이가 더 빨리 재시도를 제안할 수 있습니다. 이벤트를 계속 내는 장시간 도구는 정체로 치지 않습니다. 앱은 사용자가 시작한 턴을 스스로 끝내지 않습니다 — 턴 종료는 사용자만 할 수 있습니다.",
+  "settings.streamStallSecondsDesc": "턴에 이 시간 동안 스트림 청크나 도구 활동이 없으면, 앱은 먼저 이미 끝난 호스트 상태를 조용히 복구한 뒤 계속 기다리기 / 턴 종료를 표시합니다(기본 600 = 10분). 토큰도 도구도 없는 턴은 더 짧은 창(~90초)을 써서 죽은 게이트웨이가 더 빨리 재시도를 제안할 수 있습니다. 이벤트를 계속 내는 장시간 도구는 정체로 치지 않습니다. 앱은 사용자가 시작한 턴을 스스로 끝내지 않습니다 — 턴 종료는 사용자만 할 수 있습니다.",
   "settings.includePartialMessagesDesc": "`--output-format streaming-messages-json`을 쓰는 헤드리스 경로는 `--include-partial-messages`도 전달합니다(CLI 0.2.117+) 그래서 증분 `stream_event` 텍스트/생각 델타가 나갑니다. 꺼짐 = 전체 메시지만(CLI 기본값). 켜져 있고 CLI가 충분히 새면 Remote IM이 streaming-messages-json으로 업그레이드되고, 이전 CLI는 소프트 실패합니다(플래그 생략).",
   "settings.maxAgentTurns": "최대 에이전트 턴",
   "settings.maxAgentTurnsDesc": "에이전트 시작 시 `grok --max-turns N`을 전달합니다(1–200). 비우거나 0이면 CLI 기본값입니다. 다음 에이전트 시작에 적용됩니다 — 변경 후 세션을 다시 연결하세요.",

@@ -192,7 +192,7 @@ export const zhTWSettings = {
   "settings.agentIdleMinutes": "閒置回收（分鐘）",
   "settings.agentIdleMinutesDesc": "超過該分鐘數無活動後回收 Agent 行程。對話紀錄保留，下次傳送會自動重連。",
   "settings.streamStallSeconds": "串流停滯逾時（秒）",
-  "settings.streamStallSecondsDesc": "若一輪對話在該時間內無任何串流片段或工具活動，應用會先嘗試靜默收尾已真正結束的 Host 狀態，再提示「繼續等待 / 結束本輪」（預設 600 秒 = 10 分鐘）。尚無 token、也無工具的空轉會用更短視窗（約 45 秒），以便閘道失敗時更快出現重試。仍有工具事件的長任務不會誤判為停滯。應用不會擅自結束你發起的任務——只有你點「結束本輪」才會停。",
+  "settings.streamStallSecondsDesc": "若一輪對話在該時間內無任何串流片段或工具活動，應用會先嘗試靜默收尾已真正結束的 Host 狀態，再提示「繼續等待 / 結束本輪」（預設 600 秒 = 10 分鐘）。尚無 token、也無工具的空轉會用更短視窗（約 90 秒），以便閘道失敗時更快出現重試。仍有工具事件的長任務不會誤判為停滯。應用不會擅自結束你發起的任務——只有你點「結束本輪」才會停。",
   "settings.includePartialMessagesDesc": "使用 `--output-format streaming-messages-json` 的無頭路徑會額外傳入 `--include-partial-messages`（CLI 0.2.117+），輸出增量 `stream_event` 文字/思考 delta。關閉 = 僅完整訊息（CLI 預設）。開啟且 CLI 足夠新時，遠端 IM 會升級為 streaming-messages-json；更舊 CLI soft-fail（省略 flag）。",
   "settings.maxAgentTurns": "最大 Agent 輪次",
   "settings.maxAgentTurnsDesc": "啟動 Agent 時傳入 `grok --max-turns N`（1–200）。留空或 0 表示使用 CLI 預設。下次啟動 Agent 時生效——變更後請重新連線工作階段。",

@@ -169,7 +169,7 @@ export const jaSettings = {
   "settings.agentIdleMinutes": "闲置回收（分钟）",
   "settings.agentIdleMinutesDesc": "超过该分钟数无活动后回收 Agent 进程。对话记录保留，下次发送会自动重连。",
   "settings.streamStallSeconds": "流式卡顿超时（秒）",
-  "settings.streamStallSecondsDesc": "若一轮对话在该时间内无任何流式片段或工具活动，应用会先尝试静默收尾已真正结束的 Host 状态，再提示「继续等待 / 结束本轮」（默认 600 秒 = 10 分钟）。尚无 token、也无工具的空转会用更短窗口（约 45 秒），以便网关失败时更快出现重试。仍有工具事件的长任务不会误判为卡顿。应用不会擅自结束你发起的任务——只有你点「结束本轮」才会停。",
+  "settings.streamStallSecondsDesc": "若一轮对话在该时间内无任何流式片段或工具活动，应用会先尝试静默收尾已真正结束的 Host 状态，再提示「继续等待 / 结束本轮」（默认 600 秒 = 10 分钟）。尚无 token、也无工具的空转会用更短窗口（约 90 秒），以便网关失败时更快出现重试。仍有工具事件的长任务不会误判为卡顿。应用不会擅自结束你发起的任务——只有你点「结束本轮」才会停。",
   "settings.includePartialMessagesDesc": "使用 `--output-format streaming-messages-json` 的无头路径会额外传入 `--include-partial-messages`（CLI 0.2.117+），输出增量 `stream_event` 文本/思考 delta。关闭 = 仅完整消息（CLI 默认）。开启且 CLI 足够新时，远程 IM 会升级为 streaming-messages-json；更旧 CLI soft-fail（省略 flag）。",
   "settings.maxAgentTurns": "最大 Agent 轮次",
   "settings.maxAgentTurnsDesc": "启动 Agent 时传入 `grok --max-turns N`（1–200）。留空或 0 表示使用 CLI 默认。下次启动 Agent 时生效——更改后请重连会话。",

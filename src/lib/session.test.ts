@@ -35,6 +35,7 @@ import {
   reconcileOptimisticDuplicates,
   isClientOptimisticId,
   weaveToolsIntoAssistantSegments,
+  mergeToolsIntoAssistantSegments,
   reorderSegmentsToHistoryLayout,
   mergeAssistantFragments,
   pickAssistantFragmentCarrierIdx,
@@ -1328,6 +1329,107 @@ describe("session projection", () => {
       "tool",
       "content",
     ]);
+  });
+
+  it("mergeToolsIntoAssistantSegments completes live reads when later tools arrive", () => {
+    // Live read still in_progress in segments; journal already completed it and
+    // added a later bash. The weave used to append only the missing bash and
+    // leave the read spinning at the top of 工作中.
+    const segs = mergeToolsIntoAssistantSegments(
+      [
+        { kind: "thought", text: "plan" },
+        {
+          kind: "tool",
+          toolCallId: "r1",
+          title: "Read a",
+          toolKind: "read_file",
+          status: "in_progress",
+          streaming: true,
+        },
+      ],
+      [
+        {
+          kind: "tool",
+          toolCallId: "r1",
+          title: "Read a",
+          toolKind: "read_file",
+          status: "completed",
+          streaming: false,
+        },
+        {
+          kind: "tool",
+          toolCallId: "b1",
+          title: "Run",
+          toolKind: "run_terminal_command",
+          status: "in_progress",
+          streaming: true,
+        },
+      ],
+    );
+    const tools = segs.filter(
+      (s): s is Extract<typeof s, { kind: "tool" }> => s.kind === "tool",
+    );
+    expect(tools.map((t) => t.toolCallId)).toEqual(["r1", "b1"]);
+    expect(tools[0]).toMatchObject({
+      toolCallId: "r1",
+      status: "completed",
+      streaming: false,
+    });
+    expect(tools[1]).toMatchObject({
+      toolCallId: "b1",
+      status: "in_progress",
+      streaming: true,
+    });
+  });
+
+  it("weaveToolsIntoAssistantSegments settles inlined reads when the journal adds later tools", () => {
+    const woven = weaveToolsIntoAssistantSegments([
+      { id: "u1", role: "user", content: "q" },
+      {
+        id: "a1",
+        role: "assistant",
+        content: "",
+        streaming: true,
+        segments: [
+          { kind: "thought", text: "plan" },
+          {
+            kind: "tool",
+            toolCallId: "r1",
+            title: "Read a",
+            toolKind: "read_file",
+            status: "in_progress",
+            streaming: true,
+          },
+        ],
+      },
+      {
+        id: "tool-r1",
+        role: "tool",
+        content: "tool_step|completed|read_file|Read a",
+        marker: "tool_step",
+        toolCallId: "r1",
+        toolKind: "read_file",
+        toolStatus: "completed",
+      },
+      {
+        id: "tool-b1",
+        role: "tool",
+        content: "tool_step|in_progress|run_terminal_command|Run",
+        marker: "tool_step",
+        toolCallId: "b1",
+        toolKind: "run_terminal_command",
+        toolStatus: "in_progress",
+      },
+    ]);
+    const segs = messageSegments(woven.find((m) => m.id === "a1")!);
+    const tools = segs.filter(
+      (s): s is Extract<typeof s, { kind: "tool" }> => s.kind === "tool",
+    );
+    expect(tools.map((t) => t.toolCallId)).toEqual(["r1", "b1"]);
+    expect(tools[0]).toMatchObject({
+      status: "completed",
+      streaming: false,
+    });
   });
 
   it("reorderSegmentsToHistoryLayout keeps think/tool/body interleave", () => {

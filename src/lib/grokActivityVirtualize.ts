@@ -51,6 +51,27 @@ export function shouldVirtualizeActivityWithExpand(
 }
 
 /**
+ * Key to keep in view while a work phase is live.
+ * Prefer the last running/streaming step so later bash/polls are not hidden
+ * under a capped scroller that stays pinned to the first reads.
+ */
+export function liveActivityFollowKey(
+  steps: Array<{
+    key: string;
+    type?: string;
+    running?: boolean;
+    streaming?: boolean;
+  }>,
+): string | null {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i]!;
+    if (s.running) return s.key;
+    if (s.type === "thought" && s.streaming) return s.key;
+  }
+  return steps[steps.length - 1]?.key ?? null;
+}
+
+/**
  * Parent-owned expand set update. Remounts must call this only on real user
  * toggles / policy defaults — never clear a key solely because a row unmounted.
  */

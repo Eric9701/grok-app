@@ -496,8 +496,10 @@ function toolSegmentFromMessageRow(row: ChatMessage): MessageToolSegment | null 
  * Host often finalizes the assistant row *before* appending tool_step rows, and
  * assistant.createdAt is often *after* tool timestamps — so tools must not sit
  * only after the answer. Prefer: thoughts → tools → content for journals that
- * never stored live interleave. If segments already contain tools, only fill
- * missing ids and keep stream order (do not flatten at turn end).
+ * never stored live interleave. If segments already contain tools, upsert
+ * every turn tool (status updates for known ids + append missing) and keep
+ * stream order. Skipping status updates when a later tool appeared left the
+ * first reads spinning in 工作中 while bash was already running.
  */
 export function mergeToolsIntoAssistantSegments(
   segs: MessageSegment[],
@@ -521,17 +523,13 @@ export function mergeToolsIntoAssistantSegments(
     if (fam && existingFamilies.has(fam)) return false;
     return true;
   });
-  if (!missing.length) {
-    // Still apply status updates for known tools (and host-family merges).
-    let next = segs;
-    for (const t of tools) next = upsertToolInSegments(next, t);
-    return compactMessageSegments(next);
-  }
 
   const alreadyHasTools = segs.some((s) => s.kind === "tool");
   if (alreadyHasTools) {
+    // Always upsert the full turn tool list: completed journal rows must
+    // settle live in_progress segments even when a newer tool is missing.
     let next = segs;
-    for (const t of missing) next = upsertToolInSegments(next, t);
+    for (const t of tools) next = upsertToolInSegments(next, t);
     return compactMessageSegments(next);
   }
 

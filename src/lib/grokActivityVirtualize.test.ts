@@ -8,6 +8,7 @@ import {
   applyActivityStepUserToggle,
   emptyActivityStepExpandState,
   grokActivityVirtualMaxHeightPx,
+  liveActivityFollowKey,
   resolveActivityStepExpandDesired,
   shouldCapMappedGrokActivitySteps,
   shouldVirtualizeActivityWithExpand,
@@ -26,6 +27,30 @@ describe("grokActivityVirtualize", () => {
     expect(
       shouldVirtualizeGrokActivitySteps(GROK_ACTIVITY_VIRTUALIZE_THRESHOLD),
     ).toBe(false);
+  });
+
+  it("liveActivityFollowKey prefers the last running step, not the first reads", () => {
+    expect(
+      liveActivityFollowKey([
+        { key: "explore-0", running: false },
+        { key: "bash-2", running: true },
+        { key: "read-9", running: false },
+      ]),
+    ).toBe("bash-2");
+    expect(
+      liveActivityFollowKey([
+        { key: "explore-0", running: true },
+        { key: "bash-2", running: true },
+      ]),
+    ).toBe("bash-2");
+    expect(
+      liveActivityFollowKey([
+        { key: "th-0", type: "thought", streaming: false },
+        { key: "th-1", type: "thought", streaming: true },
+      ]),
+    ).toBe("th-1");
+    expect(liveActivityFollowKey([{ key: "only" }])).toBe("only");
+    expect(liveActivityFollowKey([])).toBeNull();
   });
 
   it("virtualizes when count exceeds threshold", () => {

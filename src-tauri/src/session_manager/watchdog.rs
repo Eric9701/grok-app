@@ -98,8 +98,15 @@ impl SessionManager {
             });
         }
         let saw_model_this_turn = s.saw_model_output || !s.stream_buf.trim().is_empty();
+        // Streamed CoT is this-turn progress even before visible body — do not
+        // use the short pre-token window while thinking tokens are arriving.
+        let saw_thought_this_turn = !s.stream_thought.trim().is_empty();
         let saw_tools = s.tools_this_turn > 0 || !s.open_tool_ids.is_empty();
-        let stall_secs = effective_stall_seconds(stall_secs, saw_model_this_turn, saw_tools);
+        let stall_secs = effective_stall_seconds(
+            stall_secs,
+            saw_model_this_turn || saw_thought_this_turn,
+            saw_tools,
+        );
         // No silence yet — keep working.
         if !is_stream_stalled(s.last_stream_progress, stall_secs, now) {
             return None;
@@ -112,15 +119,13 @@ impl SessionManager {
             });
         }
 
-        // This-turn body only (do not use prior-turn journal — that false-triggers
-        // maybe_done tier on a new turn that has not produced text yet).
+        // This-turn body only. Prior-turn journal must not upgrade a new send
+        // to post_output — that painted “输出暂时停住了” during first-token wait
+        // after an earlier answer in the same chat.
         if saw_model_this_turn {
             s.saw_model_output = true;
         }
-        // Soft-banner tier may look at prior journal so we never say pre-token
-        // after a full earlier answer in the same chat.
-        let saw_model_for_tier =
-            saw_model_this_turn || Self::journal_has_assistant_body(&s.app_session_id);
+        let saw_model_for_tier = saw_model_this_turn;
         // Maybe-done = this turn has body + tools idle. Used for UI copy only —
         // never force-ends; user chooses Keep waiting / End turn.
         let terminal_candidate = is_maybe_done_candidate(
