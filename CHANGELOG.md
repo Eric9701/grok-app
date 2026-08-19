@@ -68,6 +68,7 @@ See `docs/llm-wiki/release.md`.
 - **User images no longer echo as broken assistant cards**: Pasted / attached user files are not re-attached onto the assistant turn. Outside-project paths 403 after restart no longer lock the card as a corrupt blob.
 - **Windows pet overlay no longer inherits File / Edit / Window / Help; toggle follows real window visibility; hit target shrinks after drag (#696)**: The overlay keeps a window-local empty menu and strips the native bar. Hide retries if the HWND stays painted; File → Close hides instead of destroying. Host clears drag when the left button is up, and measured hit radius is clamped to the mark size.
 - **Linux / KDE pet overlay can be clicked and dragged**: The always-on-top pet stays focusable on Linux so KWin delivers pointer events, hides the GTK Edit/Window/Help bar that `app.set_menu` reapplied on the transparent window, and moves with `movementX/Y` on Wayland (late `startDragging` has no button serial).
+- **Windows release build compiles the last-crash filter**: `windows` 0.61 moved `EXCEPTION_CONTINUE_SEARCH` into Debug and gates `SetUnhandledExceptionFilter` on `Win32_System_Kernel`. The Host now enables that feature so NSIS / portable packages can build.
 - Attach is drag-onto-composer or the row menu (no ⋮⋮ grip-drag). Host compact keeps the newest turns; chips-only missing/empty sources return typed errors; recycle bootstrap keeps a stub or re-expanded attach context.
 
 **中文 · 修复**
@@ -89,6 +90,7 @@ See `docs/llm-wiki/release.md`.
 - **用户图片不再回显成损坏的助手图卡**：用户粘贴/附图不会再挂到助手回合上。项目外路径重启后 403 也不再把卡片钉成坏图。
 - **Windows 宠物不再继承 File / Edit / Window / Help；开关跟真实窗口走；拖完热区会收回（#696）**：浮层用自己的空菜单并卸掉原生菜单栏。关掉后若仍显示会再 hide 一次；File → 关闭只会收起。松开鼠标后 Host 清掉拖拽状态，热区半径按标记尺寸封顶。
 - **Linux / KDE 上可以点、可以拖桌面宠物**：Linux 上宠物窗保持可接收指针；去掉 GTK 应用菜单画在透明 overlay 上的 Edit/Window/Help；Wayland 用位移挪窗，不再等已经过期的 `startDragging` 抓手。
+- **Windows 正式包能编过崩溃摘要钩子**：`windows` 0.61 把 `EXCEPTION_CONTINUE_SEARCH` 挪到 Debug，并把 `SetUnhandledExceptionFilter` 挂在 `Win32_System_Kernel` 上。Host 打开该 feature，NSIS / 绿色版才能编出来。
 - 附加对话改为拖到输入框或用行菜单（无 ⋮⋮ 拖曳）。压缩时保留最新轮次；只发 chip 且来源缺失/空白会返回明确错误；Agent 重开后仍保留附加上下文或占位。
 
 ## [0.2.22] - 2026-08-19

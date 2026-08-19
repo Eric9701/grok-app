@@ -7,9 +7,10 @@ pub fn format_last_crash_line(code: u32, address: u64, pid: u32) -> String {
 
 #[cfg(windows)]
 pub fn install() {
-    use windows::Win32::Foundation::EXCEPTION_CONTINUE_SEARCH;
+    // windows 0.61 gates SetUnhandledExceptionFilter / EXCEPTION_POINTERS on
+    // Win32_System_Kernel; EXCEPTION_CONTINUE_SEARCH lives in Debug as i32.
     use windows::Win32::System::Diagnostics::Debug::{
-        SetUnhandledExceptionFilter, EXCEPTION_POINTERS,
+        SetUnhandledExceptionFilter, EXCEPTION_CONTINUE_SEARCH, EXCEPTION_POINTERS,
     };
 
     unsafe extern "system" fn filter(info: *const EXCEPTION_POINTERS) -> i32 {
@@ -20,11 +21,14 @@ pub fn install() {
             if rec.is_null() {
                 (0u32, 0u64)
             } else {
-                ((*rec).ExceptionCode.0 as u32, (*rec).ExceptionAddress as usize as u64)
+                (
+                    (*rec).ExceptionCode.0 as u32,
+                    (*rec).ExceptionAddress as usize as u64,
+                )
             }
         };
         write_last_crash_sync(code, address, std::process::id());
-        EXCEPTION_CONTINUE_SEARCH.0
+        EXCEPTION_CONTINUE_SEARCH
     }
 
     unsafe {
