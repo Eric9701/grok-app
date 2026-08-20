@@ -109,6 +109,7 @@ export {
   PET_COLORS,
   PET_COLOR_SWATCH,
   PET_INK,
+  PET_PICKER_SHAPES,
   PET_SHAPES,
   PET_SIZES,
   isPetColor,
@@ -120,9 +121,23 @@ export {
   resolvePetEyeInk,
   type PetColor,
   type PetEyeColor,
+  type PetPickerShape,
   type PetShape,
   type PetSizePx,
 } from "./petIdentity";
+
+export {
+  PET_COMPOSING_HOLD_MS,
+  PET_EXPRESSIONS,
+  bloubNotifFill,
+  bloubShapeId,
+  isPetExpression,
+  normalizePetExpression,
+  petIsComposing,
+  petVerbForComposer,
+  resolveBloubPlay,
+  type PetExpression,
+} from "./bloubPlay";
 
 export { petDoneTaskIds, shouldTriggerPetSpin } from "./petCelebrate";
 

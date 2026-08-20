@@ -30,6 +30,8 @@ export type PetFocus = {
   toolTitle: string | null;
   rank: number;
   updatedAt: number;
+  /** True while the main composer has a non-empty draft. */
+  composing?: boolean;
 };
 
 export type PetFocusSession = {
@@ -133,6 +135,7 @@ function focusOf(
       toolTitle: null,
       rank: petKindRank("idle"),
       updatedAt: now,
+      composing: false,
     };
   }
   const snap = input.liveMap[sessionId];
@@ -143,6 +146,7 @@ function focusOf(
     toolTitle: snap?.liveToolTitle ?? null,
     rank: petKindRank(kind),
     updatedAt: activityAt(sessionId, kind, input) || now,
+    composing: false,
   };
 }
 

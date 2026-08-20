@@ -45,6 +45,7 @@ fn pet_init_script(prefs: &PetPrefs) -> String {
         "shape": prefs.shape,
         "color": prefs.color,
         "eyeColor": prefs.eye_color,
+        "expression": prefs.expression,
         "sizePx": prefs.size_px,
         "bubblesEnabled": prefs.bubbles_enabled,
         "progressBarEnabled": prefs.progress_bar_enabled,
@@ -72,6 +73,8 @@ pub struct PetPrefs {
     pub color: String,
     #[serde(default = "default_eye_color")]
     pub eye_color: String,
+    #[serde(default = "default_expression")]
+    pub expression: String,
     #[serde(default = "default_size")]
     pub size_px: u32,
     #[serde(default = "default_bubbles")]
@@ -99,6 +102,9 @@ fn default_color() -> String {
 fn default_eye_color() -> String {
     "auto".into()
 }
+fn default_expression() -> String {
+    "neutre".into()
+}
 fn default_size() -> u32 {
     128
 }
@@ -123,6 +129,7 @@ impl Default for PetPrefs {
             shape: default_shape(),
             color: default_color(),
             eye_color: default_eye_color(),
+            expression: default_expression(),
             size_px: default_size(),
             bubbles_enabled: default_bubbles(),
             progress_bar_enabled: false,
@@ -149,6 +156,8 @@ pub struct PetFocusPayload {
     pub rank: u32,
     #[serde(default)]
     pub updated_at: u64,
+    #[serde(default)]
+    pub composing: bool,
 }
 
 static LAST_FOCUS: Mutex<Option<PetFocusPayload>> = Mutex::new(None);
@@ -283,6 +292,27 @@ fn normalize_prefs(mut p: PetPrefs) -> PetPrefs {
     }
     if p.eye_color != "auto" && !colors.contains(&p.eye_color.as_str()) {
         p.eye_color = default_eye_color();
+    }
+    let expressions = [
+        "neutre",
+        "attentif",
+        "surpris",
+        "excite",
+        "heureux",
+        "hilare",
+        "colere",
+        "triste",
+        "effraye",
+        "mefiant",
+        "confus",
+        "curieux",
+        "fier",
+        "timide",
+        "blase",
+        "somnolent",
+    ];
+    if !expressions.contains(&p.expression.as_str()) {
+        p.expression = default_expression();
     }
     p.size_px = if p.size_px <= 112 {
         96
@@ -1302,6 +1332,16 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(leaf.shape, "leaf");
+        let expr = normalize_prefs(PetPrefs {
+            expression: "nope".into(),
+            ..Default::default()
+        });
+        assert_eq!(expr.expression, "neutre");
+        let happy = normalize_prefs(PetPrefs {
+            expression: "heureux".into(),
+            ..Default::default()
+        });
+        assert_eq!(happy.expression, "heureux");
         let bubbles = normalize_prefs(PetPrefs {
             bubble_shape: "nope".into(),
             bubble_style: "neon".into(),

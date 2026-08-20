@@ -13,6 +13,8 @@ import {
   isPetColor,
   isPetShape,
   normalizePetEyeColor,
+  normalizePetExpression,
+  petVerbForComposer,
   PET_BUBBLE_WIDTH,
   PET_DRAG_SLOP,
   petBubbleViewportHeight,
@@ -79,7 +81,11 @@ export function PetOverlay({
   const shape = isPetShape(prefs.shape) ? prefs.shape : "hex";
   const color = isPetColor(prefs.color) ? prefs.color : "green";
   const eyeColor = normalizePetEyeColor(prefs.eyeColor);
-  const verb = petVerbFor(focus.kind, focus.toolTitle);
+  const expression = normalizePetExpression(prefs.expression);
+  const verb = petVerbForComposer({
+    sessionVerb: petVerbFor(focus.kind, focus.toolTitle),
+    composing: focus.composing === true,
+  });
   const sizePx = prefs.sizePx || 128;
   const bubblesOn = petBubblesEnabled(prefs);
   const bubbleShape = normalizePetBubbleShape(prefs.bubbleShape);
@@ -455,6 +461,7 @@ export function PetOverlay({
           shape={shape}
           color={color}
           eyeColor={eyeColor}
+          expression={expression}
           verb={verb}
           sizePx={sizePx}
           title={title}

@@ -1,32 +1,31 @@
 /**
- * Living mark — port of Grok Bot / Sand `$_t` renderer:
- * clip-path body, --fg/--bg eyes, spring pose, 25 eye topologies, state table.
+ * Living mark — bloub BotEngine (radial morph, mask-hole eyes, measured states).
+ * Overlay chrome (drag, bubbles, menu) stays outside this renderer.
  */
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { listen } from "@/lib/api/host";
 import type { PetColor, PetEyeColor, PetShape, PetVerb } from "@/lib/pet";
 import { isPetColor, resolvePetBodyInk, resolvePetEyeInk } from "@/lib/pet";
-import shapes from "@/lib/pet/data/shapes.json";
-import eyes from "@/lib/pet/data/eyes.json";
 import {
-  MARK_CENTER as Re,
-  MARK_VIEWBOX,
-  STATE_BLINK,
-  STATE_TOPO_HOLD,
-  STATE_TOPOLOGIES,
-  verbToMarkState,
-} from "@/lib/pet/markTables";
+  BotEngine,
+  DEMI_VIEWBOX,
+  POSES,
+  RAYON,
+  mixHex,
+  type BotFrame,
+} from "@/lib/pet/bloub";
 import {
-  clamp,
-  gazeFromDelta,
-  gazeFromPointer,
-  lerpPts,
-  polyPath,
-  randBetween,
-  spring,
-  stepSpring,
-  type Spring,
-} from "@/lib/pet/markMath";
+  bloubExpressionOf,
+  bloubLookAtPointer,
+  bloubNotifFill,
+  bloubShapeRadii,
+  bloubShouldLoop,
+  bloubStateDuration,
+  normalizePetExpression,
+  resolveBloubPlay,
+} from "@/lib/pet/bloubPlay";
+import { pickRestEmote, resolveLivingMood } from "@/lib/pet/petMood";
+import { MARK_CENTER, verbToMarkState } from "@/lib/pet/markTables";
 import { createMarkOrbit } from "@/lib/pet/markOrbit";
 import {
   beginPetSpin,
@@ -36,223 +35,40 @@ import {
   type PetSpinKind,
   type PetSpinRun,
 } from "@/lib/pet/markSpin";
-import { pickRestEmote, resolveLivingMood } from "@/lib/pet/petMood";
+import { clamp } from "@/lib/pet/markMath";
 
-
-type ShapeRec = {
-  path: string;
-  face: { x: number; y: number; sx: number; sy: number; eye: number; leftDX?: number };
-  top: number;
-  bottom: number;
-  beltRadius?: number;
-};
-
-const SHAPES = shapes as Record<string, ShapeRec>;
-const EYES = eyes as number[][][][];
-
-function applyPose(state: string, tSec: number, age: number, pose: {
-  turn: Spring;
-  tilt: Spring;
-  bob: Spring;
-  scale: Spring;
-  lid: Spring;
-}) {
-  const mt = tSec;
-  const Dt = age;
-  let lid = 1;
-  switch (state) {
-    case "sleeping":
-      pose.turn.t = 4 + Math.sin(mt * 0.25) * 2;
-      pose.tilt.t = -2;
-      pose.bob.t = 8 + Math.sin(mt * 0.55) * 3;
-      pose.scale.t = 1 + Math.sin(mt * 0.55) * 0.016;
-      lid = 0.08;
-      break;
-    case "waking":
-      if (Dt < 0.5) {
-        lid = 0.07;
-        pose.bob.t = 6;
-      } else if (Dt < 1.2) {
-        lid = 1;
-        pose.bob.t = -5;
-        pose.tilt.t = 0;
-        pose.scale.t = 1.04;
-      } else {
-        pose.bob.t = Math.sin(mt * 0.9) * 2;
-        pose.scale.t = 1;
-        lid = 1;
-      }
-      break;
-    case "idle":
-      pose.turn.t = Math.sin(mt * 0.5) * 1.5 + Math.sin(mt * 0.17) * 0.6;
-      pose.tilt.t = Math.sin(mt * 0.27) * 1;
-      pose.bob.t = Math.sin(mt * 0.85) * 1.2;
-      pose.scale.t = 1 + Math.sin(mt * 0.85) * 0.007;
-      break;
-    case "listening":
-      pose.turn.t = 8 + Math.sin(mt * 0.5) * 1.5;
-      pose.tilt.t = 2;
-      pose.bob.t = -2 + Math.sin(mt * 0.8) * 0.8;
-      pose.scale.t = 1.015;
-      break;
-    case "thinking":
-      pose.turn.t = -9 + Math.sin(mt * 0.35) * 5;
-      pose.tilt.t = Math.sin(mt * 0.3) * 5;
-      pose.bob.t = Math.sin(mt * 0.6) * 2.5;
-      pose.scale.t = 1;
-      break;
-    case "searching": {
-      const w = Math.sin(mt * 1.3);
-      pose.turn.t = w * 13;
-      pose.tilt.t = w * 7;
-      pose.bob.t = Math.sin(mt * 1.7) * 3;
-      pose.scale.t = 1;
-      break;
+function sampleDots(
+  frame: BotFrame,
+  ink: string,
+  paper: string,
+  keyPrefix: string,
+) {
+  return frame.dots.map((dot, i) => {
+    const fill =
+      dot.color ??
+      (dot.depth === undefined ? ink : mixHex(paper, ink, dot.depth));
+    if (dot.d) {
+      return (
+        <path
+          key={`${keyPrefix}${i}`}
+          d={dot.d}
+          transform={`translate(${dot.x} ${dot.y}) rotate(${dot.rot ?? 0}) scale(${RAYON})`}
+          fill={fill}
+          opacity={dot.opacity}
+        />
+      );
     }
-    case "working": {
-      const w = Math.sin(mt * Math.PI * 2 * 1.6);
-      pose.turn.t = 4 + w * 2.5;
-      pose.tilt.t = 3;
-      pose.bob.t = 1.5 + Math.max(0, w) * 3;
-      pose.scale.t = 1 - Math.max(0, w) * 0.02;
-      break;
-    }
-    case "sad":
-      pose.turn.t = 3 + Math.sin(mt * 0.3) * 2;
-      pose.tilt.t = Math.sin(mt * 0.25) * 1.5;
-      pose.bob.t = 7 + Math.sin(mt * 0.4);
-      pose.scale.t = 0.97;
-      lid = 0.7;
-      break;
-    case "happy":
-      pose.turn.t = Math.sin(mt * 0.7) * 2;
-      pose.tilt.t = Math.sin(mt * 0.4) * 2;
-      pose.bob.t = -Math.abs(Math.sin(mt * 1.4)) * 3;
-      pose.scale.t = 1.02;
-      lid = 0.72;
-      break;
-    case "curious":
-      pose.turn.t = 10 + Math.sin(mt * 0.6) * 2;
-      pose.tilt.t = -6;
-      pose.bob.t = Math.sin(mt * 1.1) * 1.4;
-      pose.scale.t = 1.02;
-      lid = 1.08;
-      break;
-    case "confused":
-      pose.turn.t = Math.sin(mt * 1.1) * 8;
-      pose.tilt.t = 8 + Math.sin(mt * 0.9) * 4;
-      pose.bob.t = Math.sin(mt * 0.7) * 1.6;
-      pose.scale.t = 1;
-      lid = 0.9;
-      break;
-    case "playful":
-      pose.turn.t = Math.sin(mt * 2.1) * 10;
-      pose.tilt.t = Math.sin(mt * 1.7) * 8;
-      pose.bob.t = -Math.abs(Math.sin(mt * 2.4)) * 4;
-      pose.scale.t = 1.03 + Math.sin(mt * 2.4) * 0.02;
-      break;
-    case "shy":
-      pose.turn.t = -12 + Math.sin(mt * 0.4) * 2;
-      pose.tilt.t = 6;
-      pose.bob.t = 5 + Math.sin(mt * 0.5);
-      pose.scale.t = 0.96;
-      lid = 0.78;
-      break;
-    case "proud":
-      pose.turn.t = Math.sin(mt * 0.35) * 1.5;
-      pose.tilt.t = -3;
-      pose.bob.t = -4;
-      pose.scale.t = 1.05;
-      lid = 0.68;
-      break;
-    case "bored":
-      pose.turn.t = -8 + Math.sin(mt * 0.2) * 1;
-      pose.tilt.t = 3;
-      pose.bob.t = 3 + Math.sin(mt * 0.3);
-      pose.scale.t = 0.98;
-      lid = 0.48;
-      break;
-    case "drowsy":
-      pose.turn.t = Math.sin(mt * 0.22) * 2;
-      pose.tilt.t = 4;
-      pose.bob.t = 6 + Math.sin(mt * 0.35) * 2;
-      pose.scale.t = 0.97;
-      lid = 0.32;
-      break;
-    case "excited":
-      pose.turn.t = Math.sin(mt * 2.4) * 6;
-      pose.tilt.t = Math.sin(mt * 1.8) * 5;
-      pose.bob.t = -Math.abs(Math.sin(mt * 2.8)) * 5;
-      pose.scale.t = 1.04 + Math.sin(mt * 2.8) * 0.03;
-      lid = 1.12;
-      break;
-    case "surprised":
-      pose.turn.t = 0;
-      pose.tilt.t = -2;
-      pose.bob.t = -6;
-      pose.scale.t = 1.08;
-      lid = 1.2;
-      break;
-    case "laughing":
-      pose.turn.t = Math.sin(mt * 3.2) * 4;
-      pose.tilt.t = Math.sin(mt * 2.6) * 3;
-      pose.bob.t = -Math.abs(Math.sin(mt * 3.6)) * 3.5;
-      pose.scale.t = 1.03;
-      lid = 0.22;
-      break;
-    case "scared":
-      pose.turn.t = Math.sin(mt * 18) * 3;
-      pose.tilt.t = Math.sin(mt * 14) * 2;
-      pose.bob.t = -3;
-      pose.scale.t = 0.94;
-      lid = 1.18;
-      break;
-    case "angry":
-      pose.turn.t = 4 + Math.sin(mt * 1.4) * 2;
-      pose.tilt.t = -4;
-      pose.bob.t = Math.sin(mt * 1.1) * 1.2;
-      pose.scale.t = 1.02;
-      lid = 0.55;
-      break;
-    case "suspicious":
-      pose.turn.t = 11;
-      pose.tilt.t = 3;
-      pose.bob.t = Math.sin(mt * 0.5) * 0.8;
-      pose.scale.t = 1;
-      lid = 0.62;
-      break;
-    case "writing":
-      pose.turn.t = -6 + Math.sin(mt * 0.45) * 3;
-      pose.tilt.t = 5 + Math.sin(mt * 0.55) * 2;
-      pose.bob.t = Math.sin(mt * 0.7) * 1.4;
-      pose.scale.t = 1;
-      lid = 0.92;
-      break;
-    case "notifying":
-      pose.turn.t = 3;
-      pose.tilt.t = 2;
-      pose.bob.t = -1;
-      pose.scale.t = 1 + 0.05 * Math.exp(-Dt * 3);
-      break;
-    case "celebrate":
-      pose.turn.t = 0;
-      pose.tilt.t = 0;
-      pose.bob.t = -Math.abs(Math.sin(mt * 1.6)) * 2.5;
-      pose.scale.t = 1;
-      break;
-    case "dragging":
-      pose.turn.t = Math.sin(mt * 2.6) * 6;
-      pose.tilt.t = 16;
-      pose.bob.t = Math.sin(mt * 1.4) * 2;
-      pose.scale.t = 1;
-      break;
-    default:
-      pose.turn.t = Math.sin(mt * 0.5) * 1.5;
-      pose.tilt.t = Math.sin(mt * 0.27);
-      pose.bob.t = Math.sin(mt * 0.85) * 1.2;
-      pose.scale.t = 1 + Math.sin(mt * 0.85) * 0.007;
-  }
-  pose.lid.t = lid;
+    return (
+      <circle
+        key={`${keyPrefix}${i}`}
+        cx={dot.x}
+        cy={dot.y}
+        r={dot.r}
+        fill={fill}
+        opacity={dot.opacity}
+      />
+    );
+  });
 }
 
 export function PetMark({
@@ -266,6 +82,8 @@ export function PetMark({
   emoteSignal = 0,
   dragging = false,
   eyeColor = "auto",
+  expression = "neutre",
+  restOnly = false,
 }: {
   shape?: PetShape | string;
   color?: PetColor;
@@ -275,62 +93,76 @@ export function PetMark({
   title?: string;
   paused?: boolean;
   dragging?: boolean;
-  /** Increment to replay a random Grok Bot spin (`Sn` / `spinWild`). */
   spinSignal?: number;
-  /** Increment to flash a random rest expression. */
   emoteSignal?: number;
+  expression?: string;
+  /** Settings picker: selected rest face only — no hover / idle bursts. */
+  restOnly?: boolean;
 }) {
-  const rec = SHAPES[shape] ?? SHAPES.hex;
   const fill = resolvePetBodyInk(isPetColor(color) ? color : "green");
   const eyeInk = resolvePetEyeInk(isPetColor(color) ? color : "green", eyeColor);
+  const restExpr = normalizePetExpression(expression);
   const uid = useId().replace(/:/g, "");
+  const maskId = `pet-mask-${uid}`;
   const svgRef = useRef<SVGSVGElement>(null);
-  const rootRef = useRef<SVGGElement>(null);
-  const bodyRef = useRef<SVGGElement>(null);
-  const backRef = useRef<SVGGElement>(null);
-  const frontRef = useRef<SVGGElement>(null);
-  const pathRef = useRef<SVGPathElement>(null);
-  const eye0Ref = useRef<SVGPathElement>(null);
-  const eye1Ref = useRef<SVGPathElement>(null);
-  const clipRef = useRef<SVGPathElement>(null);
-  const stateRef = useRef(verbToMarkState(verb));
+  const bodySpinRef = useRef<SVGGElement>(null);
+  const orbitBackRef = useRef<SVGGElement>(null);
+  const orbitFrontRef = useRef<SVGGElement>(null);
+  const engineRef = useRef<BotEngine | null>(null);
+  const clockRef = useRef(0);
+  const verbRef = useRef(verb);
   const shapeRef = useRef(shape);
+  const restRef = useRef(restExpr);
   const pausedRef = useRef(paused);
-  const startedRef = useRef(0);
+  const draggingRef = useRef(dragging);
+  const restOnlyRef = useRef(restOnly);
   const wantSpinRef = useRef(0);
   const playedSpinRef = useRef(0);
   const wantEmoteRef = useRef(0);
   const playedEmoteRef = useRef(0);
-  const draggingRef = useRef(dragging);
-  const fillRef = useRef(fill);
-  const eyeInkRef = useRef(eyeInk);
-  stateRef.current = verbToMarkState(verb);
+  verbRef.current = verb;
   shapeRef.current = shape;
+  restRef.current = restExpr;
   pausedRef.current = paused;
   draggingRef.current = dragging;
-  fillRef.current = fill;
-  eyeInkRef.current = eyeInk;
+  restOnlyRef.current = restOnly;
   if (spinSignal > 0) wantSpinRef.current = spinSignal;
   if (emoteSignal > 0) wantEmoteRef.current = emoteSignal;
 
-  useEffect(() => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce || pausedRef.current) return;
+  const [frame, setFrame] = useState<BotFrame>(() => {
+    const engine = new BotEngine(
+      RAYON,
+      "idle",
+      bloubShapeRadii(shape),
+      bloubExpressionOf(restExpr),
+    );
+    engineRef.current = engine;
+    const play = resolveBloubPlay(verbToMarkState(verb), restExpr);
+    engine.setState(play.state, 0);
+    engine.setExpression(bloubExpressionOf(play.expression), 0);
+    return engine.sample(paused ? (POSES[play.state] ?? 1) : 0);
+  });
 
-    const pose = {
-      turn: spring(0),
-      tilt: spring(0),
-      bob: spring(0),
-      scale: spring(1),
-      lid: spring(1),
-    };
-    const morph = spring(1);
-    const gazeX = spring(0);
-    const gazeY = spring(0);
+  useEffect(() => {
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const engine =
+      engineRef.current ??
+      new BotEngine(
+        RAYON,
+        "idle",
+        bloubShapeRadii(shapeRef.current),
+        bloubExpressionOf(restRef.current),
+      );
+    engineRef.current = engine;
+
     const look = { dx: 0, dy: 0, localR: 48, at: 0, fromScreen: false };
     let unlistenCursor: (() => void) | undefined;
+    let aiming = false;
 
     const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
       if (look.fromScreen && performance.now() - look.at < 180) return;
       look.dx = e.clientX;
       look.dy = e.clientY;
@@ -341,81 +173,59 @@ export function PetMark({
     const onPointerLeave = () => {
       if (!look.fromScreen) look.at = 0;
     };
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-    window.addEventListener("pointerleave", onPointerLeave);
-    void listen<{ dx?: number; dy?: number; localR?: number }>("pet://cursor", (p) => {
-      if (p == null || typeof p.dx !== "number" || typeof p.dy !== "number") return;
-      look.dx = p.dx;
-      look.dy = p.dy;
-      look.localR = typeof p.localR === "number" && p.localR > 0 ? p.localR : 64;
-      look.fromScreen = true;
-      look.at = performance.now();
-    }).then((u) => {
-      unlistenCursor = u;
-    });
 
-    let topoIdx = 0;
-    let fromEyes = [EYES[0][0], EYES[0][1]] as number[][][];
-    let toEyes = fromEyes;
-    let nextTopoAt = 0;
-    let nextBlinkAt = 0;
-    let blinkingUntil = 0;
-    let gazeUntil = 0;
+    if (!pausedRef.current && !reduce) {
+      window.addEventListener("pointermove", onPointerMove, { passive: true });
+      window.addEventListener("pointerleave", onPointerLeave);
+      void listen<{ dx?: number; dy?: number; localR?: number }>(
+        "pet://cursor",
+        (p) => {
+          if (p == null || typeof p.dx !== "number" || typeof p.dy !== "number") {
+            return;
+          }
+          look.dx = p.dx;
+          look.dy = p.dy;
+          look.localR =
+            typeof p.localR === "number" && p.localR > 0 ? p.localR : 64;
+          look.fromScreen = true;
+          look.at = performance.now();
+        },
+      ).then((u) => {
+        unlistenCursor = u;
+      });
+    }
+
     let raf = 0;
-    let last = performance.now();
-    startedRef.current = last;
-    let lastState = "";
+    let last = 0;
     let hoverSince = 0;
     let emoteMood = "";
     let emoteUntil = 0;
     let idleBurstMood = "";
     let idleBurstUntil = 0;
     let idleBurstNextAt = 0;
-    let beltRadius = SHAPES[shapeRef.current]?.beltRadius ?? Re;
-    const orbit = createMarkOrbit({
-      back: backRef.current,
-      front: frontRef.current,
-      idPrefix: uid,
-      reduceMotion: reduce,
-      radius: () => beltRadius,
-    });
+    let lastPlayState = engine.state;
+    let stateSince = clockRef.current;
     let spin: PetSpinRun | null = null;
     let lastSpinKind: PetSpinKind | null = null;
-    const startSpin = () => {
-      if (pausedRef.current) return;
-      const kind = pickPetSpinKind(lastSpinKind);
-      lastSpinKind = kind;
-      spin = beginPetSpin(kind, performance.now());
-      if (petSpinWantsBurst(kind)) orbit.burst(16, 0.95, 0.3);
-    };
+    const orbit = createMarkOrbit({
+      back: orbitBackRef.current,
+      front: orbitFrontRef.current,
+      idPrefix: uid,
+      reduceMotion: reduce,
+      radius: () => MARK_CENTER,
+    });
 
-    const pickTopo = (state: string, hop = false) => {
-      const list = STATE_TOPOLOGIES[state] ?? STATE_TOPOLOGIES.idle;
-      if (hop) {
-        topoIdx = (topoIdx + 1 + Math.floor(Math.random() * Math.max(1, list.length - 1))) % list.length;
-      } else {
-        topoIdx = 0;
-      }
-      const id = list[topoIdx] ?? 0;
-      const pair = EYES[id] ?? EYES[0];
-      const t = Math.min(Math.max(morph.x, 0), 1);
-      fromEyes = [lerpPts(fromEyes[0], toEyes[0], t), lerpPts(fromEyes[1], toEyes[1], t)];
-      toEyes = [pair[0], pair[1]];
-      morph.x = 0;
-      morph.v = 0;
-      morph.t = 1;
-    };
-
-    const tick = (now: number) => {
-      const dt = Math.min((now - last) / 1000, 0.1);
-      last = now;
-      const session = stateRef.current;
+    const resolvePlay = (nowMs: number) => {
+      const session = verbToMarkState(verbRef.current);
       if (wantEmoteRef.current !== playedEmoteRef.current) {
         playedEmoteRef.current = wantEmoteRef.current;
         emoteMood = pickRestEmote(emoteMood);
-        emoteUntil = now + 2600;
+        emoteUntil = nowMs + 2600;
       }
-      const lookFresh = look.at > 0 && now - look.at < 280;
+      if (restOnlyRef.current) {
+        return resolveBloubPlay(session, restRef.current);
+      }
+      const lookFresh = look.at > 0 && nowMs - look.at < 280;
       const nearMark = look.fromScreen
         ? Math.hypot(look.dx, look.dy) <= (look.localR || 64) * 1.35
         : lookFresh;
@@ -426,131 +236,86 @@ export function PetMark({
         session !== "dragging" &&
         !draggingRef.current;
       if (trackingLook && session === "idle") {
-        if (!hoverSince) hoverSince = now;
+        if (!hoverSince) hoverSince = nowMs;
       } else {
         hoverSince = 0;
       }
-      if (
-        session === "idle" &&
-        !draggingRef.current &&
-        emoteUntil <= now
-      ) {
+      if (session === "idle" && !draggingRef.current && emoteUntil <= nowMs) {
         if (!idleBurstNextAt) {
-          idleBurstNextAt = now + randBetween(8000, 16000);
-        } else if (now >= idleBurstNextAt) {
+          idleBurstNextAt = nowMs + 8000 + Math.random() * 8000;
+        } else if (nowMs >= idleBurstNextAt) {
           idleBurstMood = pickRestEmote(idleBurstMood);
-          idleBurstUntil = now + randBetween(2200, 4000);
-          idleBurstNextAt = idleBurstUntil + randBetween(8000, 16000);
+          idleBurstUntil = nowMs + 2200 + Math.random() * 1800;
+          idleBurstNextAt = idleBurstUntil + 8000 + Math.random() * 8000;
         }
       }
-      const state = resolveLivingMood({
+      const mood = resolveLivingMood({
         sessionVerb: session,
-        now,
+        now: nowMs,
         dragging: draggingRef.current,
         hovering: hoverSince > 0,
-        hoverMs: hoverSince > 0 ? now - hoverSince : 0,
+        hoverMs: hoverSince > 0 ? nowMs - hoverSince : 0,
         emoteMood,
         emoteUntil,
         idleBurstMood,
         idleBurstUntil,
       });
-      const age = (now - startedRef.current) / 1000;
-      if (state !== lastState) {
-        lastState = state;
-        startedRef.current = now;
-        pickTopo(state, false);
-        const hold = STATE_TOPO_HOLD[state] ?? [4000, 8000];
-        nextTopoAt = now + randBetween(hold[0], hold[1]);
-        const blink = STATE_BLINK[state];
-        nextBlinkAt = blink ? now + randBetween(blink[0], blink[1]) : Number.POSITIVE_INFINITY;
-        blinkingUntil = 0;
-      }
+      return resolveBloubPlay(mood, restRef.current);
+    };
 
+    const paint = (clock: number, dt: number) => {
+      const nowMs = performance.now();
       if (wantSpinRef.current !== playedSpinRef.current) {
         playedSpinRef.current = wantSpinRef.current;
-        startSpin();
+        if (!pausedRef.current && !reduce) {
+          const kind = pickPetSpinKind(lastSpinKind);
+          lastSpinKind = kind;
+          spin = beginPetSpin(kind, nowMs);
+          if (petSpinWantsBurst(kind)) orbit.burst(16, 0.95, 0.3);
+        }
       }
-
-      const spinning = spin != null;
-      const celebrate =
-        spin?.kind === "spinWild" || spin?.kind === "spinDizzy";
-      applyPose(celebrate ? "celebrate" : state, now / 1000, age, pose);
-
-      if (now >= nextTopoAt) {
-        pickTopo(state, true);
-        const hold = STATE_TOPO_HOLD[state] ?? [4000, 8000];
-        nextTopoAt = now + randBetween(hold[0], hold[1]);
+      const play = resolvePlay(nowMs);
+      engine.setShape(bloubShapeRadii(shapeRef.current), clock);
+      engine.setExpression(bloubExpressionOf(play.expression), clock);
+      if (play.state !== lastPlayState) {
+        engine.setState(play.state, clock);
+        lastPlayState = play.state;
+        stateSince = clock;
+      } else if (
+        bloubShouldLoop(play.state) &&
+        clock - stateSince >= bloubStateDuration(play.state)
+      ) {
+        engine.reset(play.state, clock);
+        stateSince = clock;
       }
-      if (now >= nextBlinkAt) {
-        blinkingUntil = now + 160;
-        const blink = STATE_BLINK[state];
-        nextBlinkAt = blink ? now + randBetween(blink[0], blink[1]) : Number.POSITIVE_INFINITY;
+      const frozen = pausedRef.current || reduce;
+      const t = frozen ? (POSES[play.state] ?? 1) : clock;
+      const baseFace =
+        play.state === "idle" || play.state === "swirl";
+      const fresh = look.at > 0 && nowMs - look.at < 280;
+      if (!baseFace || !fresh || restOnlyRef.current) {
+        if (aiming) {
+          engine.setLook(null, clock);
+          aiming = false;
+        }
+      } else {
+        const box = svgRef.current?.getBoundingClientRect();
+        let nx = 0;
+        let ny = 0;
+        if (look.fromScreen) {
+          const r = look.localR || 64;
+          nx = look.dx / Math.max(1, r);
+          ny = look.dy / Math.max(1, r);
+        } else if (box && box.width > 0 && box.height > 0) {
+          nx = (look.dx - (box.left + box.width / 2)) / Math.max(1, box.width);
+          ny = (look.dy - (box.top + box.height / 2)) / Math.max(1, box.height);
+        }
+        if (Number.isFinite(nx) && Number.isFinite(ny)) {
+          engine.setLook(bloubLookAtPointer(nx, ny, true), clock);
+          aiming = true;
+        }
       }
-      if (now < blinkingUntil) {
-        const u = 1 - (blinkingUntil - now) / 160;
-        pose.lid.t = u < 0.45 ? 0.06 : pose.lid.t;
-      }
-      const tracking =
-        !spinning &&
-        look.at > 0 &&
-        now - look.at < 280 &&
-        state !== "sleeping" &&
-        state !== "dragging";
-      if (tracking) {
-        const g = look.fromScreen
-          ? gazeFromDelta(look.dx, look.dy, look.localR)
-          : svgRef.current
-            ? gazeFromPointer(look.dx, look.dy, svgRef.current.getBoundingClientRect())
-            : { x: 0, y: 0 };
-        gazeX.t = g.x;
-        gazeY.t = g.y;
-        pose.turn.t = g.x * 0.32;
-        pose.tilt.t = g.y * 0.22;
-        gazeUntil = now + 640;
-      } else if (!spinning && now >= gazeUntil) {
-        gazeX.t = randBetween(-0.4, 0.4) * 15;
-        gazeY.t = randBetween(-0.3, 0.3) * 9;
-        gazeUntil = now + randBetween(1800, 4200);
-      }
-
-      const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
-      const h = dt / steps;
-      for (let i = 0; i < steps; i++) {
-        stepSpring(morph, 7, 1, h);
-        stepSpring(pose.turn, 5, 0.9, h);
-        stepSpring(pose.tilt, 3.5, 1, h);
-        stepSpring(pose.bob, 4, 1, h);
-        stepSpring(pose.scale, 10, 0.8, h);
-        stepSpring(pose.lid, 26, 1, h);
-        stepSpring(gazeX, tracking ? 16 : 13, 1, h);
-        stepSpring(gazeY, tracking ? 16 : 13, 1, h);
-      }
-
-      const recNow = SHAPES[shapeRef.current] ?? SHAPES.hex;
-      const t = clamp(morph.x, 0, 1);
-      const e0 = lerpPts(fromEyes[0], toEyes[0], t);
-      const e1 = lerpPts(fromEyes[1], toEyes[1], t);
-      const face = recNow.face;
-      const lid = clamp(pose.lid.x, 0.04, 1.2);
-      const eyeS = face.eye * (8 / 9);
-      const lookAmp = tracking ? 1 : 0.35;
-      const place = (pts: number[][], side: 0 | 1) => {
-        const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
-        const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-        const dx = (cx - Re) * face.sx + gazeX.x * lookAmp + (side === 0 ? (face.leftDX ?? 0) : 0);
-        const dy = (cy - Re) * face.sy + gazeY.x * lookAmp;
-        return pts.map(([x, y]) => [
-          Re + face.x + (x - cx) * eyeS + dx,
-          Re + face.y + (y - cy) * eyeS * lid + dy,
-        ]);
-      };
-      eye0Ref.current?.setAttribute("d", polyPath(place(e0, 0)));
-      eye1Ref.current?.setAttribute("d", polyPath(place(e1, 1)));
-      eye0Ref.current?.setAttribute("fill", eyeInkRef.current);
-      eye1Ref.current?.setAttribute("fill", eyeInkRef.current);
-      pathRef.current?.setAttribute("d", recNow.path);
-      pathRef.current?.setAttribute("fill", fillRef.current);
-      clipRef.current?.setAttribute("d", recNow.path);
+      setFrame(engine.sample(t));
 
       let spinAngle = 0;
       let extraRot = 0;
@@ -560,7 +325,7 @@ export function PetMark({
       let bounceY = 0;
       let wideStyle = false;
       if (spin) {
-        const sw = stepPetSpin(spin, now, dt);
+        const sw = stepPetSpin(spin, nowMs, dt);
         if (sw.done) {
           spin = null;
         } else {
@@ -571,33 +336,44 @@ export function PetMark({
           wobbleBob = sw.wobbleBob;
           bounceY = sw.bounceY;
           wideStyle = sw.wideStyle;
-          if (sw.lid != null) pose.lid.t = sw.lid;
         }
       }
-      beltRadius = recNow.beltRadius ?? Re;
+      if (bodySpinRef.current) {
+        const rot = extraRot + wobbleTurn;
+        const tx = wobbleTilt;
+        const ty = wobbleBob + bounceY;
+        bodySpinRef.current.setAttribute(
+          "transform",
+          `translate(${tx.toFixed(2)} ${ty.toFixed(2)}) rotate(${rot.toFixed(2)})`,
+        );
+      }
       const markPx = svgRef.current?.getBoundingClientRect().width ?? 128;
       const sizeScale = clamp((340 / Math.max(markPx, 1)) ** 0.7, 1, 2.6);
-      orbit.update(now, dt, {
+      orbit.update(nowMs, dt, {
         spinAngle,
         sizeScale,
         wideStyle,
         sustainBelts: false,
       });
-
-      if (bodyRef.current) {
-        const tx = pose.tilt.x + wobbleTilt;
-        const ty = pose.bob.x + wobbleBob + bounceY;
-        const rot = pose.turn.x + wobbleTurn + extraRot;
-        const sc = pose.scale.x;
-        bodyRef.current.setAttribute(
-          "transform",
-          `translate(${(Re + tx).toFixed(2)} ${(Re + ty).toFixed(2)}) rotate(${rot.toFixed(2)}) scale(${sc.toFixed(4)} ${sc.toFixed(4)}) translate(${-Re} ${-Re})`,
-        );
-      }
-
-      if (!pausedRef.current) raf = requestAnimationFrame(tick);
     };
 
+    if (pausedRef.current || reduce) {
+      paint(clockRef.current, 0);
+      return () => {
+        orbit.clear();
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerleave", onPointerLeave);
+        unlistenCursor?.();
+      };
+    }
+
+    const tick = (ms: number) => {
+      const dt = last ? Math.min((ms - last) / 1000, 0.064) : 0;
+      last = ms;
+      clockRef.current += dt;
+      paint(clockRef.current, dt);
+      raf = requestAnimationFrame(tick);
+    };
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
@@ -606,7 +382,24 @@ export function PetMark({
       window.removeEventListener("pointerleave", onPointerLeave);
       unlistenCursor?.();
     };
-  }, [shape, verb, paused, uid]);
+  }, [paused, uid]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const play = resolveBloubPlay(verbToMarkState(verb), restExpr);
+    engine.setShape(bloubShapeRadii(shape), clockRef.current);
+    engine.setExpression(bloubExpressionOf(play.expression), clockRef.current);
+    if (paused) {
+      engine.reset(play.state, 0);
+      setFrame(engine.sample(POSES[play.state] ?? 1));
+    }
+  }, [paused, shape, verb, restExpr]);
+
+  const paper = eyeInk;
+  const ink = fill;
+  const notifFill = bloubNotifFill(ink);
+  const vb = DEMI_VIEWBOX;
 
   return (
     <svg
@@ -614,7 +407,7 @@ export function PetMark({
       className="pet-mark"
       width={sizePx}
       height={sizePx}
-      viewBox={MARK_VIEWBOX}
+      viewBox={`${-vb} ${-vb} ${vb * 2} ${vb * 2}`}
       role="img"
       aria-label={title}
       data-state={verbToMarkState(verb)}
@@ -626,22 +419,108 @@ export function PetMark({
         ["--pet-ink" as string]: fill,
       }}
     >
-      <g ref={rootRef}>
-        <g ref={backRef} aria-hidden="true" />
-        <defs>
-          <clipPath id={`pet-clip-${uid}`}>
-            <path ref={clipRef} d={rec.path} />
-          </clipPath>
-        </defs>
-        <g ref={bodyRef}>
-          <path ref={pathRef} d={rec.path} fill={fill} />
-          <g clipPath={`url(#pet-clip-${uid})`}>
-            <path ref={eye0Ref} d={polyPath(EYES[0][0])} fill={eyeInk} />
-            <path ref={eye1Ref} d={polyPath(EYES[0][1])} fill={eyeInk} />
+      <defs>
+        <mask
+          id={maskId}
+          maskUnits="userSpaceOnUse"
+          x={-vb}
+          y={-vb}
+          width={vb * 2}
+          height={vb * 2}
+        >
+          <path d={frame.bodyPath} fill="#fff" />
+          {frame.eyes.map((eye, i) => (
+            <path
+              key={i}
+              d={eye.d}
+              transform={eye.matrix}
+              opacity={eye.alpha}
+              fill="#000"
+            />
+          ))}
+          {frame.notch ? (
+            <circle
+              cx={frame.notch.x}
+              cy={frame.notch.y}
+              r={frame.notch.r}
+              fill="#000"
+            />
+          ) : null}
+        </mask>
+        {frame.arcs.map((arc) => (
+          <linearGradient
+            key={arc.id}
+            id={`${uid}-${arc.id}`}
+            gradientUnits="userSpaceOnUse"
+            x1={arc.grad.x1}
+            y1={arc.grad.y1}
+            x2={arc.grad.x2}
+            y2={arc.grad.y2}
+          >
+            {arc.grad.stops.map((c, i) => (
+              <stop
+                key={i}
+                offset={
+                  arc.grad.stops.length > 1
+                    ? i / (arc.grad.stops.length - 1)
+                    : 0
+                }
+                stopColor={c}
+              />
+            ))}
+          </linearGradient>
+        ))}
+      </defs>
+      <g
+        ref={orbitBackRef}
+        aria-hidden="true"
+        transform={`translate(${-MARK_CENTER} ${-MARK_CENTER})`}
+      />
+      <g ref={bodySpinRef}>
+        <g fill="none" strokeLinecap="round">
+          {frame.arcs.map((arc) => (
+            <path
+              key={`b${arc.id}`}
+              d={arc.back}
+              stroke={`url(#${uid}-${arc.id})`}
+              strokeWidth={arc.width}
+              opacity={arc.opacity}
+            />
+          ))}
+        </g>
+        {frame.dotsBehind ? <g>{sampleDots(frame, ink, paper, "pb")}</g> : null}
+        <g opacity={frame.bodyAlpha}>
+          <path d={frame.bodyPath} fill={paper} />
+          <g mask={`url(#${maskId})`}>
+            <rect x={-vb} y={-vb} width={vb * 2} height={vb * 2} fill={ink} />
           </g>
         </g>
-        <g ref={frontRef} aria-hidden="true" />
+        {!frame.dotsBehind ? <g>{sampleDots(frame, ink, paper, "pf")}</g> : null}
+        {frame.notif ? (
+          <circle
+            cx={frame.notif.x}
+            cy={frame.notif.y}
+            r={frame.notif.r}
+            fill={notifFill}
+          />
+        ) : null}
+        <g fill="none" strokeLinecap="round">
+          {frame.arcs.map((arc) => (
+            <path
+              key={`f${arc.id}`}
+              d={arc.front}
+              stroke={`url(#${uid}-${arc.id})`}
+              strokeWidth={arc.width}
+              opacity={arc.opacity}
+            />
+          ))}
+        </g>
       </g>
+      <g
+        ref={orbitFrontRef}
+        aria-hidden="true"
+        transform={`translate(${-MARK_CENTER} ${-MARK_CENTER})`}
+      />
     </svg>
   );
 }

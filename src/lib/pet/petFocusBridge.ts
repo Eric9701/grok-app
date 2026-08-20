@@ -29,6 +29,7 @@ export type PetFocusBridgeOpts = {
   pushTasks?: (tasks: PetTask[]) => void;
   getSnippets?: () => Readonly<Record<string, string>>;
   getDismissMs?: () => number;
+  getComposing?: () => boolean;
 };
 
 export type PetFocusBridge = {
@@ -70,7 +71,10 @@ export function startPetFocusBridge(opts: PetFocusBridgeOpts): PetFocusBridge {
       sessions: opts.getSessions(),
       snippets: opts.getSnippets?.() ?? petStageSnippetStore.getMap(),
     };
-    const next = resolvePetFocus(prev, input);
+    const next: PetFocus = {
+      ...resolvePetFocus(prev, input),
+      composing: opts.getComposing?.() === true,
+    };
     const live = collectPetTasks(input);
     held = mergeHeldPetTasks({
       held,
@@ -94,7 +98,8 @@ export function startPetFocusBridge(opts: PetFocusBridgeOpts): PetFocusBridge {
       prev &&
       prev.kind === next.kind &&
       prev.sessionId === next.sessionId &&
-      prev.toolTitle === next.toolTitle
+      prev.toolTitle === next.toolTitle &&
+      !!prev.composing === !!next.composing
     ) {
       prev = next;
       return;

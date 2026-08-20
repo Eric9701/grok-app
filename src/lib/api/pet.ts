@@ -7,6 +7,7 @@ import {
   isPetColor,
   isPetShape,
   normalizePetBubbleDismissSec,
+  normalizePetExpression,
   normalizePetBubbleShape,
   normalizePetBubbleStyle,
   petBubbleOffsetX,
@@ -22,6 +23,7 @@ export type PetPrefs = {
   shape: string;
   color: string;
   eyeColor?: string;
+  expression?: string;
   bubblesEnabled?: boolean;
   progressBarEnabled?: boolean;
   bubbleDismissSec?: number;
@@ -38,6 +40,7 @@ export const PET_PREFS_FALLBACK: PetPrefs = {
   shape: "hex",
   color: "green",
   eyeColor: "auto",
+  expression: "neutre",
   bubblesEnabled: true,
   progressBarEnabled: false,
   bubbleDismissSec: PET_BUBBLE_DISMISS_DEFAULT,
@@ -65,6 +68,7 @@ export function readPetBootPrefs(): PetPrefs {
     ...raw,
     shape: isPetShape(raw.shape) ? raw.shape : fallback.shape,
     color: isPetColor(raw.color) ? raw.color : fallback.color,
+    expression: normalizePetExpression(raw.expression),
     sizePx: raw.sizePx || fallback.sizePx,
     bubbleDismissSec: normalizePetBubbleDismissSec(raw.bubbleDismissSec),
     bubbleShape: normalizePetBubbleShape(raw.bubbleShape),
@@ -131,6 +135,7 @@ export async function petPushFocus(focus: PetFocus): Promise<void> {
       toolTitle: focus.toolTitle,
       rank: focus.rank,
       updatedAt: focus.updatedAt,
+      composing: focus.composing === true,
     },
   });
 }
@@ -189,6 +194,7 @@ export async function petGetFocus(): Promise<PetFocus | null> {
     toolTitle?: string | null;
     rank?: number;
     updatedAt?: number;
+    composing?: boolean;
   } | null>("pet_get_focus");
   if (!raw) return null;
   return {
@@ -198,6 +204,7 @@ export async function petGetFocus(): Promise<PetFocus | null> {
     toolTitle: raw.toolTitle ?? null,
     rank: raw.rank ?? 5,
     updatedAt: raw.updatedAt ?? 0,
+    composing: raw.composing === true,
   };
 }
 

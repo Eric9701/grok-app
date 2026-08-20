@@ -23,6 +23,20 @@ export const PET_SHAPES = [
 
 export type PetShape = (typeof PET_SHAPES)[number];
 
+/** Bloub customiser: 8 measured rest silhouettes. */
+export const PET_PICKER_SHAPES = [
+  "blob",
+  "pebble",
+  "squircle",
+  "capsule",
+  "wedge",
+  "hex",
+  "cloud",
+  "teardrop",
+] as const;
+
+export type PetPickerShape = (typeof PET_PICKER_SHAPES)[number];
+
 export const PET_COLORS = [
   "black",
   "white",

@@ -15,11 +15,13 @@ import {
   PET_BUBBLE_STYLES,
   PET_COLORS,
   PET_COLOR_SWATCH,
-  PET_SHAPES,
+  PET_EXPRESSIONS,
+  PET_PICKER_SHAPES,
   PET_SIZES,
   isPetColor,
   isPetShape,
   normalizePetBubbleDismissSec,
+  normalizePetExpression,
   normalizePetBubbleShape,
   normalizePetBubbleStyle,
   normalizePetEyeColor,
@@ -125,6 +127,7 @@ export function PetSection() {
   const shape: PetShape = isPetShape(prefs.shape) ? prefs.shape : "hex";
   const color: PetColor = isPetColor(prefs.color) ? prefs.color : "green";
   const eyeColor: PetEyeColor = normalizePetEyeColor(prefs.eyeColor);
+  const expression = normalizePetExpression(prefs.expression);
   const sizePx = normalizePetSize(prefs.sizePx);
 
   return (
@@ -267,12 +270,20 @@ export function PetSection() {
             <div className="settings-row__label">{t("settings.pet.identity")}</div>
             <div className="settings-row__desc">{t("settings.pet.identityDesc")}</div>
           </div>
-          <PetMark shape={shape} color={color} eyeColor={eyeColor} verb="idle" sizePx={72} />
+          <PetMark
+            shape={shape}
+            color={color}
+            eyeColor={eyeColor}
+            expression={expression}
+            verb="idle"
+            sizePx={72}
+            restOnly
+          />
         </div>
         <div className="settings-row settings-row--stack">
           <div className="settings-row__label">{t("settings.pet.shape")}</div>
           <div className="pet-settings-grid" role="group" aria-label={t("settings.pet.shape")}>
-            {PET_SHAPES.map((sh) => (
+            {PET_PICKER_SHAPES.map((sh) => (
               <button
                 key={sh}
                 type="button"
@@ -288,9 +299,47 @@ export function PetSection() {
                   shape={sh}
                   color={color}
                   eyeColor={eyeColor}
+                  expression={expression}
                   verb="idle"
                   sizePx={28}
                   paused
+                  restOnly
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+        <div
+          className="settings-row settings-row--stack"
+          id="settings-anchor-pet-expression"
+        >
+          <div className="settings-row__label">{t("settings.pet.expression")}</div>
+          <div
+            className="pet-settings-grid"
+            role="group"
+            aria-label={t("settings.pet.expression")}
+          >
+            {PET_EXPRESSIONS.map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                className={
+                  "pet-settings-grid__btn" + (expression === ex ? " is-on" : "")
+                }
+                aria-pressed={expression === ex}
+                aria-label={t(`settings.pet.expression.${ex}`)}
+                disabled={busy}
+                onClick={() => void commit({ ...prefs, expression: ex })}
+              >
+                <PetMark
+                  shape={shape}
+                  color={color}
+                  eyeColor={eyeColor}
+                  expression={ex}
+                  verb="idle"
+                  sizePx={28}
+                  paused
+                  restOnly
                 />
               </button>
             ))}

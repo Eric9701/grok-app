@@ -173,6 +173,8 @@ describe("settingsCatalog", () => {
     expect(dismissHits.some((h) => h.entry.id === "pet.bubbleDismiss")).toBe(true);
     const lookHits = searchSettingsEntries("气泡形状", tZh, tEn);
     expect(lookHits.some((h) => h.entry.id === "pet.bubbleLook")).toBe(true);
+    const faceHits = searchSettingsEntries("表情", tZh, tEn);
+    expect(faceHits.some((h) => h.entry.id === "pet.expression")).toBe(true);
   });
 
   it("keywordKeysForSection includes appearance prefs and remote control", () => {

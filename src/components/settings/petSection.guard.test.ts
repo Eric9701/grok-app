@@ -27,6 +27,13 @@ describe("PetSection visibility switch", () => {
     expect(src).toContain("bubblesEnabled");
   });
 
+  it("picks bloub rest shapes and expressions", () => {
+    expect(src).toContain("PET_PICKER_SHAPES");
+    expect(src).toContain("PET_EXPRESSIONS");
+    expect(src).toContain("settings.pet.expression");
+    expect(src).toContain("restOnly");
+  });
+
   it("lets the user pick dismiss seconds, progress bar, and bubble look", () => {
     expect(src).toContain("settings.pet.bubbleDismiss");
     expect(src).toContain("bubbleDismissSec");
