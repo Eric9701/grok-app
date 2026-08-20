@@ -16,6 +16,7 @@ use crate::process_limits::{can_spawn_process, normalize_max_concurrent, process
 use crate::session_fsm::{SessionFsm, SessionState};
 use crate::store::{self};
 
+use super::fork_trim::{child_trim_plan, fork_trimmed_outcome, ChildTrimPlan};
 use super::*;
 
 /// Drops `connect_lock` holder diagnostics when the lock guard goes out of
@@ -1059,6 +1060,7 @@ impl SessionManager {
             empty_mcp_servers: false,
         };
 
+        let cwd_str = cwd.to_string_lossy().to_string();
         let spawn_result = tokio::time::timeout(
             Duration::from_secs(CONNECT_HANDSHAKE_BUDGET_SECS),
             AcpClient::spawn_with_options(cli_path, cwd, spawn_opts),
@@ -1156,22 +1158,104 @@ impl SessionManager {
             fork_session = fork_agent,
             "connect session_open_begin"
         );
+        let rewind_index = meta.fork_rewind_prompt_index;
         let open_result = Self::with_handshake_budget(
             client.initialize_and_open_session(resume_agent_sid.as_deref(), fork_agent),
         )
         .await;
 
-        // One-shot flag: clear whether fork succeeded or fell through to new/load.
+        // One-shot flags: clear whether fork succeeded or fell through to new/load.
         if meta.fork_agent_session {
             let _ = store::clear_session_fork_agent_session(&meta.id);
         }
 
         match open_result {
-            Ok((agent_sid, resumed)) => {
+            Ok((mut agent_sid, resumed)) => {
+                let plan = child_trim_plan(rewind_index, resumed);
+                let mut rewind_ok: Option<bool> = None;
+                let mut need_bootstrap = !resumed && journal_has_history;
+                let mut skip_set_mode = fork_agent && matches!(plan, ChildTrimPlan::Skip);
+
+                match plan {
+                    ChildTrimPlan::RewindChild { prompt_index } => {
+                        match client
+                            .rewind_execute_for(&agent_sid, prompt_index, false)
+                            .await
+                        {
+                            Ok(_) => {
+                                rewind_ok = Some(true);
+                                need_bootstrap = false;
+                                skip_set_mode = true;
+                                tracing::info!(
+                                    target: "session",
+                                    session = %meta.id,
+                                    agent = %agent_sid,
+                                    prompt_index,
+                                    "connect child rewind ok (memory matches cut journal)"
+                                );
+                            }
+                            Err(e) => {
+                                rewind_ok = Some(false);
+                                tracing::warn!(
+                                    target: "session",
+                                    session = %meta.id,
+                                    agent = %agent_sid,
+                                    error = %e,
+                                    "child rewind failed; session/new + bootstrap (will not keep untrimmed fork)"
+                                );
+                                match Self::with_handshake_budget(
+                                    client.open_session_at(None, false, &cwd_str),
+                                )
+                                .await
+                                {
+                                    Ok((new_sid, _)) => {
+                                        agent_sid = new_sid;
+                                        need_bootstrap = journal_has_history;
+                                        skip_set_mode = false;
+                                    }
+                                    Err(new_err) => {
+                                        tracing::warn!(
+                                            target: "session",
+                                            session = %meta.id,
+                                            error = %new_err.message,
+                                            "session/new after failed child rewind also failed"
+                                        );
+                                        Self::kill_acp_bounded(&client).await;
+                                        self.unregister_pending_child(&process_id);
+                                        {
+                                            let mut guard = self.inner.lock();
+                                            if let Some(s) = guard.as_mut() {
+                                                let _ = s.fsm.connect_failed(new_err);
+                                            }
+                                        }
+                                        let snap = self.snapshot();
+                                        Self::emit_state(&app, &snap);
+                                        return Ok(snap);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    ChildTrimPlan::Bootstrap => {
+                        need_bootstrap = journal_has_history;
+                        skip_set_mode = false;
+                    }
+                    ChildTrimPlan::Skip => {}
+                }
+
+                if let Some(outcome) = fork_trimmed_outcome(plan, rewind_ok) {
+                    let _ = app.emit(
+                        "session://fork_trimmed",
+                        serde_json::json!({
+                            "sessionId": meta.id,
+                            "outcome": outcome,
+                        }),
+                    );
+                }
+
                 // Native resume / successful fork = full agent context. Fresh
                 // session + existing UI journal → bootstrap history into the next prompt.
-                let need_bootstrap = !resumed && journal_has_history;
-                if resumed {
+                if resumed && rewind_ok != Some(false) {
                     tracing::info!(
                         target: "session",
                         session = %meta.id,
@@ -1202,6 +1286,7 @@ impl SessionManager {
                         s.process_id = process_id.clone();
                         s.meta.agent_session_id = Some(agent_sid);
                         s.meta.fork_agent_session = false;
+                        s.meta.fork_rewind_prompt_index = None;
                         s.meta.model_id = Some(prefs.model_id.clone());
                         s.meta.mode = Some(prefs.mode.clone());
                         s.meta.effort = Some(prefs.effort.clone());
@@ -1222,8 +1307,8 @@ impl SessionManager {
                 // set_mode so a wall-clock sweep cannot kill a working agent.
                 self.unregister_pending_child(&process_id);
                 // Nudge mode *after* Ready so a slow/failed set_mode cannot pin
-                // the pill on 连接中. Fork already inherited parent mode.
-                if fork_agent {
+                // the pill on 连接中. Successful fork already inherited parent mode.
+                if skip_set_mode {
                     tracing::info!(
                         target: "session",
                         session = %meta.id,
