@@ -50,6 +50,7 @@ import {
   endIndexThroughUserPrompt,
   canRewindToUserPrompt,
   userPromptIndexOf,
+  userPromptIndexContaining,
   countUserPrompts,
   lastUserRowIndex,
   lastUserMessageIndex,
@@ -232,6 +233,34 @@ describe("session projection", () => {
     expect(userPromptIndexOf(msgs, "u2")).toBe(1);
     expect(userPromptIndexOf(msgs, "a1")).toBe(-1);
     expect(countUserPrompts(msgs)).toBe(2);
+  });
+
+  it("userPromptIndexContaining maps assistant/tool to the parent user turn", () => {
+    const msgs: ChatMessage[] = [
+      { id: "u1", role: "user", content: "first" },
+      { id: "a1", role: "assistant", content: "ok" },
+      { id: "t1", role: "tool", content: "ran" },
+      { id: "u2", role: "user", content: "second" },
+      { id: "a2", role: "assistant", content: "later" },
+      {
+        id: "i1",
+        role: "user",
+        content: "steer",
+        marker: "interjection",
+      },
+    ];
+    expect(userPromptIndexContaining(msgs, "a1")).toBe(0);
+    expect(userPromptIndexContaining(msgs, "t1")).toBe(0);
+    expect(userPromptIndexContaining(msgs, "u1")).toBe(0);
+    expect(userPromptIndexContaining(msgs, "a2")).toBe(1);
+    expect(userPromptIndexContaining(msgs, "i1")).toBe(1);
+    expect(userPromptIndexContaining(msgs, "missing")).toBe(-1);
+    expect(
+      userPromptIndexContaining(
+        [{ id: "a0", role: "assistant", content: "x" }],
+        "a0",
+      ),
+    ).toBe(-1);
   });
 
   it("keeps interjections inside the surrounding rewind turn", () => {

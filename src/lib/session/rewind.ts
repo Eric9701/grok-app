@@ -69,6 +69,27 @@ export function userPromptIndexOf(
 }
 
 /**
+ * 0-based user-prompt index of the turn that contains `messageId`, or -1.
+ * Prompt rows map to themselves; assistant/tool/interjection map to the
+ * nearest preceding real user prompt (`isTurnPromptMessage`).
+ */
+export function userPromptIndexContaining(
+  messages: ChatMessage[],
+  messageId: string,
+): number {
+  let lastPrompt = -1;
+  let idx = -1;
+  for (const m of messages) {
+    if (isTurnPromptMessage(m)) {
+      idx += 1;
+      lastPrompt = idx;
+    }
+    if (m.id === messageId) return lastPrompt;
+  }
+  return -1;
+}
+
+/**
  * End index (exclusive) of the full turn for `userPromptIndex` (0-based).
  * A turn = that user message + following non-user rows until the next user.
  * Returns `-1` when the index is out of range.

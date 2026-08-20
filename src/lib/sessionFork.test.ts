@@ -14,6 +14,9 @@ import {
   keepForkDialogOpenOnSoftFail,
   resolveForkAgentCheckbox,
   resolveForkAgentSession,
+  resolveForkCliOnConfirm,
+  shouldOfferAssistantFork,
+  shouldShowForkCliCheckbox,
   resolveSessionForkSoftFail,
   resumeRestoreGateMessageKey,
   resumeRestoreSuccessToastKey,
@@ -28,6 +31,86 @@ describe("forkSessionSpawnArgs / CLI --fork-session", () => {
     expect(forkSessionSpawnArgs(false)).toEqual([]);
     expect(forkSessionSpawnArgs(true)).toEqual([FORK_SESSION_CLI_FLAG]);
     expect(FORK_SESSION_CLI_FLAG).toBe("--fork-session");
+  });
+});
+
+describe("shouldOfferAssistantFork", () => {
+  it("is idle completed assistant with a parent prompt", () => {
+    expect(
+      shouldOfferAssistantFork({
+        streaming: false,
+        turnLive: false,
+        canRewindSession: true,
+        parentPromptIndex: 0,
+      }),
+    ).toBe(true);
+    expect(
+      shouldOfferAssistantFork({
+        streaming: true,
+        turnLive: false,
+        canRewindSession: true,
+        parentPromptIndex: 0,
+      }),
+    ).toBe(false);
+    expect(
+      shouldOfferAssistantFork({
+        streaming: false,
+        turnLive: true,
+        canRewindSession: true,
+        parentPromptIndex: 0,
+      }),
+    ).toBe(false);
+    expect(
+      shouldOfferAssistantFork({
+        streaming: false,
+        turnLive: false,
+        canRewindSession: false,
+        parentPromptIndex: 0,
+      }),
+    ).toBe(false);
+    expect(
+      shouldOfferAssistantFork({
+        streaming: false,
+        turnLive: false,
+        canRewindSession: true,
+        parentPromptIndex: -1,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("partial fork CLI checkbox / auto-arm", () => {
+  it("hides CLI checkbox and auto-arms when an agent id exists", () => {
+    expect(shouldShowForkCliCheckbox(0)).toBe(false);
+    expect(shouldShowForkCliCheckbox(null)).toBe(true);
+    expect(
+      resolveForkCliOnConfirm({
+        throughUserPromptIndex: 0,
+        checkboxChecked: false,
+        agentSessionId: "agent-1",
+      }),
+    ).toBe(true);
+    expect(
+      resolveForkCliOnConfirm({
+        throughUserPromptIndex: 0,
+        checkboxChecked: true,
+        agentSessionId: null,
+      }),
+    ).toBe(false);
+    expect(
+      resolveForkCliOnConfirm({
+        throughUserPromptIndex: null,
+        checkboxChecked: true,
+        agentSessionId: "agent-1",
+      }),
+    ).toBe(true);
+    expect(
+      resolveForkCliOnConfirm({
+        throughUserPromptIndex: null,
+        checkboxChecked: false,
+        agentSessionId: "agent-1",
+      }),
+    ).toBe(false);
   });
 });
 

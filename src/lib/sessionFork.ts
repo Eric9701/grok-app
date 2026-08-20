@@ -50,6 +50,42 @@ export function canOfferForkAgentSession(
   return (agentSessionId ?? "").trim().length > 0;
 }
 
+/** Fork-from-here on a completed idle assistant that belongs to a user turn. */
+export function shouldOfferAssistantFork(input: {
+  streaming?: boolean | null;
+  turnLive?: boolean | null;
+  canRewindSession?: boolean | null;
+  parentPromptIndex: number;
+}): boolean {
+  return (
+    !input.streaming &&
+    !input.turnLive &&
+    !!input.canRewindSession &&
+    input.parentPromptIndex >= 0
+  );
+}
+
+/** CLI `--fork-session` checkbox is only for full (uncut) forks. */
+export function shouldShowForkCliCheckbox(
+  throughUserPromptIndex: number | null | undefined,
+): boolean {
+  return throughUserPromptIndex == null;
+}
+
+/**
+ * Effective CLI-fork flag for `session_fork`.
+ * Partial forks auto-arm when a source agent id exists (no checkbox).
+ */
+export function resolveForkCliOnConfirm(input: {
+  throughUserPromptIndex?: number | null;
+  checkboxChecked?: boolean | null;
+  agentSessionId?: string | null;
+}): boolean {
+  if (!canOfferForkAgentSession(input.agentSessionId)) return false;
+  if (input.throughUserPromptIndex != null) return true;
+  return !!input.checkboxChecked;
+}
+
 /**
  * Resolve whether connect should fork the agent session.
  * `wantFork` is the UI checkbox; `agentSessionId` is the source to fork.
