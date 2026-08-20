@@ -67,3 +67,48 @@ export function shouldSendOnKeydown(
   // mod-enter
   return e.metaKey || e.ctrlKey;
 }
+
+/**
+ * Mid-turn Steer chord. Default matches Grok Build CLI: **Ctrl+Enter**
+ * (non–VS Code family; CLI docs also list Ctrl+I / Apple Ctrl+O / VS Code
+ * family Ctrl+L as terminal-specific alts).
+ *
+ * Independent of the Composer send-key preference. While a turn is live,
+ * this chord steers (`sessionInterject`) instead of queueing. Cmd+Enter is
+ * accepted too so macOS App users hit the same modifier as other App chords.
+ */
+export function shouldSteerOnKeydown(e: ComposerSendKeyEvent): boolean {
+  if (e.key !== "Enter") return false;
+  if (e.shiftKey || e.altKey) return false;
+  return e.ctrlKey || e.metaKey;
+}
+
+export type ComposerSubmitAction = "steer" | "send" | "none";
+
+/**
+ * Whether the Ctrl/Cmd+Enter chord should be dispatched to `steerFromComposer`.
+ * Permission waits stay **true** — that handler toasts and refuses to write.
+ * Pre-filtering `awaiting_permission` here made the chord a silent no-op.
+ */
+export function composerSteerLive(opts: {
+  canGuideQueuedMessage: boolean;
+  sessionState: string;
+}): boolean {
+  void opts.sessionState;
+  return opts.canGuideQueuedMessage;
+}
+
+/**
+ * What composer Enter should do. Steer (CLI Ctrl+Enter) wins while a
+ * turn is live so a mod-enter send pref cannot queue instead.
+ */
+export function resolveComposerSubmitAction(opts: {
+  event: ComposerSendKeyEvent;
+  sendPref: ComposerSendKeyPref;
+  /** Live turn (streaming **or** permission wait). Handler toasts on the gate. */
+  canSteer: boolean;
+}): ComposerSubmitAction {
+  if (shouldSteerOnKeydown(opts.event) && opts.canSteer) return "steer";
+  if (shouldSendOnKeydown(opts.event, opts.sendPref)) return "send";
+  return "none";
+}

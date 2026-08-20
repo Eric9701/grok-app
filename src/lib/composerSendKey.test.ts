@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  composerSteerLive,
   loadComposerSendKeyPref,
+  resolveComposerSubmitAction,
   saveComposerSendKeyPref,
   shouldSendOnKeydown,
+  shouldSteerOnKeydown,
   type ComposerSendKeyEvent,
 } from "./composerSendKey";
 
@@ -98,5 +101,99 @@ describe("shouldSendOnKeydown — mod-enter pref", () => {
     expect(shouldSendOnKeydown(key({ altKey: true, metaKey: true }), pref)).toBe(
       false,
     );
+  });
+});
+
+describe("shouldSteerOnKeydown — Grok Build CLI Ctrl+Enter", () => {
+  it("steers on Ctrl+Enter (CLI default mid-turn chord)", () => {
+    expect(shouldSteerOnKeydown(key({ ctrlKey: true }))).toBe(true);
+  });
+
+  it("also steers on Cmd+Enter (macOS App modifier)", () => {
+    expect(shouldSteerOnKeydown(key({ metaKey: true }))).toBe(true);
+  });
+
+  it("does not steal plain Enter (that still sends / queues)", () => {
+    expect(shouldSteerOnKeydown(key())).toBe(false);
+  });
+
+  it("does not fire on Shift+Enter or Alt+Enter", () => {
+    expect(shouldSteerOnKeydown(key({ shiftKey: true, ctrlKey: true }))).toBe(
+      false,
+    );
+    expect(shouldSteerOnKeydown(key({ altKey: true, ctrlKey: true }))).toBe(
+      false,
+    );
+  });
+
+  it("ignores non-Enter keys", () => {
+    expect(shouldSteerOnKeydown(key({ key: "i", ctrlKey: true }))).toBe(false);
+  });
+});
+
+describe("resolveComposerSubmitAction", () => {
+  it("idle + default Enter pref: Ctrl+Enter does nothing (CLI chord is mid-turn only)", () => {
+    expect(
+      resolveComposerSubmitAction({
+        event: key({ ctrlKey: true }),
+        sendPref: "enter",
+        canSteer: false,
+      }),
+    ).toBe("none");
+  });
+
+  it("live turn: Ctrl+Enter steers even if send pref is mod-enter", () => {
+    expect(
+      resolveComposerSubmitAction({
+        event: key({ ctrlKey: true }),
+        sendPref: "mod-enter",
+        canSteer: true,
+      }),
+    ).toBe("steer");
+  });
+
+  it("permission / not live: Ctrl+Enter does not steer", () => {
+    expect(
+      resolveComposerSubmitAction({
+        event: key({ ctrlKey: true }),
+        sendPref: "mod-enter",
+        canSteer: false,
+      }),
+    ).toBe("send");
+  });
+
+  it("plain Enter still sends when pref is enter", () => {
+    expect(
+      resolveComposerSubmitAction({
+        event: key(),
+        sendPref: "enter",
+        canSteer: true,
+      }),
+    ).toBe("send");
+  });
+
+  it("does not drop steer while awaiting_permission (handler toasts)", () => {
+    expect(
+      composerSteerLive({
+        canGuideQueuedMessage: true,
+        sessionState: "awaiting_permission",
+      }),
+    ).toBe(true);
+    expect(
+      resolveComposerSubmitAction({
+        event: key({ ctrlKey: true }),
+        sendPref: "enter",
+        canSteer: composerSteerLive({
+          canGuideQueuedMessage: true,
+          sessionState: "awaiting_permission",
+        }),
+      }),
+    ).toBe("steer");
+    expect(
+      composerSteerLive({
+        canGuideQueuedMessage: false,
+        sessionState: "ready",
+      }),
+    ).toBe(false);
   });
 });

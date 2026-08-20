@@ -692,8 +692,9 @@ import {
 } from "@/lib/recentPromptHistory";
 import {
   COMPOSER_SEND_KEY_CHANGED_EVENT,
+  composerSteerLive,
   loadComposerSendKeyPref,
-  shouldSendOnKeydown,
+  resolveComposerSubmitAction,
   type ComposerSendKeyPref
 } from "@/lib/composerSendKey";
 import {
@@ -746,6 +747,7 @@ import {
   type PromptHistoryScope
 } from "@/components/PromptHistoryPanel";
 import {
+  makeQueuedSend,
   migrateDraftSendClaim,
   planClearSendQueue,
   queueSessionKey,
@@ -11430,6 +11432,83 @@ export function AppWorkbench() {
     ],
   );
 
+  /**
+   * Ctrl+Enter (Grok Build CLI mid-turn chord): steer the composer draft
+   * into the live turn. Empty composer + a queued follow-up steers the head.
+   */
+  const steerFromComposer = useCallback(async () => {
+    if (!canLiveParticipate(isSecondaryWindowRef.current)) {
+      showToast(tr("session.secondaryLiveBanner"), 4000);
+      return;
+    }
+    if (guidingQueueItemId) return;
+    if (session.state === "awaiting_permission") {
+      showToast(tr("composer.queueBlockedPermission"), 2800);
+      return;
+    }
+    if (!canGuideQueuedMessage) return;
+
+    const editorEl = composerInputRef.current;
+    let draft = getDraft();
+    if (editorEl) {
+      try {
+        const live = serializeDom(editorEl);
+        if (live !== draft) {
+          setDraft(live);
+          draft = live;
+        }
+      } catch {
+        /* keep getDraft() */
+      }
+    }
+    const fromDraft = parseChatTokens(draft, (id) =>
+      lookupChatTitle(id, sessions, ""),
+    );
+    let refs = chatAttachments;
+    for (const extra of fromDraft) {
+      refs = addChatRef(refs, extra, { currentId: session.sessionId }).refs;
+    }
+    const storedDisplay = prependChatTokens(stripChatTokens(draft), refs);
+    const segments = parseStoredContent(storedDisplay);
+    const att = attachments;
+    const sendQuotes = quotesRef.current;
+    const hasBody =
+      !isDraftEmpty(segments) || att.length > 0 || sendQuotes.length > 0;
+
+    if (hasBody) {
+      const item = makeQueuedSend({
+        storedDisplay,
+        attachments: att,
+        quotes: sendQuotes,
+        goalMode,
+      });
+      const fromNewChatPage = session.sessionId == null;
+      clearComposerAfterSubmit({
+        clearProjectDraft: fromNewChatPage,
+        clearSessionDraft: !fromNewChatPage,
+        sessionDraftId: viewingSessionIdRef.current ?? session.sessionId,
+      });
+      await guideQueuedMessage(item);
+      return;
+    }
+
+    const head = sendQueue.activeQueue[0];
+    if (head) await guideQueuedMessage(head);
+  }, [
+    attachments,
+    canGuideQueuedMessage,
+    chatAttachments,
+    goalMode,
+    guidingQueueItemId,
+    guideQueuedMessage,
+    sessions,
+    session.sessionId,
+    session.state,
+    sendQueue.activeQueue,
+    showToast,
+    tr,
+  ]);
+
 
   /** Honest fork-agent checkbox presentation (never claims available without id). */
   const forkAgentCheckbox = useMemo(
@@ -17975,7 +18054,12 @@ export function AppWorkbench() {
         setAtActiveIndex((i) => (i - 1 + n) % n);
         return;
       }
-      if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+      if (
+        (e.key === "Enter" || e.key === "Tab") &&
+        !e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey
+      ) {
         e.preventDefault();
         if (!n) return;
         const entry =
@@ -18007,7 +18091,7 @@ export function AppWorkbench() {
         setSlashActiveIndex((i) => (i - 1 + n) % n);
         return;
       }
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         const entry =
           flat[
@@ -18050,7 +18134,10 @@ export function AppWorkbench() {
         closePromptHistory();
         return;
       }
-      if (e.key === "Enter" || e.key === "Tab") {
+      if (
+        (e.key === "Enter" && !e.ctrlKey && !e.metaKey) ||
+        e.key === "Tab"
+      ) {
         const entry = promptHistoryEntries[promptHistoryActive];
         if (entry) {
           e.preventDefault();
@@ -18139,7 +18226,20 @@ export function AppWorkbench() {
         return;
       }
     }
-    if (shouldSendOnKeydown(e, composerSendKeyPref)) {
+    const submit = resolveComposerSubmitAction({
+      event: e,
+      sendPref: composerSendKeyPref,
+      canSteer: composerSteerLive({
+        canGuideQueuedMessage,
+        sessionState: session.state,
+      }),
+    });
+    if (submit === "steer") {
+      e.preventDefault();
+      void steerFromComposer();
+      return;
+    }
+    if (submit === "send") {
       e.preventDefault();
       const draftNow = getDraft();
       const hasBody =
