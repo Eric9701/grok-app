@@ -11,6 +11,24 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Fixed
+- **Windows `pnpm test` no longer fails on a fresh clone (#730)**: `window-config.test.ts` now normalizes CRLF before asserting on Host source, so `core.autocrlf=true` checkouts stay green.
+- **German “turn” is *Vorgang*, not *Zug* (#728)**: 125 catalog sites no longer read as “train” / “chess move”.
+- **15-locale auto-title and test cascade (#726)**: CJK titles no longer panic when peeling 「」 / “”; every shipped locale’s placeholder name is recognised; engine-locale tests no longer poison `APP_HOME_ENV_LOCK` on a non-English desktop.
+- **Parallel `cargo test` is reliable again (#727)**: `plan_chrome` takes the shared app-home lock; a poisoned env lock no longer takes the rest of the suite with it.
+- **Dates and clocks follow Settings, not the WebView (#729)**: history / audit timestamps and the quota-reset clock use the chosen locale (tray included).
+- **Boot splash and “follow system” honour the chosen language (#731)**: splash copy covers all 15 catalogs; `<html lang>` is no longer `en` for twelve of them; follow-system reads the Host OS tag instead of the WebView’s `navigator.language`.
+- **`cargo fmt --check` is green on main (#725)**.
+
+**中文 · 修复**
+- **Windows 全新 clone 上 `pnpm test` 不再红（#730）**：断言 Host 源码前把 CRLF 归一成 LF。
+- **德语 “turn” 改为 Vorgang，不再用 Zug（#728）**。
+- **十五语言自动标题与测试连锁失败（#726）**：剥「」/“”不再 panic；占位标题覆盖全部语言；非英语桌面上的 engine locale 断言不再毒化锁。
+- **并行 `cargo test` 重新稳定（#727）**。
+- **日期和时间跟设置语言走，不再跟 WebView（#729）**。
+- **启动页和「跟随系统」使用所选语言（#731）**。
+- **`cargo fmt --check` 在 main 上重新通过（#725）**。
+
 ## [0.2.23] - 2026-08-20
 
 > **Highlight:** Fifteen UI locales; attach another chat as context; custom STT; think → tools timeline stays honest; sidebar drag no longer fires on a twitch.
