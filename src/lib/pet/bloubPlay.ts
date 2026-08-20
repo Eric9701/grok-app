@@ -91,8 +91,8 @@ const VERB_STATE: Record<string, StateId> = {
   thinking: "thinking",
   searching: "comet",
   working: "orbit",
-  writing: "hexagon",
-  waiting: "alert",
+  writing: "alert",
+  waiting: "wide",
   notifying: "notify",
   sleeping: "sleep",
   waking: "swirl",
@@ -202,10 +202,10 @@ export function petVerbForComposer(input: {
   return input.sessionVerb;
 }
 
-/** How long after the last keystroke the pet holds the catalog hexagon morph. */
+/** How long after the last keystroke the pet holds the catalog alert morph. */
 export const PET_COMPOSING_HOLD_MS = 1500;
 
-/** Typing → catalog `hexagon`; empty draft or a pause → original rest shape. */
+/** Typing → catalog `alert` (slanted !); empty draft or a pause → original rest shape. */
 export function petIsComposing(input: {
   empty: boolean;
   lastTypeAt: number;

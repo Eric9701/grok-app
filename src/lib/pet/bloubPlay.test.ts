@@ -23,9 +23,9 @@ describe("bloub product mapping", () => {
   });
 
   it("maps session verbs onto measured animation states", () => {
-    expect(resolveBloubPlay("writing", "neutre").state).toBe("hexagon");
+    expect(resolveBloubPlay("writing", "neutre").state).toBe("alert");
     expect(resolveBloubPlay("notifying", "neutre").state).toBe("notify");
-    expect(resolveBloubPlay("waiting", "neutre").state).toBe("alert");
+    expect(resolveBloubPlay("waiting", "neutre").state).toBe("wide");
     expect(resolveBloubPlay("thinking", "neutre").state).toBe("thinking");
     expect(resolveBloubPlay("searching", "neutre").state).toBe("comet");
     expect(resolveBloubPlay("working", "neutre").state).toBe("orbit");
@@ -41,7 +41,7 @@ describe("bloub product mapping", () => {
     expect(normalizePetExpression("nope")).toBe("neutre");
   });
 
-  it("turns composer typing into the catalog hexagon morph while idle", () => {
+  it("turns composer typing into the catalog alert morph while idle", () => {
     expect(
       petVerbForComposer({ sessionVerb: "idle", composing: true }),
     ).toBe("writing");
@@ -53,7 +53,7 @@ describe("bloub product mapping", () => {
     ).toBe("idle");
   });
 
-  it("drops the hexagon morph when typing pauses or the draft is empty", () => {
+  it("drops the alert morph when typing pauses or the draft is empty", () => {
     expect(
       petIsComposing({ empty: true, lastTypeAt: 1000, now: 1100 }),
     ).toBe(false);
