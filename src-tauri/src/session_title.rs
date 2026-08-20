@@ -10,7 +10,9 @@ use crate::cli_probe;
 use crate::store::{self, SessionMeta};
 use crate::tray_i18n::{self, Locale};
 
-const PLACEHOLDERS: &[&str] = &[
+/// Default names written to disk before the locale catalogs existed.
+/// Live names come from `tray_i18n` in [`is_placeholder_title`].
+const LEGACY_PLACEHOLDERS: &[&str] = &[
     "New chat",
     "Новый чат",
     "Новая беседа",
@@ -24,9 +26,27 @@ const PLACEHOLDERS: &[&str] = &[
     "新建会话",
 ];
 
+/// True when a title is a default name rather than something about the chat.
+///
+/// Walks every shipped locale instead of a hand-kept list. The app writes
+/// `session.placeholderTitle` in the user's language, so a German session is
+/// stored as "Neuer Chat"; a matcher that only knows English and Chinese never
+/// recognises it and leaves that session on its default name forever.
 pub fn is_placeholder_title(title: &str) -> bool {
     let t = title.trim();
-    t.is_empty() || PLACEHOLDERS.iter().any(|p| p.eq_ignore_ascii_case(t))
+    if t.is_empty() {
+        return true;
+    }
+    if LEGACY_PLACEHOLDERS
+        .iter()
+        .any(|p| p.eq_ignore_ascii_case(t))
+    {
+        return true;
+    }
+    tray_i18n::ALL.iter().any(|l| {
+        let s = tray_i18n::strings(*l);
+        s.new_chat.eq_ignore_ascii_case(t) || s.untitled.eq_ignore_ascii_case(t)
+    })
 }
 
 /// Offline title: first non-empty line, collapsed whitespace, max ~28 display chars.
@@ -70,13 +90,24 @@ fn clean_llm_title(raw: &str) -> Option<String> {
         t = line.to_string();
     }
     for _ in 0..3 {
-        if (t.starts_with('"') && t.ends_with('"'))
-            || (t.starts_with('「') && t.ends_with('」'))
-            || (t.starts_with('“') && t.ends_with('”'))
-            || (t.starts_with('\'') && t.ends_with('\''))
-        {
-            t = t[1..t.len() - 1].trim().to_string();
+        // Peel one matched pair per pass, by character rather than by byte:
+        // 「」 and “” are three bytes each, so `t[1..t.len() - 1]` cuts a
+        // codepoint in half and panics — and those are exactly the quotes a
+        // title model puts around Japanese and Chinese output.
+        let mut inner = t.chars();
+        let first = inner.next();
+        let last = inner.next_back();
+        let quoted = matches!(
+            (first, last),
+            (Some('"'), Some('"'))
+                | (Some('「'), Some('」'))
+                | (Some('“'), Some('”'))
+                | (Some('\''), Some('\''))
+        );
+        if !quoted {
+            break;
         }
+        t = inner.as_str().trim().to_string();
     }
     if let Some(rest) = t
         .strip_prefix("标题：")
@@ -92,7 +123,9 @@ fn clean_llm_title(raw: &str) -> Option<String> {
     {
         t = rest.trim().to_string();
     }
-    if t.is_empty() || t.len() > 120 || is_placeholder_title(&t) {
+    // Character count, not bytes: 120 bytes is only 40 Japanese characters,
+    // so a byte guard rejects titles in the CJK locales it accepts in English.
+    if t.is_empty() || t.chars().count() > 120 || is_placeholder_title(&t) {
         return None;
     }
     if skip_line(&t) {
@@ -254,6 +287,53 @@ mod tests {
         assert!(!is_placeholder_title("修权限条 bug"));
         assert!(!is_placeholder_title("Исправить панель разрешений"));
         assert!(!is_placeholder_title("馬斯克最近有發什麼貼文"));
+    }
+
+    /// `t[1..t.len() - 1]` panicked here: 「」 and “” are three bytes each, so
+    /// the slice cut a codepoint in half. `refine_title_in_background` swallows
+    /// the panic, so auto-titling simply stopped for the CJK locales.
+    #[test]
+    fn clean_strips_multibyte_quotes_without_panicking() {
+        assert_eq!(
+            clean_llm_title("「ログイン修正」\n").as_deref(),
+            Some("ログイン修正")
+        );
+        assert_eq!(clean_llm_title("“修复登录”\n").as_deref(), Some("修复登录"));
+        // An unmatched opening quote must not panic either.
+        assert_eq!(clean_llm_title("「テスト").as_deref(), Some("「テスト"));
+        // Neither may a string that is a single quote character.
+        assert_eq!(clean_llm_title("「").as_deref(), Some("「"));
+    }
+
+    /// The sanity cap counted bytes, so 120 bytes is 40 Japanese characters:
+    /// a title was rejected at a length its English equivalent passed.
+    #[test]
+    fn clean_measures_length_in_characters() {
+        let long_ja: String = "あ".repeat(64);
+        let got = clean_llm_title(&long_ja).expect("accepted");
+        assert_eq!(got.chars().count(), 32, "truncated to the char budget");
+    }
+
+    /// The app writes `session.placeholderTitle` in the user's language, so
+    /// every shipped locale's default name has to be recognised — otherwise
+    /// those sessions keep their default name forever.
+    #[test]
+    fn placeholder_detection_covers_every_shipped_locale() {
+        for locale in tray_i18n::ALL {
+            let s = tray_i18n::strings(locale);
+            assert!(
+                is_placeholder_title(s.new_chat),
+                "{}: {:?} not recognised",
+                locale.as_tag(),
+                s.new_chat
+            );
+            assert!(
+                is_placeholder_title(s.untitled),
+                "{}: {:?} not recognised",
+                locale.as_tag(),
+                s.untitled
+            );
+        }
     }
 
     #[test]
