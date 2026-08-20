@@ -66,6 +66,7 @@ export const enProviders = {
   "prov.preset.yunApi.blurb": "Yun API (yunyi) — Grok 4.6 / 4.5, official effort low/medium/high/xhigh",
   "prov.preset.opencodeGo.blurb": "OpenCode Zen Go — DeepSeek V4 via chat_completions (not Responses)",
   "prov.preset.volcanoArk.blurb": "Volcengine Ark (火山方舟) Coding Plan — full path, chat_completions, DeepSeek V4 Flash",
+  "prov.preset.ai98pro.blurb": "AI98PRO relay — Grok 4.6 / 4.5, Responses, official effort low/medium/high/xhigh",
   "prov.getApiKey": "Get API Key",
   "prov.efforts": "Reasoning levels",
   "prov.effortsHint": "Options shown in the composer effort menu for this channel. Values are sent as reasoning_effort.",

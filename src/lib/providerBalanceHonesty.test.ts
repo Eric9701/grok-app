@@ -46,6 +46,12 @@ describe("supportsProviderBalance", () => {
         baseUrl: "https://ark.cn-beijing.volces.com/api/plan/v3",
       }),
     ).toBe(false);
+    expect(
+      supportsProviderBalance({
+        providerId: "ai98pro",
+        baseUrl: "https://ai98pro.xyz/v1",
+      }),
+    ).toBe(false);
   });
 });
 

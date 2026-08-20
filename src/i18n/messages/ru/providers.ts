@@ -64,6 +64,7 @@ export const ruProviders = {
   "prov.preset.yunApi.blurb": "Yun API (yunyi) — Grok 4.6 / 4.5, официальные уровни low/medium/high/xhigh",
   "prov.preset.opencodeGo.blurb": "OpenCode Zen Go — DeepSeek V4 через chat_completions",
   "prov.preset.volcanoArk.blurb": "Volcengine Ark Coding Plan — полный путь, chat_completions, DeepSeek V4 Flash",
+  "prov.preset.ai98pro.blurb": "AI98PRO relay — Grok 4.6 / 4.5, Responses, официальные уровни low/medium/high/xhigh",
   "prov.getApiKey": "Получить API-ключ",
   "prov.efforts": "Уровни рассуждения",
   "prov.effortsHint": "Варианты, показываемые в меню рассуждения. Значения передаются как reasoning_effort.",

@@ -31,8 +31,13 @@ export type ProviderPreset = {
   blurbKey?: string;
   /** Where to obtain an API key (opened from the form). */
   apiKeyUrl?: string;
-  /** Brand logo key when available (Yun API has none yet). */
+  /** Brand logo key when available (Yun API / AI98PRO have none yet). */
   brandId?: ProviderBrandId;
+  /**
+   * Prefill “this model can see images”. Grok-named models already count as
+   * vision; set true when the channel is an explicit multimodal Grok relay.
+   */
+  supportsVision?: boolean;
 };
 
 /**
@@ -48,7 +53,8 @@ export const GROK_CHANNEL_EFFORTS: ProviderEffortEntry[] = [
 
 /**
  * Official Grok 4.6 effort enum (ids, display names, default).
- * Grok relay presets (Amux / Yun) use this instead of `GROK_CHANNEL_EFFORTS`.
+ * Grok relay presets (Amux / Yun / AI98PRO) use this instead of
+ * `GROK_CHANNEL_EFFORTS`.
  */
 export const GROK_OFFICIAL_EFFORTS: ProviderEffortEntry[] = [
   { id: "low", name: "Low" },
@@ -57,10 +63,10 @@ export const GROK_OFFICIAL_EFFORTS: ProviderEffortEntry[] = [
   { id: "xhigh", name: "Extra high", isDefault: true },
 ];
 
-const GROK_RELAY_PRESET_IDS = new Set(["amux", "yun-api"]);
+const GROK_RELAY_PRESET_IDS = new Set(["amux", "yun-api", "ai98pro"]);
 
 export function isGrokRelayPresetId(id: string | null | undefined): boolean {
-  return !!id && GROK_RELAY_PRESET_IDS.has(id);
+  return !!id && GROK_RELAY_PRESET_IDS.has(id.trim().toLowerCase());
 }
 
 export function officialGrokChannelEfforts(): ProviderEffortEntry[] {
@@ -151,6 +157,12 @@ export const YUN_API_MODELS: ProviderModelEntry[] = [
   { id: "grok-4.5", name: "Grok 4.5" },
 ];
 
+/** AI98PRO OpenAI-compatible Grok relay. */
+export const AI98PRO_MODELS: ProviderModelEntry[] = [
+  { id: "grok-4.6", name: "Grok 4.6" },
+  { id: "grok-4.5", name: "Grok 4.5" },
+];
+
 /**
  * Volcengine Ark (火山方舟) Coding Plan — OpenAI-compatible chat_completions
  * at a non-`/v1` full path root (requires baseUrlFullPath).
@@ -233,10 +245,30 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     apiKeyUrl: "https://console.volcengine.com/ark",
     brandId: "volcano-ark",
   },
+  /**
+   * AI98PRO Grok relay (Responses). Config id is the short slug `ai98pro`
+   * (host sanitize lowercases); gallery / form display name is AI98PRO.
+   */
+  {
+    id: "ai98pro",
+    name: "AI98PRO",
+    suggestedId: "AI98PRO",
+    baseUrl: "https://ai98pro.xyz/v1",
+    apiBackend: "responses",
+    models: AI98PRO_MODELS,
+    efforts: officialGrokChannelEfforts(),
+    blurbKey: "prov.preset.ai98pro.blurb",
+    apiKeyUrl: "https://ai98pro.xyz",
+    supportsVision: true,
+  },
 ];
 
 export function findProviderPreset(id: string): ProviderPreset | undefined {
-  return PROVIDER_PRESETS.find((p) => p.id === id);
+  const n = id.trim().toLowerCase();
+  if (!n) return undefined;
+  return PROVIDER_PRESETS.find(
+    (p) => p.id.toLowerCase() === n || p.suggestedId.toLowerCase() === n,
+  );
 }
 
 function matchPreset(opts: {
@@ -246,7 +278,7 @@ function matchPreset(opts: {
   const pid = opts.providerId?.trim().toLowerCase() ?? "";
   if (pid) {
     const byId = PROVIDER_PRESETS.find(
-      (p) => p.id === pid || p.suggestedId === pid,
+      (p) => p.id.toLowerCase() === pid || p.suggestedId.toLowerCase() === pid,
     );
     if (byId) return byId;
     // Legacy local ids that still map to a known brand (e.g. huo-shan → 火山方舟).
@@ -259,6 +291,11 @@ function matchPreset(opts: {
     ) {
       const ark = PROVIDER_PRESETS.find((p) => p.id === "volcano-ark");
       if (ark) return ark;
+    }
+    // Auto-suffixed local ids from the add form (ai98pro-----1072183582).
+    if (pid === "ai98pro" || pid.startsWith("ai98pro-")) {
+      const ai98 = PROVIDER_PRESETS.find((p) => p.id === "ai98pro");
+      if (ai98) return ai98;
     }
   }
   let host = "";

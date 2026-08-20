@@ -182,7 +182,7 @@ function formFromPreset(preset: ProviderPreset): FormState {
     providerMode: "generic",
     // Presets carry no channel rules — opt-in per provider.
     appendPrompt: "",
-    supportsVision: false,
+    supportsVision: !!preset.supportsVision,
     models: preset.models.map((m) => ({
       id: m.id,
       name: m.name || m.id,

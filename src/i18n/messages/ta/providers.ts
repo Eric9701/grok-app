@@ -64,6 +64,7 @@ export const taProviders = {
   "prov.preset.yunApi.blurb": "Yun API (yunyi) — Grok 4.6 / 4.5, அதிகாரப்பூர்வ முயற்சி குறைந்த/நடுத்தர/உயர்/xhigh",
   "prov.preset.opencodeGo.blurb": "OpenCode Zen Go — DeepSeek V4 வழியாக chat_completions (பதில்கள் அல்ல)",
   "prov.preset.volcanoArk.blurb": "Volcengine Ark (火山方舟) கோடிங் திட்டம் — முழு பாதை, chat_completions, DeepSeek V4 Flash",
+  "prov.preset.ai98pro.blurb": "AI98PRO ரிலே — Grok 4.6 / 4.5, Responses, அதிகாரப்பூர்வ முயற்சி low/medium/high/xhigh",
   "prov.getApiKey": "API விசையைப் பெறுங்கள்",
   "prov.efforts": "பகுத்தறிவு நிலைகள்",
   "prov.effortsHint": "இந்த சேனலுக்கான எழுதி முயற்சி மெனுவில் காட்டப்படும் விருப்பங்கள். மதிப்புகள் பகுத்தறிவு_முயற்சியாக அனுப்பப்படுகின்றன.",

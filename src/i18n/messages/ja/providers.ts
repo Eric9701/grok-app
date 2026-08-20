@@ -64,6 +64,7 @@ export const jaProviders = {
   "prov.preset.yunApi.blurb": "Yun API（yunyi）— Grok 4.6 / 4.5、思考レベルは公式と同じ low/medium/high/xhigh",
   "prov.preset.opencodeGo.blurb": "OpenCode Zen Go — DeepSeek V4 は Chat Completions を使用（Responses は不可）",
   "prov.preset.volcanoArk.blurb": "火山方舟 Coding Plan — 完整路径 + Chat Completions，DeepSeek V4 Flash",
+  "prov.preset.ai98pro.blurb": "AI98PRO リレー — Grok 4.6 / 4.5、Responses、思考レベルは公式と同じ low/medium/high/xhigh",
   "prov.getApiKey": "API キーを取得",
   "prov.efforts": "思考の深さ",
   "prov.effortsHint": "コンポーザーの推論強度メニューに出ます。値は reasoning_effort として上流に送られます。",

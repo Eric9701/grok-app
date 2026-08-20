@@ -66,6 +66,7 @@ export const zhProviders = {
   "prov.preset.yunApi.blurb": "Yun API（云驿）— Grok 4.6 / 4.5，思考档与官方一致 low/medium/high/xhigh",
   "prov.preset.opencodeGo.blurb": "OpenCode Zen Go — DeepSeek V4 须用 Chat Completions（勿用 Responses）",
   "prov.preset.volcanoArk.blurb": "火山方舟 Coding Plan — 完整路径 + Chat Completions，DeepSeek V4 Flash",
+  "prov.preset.ai98pro.blurb": "AI98PRO 中转 — Grok 4.6 / 4.5，Responses，思考档与官方一致 low/medium/high/xhigh",
   "prov.getApiKey": "获取 API Key",
   "prov.efforts": "思考深度",
   "prov.effortsHint": "出现在输入框推理强度菜单中；取值作为 reasoning_effort 传给上游。",

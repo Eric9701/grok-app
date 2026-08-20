@@ -12,12 +12,14 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- **AI98PRO provider preset**: Add-provider gallery ships a one-click Grok relay — `https://ai98pro.xyz/v1` with Responses, models **`grok-4.6`** + **`grok-4.5`**, official effort `low`/`medium`/`high`/`xhigh` (default Extra high), vision on, and config id **`AI98PRO`** (stored slug `ai98pro`). Existing auto-suffixed local ids such as `ai98pro-----…` resolve the same channel.
 - **Settings closes with Ctrl+, / Esc (#752)**: Pressing the settings chord again on the Settings page (including in a field) returns to the workbench. Esc does the same, without stopping a background turn. Nested dialogs and Select menus still own Escape first. The account-menu Settings row, slash `/settings`, command-palette settings actions, and “Back to app” show the live chord.
 - **Ctrl+Q twice to quit (#743)**: First press toasts; second within 2s exits. Side-terminal Ctrl+Q (XON after Ctrl+S freeze) is not swallowed. macOS tray does not advertise `(Ctrl+Q)` — ⌘Q is still immediate quit; the catalog mac column is `⌃ Q`.
 - **Ctrl+Enter steers a live turn (Grok Build CLI chord) (#741)**: While the agent is mid-turn, Ctrl+Enter (Cmd+Enter on macOS too) injects the composer draft via Steer / `sessionInterject`. Empty composer + a queued follow-up steers the head. You no longer have to queue first and click **Steer**. Plain Enter still queues.
 - **Pet uses the full bloub morph catalogue**: the overlay now runs the measured SVG engine (idle, thinking, wink, notify, alert, hexagon, orbit, comet, …) instead of the old clip-path faces. Settings pick the 8 rest shapes plus 16 rest expressions. Typing in the composer plays the catalog alert morph (slanted !) and returns to the chosen rest shape after a short pause; unread ready chats show a vivid orange-red pastille (lime on already-hot bodies) rather than the video’s blue.
 
 **中文 · 新增**
+- **AI98PRO 服务商预设**：添加提供商图库一键填入 `https://ai98pro.xyz/v1`（Responses）、**Grok 4.6 / 4.5**、官方思考档 `low`/`medium`/`high`/`xhigh`（默认极高）、开启视觉；配置 ID 为 **AI98PRO**（落盘 slug `ai98pro`）。本地已有带随机后缀的 `ai98pro-----…` 仍识别为同一渠道。
 - **设置页再按 Ctrl+, / Esc 回到主窗（#752）**：设置页再按一次设置快捷键（输入框里也能关）走「返回应用」。Esc 同样离开设置，不误停后台生成；嵌套对话框和 Select 仍先处理 Esc。账号菜单 Settings、`/settings`、命令面板设置项、「返回应用」显示当前和弦。
 - **Ctrl+Q 连按两次退出（#743）**：第一次提示，2 秒内再按才退出。侧栏终端的 Ctrl+Q（XON，Ctrl+S 冻结后靠它解冻）不吞。macOS 托盘不写 `(Ctrl+Q)`，⌘Q 仍立即退出；目录 mac 列是 `⌃ Q`。
 - **Ctrl+Enter 引导当前回合（对标 Grok Build CLI）（#741）**：Agent 正在跑时，Ctrl+Enter（macOS 也认 Cmd+Enter）把输入框里的内容直接 Steer 进当前回合。输入框空、队列里有跟进时引导队首。不用先排队再点「引导」。普通 Enter 仍是排队。

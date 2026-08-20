@@ -64,6 +64,7 @@ export const ukProviders = {
   "prov.preset.yunApi.blurb": "Yun API (yunyi) — Grok 4,6 / 4,5, офіційне зусилля низьке/середнє/високе/xвисоке",
   "prov.preset.opencodeGo.blurb": "OpenCode Zen Go — DeepSeek V4 через chat_completions (не відповіді)",
   "prov.preset.volcanoArk.blurb": "Volcengine Ark (火山方舟) План кодування — повний шлях, chat_completions, DeepSeek V4 Flash",
+  "prov.preset.ai98pro.blurb": "Реле AI98PRO — Grok 4.6 / 4.5, Responses, офіційне зусилля low/medium/high/xhigh",
   "prov.getApiKey": "Отримати ключ API",
   "prov.efforts": "Рівні міркування",
   "prov.effortsHint": "Параметри, показані в меню композера для цього каналу. Значення надсилаються як reasoning_effort.",

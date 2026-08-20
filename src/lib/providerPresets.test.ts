@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AI98PRO_MODELS,
   AMUX_MODELS,
   DEEPSEEK_EFFORTS,
   DEEPSEEK_MODELS,
@@ -119,6 +120,38 @@ describe("providerPresets", () => {
     expect(ark!.efforts.find((e) => e.isDefault)?.id).toBe("medium");
   });
 
+  it("ships AI98PRO with short id, Grok 4.6/4.5, Responses, and vision", () => {
+    const p = findProviderPreset("ai98pro");
+    expect(p).toBeDefined();
+    expect(findProviderPreset("AI98PRO")?.id).toBe("ai98pro");
+    expect(p!.name).toBe("AI98PRO");
+    expect(p!.suggestedId).toBe("AI98PRO");
+    expect(p!.baseUrl).toBe("https://ai98pro.xyz/v1");
+    expect(p!.apiBackend).toBe("responses");
+    expect(p!.supportsVision).toBe(true);
+    expect(p!.brandId).toBeUndefined();
+    expect(AI98PRO_MODELS).toEqual([
+      { id: "grok-4.6", name: "Grok 4.6" },
+      { id: "grok-4.5", name: "Grok 4.5" },
+    ]);
+    expect(p!.models).toEqual(AI98PRO_MODELS);
+    expect(p!.efforts.map((e) => e.id)).toEqual(
+      GROK_OFFICIAL_EFFORTS.map((e) => e.id),
+    );
+    expect(p!.efforts.find((e) => e.isDefault)?.id).toBe("xhigh");
+    expect(p!.apiKeyUrl).toBe("https://ai98pro.xyz");
+    expect(
+      resolveProviderApiKeyUrl({
+        providerId: "ai98pro-----1072183582",
+      }),
+    ).toBe("https://ai98pro.xyz");
+    expect(
+      resolveProviderApiKeyUrl({
+        baseUrl: "https://ai98pro.xyz/v1",
+      }),
+    ).toBe("https://ai98pro.xyz");
+  });
+
   it("resolves brand logos for DeepSeek/Amux/OpenCode Go/Volcano Ark", () => {
     expect(resolveProviderBrandId({ providerId: "deepseek" })).toBe(
       "deepseek",
@@ -184,6 +217,17 @@ describe("providerPresets", () => {
         efforts: [{ id: "max", name: "max" }],
       }),
     ).toBeNull();
+    expect(
+      alignGrokPresetEfforts({
+        providerId: "ai98pro-----1072183582",
+        efforts: [
+          { id: "low", name: "low" },
+          { id: "medium", name: "medium", isDefault: true },
+          { id: "high", name: "high" },
+          { id: "max", name: "max" },
+        ],
+      })?.map((e) => e.id),
+    ).toEqual(["low", "medium", "high", "xhigh"]);
     expect(
       alignGrokPresetEfforts({
         providerId: "yun-api",

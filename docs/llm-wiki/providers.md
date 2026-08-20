@@ -56,6 +56,7 @@ Add flow opens a **preset gallery** (`providerPresets.ts`):
 | **Yun API** | `grok-4.6` + `grok-4.5` | Official Grok `low`/`medium`/`high`/`xhigh` (default `xhigh`) |
 | **OpenCode Go** | `deepseek-v4-flash`, `deepseek-v4-pro` | DeepSeek efforts (default `high`) |
 | **火山方舟** (Volcengine Ark) | `deepseek-v4-flash` | Grok `low`/`medium`/`high`/`max` (default `medium`); **full path** on |
+| **AI98PRO** | `grok-4.6` + `grok-4.5` | Official Grok `low`/`medium`/`high`/`xhigh` (default `xhigh`); vision on |
 
 | Preset | Base | Get API Key |
 |--------|------|-------------|
@@ -64,6 +65,7 @@ Add flow opens a **preset gallery** (`providerPresets.ts`):
 | Yun API | `https://api.yunyi.ai/v1` (`responses`) | https://api.yunyi.ai/register/?aff_code=W0iw |
 | OpenCode Go | `https://opencode.ai/zen/go/v1` (`chat_completions`) | https://opencode.ai/ |
 | 火山方舟 | `https://ark.cn-beijing.volces.com/api/plan/v3` (`chat_completions`, **full path**) | https://console.volcengine.com/ark |
+| AI98PRO | `https://ai98pro.xyz/v1` (`responses`) | https://ai98pro.xyz |
 
 ### Protocol pitfall (OpenCode Go / DeepSeek)
 

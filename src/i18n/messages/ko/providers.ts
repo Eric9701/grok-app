@@ -64,6 +64,7 @@ export const koProviders = {
   "prov.preset.yunApi.blurb": "Yun API (yunyi) — Grok 4.6 / 4.5, 공식 effort low/medium/high/xhigh",
   "prov.preset.opencodeGo.blurb": "OpenCode Zen Go — DeepSeek V4 via chat_completions (Responses 아님)",
   "prov.preset.volcanoArk.blurb": "Volcengine Ark (火山方舟) Coding Plan — 전체 경로, chat_completions, DeepSeek V4 Flash",
+  "prov.preset.ai98pro.blurb": "AI98PRO 릴레이 — Grok 4.6 / 4.5, Responses, 공식 effort low/medium/high/xhigh",
   "prov.getApiKey": "API 키 받기",
   "prov.efforts": "추론 수준",
   "prov.effortsHint": "이 채널의 작성기 추론 메뉴에 표시되는 옵션입니다. 값은 reasoning_effort로 보내집니다.",

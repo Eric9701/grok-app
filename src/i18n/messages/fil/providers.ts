@@ -64,6 +64,7 @@ export const filProviders = {
   "prov.preset.yunApi.blurb": "Yun API (yunyi) — Grok 4.6 / 4.5, opisyal na effort low/medium/high/xhigh",
   "prov.preset.opencodeGo.blurb": "OpenCode Zen Go — DeepSeek V4 sa pamamagitan ng chat_completions (hindi Responses)",
   "prov.preset.volcanoArk.blurb": "Volcengine Ark (火山方舟) Coding Plan — buong path, chat_completions, DeepSeek V4 Flash",
+  "prov.preset.ai98pro.blurb": "AI98PRO relay — Grok 4.6 / 4.5, Responses, opisyal na effort low/medium/high/xhigh",
   "prov.getApiKey": "Kumuha ng API Key",
   "prov.efforts": "Mga antas ng pangangatwiran",
   "prov.effortsHint": "Mga opsyon na ipinapakita sa menu ng pangangatwiran ng composer para sa channel na ito. Ipinapadala ang mga halaga bilang reasoning_effort.",
