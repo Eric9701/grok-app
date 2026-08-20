@@ -1847,6 +1847,7 @@ mod connect_preserve_tests {
                 max_agent_turns: None,
                 system_prompt_override: None,
                 fork_agent_session: false,
+                fork_rewind_prompt_index: None,
                 no_ask_user: None,
             },
             fsm,

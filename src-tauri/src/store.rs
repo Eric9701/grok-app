@@ -187,6 +187,11 @@ pub struct SessionMeta {
     /// Requires `agent_session_id` as the source; cleared after connect attempt.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fork_agent_session: bool,
+    /// One-shot: after ACP session/fork, rewind the CHILD to this 0-based
+    /// user prompt index (`restoreFiles=false`). Partial forks only.
+    /// Cleared after the connect attempt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fork_rewind_prompt_index: Option<u32>,
     /// Optional per-session override for CLI top-level `--no-ask-user`
     /// (disables `ask_user_question` for the agent process; CLI ≥ 0.2.117).
     /// `None` → inherit global `AppSettings.no_ask_user`. Soft-respawn on change.
@@ -1665,6 +1670,7 @@ pub fn create_session(
         max_agent_turns: None,
         system_prompt_override: None,
         fork_agent_session: false,
+        fork_rewind_prompt_index: None,
         no_ask_user: None,
     };
     update_sessions_index({
@@ -2330,6 +2336,7 @@ pub fn fork_session(
         if let Some(aid) = source_agent {
             meta.agent_session_id = Some(aid);
             meta.fork_agent_session = true;
+            meta.fork_rewind_prompt_index = through_user_prompt_index;
         }
     }
     meta.updated_at = Utc::now();
@@ -2363,6 +2370,9 @@ pub fn set_session_fork_agent_session(
             .as_deref()
             .is_some_and(|a| !a.trim().is_empty());
         s.fork_agent_session = fork_agent_session && has_agent;
+        if !s.fork_agent_session {
+            s.fork_rewind_prompt_index = None;
+        }
         s.updated_at = Utc::now();
         Ok(s.clone())
     })
@@ -3625,6 +3635,7 @@ mod tests {
             max_agent_turns: None,
             system_prompt_override: None,
             fork_agent_session: false,
+            fork_rewind_prompt_index: None,
             no_ask_user: None,
         }
     }
@@ -3748,6 +3759,102 @@ mod tests {
     }
 
     #[test]
+    fn fork_session_partial_stores_rewind_index() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-fork-rewind-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut src = create_session(None, Some("src".into()), false).expect("create");
+        src.agent_session_id = Some("agent-parent".into());
+        update_session_meta(&src).expect("meta");
+        save_messages(
+            &src.id,
+            &[
+                stored_msg("u1", "user", "first", None),
+                stored_msg("a1", "assistant", "ok", None),
+                stored_msg("u2", "user", "second", None),
+            ],
+        )
+        .expect("msgs");
+
+        let partial = fork_session(&src.id, Some(0), None, true).expect("partial");
+        assert_eq!(partial.agent_session_id.as_deref(), Some("agent-parent"));
+        assert!(partial.fork_agent_session);
+        assert_eq!(partial.fork_rewind_prompt_index, Some(0));
+        let kept = load_messages(&partial.id);
+        assert_eq!(kept.len(), 2, "through first turn only");
+        assert!(kept.iter().all(|m| m.content != "second"));
+        assert_eq!(load_messages(&src.id).len(), 3, "parent journal unchanged");
+        assert_eq!(
+            load_sessions_index()
+                .iter()
+                .find(|s| s.id == src.id)
+                .and_then(|s| s.agent_session_id.as_deref()),
+            Some("agent-parent"),
+            "parent agent id unchanged"
+        );
+
+        let full = fork_session(&src.id, None, None, true).expect("full");
+        assert!(full.fork_agent_session);
+        assert_eq!(full.fork_rewind_prompt_index, None);
+        assert_eq!(load_messages(&full.id).len(), 3);
+
+        let journal_only = fork_session(&src.id, Some(0), None, false).expect("journal");
+        assert!(!journal_only.fork_agent_session);
+        assert_eq!(journal_only.fork_rewind_prompt_index, None);
+        assert!(journal_only.agent_session_id.is_none());
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn clear_fork_oneshots_clears_rewind_index() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-fork-oneshot-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut src = create_session(None, Some("src".into()), false).expect("create");
+        src.agent_session_id = Some("agent-parent".into());
+        update_session_meta(&src).expect("meta");
+        save_messages(
+            &src.id,
+            &[
+                stored_msg("u1", "user", "first", None),
+                stored_msg("a1", "assistant", "ok", None),
+            ],
+        )
+        .expect("msgs");
+        let child = fork_session(&src.id, Some(0), None, true).expect("partial");
+        assert_eq!(child.fork_rewind_prompt_index, Some(0));
+        let cleared = clear_session_fork_agent_session(&child.id).expect("clear");
+        assert!(!cleared.fork_agent_session);
+        assert_eq!(cleared.fork_rewind_prompt_index, None);
+        assert_eq!(cleared.agent_session_id.as_deref(), Some("agent-parent"));
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn set_session_worktree_marks_and_clears() {
         let _g = crate::paths::APP_HOME_ENV_LOCK
             .lock()
@@ -3859,6 +3966,7 @@ mod tests {
                 max_agent_turns: None,
                 system_prompt_override: None,
                 fork_agent_session: false,
+                fork_rewind_prompt_index: None,
                 no_ask_user: None,
             },
         );
