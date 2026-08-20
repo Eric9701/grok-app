@@ -157,7 +157,7 @@
 
 /* Outer wrap keeps trust hint / empty state outside the windowed list. */
 .tree-l3-list-wrap {
-  padding: 2px 0 6px 12px;
+  padding: 2px 0 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -175,11 +175,7 @@
   flex-shrink: 0;
 }
 
-.tree-orphan .tree-l3-list-wrap {
-  padding-left: 4px;
-}
-
-/* Orphan sessions under “Other sessions” (same row metrics as project L3). */
+/* Orphan sessions under Other (same row metrics and left inset as project L3). */
 .tree-orphan-list {
   display: flex;
   flex-direction: column;
@@ -206,7 +202,7 @@
   align-items: center;
   height: 22px;
   min-height: 22px;
-  padding: 0 6px 0 12px;
+  padding: 0 6px 0 var(--tree-text-inset);
   margin: 0;
   box-sizing: border-box;
   font-size: 11px;
@@ -219,11 +215,6 @@
   box-shadow: 0 1px 0 color-mix(in srgb, var(--border-subtle, transparent) 70%, transparent);
   user-select: none;
   pointer-events: none;
-}
-
-.tree-orphan-list .tree-date-group__head,
-.tree-date-group--orphan .tree-date-group__head {
-  padding-left: 8px;
 }
 
 html[data-sidebar-density="compact"] .tree-date-group__head {
@@ -248,7 +239,7 @@ html[data-sidebar-density="compact"] .tree-date-group__head {
   min-height: 30px;
   max-height: 30px;
   box-sizing: border-box;
-  padding: 0 6px 0 12px;
+  padding: 0 6px 0 var(--tree-text-inset);
   border-radius: 8px;
   color: var(--text-secondary);
   font-size: 13px;
@@ -272,11 +263,6 @@ html[data-sidebar-density="compact"] .tree-date-group__head {
 
 .tree-l3--archived {
   opacity: 0.55;
-}
-
-.tree-l3--orphan {
-  margin-left: 0;
-  padding-left: 8px;
 }
 
 .tree-l3--hint {
