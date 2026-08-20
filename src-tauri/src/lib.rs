@@ -1659,7 +1659,12 @@ fn schedule_persist_main_window_state(app: &tauri::AppHandle) {
         if GENERATION.load(Ordering::Relaxed) != gen {
             return;
         }
-        persist_main_window_state(&app);
+        // macOS deadlock guard (#735): save_window_state holds the plugin's
+        // cache mutex while querying window geometry. Off the main thread the
+        // getters block on the main thread, which may itself be waiting on
+        // that mutex inside the plugin's Resized handler. Hop back first.
+        let app2 = app.clone();
+        let _ = app.run_on_main_thread(move || persist_main_window_state(&app2));
     });
 }
 
