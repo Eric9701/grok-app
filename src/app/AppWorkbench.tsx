@@ -15,32 +15,11 @@ import { usePetCompanion } from "@/hooks/usePetCompanion";
 import { createPortal } from "react-dom";
 import { useFloatingMenu } from "@/lib/floatingMenu";
 import { DEFAULT_WALLPAPER_FOCUS } from "@/lib/themeSkin";
-import {
-  loadMessageTimestampsPref,
-  MESSAGE_TIMESTAMPS_CHANGE_EVENT,
-  saveMessageTimestampsPref
-} from "@/lib/messageTimestampsPref";
-import {
-  loadShowReplyLengthPref,
-  saveShowReplyLengthPref,
-  SHOW_REPLY_LENGTH_CHANGE_EVENT
-} from "@/lib/messageLength";
-import {
-  loadReplaceProviderBrandLogoPref,
-  REPLACE_PROVIDER_BRAND_LOGO_CHANGE_EVENT,
-  saveReplaceProviderBrandLogoPref,
-} from "@/lib/replaceProviderBrandLogoPref";
-import {
-  loadMessageTimeFormatPref,
-  MESSAGE_TIME_FORMAT_CHANGE_EVENT,
-  saveMessageTimeFormatPref,
-  type MessageTimeFormat
-} from "@/lib/messageTimeFormatPref";
-import {
-  loadSidebarShowRelativeTimePref,
-  saveSidebarShowRelativeTimePref,
-  SIDEBAR_SHOW_RELATIVE_TIME_CHANGE_EVENT
-} from "@/lib/sidebarShowRelativeTimePref";
+import { saveMessageTimestampsPref } from "@/lib/messageTimestampsPref";
+import { saveShowReplyLengthPref } from "@/lib/messageLength";
+import { saveReplaceProviderBrandLogoPref } from "@/lib/replaceProviderBrandLogoPref";
+import { saveMessageTimeFormatPref } from "@/lib/messageTimeFormatPref";
+import { saveSidebarShowRelativeTimePref } from "@/lib/sidebarShowRelativeTimePref";
 import { formatRelativeTime } from "@/lib/accountUi";
 import {
   canFetchOfficialQuota,
@@ -79,16 +58,8 @@ import {
 } from "@/lib/confirmQuit";
 import { QUIT_DOUBLE_PRESS_MS } from "@/lib/doublePressQuit";
 import { useDoublePressQuit } from "@/hooks/useDoublePressQuit";
-import {
-  loadNotifySoundPref,
-  NOTIFY_SOUND_CHANGE_EVENT,
-  saveNotifySoundPref
-} from "@/lib/notifySound";
-import {
-  applyWindowAlwaysOnTop,
-  loadWindowAlwaysOnTopPref,
-  saveWindowAlwaysOnTopPref
-} from "@/lib/windowAlwaysOnTop";
+import { saveNotifySoundPref } from "@/lib/notifySound";
+import { saveWindowAlwaysOnTopPref } from "@/lib/windowAlwaysOnTop";
 import {
   canLiveParticipate,
   canOpenSessionInNewWindow,
@@ -109,15 +80,10 @@ import {
   resumeGateClock
 } from "@/lib/gateClock";
 import {
-  loadPermissionTimeoutSec,
-  PERMISSION_TIMEOUT_CHANGE_EVENT,
   permissionTimeoutRemainingSec,
   savePermissionTimeoutSec
 } from "@/lib/permissionTimeout";
-import {  ASK_USER_TIMEOUT_CHANGE_EVENT,
-  loadAskUserTimeoutSec,
-  saveAskUserTimeoutSec
-} from "@/lib/askUserTimeout";
+import { saveAskUserTimeoutSec } from "@/lib/askUserTimeout";
 import { WallpaperMediaLayer } from "@/components/WallpaperMediaLayer";
 import {
   ASIDE_WIDTH_MIN,
@@ -129,26 +95,8 @@ import {
   resolveSidebarDragEnd,
   SIDEBAR_DEFAULT_WIDTH,
   SIDEBAR_WIDTH_MIN,
-  isMirrorPhoneLayout,
-  loadLayout,
   saveLayout,
-  withMirrorPhoneDrawerDefault,
 } from "@/lib/layout";
-import {
-  ZEN_MODE_CHANGE_EVENT,
-  applyZenModeLayoutTransition,
-  clearZenModePrior,
-  loadZenMode,
-  loadZenModePrior,
-  saveZenMode,
-  saveZenModePrior
-} from "@/lib/zenMode";
-import {
-  TRANSCRIPT_FILTER_CHANGE_EVENT,
-  loadTranscriptFilterPref,
-  saveTranscriptFilterPref,
-  type TranscriptFilterMode
-} from "@/lib/transcriptFilterPref";
 import {
   ensureWindowFitsLayout,
   isWindowFitSuppressed
@@ -204,11 +152,7 @@ import {
 import { UiErrorBoundary } from "@/components/UiErrorBoundary";
 import {
   buildCompactSlashCommand,
-  COMPACT_PRESET_IDS,
   DEFAULT_COMPACT_PRESET,
-  estimateCompactAfterTokens,
-  formatCompactBeforeAfterRange,
-  formatTokenCount,
   INITIAL_CONTEXT_USAGE,
   resolveCompactNoteBody,
   resolveContextUsageDisplay,
@@ -217,11 +161,8 @@ import {
   type ContextUsageState
 } from "@/lib/contextUsage";
 import {
-  COMPACTION_DETAILS,
-  COMPACTION_MODES,
   DEFAULT_COMPACTION_DETAIL,
   DEFAULT_COMPACTION_MODE,
-  compactionDetailApplies,
   normalizeCompactionDetail,
   normalizeCompactionMode,
   type CompactionDetailId,
@@ -250,10 +191,7 @@ import {
   classifyTasksStopError,
   type TasksBindCwdResult
 } from "@/lib/tasksPanelPro";
-import {
-  loadTrayBusyBadgePref,
-  saveTrayBusyBadgePref
-} from "@/lib/trayBusyBadgePref";
+import { saveTrayBusyBadgePref } from "@/lib/trayBusyBadgePref";
 import { resolveTrayBusyBadgeCount } from "@/lib/trayNotifyPro";
 import {
   collectAgentDashboardRows,
@@ -289,12 +227,10 @@ import {
   buildGoalControlSummary,
   filterGoalOrchEvents,
   goalOrchPhaseLabelKey,
-  loadGoalOrchUiEnabled,
   planClearGoalOrchEvents,
   resolveGoalOrchSessionIndicator,
   saveGoalOrchUiEnabled,
-  shouldConfirmClearGoalOrch,
-  type GoalOrchEvent
+  shouldConfirmClearGoalOrch
 } from "@/lib/goalOrch";
 import * as api from "@/lib/api";
 import { queueComposerPreferenceApply } from "@/lib/composerPrefsBarrier";
@@ -410,25 +346,15 @@ import {
   mapPermissionButtons
 } from "@/lib/permissionOptions";
 import { AskUserModal, dropAskUserClocks } from "@/components/AskUserModal";
-import { TraceHistoryList } from "@/components/TraceHistoryList";
-import { PlanHistoryList } from "@/components/PlanHistoryList";
-import { formatListTimestamp } from "@/lib/formatDateTime";
-import { MarkdownBody } from "@/components/MarkdownBody";
 import {
   clearSessionSearchFilters,
   filterSessionSearch,
   hasActiveSessionSearchFilters,
   mergeSessionSearchHits,
   resolveSessionSearchEmptyState,
-  sessionSearchBadge,
-  sessionSearchBadgeLabelKey,
-  sessionSearchModeLabelKey,
-  sessionSearchRankModeLabelKey,
   shouldScanSessionContent,
-  SESSION_SEARCH_RANK_MODES,
   type SessionContentHit,
   type SessionSearchMode,
-  SESSION_SEARCH_MODES,
   type SessionSearchRankMode
 } from "@/lib/sessionSearch";
 import {
@@ -505,7 +431,6 @@ import {
 import {
   loadExportImageSkinPref,
   saveExportImageSkinPref,
-  SHARE_CARD_SKIN_IDS,
   type ShareCardSkinId
 } from "@/lib/shareCardSkins";
 import {
@@ -515,7 +440,6 @@ import {
   exportImageBlobMatchesOptions,
   formatExportImageBytes,
   resolveExportImageError,
-  shareCardSkinMessageKey,
   stampFromPipelineResult,
   type ExportImageBlobStamp
 } from "@/lib/exportSharePro";
@@ -544,7 +468,6 @@ import {
 import {
   formatShortcutHint,
   matchGlobalShortcut,
-  shortcutsForPlatform
 } from "@/lib/shortcuts";
 import { nextSessionId } from "@/lib/sidebarSessionNav";
 import {
@@ -555,7 +478,6 @@ import {
   type ShortcutRemapMap
 } from "@/lib/shortcutRemap";
 import {
-  SHORTCUT_KEYS_OFF,
   loadVoiceHotkeyEnabled,
   shouldFireLiveVoiceHotkey,
   VOICE_HOTKEY_CHANGED_EVENT,
@@ -583,8 +505,6 @@ import {
   shouldConfirmClearAllUnread,
 } from "@/lib/sessionUnread";
 import {
-  SESSION_NOTE_MAX_LENGTH,
-  clampSessionNoteInput,
   clearNote as clearSessionNote,
   getNote as getSessionNote,
   loadSessionNotes,
@@ -598,8 +518,6 @@ import {
   dismissCliUpdateNotice,
   shouldOfferCliUpdateNotice
 } from "@/lib/cliUpdateNotice";
-import { GlassModal } from "@/components/GlassModal";
-import { Select } from "@/components/Select";
 import {
   loadDone as loadProductTutorialDone,
   markDone as markProductTutorialDone,
@@ -661,20 +579,10 @@ import {
   parseJsonSchemaText,
   wrapAgentTextWithJsonSchema
 } from "@/lib/jsonSchema";
+import { sanitizeExtraRules } from "@/lib/sessionExtraRules";
+import { normalizeMaxAgentTurns } from "@/lib/sessionMaxAgentTurns";
+import { sanitizeSystemPromptOverride } from "@/lib/sessionSystemPrompt";
 import {
-  SESSION_EXTRA_RULES_MAX_CHARS,
-  sanitizeExtraRules
-} from "@/lib/sessionExtraRules";
-import {
-  MAX_AGENT_TURNS_CAP,
-  normalizeMaxAgentTurns
-} from "@/lib/sessionMaxAgentTurns";
-import {
-  SESSION_SYSTEM_PROMPT_MAX_CHARS,
-  sanitizeSystemPromptOverride
-} from "@/lib/sessionSystemPrompt";
-import {
-  clampSessionTextInput,
   presentSessionPromptSoftFail,
   shouldConfirmSessionTextDiscard,
   validateSessionTextField
@@ -698,25 +606,14 @@ import {
   RECENT_PROMPT_HISTORY_STORAGE_KEY
 } from "@/lib/recentPromptHistory";
 import {
-  COMPOSER_SEND_KEY_CHANGED_EVENT,
   composerSteerLive,
-  loadComposerSendKeyPref,
   resolveComposerSubmitAction,
-  type ComposerSendKeyPref
 } from "@/lib/composerSendKey";
-import {
-  COMPOSER_DRAFT_STATS_CHANGED_EVENT,
-  countDraftChars,
-  loadComposerDraftStatsPref
-} from "@/lib/draftStats";
+import { countDraftChars } from "@/lib/draftStats";
 import {
   composerDraftStore,
   getDraft as getComposerDraft,
 } from "@/lib/composerDraftStore";
-import {
-  COMPOSER_SPELLCHECK_CHANGED_EVENT,
-  loadComposerSpellcheck
-} from "@/lib/composerSpellcheck";
 import {
   clearComposerProjectDraft,
   loadComposerProjectDraft,
@@ -795,12 +692,7 @@ import {
   type SidebarSessionWorktreeBadgeProp,
 } from "@/components/SidebarSessionRow";
 import { SidebarTreeReveal } from "@/components/SidebarTreeReveal";
-import {
-  SIDEBAR_DENSITY_EVENT,
-  loadSidebarDensity,
-  sidebarSessionRowMetrics,
-  type SidebarDensity
-} from "@/lib/sidebarDensity";
+import { sidebarSessionRowMetrics } from "@/lib/sidebarDensity";
 import { sortSessionsForSidebar } from "@/lib/sidebarDateGroups";
 import { nextSessionTitle } from "@/lib/sidebarSessionRename";
 import { GrokLogo } from "@/components/GrokLogo";
@@ -978,7 +870,6 @@ import {
   IconSettings,
   IconAppearance,
   IconPuzzle,
-  IconHelp,
 } from "@/components/icons";
 import { PhoneAccountSheet } from "@/components/PhoneAccountSheet";
 import { PhoneComposerToolsSheet } from "@/components/PhoneComposerToolsSheet";
@@ -1042,6 +933,32 @@ import {
 import { applySideContextOpen } from "@/lib/sideContextOpen";
 import { resolveSidePathDeepLink } from "@/lib/sidePathDeepLink";
 import { ProjectRulesModal } from "@/components/ProjectRulesModal";
+import { PromptHistoryClearModal } from "@/components/workbench-modals/PromptHistoryClearModal";
+import { ArchiveAgeConfirmModal } from "@/components/workbench-modals/ArchiveAgeConfirmModal";
+import { WorktreeCreateModal } from "@/components/workbench-modals/WorktreeCreateModal";
+import { WorktreeGcModal } from "@/components/workbench-modals/WorktreeGcModal";
+import { WorktreeShipModal } from "@/components/workbench-modals/WorktreeShipModal";
+import { ShortcutsHelpModal } from "@/components/workbench-modals/ShortcutsHelpModal";
+import { RewindConfirmModal } from "@/components/workbench-modals/RewindConfirmModal";
+import { ForkConfirmModal } from "@/components/workbench-modals/ForkConfirmModal";
+import { ResumeRestoreConfirmModal } from "@/components/workbench-modals/ResumeRestoreConfirmModal";
+import { ConfirmCopyModal } from "@/components/workbench-modals/ConfirmCopyModal";
+import { RewindTimelineModal } from "@/components/workbench-modals/RewindTimelineModal";
+import { TracesHistoryModal } from "@/components/workbench-modals/TracesHistoryModal";
+import { PlanHistoryModal } from "@/components/workbench-modals/PlanHistoryModal";
+import { PlanHistoryPreviewModal } from "@/components/workbench-modals/PlanHistoryPreviewModal";
+import { PlanReviseModal } from "@/components/workbench-modals/PlanReviseModal";
+import { JsonSchemaModal } from "@/components/workbench-modals/JsonSchemaModal";
+import { QueueEditModal } from "@/components/workbench-modals/QueueEditModal";
+import { SessionNoteModal } from "@/components/workbench-modals/SessionNoteModal";
+import { SessionRulesModal } from "@/components/workbench-modals/SessionRulesModal";
+import { SessionMaxTurnsModal } from "@/components/workbench-modals/SessionMaxTurnsModal";
+import { SessionSysPromptModal } from "@/components/workbench-modals/SessionSysPromptModal";
+import { ExportMdModal } from "@/components/workbench-modals/ExportMdModal";
+import { ExportImageModal } from "@/components/workbench-modals/ExportImageModal";
+import { CompactModal } from "@/components/workbench-modals/CompactModal";
+import { AppDialogHost } from "@/components/workbench-modals/AppDialogHost";
+import { SearchPalette } from "@/components/workbench-modals/SearchPalette";
 import {
   mergeSessionChange,
   sessionChangesFromMessages,
@@ -1163,7 +1080,6 @@ import {
   titlebarMaximizeHandlers
 } from "@/components/WindowControls";
 
-import { paletteActionIcon } from "@/app/paletteActionIcon";
 import {
   isGeneralProject,
   mapProjectsList,
@@ -1210,6 +1126,8 @@ import { useSessionHostEvents } from "@/hooks/useSessionHostEvents";
 import { useSessionSpend } from "@/hooks/useSessionSpend";
 import { useGhostStreamingHeal } from "@/hooks/useGhostStreamingHeal";
 import { useAccountQuotaAutoRefresh } from "@/hooks/useAccountQuotaAutoRefresh";
+import { useWorkbenchDisplayPrefs } from "@/hooks/useWorkbenchDisplayPrefs";
+import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
 import { createDebouncedSkillsReload } from "@/lib/skillCatalogRefresh";
 
 /** App-local plan chrome state (session-scoped via planBySessionRef). */
@@ -1254,28 +1172,36 @@ export function AppWorkbench() {
     applyWallpaperMediaSize,
     applyWallpaperScrimChoice,
   } = useThemeShell();
-  const [showMessageTimestamps, setShowMessageTimestamps] = useState(() =>
-    loadMessageTimestampsPref(localStorage),
-  );
-  const [showReplyLength, setShowReplyLength] = useState(() =>
-    loadShowReplyLengthPref(localStorage),
-  );
-  /** Sidebar top-left: swap Grok mark for branded custom providers. */
-  const [replaceProviderBrandLogo, setReplaceProviderBrandLogo] = useState(
-    () => loadReplaceProviderBrandLogoPref(localStorage),
-  );
-  /** Display-only: Reliability “Goal orchestration” section (default on). */
-  const [goalOrchUiEnabled, setGoalOrchUiEnabled] = useState(() =>
-    loadGoalOrchUiEnabled(localStorage),
-  );
-  /** In-memory ring of CLI goal_updated / goal phase events (never invented). */
-  const [goalOrchEvents, setGoalOrchEvents] = useState<GoalOrchEvent[]>([]);
-  const [messageTimeFormat, setMessageTimeFormat] = useState<MessageTimeFormat>(
-    () => loadMessageTimeFormatPref(localStorage),
-  );
-  const [sidebarShowRelativeTime, setSidebarShowRelativeTime] = useState(() =>
-    loadSidebarShowRelativeTimePref(localStorage),
-  );
+  const {
+    showMessageTimestamps,
+    setShowMessageTimestamps,
+    showReplyLength,
+    setShowReplyLength,
+    replaceProviderBrandLogo,
+    setReplaceProviderBrandLogo,
+    goalOrchUiEnabled,
+    setGoalOrchUiEnabled,
+    goalOrchEvents,
+    setGoalOrchEvents,
+    messageTimeFormat,
+    setMessageTimeFormat,
+    sidebarShowRelativeTime,
+    setSidebarShowRelativeTime,
+    notifySound,
+    setNotifySound,
+    windowAlwaysOnTop,
+    setWindowAlwaysOnTop,
+    trayBusyBadge,
+    setTrayBusyBadge,
+    composerSendKeyPref,
+    showComposerDraftStats,
+    composerSpellcheck,
+    sidebarDensity,
+    permissionTimeoutSec,
+    setPermissionTimeoutSec,
+    askUserTimeoutSec,
+    setAskUserTimeoutSec,
+  } = useWorkbenchDisplayPrefs();
   // Warm loopback media HTTP endpoint ASAP so chat images resolve to
   // http://127.0.0.1 (not media://) before the first history paint.
   useEffect(() => {
@@ -1284,16 +1210,6 @@ export function AppWorkbench() {
       .catch(() => {
         /* non-Tauri / server down */
       });
-  }, []);
-  useEffect(() => {
-    const reload = () =>
-      setSidebarShowRelativeTime(loadSidebarShowRelativeTimePref(localStorage));
-    window.addEventListener(SIDEBAR_SHOW_RELATIVE_TIME_CHANGE_EVENT, reload);
-    return () =>
-      window.removeEventListener(
-        SIDEBAR_SHOW_RELATIVE_TIME_CHANGE_EVENT,
-        reload,
-      );
   }, []);
   /** Per-session desktop notification mute (localStorage Set). */
   const [mutedSessionIds, setMutedSessionIds] = useState<Set<string>>(
@@ -1449,53 +1365,16 @@ export function AppWorkbench() {
     resumeRestoreBusy,
     setResumeRestoreBusy,
   } = useAppDialogs();
-
-  const [notifySound, setNotifySound] = useState(() =>
-    loadNotifySoundPref(localStorage),
-  );
-  const [windowAlwaysOnTop, setWindowAlwaysOnTop] = useState(() =>
-    loadWindowAlwaysOnTopPref(localStorage),
-  );
-  const [trayBusyBadge, setTrayBusyBadge] = useState(() =>
-    loadTrayBusyBadgePref(localStorage),
-  );
-  const [layout, setLayout] = useState(() => {
-    // Platform UA is available at first paint; reserve window-control inset on Win.
-    const ua =
-      typeof navigator !== "undefined"
-        ? navigator.userAgent.toLowerCase()
-        : "";
-    const winChrome =
-      ua.includes("win") ||
-      (!ua.includes("mac") && typeof navigator !== "undefined");
-    const clampOpts =
-      typeof window !== "undefined"
-        ? {
-            windowControlsInset: winChrome ? WINDOW_CONTROLS_INSET : 0,
-            viewportWidth: window.innerWidth,
-          }
-        : undefined;
-    let base = loadLayout(localStorage, clampOpts);
-    // Zen mode maximizes chat: force both side panes collapsed on cold start.
-    if (loadZenMode(localStorage)) {
-      base = {
-        ...base,
-        sidebarCollapsed: true,
-        asideCollapsed: true,
-      };
-    }
-    // Mirror phone: drawer starts collapsed so chat is not covered on first paint.
-    if (typeof window !== "undefined" && isMirrorClient()) {
-      return withMirrorPhoneDrawerDefault(base, {
-        isMirror: true,
-        viewportWidth: window.innerWidth,
-      });
-    }
-    return base;
-  });
-  /** Hide left + right chrome to maximize chat (localStorage `grok.zenMode`). */
-  const [zenMode, setZenModeState] = useState(() => loadZenMode(localStorage));
-  const zenModeRef = useRef(zenMode);
+  const {
+    layout,
+    setLayout,
+    layoutRef,
+    zenMode,
+    setZenModeEnabled,
+    transcriptFilter,
+    toggleTranscriptFilter,
+    phoneLayout,
+  } = useWorkbenchLayout();
   /** Side Workbench multi-kind tabs (session-local; Phase 0+). */
   const [sideWorkbench, setSideWorkbench] = useState<SideWorkbenchState>(
     emptySideWorkbenchState,
@@ -1518,10 +1397,6 @@ export function AppWorkbench() {
   const [sideDockComposerH, setSideDockComposerH] = useState(0);
   /** Git work tree gate for Review picker entry. */
   const [sideIsGitProject, setSideIsGitProject] = useState(false);
-  zenModeRef.current = zenMode;
-  /** Transcript filter: all activity vs conversation-only (hide tool steps). */
-  const [transcriptFilter, setTranscriptFilter] =
-    useState<TranscriptFilterMode>(() => loadTranscriptFilterPref());
 
   /**
    * Secondary session window (`session-*` label / `#/session/<id>` deep link).
@@ -1888,15 +1763,6 @@ export function AppWorkbench() {
     typeof window !== "undefined" && isMirrorClient() ? mirrorWsConnected() : false,
   );
   const [mirrorHostLabel, setMirrorHostLabel] = useState<string | null>(null);
-  /** Mirror + ≤820px — phone chrome only; desktop layout path never sets this. */
-  const [phoneLayout, setPhoneLayout] = useState(() =>
-    typeof window !== "undefined"
-      ? isMirrorPhoneLayout({
-          isMirror: isMirrorClient(),
-          viewportWidth: window.innerWidth,
-        })
-      : false,
-  );
   const [phoneToolsOpen, setPhoneToolsOpen] = useState(false);
   const [phoneAccountOpen, setPhoneAccountOpen] = useState(false);
   /** Hash route: workbench | settings/:section | automations */
@@ -2430,12 +2296,6 @@ export function AppWorkbench() {
   const permBarRef = useRef<HTMLDivElement | null>(null);
   /** Seconds until auto-deny (null when off / no active timer). */
   const [permCountdownSec, setPermCountdownSec] = useState<number | null>(null);
-  const [permissionTimeoutSec, setPermissionTimeoutSec] = useState(() =>
-    loadPermissionTimeoutSec(localStorage),
-  );
-  const [askUserTimeoutSec, setAskUserTimeoutSec] = useState(() =>
-    loadAskUserTimeoutSec(localStorage),
-  );
   const [askUser, setAskUser] = useState<AskUserPayload | null>(null);
   /**
    * Unanswered gates per session (`sessionId` → payload).
@@ -2528,44 +2388,6 @@ export function AppWorkbench() {
   /** Where model/permission chips are remembered. */
   const [prefsScope, setPrefsScope] =
     useState<ComposerPrefsScope>("global");
-  /** Enter vs ⌘/Ctrl+Enter to send (localStorage; Settings → Composer). */
-  const [composerSendKeyPref, setComposerSendKeyPref] =
-    useState<ComposerSendKeyPref>(() => loadComposerSendKeyPref());
-  useEffect(() => {
-    const reload = () => setComposerSendKeyPref(loadComposerSendKeyPref());
-    window.addEventListener(COMPOSER_SEND_KEY_CHANGED_EVENT, reload);
-    return () =>
-      window.removeEventListener(COMPOSER_SEND_KEY_CHANGED_EVENT, reload);
-  }, []);
-  /** Muted char/word count on non-empty drafts (localStorage; Settings → Composer). */
-  const [showComposerDraftStats, setShowComposerDraftStats] = useState(() =>
-    loadComposerDraftStatsPref(),
-  );
-  useEffect(() => {
-    const reload = () => setShowComposerDraftStats(loadComposerDraftStatsPref());
-    window.addEventListener(COMPOSER_DRAFT_STATS_CHANGED_EVENT, reload);
-    return () =>
-      window.removeEventListener(COMPOSER_DRAFT_STATS_CHANGED_EVENT, reload);
-  }, []);
-  /** Browser spellcheck on main composer (localStorage; Settings → Composer). */
-  const [composerSpellcheck, setComposerSpellcheck] = useState(() =>
-    loadComposerSpellcheck(),
-  );
-  useEffect(() => {
-    const reload = () => setComposerSpellcheck(loadComposerSpellcheck());
-    window.addEventListener(COMPOSER_SPELLCHECK_CHANGED_EVENT, reload);
-    return () =>
-      window.removeEventListener(COMPOSER_SPELLCHECK_CHANGED_EVENT, reload);
-  }, []);
-  /** Sidebar session-list density (localStorage; Settings → Appearance). */
-  const [sidebarDensity, setSidebarDensity] = useState<SidebarDensity>(() =>
-    loadSidebarDensity(),
-  );
-  useEffect(() => {
-    const reload = () => setSidebarDensity(loadSidebarDensity());
-    window.addEventListener(SIDEBAR_DENSITY_EVENT, reload);
-    return () => window.removeEventListener(SIDEBAR_DENSITY_EVENT, reload);
-  }, []);
   const sidebarRowMetrics = sidebarSessionRowMetrics(sidebarDensity);
   /** Chat file/url card → open in right resource pane / Side Workbench. */
   const [resourceOpenTarget, setResourceOpenTarget] =
@@ -2585,8 +2407,6 @@ export function AppWorkbench() {
   /** Tauri OS drop timestamp — HTML5 fallback must not double-attach. */
   const lastNativeDropAtRef = useRef(0);
   const html5DragDepthRef = useRef(0);
-  const layoutRef = useRef(layout);
-  layoutRef.current = layout;
   const [, setSetup] = useState({ cli: false, auth: false, project: false });
   const [localError, setLocalError] = useState<string | null>(null);
   /** Expand technical dump under the compact error banner. */
@@ -3154,82 +2974,6 @@ export function AppWorkbench() {
   const openAsidePaneRef = useRef(openAsidePane);
   openAsidePaneRef.current = openAsidePane;
 
-  /**
-   * Enter/exit zen mode: remember prior collapse, force both panes hidden,
-   * restore on disable. Escape is not bound (Esc→stop must keep working).
-   */
-  const setZenModeEnabled = useCallback((enabled: boolean) => {
-    if (zenModeRef.current === enabled) return;
-    const cur = layoutRef.current;
-    const prior = enabled ? null : loadZenModePrior(localStorage);
-    const { layout: nextCollapse, nextPrior } = applyZenModeLayoutTransition(
-      enabled,
-      {
-        sidebarCollapsed: cur.sidebarCollapsed,
-        asideCollapsed: cur.asideCollapsed,
-      },
-      prior,
-    );
-    if (enabled) {
-      if (nextPrior) saveZenModePrior(nextPrior, localStorage);
-    } else {
-      clearZenModePrior(localStorage);
-    }
-    setLayout((l) => {
-      const n = {
-        ...l,
-        sidebarCollapsed: nextCollapse.sidebarCollapsed,
-        asideCollapsed: nextCollapse.asideCollapsed,
-      };
-      saveLayout(localStorage, n);
-      return n;
-    });
-    // Sync ref before saveZenMode dispatches, so the change listener is a no-op.
-    zenModeRef.current = enabled;
-    setZenModeState(enabled);
-    saveZenMode(enabled, localStorage);
-  }, []);
-
-  /** Toggle transcript filter (all ↔ conversation) — Settings + chat chrome. */
-  const setTranscriptFilterMode = useCallback((mode: TranscriptFilterMode) => {
-    const next: TranscriptFilterMode =
-      mode === "conversation" ? "conversation" : "all";
-    setTranscriptFilter(next);
-    saveTranscriptFilterPref(next);
-  }, []);
-  const toggleTranscriptFilter = useCallback(() => {
-    setTranscriptFilterMode(
-      transcriptFilter === "conversation" ? "all" : "conversation",
-    );
-  }, [transcriptFilter, setTranscriptFilterMode]);
-
-  useEffect(() => {
-    const onPref = (ev: Event) => {
-      const detail = (ev as CustomEvent).detail;
-      if (detail === "all" || detail === "conversation") {
-        setTranscriptFilter(detail);
-      } else {
-        setTranscriptFilter(loadTranscriptFilterPref());
-      }
-    };
-    window.addEventListener(TRANSCRIPT_FILTER_CHANGE_EVENT, onPref);
-    return () =>
-      window.removeEventListener(TRANSCRIPT_FILTER_CHANGE_EVENT, onPref);
-  }, []);
-
-  // Settings (or another surface) may flip zen via localStorage + event.
-  useEffect(() => {
-    const onChange = (ev: Event) => {
-      const detail = (ev as CustomEvent<boolean>).detail;
-      const next =
-        typeof detail === "boolean" ? detail : loadZenMode(localStorage);
-      setZenModeEnabled(next);
-    };
-    window.addEventListener(ZEN_MODE_CHANGE_EVENT, onChange);
-    return () => window.removeEventListener(ZEN_MODE_CHANGE_EVENT, onChange);
-  }, [setZenModeEnabled]);
-
-
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.documentElement.lang = htmlLangForLocale(locale);
@@ -3318,11 +3062,6 @@ export function AppWorkbench() {
       unlistenScale?.();
     };
   }, []);
-
-  // Apply always-on-top from localStorage on boot (and whenever state is set).
-  useEffect(() => {
-    void applyWindowAlwaysOnTop(windowAlwaysOnTop);
-  }, [windowAlwaysOnTop]);
 
   // Chat transcript reading width (Appearance) — html[data-chat-width].
   useEffect(() => {
@@ -4189,135 +3928,6 @@ export function AppWorkbench() {
       for (const u of cleanups) u();
     };
   }, [tr]);
-
-  // Message timestamps visibility (localStorage; Settings dispatches change event).
-  useEffect(() => {
-    const onChange = (ev: Event) => {
-      const detail = (ev as CustomEvent<unknown>).detail;
-      if (typeof detail === "boolean") {
-        setShowMessageTimestamps(detail);
-        return;
-      }
-      setShowMessageTimestamps(loadMessageTimestampsPref(localStorage));
-    };
-    window.addEventListener(MESSAGE_TIMESTAMPS_CHANGE_EVENT, onChange);
-    return () =>
-      window.removeEventListener(MESSAGE_TIMESTAMPS_CHANGE_EVENT, onChange);
-  }, []);
-
-  // Assistant reply word/char count under bubble (localStorage; Settings event).
-  useEffect(() => {
-    const onChange = (ev: Event) => {
-      const detail = (ev as CustomEvent<unknown>).detail;
-      if (typeof detail === "boolean") {
-        setShowReplyLength(detail);
-        return;
-      }
-      setShowReplyLength(loadShowReplyLengthPref(localStorage));
-    };
-    window.addEventListener(SHOW_REPLY_LENGTH_CHANGE_EVENT, onChange);
-    return () =>
-      window.removeEventListener(SHOW_REPLY_LENGTH_CHANGE_EVENT, onChange);
-  }, []);
-
-  // Sidebar brand logo follows active custom provider (localStorage; Settings).
-  useEffect(() => {
-    const onChange = (ev: Event) => {
-      const detail = (ev as CustomEvent<unknown>).detail;
-      if (typeof detail === "boolean") {
-        setReplaceProviderBrandLogo(detail);
-        return;
-      }
-      setReplaceProviderBrandLogo(
-        loadReplaceProviderBrandLogoPref(localStorage),
-      );
-    };
-    window.addEventListener(REPLACE_PROVIDER_BRAND_LOGO_CHANGE_EVENT, onChange);
-    return () =>
-      window.removeEventListener(
-        REPLACE_PROVIDER_BRAND_LOGO_CHANGE_EVENT,
-        onChange,
-      );
-  }, []);
-
-  // Message time format absolute/relative (localStorage; Settings change event).
-  useEffect(() => {
-    const onChange = (ev: Event) => {
-      const detail = (ev as CustomEvent<unknown>).detail;
-      if (detail === "absolute" || detail === "relative") {
-        setMessageTimeFormat(detail);
-        return;
-      }
-      setMessageTimeFormat(loadMessageTimeFormatPref(localStorage));
-    };
-    window.addEventListener(MESSAGE_TIME_FORMAT_CHANGE_EVENT, onChange);
-    return () =>
-      window.removeEventListener(MESSAGE_TIME_FORMAT_CHANGE_EVENT, onChange);
-  }, []);
-
-  // Optional notify beep (localStorage; Settings dispatches change event).
-  useEffect(() => {
-    const onChange = (ev: Event) => {
-      const detail = (ev as CustomEvent<unknown>).detail;
-      if (typeof detail === "boolean") {
-        setNotifySound(detail);
-        return;
-      }
-      setNotifySound(loadNotifySoundPref(localStorage));
-    };
-    window.addEventListener(NOTIFY_SOUND_CHANGE_EVENT, onChange);
-    return () =>
-      window.removeEventListener(NOTIFY_SOUND_CHANGE_EVENT, onChange);
-  }, []);
-
-  // Permission auto-deny timeout (localStorage; Settings dispatches change event).
-  useEffect(() => {
-    const onChange = (ev: Event) => {
-      const detail = (ev as CustomEvent<unknown>).detail;
-      if (typeof detail === "number" && Number.isFinite(detail)) {
-        setPermissionTimeoutSec(detail);
-        return;
-      }
-      setPermissionTimeoutSec(loadPermissionTimeoutSec(localStorage));
-    };
-    window.addEventListener(PERMISSION_TIMEOUT_CHANGE_EVENT, onChange);
-    return () =>
-      window.removeEventListener(PERMISSION_TIMEOUT_CHANGE_EVENT, onChange);
-  }, []);
-
-  // Ask User Question auto-cancel timeout (localStorage; Settings dispatches change).
-  useEffect(() => {
-    const onChange = (ev: Event) => {
-      const detail = (ev as CustomEvent<unknown>).detail;
-      if (typeof detail === "number" && Number.isFinite(detail)) {
-        setAskUserTimeoutSec(detail);
-        return;
-      }
-      setAskUserTimeoutSec(loadAskUserTimeoutSec(localStorage));
-    };
-    window.addEventListener(ASK_USER_TIMEOUT_CHANGE_EVENT, onChange);
-    return () =>
-      window.removeEventListener(ASK_USER_TIMEOUT_CHANGE_EVENT, onChange);
-  }, []);
-
-  // Phone layout flag: mirror client + ≤820px only (desktop ≥821px unchanged).
-  useEffect(() => {
-    if (!isMirrorClient()) {
-      setPhoneLayout(false);
-      return;
-    }
-    const sync = () => {
-      setPhoneLayout(
-        isMirrorPhoneLayout({
-          isMirror: true,
-          viewportWidth: window.innerWidth,
-        }),
-      );
-    };
-    sync();
-    window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
-  }, []);
 
   // User-driven window resize only: clamp open aside. Ignore programmatic setSize
   // (isWindowFitSuppressed) so open-pane fit does not fight resize handlers.
@@ -22740,561 +22350,110 @@ export function AppWorkbench() {
         projectName={projectRulesTarget?.name ?? null}
         locale={locale}
       />
-      <GlassModal
+      <PromptHistoryClearModal
+        locale={locale}
         open={promptHistoryClearOpen}
         onClose={() => setPromptHistoryClearOpen(false)}
-        title={tr("promptHistory.clearRecentConfirmTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setPromptHistoryClearOpen(false)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--danger"
-              data-testid="prompt-history-clear-confirm"
-              onClick={() => {
-                setRecentPromptHistory(clearRecentPromptHistory());
-                setPromptHistoryActive(0);
-                setPromptHistoryClearOpen(false);
-              }}
-            >
-              {tr("promptHistory.clearRecentConfirmAction")}
-            </button>
-          </>
-        }
-      >
-        <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
-          {tr("promptHistory.clearRecentConfirmBody")}
-        </p>
-      </GlassModal>
-      <GlassModal
-        open={!!archiveAgeConfirm}
-        onClose={() => {
-          if (archiveAgeBusy) return;
-          setArchiveAgeConfirm(null);
+        onConfirm={() => {
+          setRecentPromptHistory(clearRecentPromptHistory());
+          setPromptHistoryActive(0);
+          setPromptHistoryClearOpen(false);
         }}
-        title={tr("sidebar.archiveOlderTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        closeOnOverlay={!archiveAgeBusy}
-        showClose={!archiveAgeBusy}
-        wrapBody
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={archiveAgeBusy}
-              onClick={() => setArchiveAgeConfirm(null)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              disabled={archiveAgeBusy || !archiveAgeConfirm?.count}
-              data-testid="archive-age-confirm"
-              onClick={() => {
-                if (!archiveAgeConfirm) return;
-                void runArchiveAgePlan(archiveAgeConfirm);
-              }}
-            >
-              {tr("sidebar.archiveOlderConfirmAction", {
-                n: String(archiveAgeConfirm?.count ?? 0),
-              })}
-            </button>
-          </>
-        }
-      >
-        {archiveAgeConfirm ? (
-          <div className="archive-age-modal">
-            <p className="archive-age-modal__msg">
-              {tr("sidebar.archiveOlderConfirm", {
-                n: String(archiveAgeConfirm.count),
-                days: String(archiveAgeConfirm.days),
-              })}
-            </p>
-            {archiveAgeConfirm.previewTitles.length > 0 ? (
-              <div className="archive-age-modal__preview">
-                <div className="archive-age-modal__preview-label">
-                  {tr("sidebar.archiveOlderPreviewLabel")}
-                </div>
-                <ul className="archive-age-modal__list">
-                  {archiveAgeConfirm.previewTitles.map((title, i) => {
-                    const row = archiveAgeConfirm.sessions[i];
-                    const key = row?.id ?? `preview-${i}`;
-                    return (
-                      <li key={key} className="archive-age-modal__item">
-                        {title || tr("session.untitled")}
-                      </li>
-                    );
-                  })}
-                </ul>
-                {archiveAgeConfirm.previewMore > 0 ? (
-                  <div className="archive-age-modal__more">
-                    {tr("sidebar.archiveOlderPreviewMore", {
-                      n: String(archiveAgeConfirm.previewMore),
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </GlassModal>
-      <GlassModal
+      />
+      <ArchiveAgeConfirmModal
+        locale={locale}
+        plan={archiveAgeConfirm}
+        busy={archiveAgeBusy}
+        onClose={() => setArchiveAgeConfirm(null)}
+        onConfirm={() => {
+          if (!archiveAgeConfirm) return;
+          void runArchiveAgePlan(archiveAgeConfirm);
+        }}
+      />
+      <WorktreeCreateModal
+        locale={locale}
         open={worktreeCreateOpen}
-        onClose={() => {
-          if (worktreeCreateBusy) return;
-          setWorktreeCreateOpen(false);
+        busy={worktreeCreateBusy}
+        startChat={worktreeCreateStartChat}
+        name={worktreeCreateName}
+        layout={worktreeCreateLayout}
+        startRef={worktreeCreateRef}
+        previewPath={worktreeCreatePreviewPath}
+        error={worktreeCreateError}
+        onClose={() => setWorktreeCreateOpen(false)}
+        onSubmit={() => {
+          void submitWorktreeCreate();
         }}
-        title={
-          worktreeCreateStartChat
-            ? tr("composer.worktreeNewChatTitle")
-            : tr("composer.worktreeNewTitle")
-        }
-        size="sm"
-        closeLabel={tr("common.close")}
-        closeOnOverlay={!worktreeCreateBusy}
-        showClose={!worktreeCreateBusy}
-        wrapBody
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={worktreeCreateBusy}
-              onClick={() => setWorktreeCreateOpen(false)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              disabled={worktreeCreateBusy || !worktreeCreateName.trim()}
-              onClick={() => {
-                void submitWorktreeCreate();
-              }}
-            >
-              {worktreeCreateBusy
-                ? tr("composer.worktreeCreating")
-                : worktreeCreateStartChat
-                  ? tr("composer.worktreeCreateChat")
-                  : tr("composer.worktreeCreate")}
-            </button>
-          </>
-        }
-      >
-        <form
-          className="wt-create"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (worktreeCreateBusy) return;
-            void submitWorktreeCreate();
-          }}
-        >
-          <p className="wt-create__hint">
-            {worktreeCreateStartChat
-              ? tr("composer.worktreeNewChatHint")
-              : tr("composer.worktreeNewHint")}
-          </p>
-          <label className="wt-create__field">
-            <span className="wt-create__label">
-              {tr("composer.worktreeName")}
-            </span>
-            <input
-              className="settings-input"
-              value={worktreeCreateName}
-              onChange={(e) => {
-                setWorktreeCreateName(e.target.value);
-                setWorktreeCreateError(null);
-              }}
-              placeholder={tr("composer.worktreeNamePlaceholder")}
-              autoComplete="off"
-              autoFocus
-              disabled={worktreeCreateBusy}
-              spellCheck={false}
-            />
-          </label>
-          <fieldset className="wt-create__field wt-create__layout" disabled={worktreeCreateBusy}>
-            <legend className="wt-create__label">
-              {tr("composer.worktreeLayout")}
-            </legend>
-            <label className="wt-create__radio">
-              <input
-                type="radio"
-                name="worktree-layout"
-                value="cli"
-                checked={worktreeCreateLayout === "cli"}
-                onChange={() => {
-                  setWorktreeCreateLayout("cli");
-                  setWorktreeCreateError(null);
-                }}
-              />
-              <span>{tr("composer.worktreeLayoutCli")}</span>
-            </label>
-            <label className="wt-create__radio">
-              <input
-                type="radio"
-                name="worktree-layout"
-                value="sibling"
-                checked={worktreeCreateLayout === "sibling"}
-                onChange={() => {
-                  setWorktreeCreateLayout("sibling");
-                  setWorktreeCreateError(null);
-                }}
-              />
-              <span>{tr("composer.worktreeLayoutSibling")}</span>
-            </label>
-          </fieldset>
-          <label className="wt-create__field">
-            <span className="wt-create__label">
-              {tr("composer.worktreeRef")}
-            </span>
-            <input
-              className="settings-input"
-              value={worktreeCreateRef}
-              onChange={(e) => {
-                setWorktreeCreateRef(e.target.value);
-                setWorktreeCreateError(null);
-              }}
-              placeholder={tr("composer.worktreeRefPlaceholder")}
-              autoComplete="off"
-              disabled={worktreeCreateBusy}
-              spellCheck={false}
-            />
-          </label>
-          {worktreeCreatePreviewPath ? (
-            <p className="wt-create__preview">
-              {tr("composer.worktreePathPreview", {
-                path: worktreeCreatePreviewPath,
-              })}
-            </p>
-          ) : null}
-          {worktreeCreateError ? (
-            <p className="wt-create__error" role="alert">
-              {worktreeCreateError}
-            </p>
-          ) : null}
-        </form>
-      </GlassModal>
-      <GlassModal
+        onNameChange={(value) => {
+          setWorktreeCreateName(value);
+          setWorktreeCreateError(null);
+        }}
+        onLayoutChange={(value) => {
+          setWorktreeCreateLayout(value);
+          setWorktreeCreateError(null);
+        }}
+        onRefChange={(value) => {
+          setWorktreeCreateRef(value);
+          setWorktreeCreateError(null);
+        }}
+      />
+      <WorktreeGcModal
+        locale={locale}
         open={worktreeGcOpen}
+        busy={worktreeGcBusy}
+        previewBusy={worktreeGcPreviewBusy}
+        force={worktreeGcForce}
+        preview={worktreeGcPreview}
+        error={worktreeGcError}
         onClose={() => {
-          if (worktreeGcBusy) return;
           setWorktreeGcOpen(false);
           setWorktreeGcError(null);
           setWorktreeGcPreview(null);
           setWorktreeGcForce(false);
         }}
-        title={tr("composer.worktreeGcTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        closeOnOverlay={!worktreeGcBusy}
-        showClose={!worktreeGcBusy}
-        wrapBody
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={worktreeGcBusy}
-              onClick={() => {
-                setWorktreeGcOpen(false);
-                setWorktreeGcError(null);
-                setWorktreeGcPreview(null);
-                setWorktreeGcForce(false);
-              }}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              disabled={worktreeGcBusy || worktreeGcPreviewBusy}
-              onClick={() => {
-                void submitWorktreeGc();
-              }}
-            >
-              {worktreeGcBusy
-                ? tr("composer.worktreeGcRunning")
-                : tr("composer.worktreeGcConfirm")}
-            </button>
-          </>
-        }
-      >
-        <div className="wt-gc">
-          <p className="wt-gc__hint">{tr("composer.worktreeGcHint")}</p>
-          <label className="wt-gc__force">
-            <input
-              type="checkbox"
-              checked={worktreeGcForce}
-              disabled={worktreeGcBusy || worktreeGcPreviewBusy}
-              onChange={(e) => setWorktreeGcForce(e.target.checked)}
-            />
-            <span>{tr("composer.worktreeGcForce")}</span>
-          </label>
-          <div className="wt-gc__preview-head">{tr("composer.worktreeGcPreview")}</div>
-          {worktreeGcPreviewBusy ? (
-            <p className="wt-gc__preview-status">
-              {tr("composer.worktreeGcPreviewLoading")}
-            </p>
-          ) : worktreeGcPreview ? (
-            <>
-              {(worktreeGcPreview.prunable?.length ?? 0) > 0 ? (
-                <p className="wt-gc__prunable">
-                  {tr("composer.worktreeGcPrunable", {
-                    n: String(worktreeGcPreview.prunable?.length ?? 0),
-                  })}
-                </p>
-              ) : null}
-              {(worktreeGcPreview.output ?? "").trim() ||
-              (worktreeGcPreview.prunable?.length ?? 0) > 0 ? (
-                <pre className="wt-gc__output" tabIndex={0}>
-                  {(worktreeGcPreview.output ?? "").trim() ||
-                    (Array.isArray(worktreeGcPreview.prunable)
-                      ? worktreeGcPreview.prunable.join("\n")
-                      : "")}
-                </pre>
-              ) : (
-                <p className="wt-gc__preview-status">
-                  {tr("composer.worktreeGcPreviewEmpty")}
-                </p>
-              )}
-            </>
-          ) : worktreeGcError ? null : (
-            <p className="wt-gc__preview-status">
-              {tr("composer.worktreeGcPreviewEmpty")}
-            </p>
-          )}
-          {worktreeGcError ? (
-            <p className="wt-gc__error" role="alert">
-              {worktreeGcError}
-            </p>
-          ) : null}
-        </div>
-      </GlassModal>
-      <GlassModal
+        onSubmit={() => {
+          void submitWorktreeGc();
+        }}
+        onForceChange={setWorktreeGcForce}
+      />
+      <WorktreeShipModal
+        locale={locale}
         open={shipOpen}
+        busy={shipBusy}
+        success={shipSuccess}
+        title={shipTitle}
+        body={shipBody}
+        createPr={shipCreatePr}
+        draft={shipDraft}
+        branch={shipBranch}
+        status={shipStatus}
+        error={shipError}
         onClose={closeShipFlow}
-        title={
-          shipSuccess
-            ? tr("composer.worktreeShipSuccessTitle")
-            : tr("composer.worktreeShipTitle")
-        }
-        size="md"
-        closeLabel={tr("common.close")}
-        closeOnOverlay={!shipBusy}
-        showClose={!shipBusy}
-        wrapBody
-        footer={
-          shipSuccess ? (
-            <>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={closeShipFlow}
-                data-testid="ship-success-done"
-              >
-                {tr("composer.worktreeShipDone")}
-              </button>
-              <button
-                type="button"
-                className="btn btn--solid"
-                onClick={() => openPrHubFromShip(shipSuccess.prNumber)}
-                data-testid="ship-open-pr-hub"
-              >
-                {tr("composer.worktreeShipOpenInHub")}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                disabled={shipBusy}
-                onClick={closeShipFlow}
-              >
-                {tr("common.cancel")}
-              </button>
-              <button
-                type="button"
-                className="btn btn--solid"
-                disabled={shipBusy || !shipTitle.trim()}
-                onClick={() => {
-                  void submitShipFlow();
-                }}
-                data-testid="ship-submit"
-              >
-                {shipBusy
-                  ? shipStatus || tr("composer.worktreeShipRunning")
-                  : shipCreatePr
-                    ? tr("composer.worktreeShipConfirmPr")
-                    : tr("composer.worktreeShipConfirmPush")}
-              </button>
-            </>
-          )
-        }
-      >
-        {shipSuccess ? (
-          <div
-            className="wt-ship wt-ship--success"
-            data-testid="ship-success"
-          >
-            <p className="wt-ship__hint">
-              {tr("composer.worktreeShipDonePr", { url: shipSuccess.prUrl })}
-            </p>
-            <p className="wt-ship__success-url" title={shipSuccess.prUrl}>
-              {shipSuccess.prUrl}
-            </p>
-            <div className="wt-ship__success-actions">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => {
-                  void api.openExternalUrl(shipSuccess.prUrl).catch(() => {
-                    showToast(tr("composer.worktreeShipOpenBrowserFailed"), 3500);
-                  });
-                }}
-                data-testid="ship-open-browser"
-              >
-                {tr("composer.worktreeShipOpenInBrowser")}
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => openPrHubFromShip(shipSuccess.prNumber)}
-              >
-                {tr("composer.worktreeShipOpenInHub")}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <form
-            className="wt-ship"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (shipBusy || !shipTitle.trim()) return;
-              void submitShipFlow();
-            }}
-          >
-            <p className="wt-ship__hint">{tr("composer.worktreeShipHint")}</p>
-            {shipBranch ? (
-              <p className="wt-ship__branch">
-                {tr("composer.worktreeShipBranch", { branch: shipBranch })}
-              </p>
-            ) : null}
-            <label className="wt-ship__field">
-              <span className="wt-ship__label">
-                {tr("composer.worktreeShipTitleField")}
-              </span>
-              <input
-                className="settings-input"
-                value={shipTitle}
-                onChange={(e) => {
-                  setShipTitle(e.target.value);
-                  setShipError(null);
-                }}
-                placeholder={tr("composer.worktreeShipTitlePlaceholder")}
-                autoComplete="off"
-                autoFocus
-                disabled={shipBusy}
-                spellCheck={true}
-                data-testid="ship-title"
-              />
-            </label>
-            <label className="wt-ship__field">
-              <span className="wt-ship__label">
-                {tr("composer.worktreeShipBodyField")}
-              </span>
-              <textarea
-                className="settings-input wt-ship__body"
-                value={shipBody}
-                onChange={(e) => {
-                  setShipBody(e.target.value);
-                  setShipError(null);
-                }}
-                placeholder={tr("composer.worktreeShipBodyPlaceholder")}
-                rows={5}
-                disabled={shipBusy}
-                spellCheck={true}
-                data-testid="ship-body"
-              />
-            </label>
-            <label className="wt-ship__check">
-              <input
-                type="checkbox"
-                checked={shipCreatePr}
-                disabled={shipBusy}
-                onChange={(e) => setShipCreatePr(e.target.checked)}
-              />
-              <span>{tr("composer.worktreeShipCreatePr")}</span>
-            </label>
-            <label className="wt-ship__check">
-              <input
-                type="checkbox"
-                checked={shipDraft}
-                disabled={shipBusy || !shipCreatePr}
-                onChange={(e) => setShipDraft(e.target.checked)}
-              />
-              <span>{tr("composer.worktreeShipDraft")}</span>
-            </label>
-            {shipStatus ? (
-              <p className="wt-ship__status" aria-live="polite">
-                {shipStatus}
-              </p>
-            ) : null}
-            {shipError ? (
-              <p className="wt-ship__error" role="alert">
-                {shipError}
-              </p>
-            ) : null}
-          </form>
-        )}
-      </GlassModal>
-      <GlassModal
+        onSubmit={() => {
+          void submitShipFlow();
+        }}
+        onTitleChange={(value) => {
+          setShipTitle(value);
+          setShipError(null);
+        }}
+        onBodyChange={(value) => {
+          setShipBody(value);
+          setShipError(null);
+        }}
+        onCreatePrChange={setShipCreatePr}
+        onDraftChange={setShipDraft}
+        onOpenPrHub={openPrHubFromShip}
+        onToast={showToast}
+      />
+      <ShortcutsHelpModal
+        locale={locale}
         open={showShortcuts}
+        platform={platform}
+        composerSendKeyPref={composerSendKeyPref}
+        shortcutRemaps={shortcutRemaps}
+        voiceHotkeyEnabled={voiceHotkeyEnabled}
         onClose={() => setShowShortcuts(false)}
-        title={tr("shortcuts.title")}
-        size="md"
-        closeLabel={tr("shortcuts.close")}
-        footer={
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setShowShortcuts(false)}
-          >
-            {tr("shortcuts.close")}
-          </button>
-        }
-      >
-        <ul className="shortcuts-list">
-          {shortcutsForPlatform(
-            platform === "mac" ? "mac" : platform === "win" ? "win" : "other",
-            composerSendKeyPref,
-            shortcutRemaps,
-            voiceHotkeyEnabled,
-          ).map((row) => (
-            <li key={row.id} className="shortcuts-list__row">
-              <span className="shortcuts-list__label">
-                {tr(row.labelKey as MessageKey)}
-              </span>
-              <kbd className="shortcuts-list__keys">
-                {row.keys === SHORTCUT_KEYS_OFF
-                  ? tr("shortcuts.off")
-                  : row.keys}
-              </kbd>
-            </li>
-          ))}
-        </ul>
-      </GlassModal>
+      />
       {(showProductTutorial) ? (
       <Suspense fallback={null}>
       <ProductTutorial
@@ -23577,2430 +22736,593 @@ export function AppWorkbench() {
       />
       </Suspense>
       ) : null}
-      {rewindTimeline && (
-        <div
-          className="overlay"
-          role="presentation"
-          onClick={() => {
-            if (!rewindBusy) setRewindTimeline(null);
-          }}
-        >
-          <div
-            ref={rewindModalRef}
-            className="modal rewind-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="rewind-modal-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header className="modal-head">
-              <h2 id="rewind-modal-title" className="modal-title">
-                {tr("session.rewindTitle")}
-              </h2>
-              <button
-                type="button"
-                className="icon-btn modal-close"
-                onClick={() => setRewindTimeline(null)}
-                aria-label={tr("common.close")}
-                disabled={rewindBusy}
-              >
-                <IconClose size={16} />
-              </button>
-            </header>
-            <p className="rewind-modal__msg">{tr("session.rewindHint")}</p>
-            <div className="rewind-modal__list" role="list">
-              {rewindTimeline.points.map((p) => {
-                const isLast =
-                  p.promptIndex ===
-                  rewindTimeline.points[rewindTimeline.points.length - 1]
-                    ?.promptIndex;
-                return (
-                  <button
-                    key={`${p.promptIndex}-${p.messageId ?? ""}`}
-                    type="button"
-                    role="listitem"
-                    className="rewind-modal__item"
-                    disabled={rewindBusy || isLast}
-                    title={
-                      isLast
-                        ? tr("session.rewindNoop")
-                        : tr("message.rewindHere")
-                    }
-                    onClick={() => {
-                      if (isLast) {
-                        return;
-                      }
-                      confirmRewindToPrompt(
-                        rewindTimeline.sessionId,
-                        p.promptIndex,
-                        p.preview,
-                      );
-                    }}
-                  >
-                    <span className="rewind-modal__idx">
-                      #{p.promptIndex + 1}
-                    </span>
-                    <span className="rewind-modal__preview">
-                      {p.preview || "…"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                disabled={rewindBusy}
-                onClick={() => setRewindTimeline(null)}
-              >
-                {tr("common.cancel")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RewindTimelineModal
+        locale={locale}
+        timeline={rewindTimeline}
+        busy={rewindBusy}
+        panelRef={rewindModalRef}
+        onClose={() => setRewindTimeline(null)}
+        onPick={(promptIndex, preview) => {
+          if (!rewindTimeline) return;
+          confirmRewindToPrompt(
+            rewindTimeline.sessionId,
+            promptIndex,
+            preview,
+          );
+        }}
+      />
 
-      <GlassModal
-        open={!!rewindConfirm}
+      <RewindConfirmModal
+        locale={locale}
+        confirm={rewindConfirm}
+        busy={rewindBusy}
+        restoreFiles={rewindRestoreFiles}
+        onRestoreFilesChange={setRewindRestoreFiles}
         onClose={() => {
-          if (rewindBusy) return;
           setRewindConfirm(null);
           setRewindRestoreFiles(false);
         }}
-        title={tr("session.rewindTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        closeOnOverlay={!rewindBusy}
-        showClose={!rewindBusy}
-        wrapBody
-        className="rewind-confirm-modal"
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={rewindBusy}
-              onClick={() => {
-                setRewindConfirm(null);
-                setRewindRestoreFiles(false);
-              }}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--danger"
-              disabled={rewindBusy || !rewindConfirm}
-              onClick={() => {
-                if (!rewindConfirm) return;
-                void runRewindToPrompt(
-                  rewindConfirm.sessionId,
-                  rewindConfirm.targetPromptIndex,
-                  rewindRestoreFiles,
-                );
-              }}
-            >
-              {tr("session.rewindConfirmLabel")}
-            </button>
-          </>
-        }
-      >
-        <div className="rewind-confirm">
-          <p className="rewind-confirm__msg">
-            {tr("session.rewindConfirm")}
-            {rewindConfirm?.preview
-              ? `\n\n“${rewindConfirm.preview}”`
-              : ""}
-          </p>
-          <label className="rewind-confirm__restore">
-            <input
-              type="checkbox"
-              checked={rewindRestoreFiles}
-              disabled={rewindBusy}
-              onChange={(e) => setRewindRestoreFiles(e.target.checked)}
-            />
-            <span>{tr("session.rewindRestoreFiles")}</span>
-          </label>
-          <p className="rewind-confirm__hint">
-            {tr("session.rewindRestoreFilesHint")}
-          </p>
-        </div>
-      </GlassModal>
+        onConfirm={() => {
+          if (!rewindConfirm) return;
+          void runRewindToPrompt(
+            rewindConfirm.sessionId,
+            rewindConfirm.targetPromptIndex,
+            rewindRestoreFiles,
+          );
+        }}
+      />
 
-      <GlassModal
-        open={!!forkConfirm}
+      <ForkConfirmModal
+        locale={locale}
+        confirm={forkConfirm}
+        busy={forkBusy}
+        restoreCode={forkRestoreCode}
+        agentCheckbox={forkAgentCheckbox}
+        onRestoreCodeChange={setForkRestoreCode}
+        onForkCliSessionChange={setForkCliSession}
         onClose={() => {
-          if (forkBusy) return;
           setForkConfirm(null);
           setForkRestoreCode(false);
           setForkCliSession(false);
         }}
-        title={tr("session.forkTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        closeOnOverlay={!forkBusy}
-        showClose={!forkBusy}
-        wrapBody
-        className="fork-confirm-modal"
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={forkBusy}
-              onClick={() => {
-                setForkConfirm(null);
-                setForkRestoreCode(false);
-                setForkCliSession(false);
-              }}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={forkBusy || !forkConfirm}
-              onClick={() => {
-                if (!forkConfirm) return;
-                void runForkSession(forkConfirm.source, {
-                  throughUserPromptIndex:
-                    forkConfirm.throughUserPromptIndex ?? null,
-                  restoreCode: forkRestoreCode,
-                  // Honesty: only pass true when checkbox is actually available.
-                  forkCliSession: forkAgentCheckbox.checked,
-                });
-              }}
-            >
-              {forkBusy ? tr("session.forkWorking") : tr("session.fork")}
-            </button>
-          </>
-        }
-      >
-        <div className="fork-confirm">
-          <p className="fork-confirm__msg">
-            {forkConfirm?.throughUserPromptIndex != null &&
-            forkConfirm.throughUserPromptIndex !== undefined
-              ? tr("session.forkConfirmPartial")
-              : tr("session.forkConfirm")}
-          </p>
-          <label className="fork-confirm__restore">
-            <input
-              type="checkbox"
-              checked={forkRestoreCode}
-              disabled={forkBusy}
-              onChange={(e) => setForkRestoreCode(e.target.checked)}
-            />
-            <span>{tr("session.forkRestoreCode")}</span>
-          </label>
-          <p className="fork-confirm__hint">
-            {tr("session.forkRestoreCodeHint")}
-          </p>
-          <label
-            className={
-              "fork-confirm__restore" +
-              (forkAgentCheckbox.disabled ? " fork-confirm__restore--disabled" : "")
-            }
-          >
-            <input
-              type="checkbox"
-              checked={forkAgentCheckbox.checked}
-              disabled={forkBusy || forkAgentCheckbox.disabled}
-              onChange={(e) => {
-                if (forkAgentCheckbox.disabled) return;
-                setForkCliSession(e.target.checked);
-              }}
-              aria-disabled={forkAgentCheckbox.disabled || undefined}
-            />
-            <span>{tr("session.forkCliSession")}</span>
-          </label>
-          <p className="fork-confirm__hint">
-            {tr(forkAgentCheckbox.hintKey as Parameters<typeof tr>[0])}
-          </p>
-        </div>
-      </GlassModal>
+        onConfirm={() => {
+          if (!forkConfirm) return;
+          void runForkSession(forkConfirm.source, {
+            throughUserPromptIndex:
+              forkConfirm.throughUserPromptIndex ?? null,
+            restoreCode: forkRestoreCode,
+            forkCliSession: forkAgentCheckbox.checked,
+          });
+        }}
+      />
 
-      <GlassModal
+      <ResumeRestoreConfirmModal
+        locale={locale}
         open={!!resumeRestoreConfirm}
+        busy={resumeRestoreBusy}
+        agentCheckbox={resumeAgentCheckbox}
+        onForkCliSessionChange={setResumeForkCliSession}
         onClose={() => {
-          if (resumeRestoreBusy) return;
           setResumeRestoreConfirm(null);
           setResumeForkCliSession(false);
         }}
-        title={tr("session.resumeRestoreTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        closeOnOverlay={!resumeRestoreBusy}
-        showClose={!resumeRestoreBusy}
-        wrapBody
-        className="fork-confirm-modal"
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={resumeRestoreBusy}
-              onClick={() => {
-                setResumeRestoreConfirm(null);
-                setResumeForkCliSession(false);
-              }}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={resumeRestoreBusy || !resumeRestoreConfirm}
-              onClick={() => {
-                if (!resumeRestoreConfirm) return;
-                void runResumeWithCodeRestore(resumeRestoreConfirm, {
-                  // Honesty: only pass true when checkbox is actually available.
-                  forkCliSession: resumeAgentCheckbox.checked,
-                });
-              }}
-            >
-              {resumeRestoreBusy
-                ? tr("session.resumeRestoreWorking")
-                : tr("session.resumeRestore")}
-            </button>
-          </>
-        }
-      >
-        <div className="fork-confirm">
-          <p className="fork-confirm__msg">
-            {tr("session.resumeRestoreConfirm")}
-          </p>
-          <p className="fork-confirm__hint">
-            {tr("session.resumeRestoreHint")}
-          </p>
-          <label
-            className={
-              "fork-confirm__restore" +
-              (resumeAgentCheckbox.disabled
-                ? " fork-confirm__restore--disabled"
-                : "")
-            }
-          >
-            <input
-              type="checkbox"
-              checked={resumeAgentCheckbox.checked}
-              disabled={resumeRestoreBusy || resumeAgentCheckbox.disabled}
-              onChange={(e) => {
-                if (resumeAgentCheckbox.disabled) return;
-                setResumeForkCliSession(e.target.checked);
-              }}
-              aria-disabled={resumeAgentCheckbox.disabled || undefined}
-            />
-            <span>{tr("session.forkCliSession")}</span>
-          </label>
-          <p className="fork-confirm__hint">
-            {tr(resumeAgentCheckbox.hintKey as Parameters<typeof tr>[0])}
-          </p>
-        </div>
-      </GlassModal>
+        onConfirm={() => {
+          if (!resumeRestoreConfirm) return;
+          void runResumeWithCodeRestore(resumeRestoreConfirm, {
+            forkCliSession: resumeAgentCheckbox.checked,
+          });
+        }}
+      />
 
-      <GlassModal
+      <TracesHistoryModal
+        locale={locale}
         open={showTraces}
         onClose={() => setShowTraces(false)}
-        title={tr("session.tracesTitle")}
-        size="md"
-        closeLabel={tr("common.close")}
-        wrapBody
-        className="trace-history-modal"
-        footer={
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setShowTraces(false)}
-          >
-            {tr("common.close")}
-          </button>
-        }
-      >
-        <p className="trace-history-modal__desc">{tr("session.tracesDesc")}</p>
-        <TraceHistoryList
-          locale={locale}
-          labels={{
-            empty: tr("session.tracesEmpty"),
-            emptyFilter: tr("session.tracesEmptyFilter"),
-            reveal: tr("session.tracesReveal"),
-            copyPath: tr("session.tracesCopyPath"),
-            copied: tr("session.tracesCopied"),
-            remove: tr("session.tracesRemove"),
-            clearAll: tr("session.tracesClearAll"),
-            clearConfirmTitle: tr("session.tracesClearConfirmTitle"),
-            clearConfirmMessage: tr("session.tracesClearConfirmMessage"),
-            clearConfirmAction: tr("session.tracesClearConfirmAction"),
-            cancel: tr("common.cancel"),
-            searchPlaceholder: tr("session.tracesSearch"),
-            listAria: tr("session.tracesTitle"),
-            uploadedBadge: tr("session.tracesUploadedBadge"),
-          }}
-          onError={(msg) => showToast(msg, 4000)}
-        />
-      </GlassModal>
+        onError={(msg) => showToast(msg, 4000)}
+      />
 
-      <GlassModal
+      <PlanHistoryModal
+        locale={locale}
         open={showPlanHistory}
+        existingSessionIds={sessions.map((s) => s.id)}
         onClose={() => setShowPlanHistory(false)}
-        title={tr("plan.historyTitle")}
-        size="md"
-        closeLabel={tr("common.close")}
-        wrapBody
-        className="plan-history-modal"
-        footer={
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setShowPlanHistory(false)}
-          >
-            {tr("common.close")}
-          </button>
-        }
-      >
-        <p className="plan-history-modal__desc">{tr("plan.historyDesc")}</p>
-        <PlanHistoryList
-          locale={locale}
-          labels={{
-            empty: tr("plan.historyEmpty"),
-            emptyFilter: tr("plan.historyEmptyFilter"),
-            open: tr("plan.historyOpen"),
-            openSession: tr("plan.historyOpenSession"),
-            clearAll: tr("plan.historyClear"),
-            searchPlaceholder: tr("plan.historySearchPlaceholder"),
-            filterAll: tr("plan.historyFilterAll"),
-            decisionApproved: tr("plan.historyDecisionApproved"),
-            decisionAbandoned: tr("plan.historyDecisionAbandoned"),
-            decisionCompleted: tr("plan.historyDecisionCompleted"),
-            listAria: tr("plan.historyTitle"),
-          }}
-          existingSessionIds={sessions.map((s) => s.id)}
-          onOpen={(entry) => setPlanHistoryPreview(entry)}
-          onOpenSession={(entry) => openPlanHistorySession(entry)}
-          onRequestClearAll={confirmClearPlanHistory}
-        />
-      </GlassModal>
+        onOpen={(entry) => setPlanHistoryPreview(entry)}
+        onOpenSession={(entry) => openPlanHistorySession(entry)}
+        onRequestClearAll={confirmClearPlanHistory}
+      />
 
-      <GlassModal
-        open={!!planHistoryPreview}
+      <PlanHistoryPreviewModal
+        locale={locale}
+        entry={planHistoryPreview}
+        canOpenSession={
+          !!planHistoryPreview &&
+          sessions.some((s) => s.id === planHistoryPreview.sessionId)
+        }
         onClose={() => setPlanHistoryPreview(null)}
-        title={tr("plan.historyPreviewTitle")}
-        size="md"
-        closeLabel={tr("common.close")}
-        wrapBody
-        className="plan-history-preview-modal"
-        footer={
-          <>
-            {planHistoryPreview &&
-            sessions.some((s) => s.id === planHistoryPreview.sessionId) ? (
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  if (planHistoryPreview) {
-                    openPlanHistorySession(planHistoryPreview);
-                  }
-                }}
-              >
-                {tr("plan.historyOpenSession")}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setPlanHistoryPreview(null)}
-            >
-              {tr("common.close")}
-            </button>
-          </>
-        }
-      >
-        {planHistoryPreview ? (
-          <div className="plan-history-preview">
-            <div className="plan-history-preview__meta">
-              <span>
-                {planHistoryPreview.decision === "approved"
-                  ? tr("plan.historyDecisionApproved")
-                  : planHistoryPreview.decision === "abandoned"
-                    ? tr("plan.historyDecisionAbandoned")
-                    : tr("plan.historyDecisionCompleted")}
-              </span>
-              {planHistoryPreview.title ? (
-                <span title={planHistoryPreview.title}>
-                  {planHistoryPreview.title}
-                </span>
-              ) : null}
-              {planHistoryPreview.at ? (
-                <span>
-                  {formatListTimestamp(planHistoryPreview.at, locale)}
-                </span>
-              ) : null}
-            </div>
-            {planHistoryPreview.bodyPreview.trim() ? (
-              <MarkdownBody locale={locale}>
-                {planHistoryPreview.bodyPreview}
-              </MarkdownBody>
-            ) : (
-              <div className="plan-history-preview__empty">
-                {tr("plan.historyPreviewEmpty")}
-              </div>
-            )}
-          </div>
-        ) : null}
-      </GlassModal>
+        onOpenSession={() => {
+          if (planHistoryPreview) openPlanHistorySession(planHistoryPreview);
+        }}
+      />
 
-      <GlassModal
+      <PlanReviseModal
+        locale={locale}
         open={planReviseOpen}
+        note={planReviseNote}
+        onNoteChange={setPlanReviseNote}
         onClose={() => {
           setPlanReviseOpen(false);
           setPlanReviseNote("");
         }}
-        title={tr("plan.reviseNoteTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        wrapBody
-        className="plan-revise-modal"
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => {
-                setPlanReviseOpen(false);
-                setPlanReviseNote("");
-              }}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              onClick={() => void requestPlanChanges(planReviseNote)}
-              data-testid="plan-revise-submit"
-            >
-              {tr("plan.reviseNoteSubmit")}
-            </button>
-          </>
-        }
-      >
-        <p className="plan-revise-modal__desc">{tr("plan.reviseNoteDesc")}</p>
-        <label className="plan-revise-modal__field">
-          <span className="sr-only">{tr("plan.reviseNotePlaceholder")}</span>
-          <textarea
-            className="plan-revise-modal__textarea"
-            value={planReviseNote}
-            onChange={(e) => setPlanReviseNote(e.target.value)}
-            placeholder={tr("plan.reviseNotePlaceholder")}
-            rows={4}
-            autoFocus
-            data-testid="plan-revise-note"
-          />
-        </label>
-      </GlassModal>
+        onSubmit={() => void requestPlanChanges(planReviseNote)}
+      />
 
-      <GlassModal
+      <JsonSchemaModal
+        locale={locale}
         open={showJsonSchemaModal}
+        draft={jsonSchemaDraft}
+        hasStoredSchema={!!sessionJsonSchema}
+        onDraftChange={setJsonSchemaDraft}
         onClose={() => setShowJsonSchemaModal(false)}
-        title={tr("composer.jsonSchemaTitle")}
-        size="md"
-        closeLabel={tr("common.close")}
-        wrapBody
-        className="json-schema-modal"
-        footer={
-          <div className="json-schema-modal__actions">
-            {sessionJsonSchema ? (
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  void (async () => {
-                    const sid = session.sessionId;
-                    setSessionJsonSchema(null);
-                    setJsonSchemaDraft("");
-                    setShowJsonSchemaModal(false);
-                    if (sid && api.isTauri()) {
-                      try {
-                        await api.sessionSetJsonSchema(sid, null);
-                      } catch {
-                        /* ignore */
-                      }
-                    }
-                    if (sid) {
-                      setSessions((list) =>
-                        list.map((row) =>
-                          row.id === sid ? { ...row, jsonSchema: null } : row,
-                        ),
-                      );
-                    }
-                  })();
-                }}
-              >
-                {tr("composer.jsonSchemaClear")}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setShowJsonSchemaModal(false)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => {
-                void (async () => {
-                  const parsed = parseJsonSchemaText(jsonSchemaDraft);
-                  if (!parsed.ok) {
-                    showToast(tr("composer.jsonSchemaInvalid"), 4000);
-                    return;
-                  }
-                  const sid = session.sessionId;
-                  setSessionJsonSchema(parsed.normalized);
-                  if (sid && api.isTauri()) {
-                    try {
-                      const saved = await api.sessionSetJsonSchema(
-                        sid,
-                        parsed.normalized,
-                      );
-                      const next =
-                        typeof saved.jsonSchema === "string" &&
-                        saved.jsonSchema.trim()
-                          ? saved.jsonSchema
-                          : parsed.normalized;
-                      setSessionJsonSchema(next);
-                      setSessions((list) =>
-                        list.map((row) =>
-                          row.id === sid
-                            ? { ...row, jsonSchema: next }
-                            : row,
-                        ),
-                      );
-                    } catch (e) {
-                      showToast(String(e), 4000);
-                      return;
-                    }
-                  } else if (!sid) {
-                    showToast(tr("composer.jsonSchemaEmptySession"), 3200);
-                  }
-                  setShowJsonSchemaModal(false);
-                })();
-              }}
-            >
-              {tr("composer.jsonSchemaApply")}
-            </button>
-          </div>
-        }
-      >
-        <p className="json-schema-modal__hint">
-          {tr("composer.jsonSchemaHint")}
-        </p>
-        <p className="json-schema-modal__experimental">
-          {tr("composer.jsonSchemaExperimental")}
-        </p>
-        <textarea
-          className="json-schema-modal__textarea"
-          value={jsonSchemaDraft}
-          onChange={(e) => setJsonSchemaDraft(e.target.value)}
-          placeholder={tr("composer.jsonSchemaPlaceholder")}
-          spellCheck={false}
-          aria-label={tr("composer.jsonSchemaTitle")}
-        />
-      </GlassModal>
+        onClear={() => {
+          void (async () => {
+            const sid = session.sessionId;
+            setSessionJsonSchema(null);
+            setJsonSchemaDraft("");
+            setShowJsonSchemaModal(false);
+            if (sid && api.isTauri()) {
+              try {
+                await api.sessionSetJsonSchema(sid, null);
+              } catch {
+                /* ignore */
+              }
+            }
+            if (sid) {
+              setSessions((list) =>
+                list.map((row) =>
+                  row.id === sid ? { ...row, jsonSchema: null } : row,
+                ),
+              );
+            }
+          })();
+        }}
+        onApply={() => {
+          void (async () => {
+            const parsed = parseJsonSchemaText(jsonSchemaDraft);
+            if (!parsed.ok) {
+              showToast(tr("composer.jsonSchemaInvalid"), 4000);
+              return;
+            }
+            const sid = session.sessionId;
+            setSessionJsonSchema(parsed.normalized);
+            if (sid && api.isTauri()) {
+              try {
+                const saved = await api.sessionSetJsonSchema(
+                  sid,
+                  parsed.normalized,
+                );
+                const next =
+                  typeof saved.jsonSchema === "string" &&
+                  saved.jsonSchema.trim()
+                    ? saved.jsonSchema
+                    : parsed.normalized;
+                setSessionJsonSchema(next);
+                setSessions((list) =>
+                  list.map((row) =>
+                    row.id === sid ? { ...row, jsonSchema: next } : row,
+                  ),
+                );
+              } catch (e) {
+                showToast(String(e), 4000);
+                return;
+              }
+            } else if (!sid) {
+              showToast(tr("composer.jsonSchemaEmptySession"), 3200);
+            }
+            setShowJsonSchemaModal(false);
+          })();
+        }}
+      />
 
-      <GlassModal
+      <SessionNoteModal
+        locale={locale}
         open={!!sessionNoteTarget}
-        onClose={closeSessionNoteModal}
-        title={tr("session.noteTitle")}
-        size="md"
-        closeLabel={tr("common.close")}
-        wrapBody
-        className="session-note-modal"
-        footer={
-          <div className="session-note-modal__actions">
-            {sessionNoteTarget &&
+        sessionTitle={sessionNoteTarget?.title ?? null}
+        draft={sessionNoteDraft}
+        baseline={sessionNoteBaseline}
+        hadStored={Boolean(
+          sessionNoteTarget && sessionNotesMap[sessionNoteTarget.id]?.trim(),
+        )}
+        showClear={Boolean(
+          sessionNoteTarget &&
             (sessionNotesMap[sessionNoteTarget.id]?.trim() ||
-              sessionNoteDraft.trim()) ? (
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={requestClearSessionNoteModal}
-              >
-                {tr("session.noteClear")}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={closeSessionNoteModal}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={saveSessionNoteModal}
-            >
-              {tr("common.save")}
-            </button>
-          </div>
-        }
-      >
-        <p className="session-note-modal__hint">
-          {tr("session.noteHint", { n: String(SESSION_NOTE_MAX_LENGTH) })}
-        </p>
-        {sessionNoteTarget ? (
-          <p
-            className="session-note-modal__session"
-            title={sessionNoteTarget.title}
-          >
-            {sessionNoteTarget.title}
-          </p>
-        ) : null}
-        {(() => {
-          const v = validateSessionNote({
-            draft: sessionNoteDraft,
-            baseline: sessionNoteBaseline,
-            hadStored: Boolean(
-              sessionNoteTarget &&
-                sessionNotesMap[sessionNoteTarget.id]?.trim(),
-            ),
-          });
-          return (
-            <>
-              {v.statusKey ? (
-                <p
-                  className={
-                    "session-prompt-status" +
-                    (v.severity === "warn"
-                      ? " session-prompt-status--warn"
-                      : v.severity === "info"
-                        ? " session-prompt-status--info"
-                        : "")
-                  }
-                  role="status"
-                >
-                  {tr(v.statusKey)}
-                </p>
-              ) : null}
-              <textarea
-                className={
-                  "session-note-modal__textarea" +
-                  (v.severity === "warn"
-                    ? " session-prompt-textarea--warn"
-                    : "")
-                }
-                value={sessionNoteDraft}
-                onChange={(e) => {
-                  const next = clampSessionNoteInput(
-                    e.target.value,
-                    SESSION_NOTE_MAX_LENGTH,
-                  );
-                  setSessionNoteDraft(next.value);
-                }}
-                placeholder={tr("session.notePlaceholder")}
-                maxLength={SESSION_NOTE_MAX_LENGTH}
-                spellCheck
-                aria-label={tr("session.noteTitle")}
-              />
-              <p
-                className={
-                  "session-note-modal__count" +
-                  (v.severity === "warn"
-                    ? " session-prompt-count--warn"
-                    : "")
-                }
-                aria-live="polite"
-              >
-                {tr("session.noteChars", {
-                  n: String(v.budget.rawLen),
-                  max: String(v.budget.max),
-                })}
-              </p>
-            </>
-          );
-        })()}
-      </GlassModal>
+              sessionNoteDraft.trim()),
+        )}
+        onClose={closeSessionNoteModal}
+        onSave={saveSessionNoteModal}
+        onClear={requestClearSessionNoteModal}
+        onDraftChange={setSessionNoteDraft}
+      />
 
-      <GlassModal
+      <ConfirmCopyModal
         open={sessionNoteDiscardOpen}
-        onClose={() => setSessionNoteDiscardOpen(false)}
         title={tr("resources.discardTitle")}
-        size="sm"
+        body={tr("session.noteDiscardBody")}
         closeLabel={tr("common.close")}
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setSessionNoteDiscardOpen(false)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              onClick={() => {
-                setSessionNoteDiscardOpen(false);
-                forceCloseSessionNoteModal();
-              }}
-            >
-              {tr("resources.discardConfirm")}
-            </button>
-          </>
-        }
-      >
-        <p className="rp-modal-copy">{tr("session.noteDiscardBody")}</p>
-      </GlassModal>
+        cancelLabel={tr("common.cancel")}
+        confirmLabel={tr("resources.discardConfirm")}
+        onClose={() => setSessionNoteDiscardOpen(false)}
+        onConfirm={() => {
+          setSessionNoteDiscardOpen(false);
+          forceCloseSessionNoteModal();
+        }}
+      />
 
-      <GlassModal
+      <ConfirmCopyModal
         open={sessionNoteClearOpen}
-        onClose={() => setSessionNoteClearOpen(false)}
         title={tr("session.noteClearTitle")}
-        size="sm"
+        body={tr("session.noteClearBody")}
         closeLabel={tr("common.close")}
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setSessionNoteClearOpen(false)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid btn--danger"
-              onClick={() => {
-                setSessionNoteClearOpen(false);
-                confirmClearSessionNoteModal();
-              }}
-            >
-              {tr("session.noteClearConfirm")}
-            </button>
-          </>
-        }
-      >
-        <p className="rp-modal-copy">{tr("session.noteClearBody")}</p>
-      </GlassModal>
+        cancelLabel={tr("common.cancel")}
+        confirmLabel={tr("session.noteClearConfirm")}
+        danger
+        onClose={() => setSessionNoteClearOpen(false)}
+        onConfirm={() => {
+          setSessionNoteClearOpen(false);
+          confirmClearSessionNoteModal();
+        }}
+      />
 
-      <GlassModal
+      <SessionRulesModal
+        locale={locale}
         open={!!sessionRulesTarget}
-        onClose={closeSessionRulesModal}
-        title={tr("session.rulesTitle")}
-        size="md"
-        closeLabel={tr("common.close")}
-        wrapBody
-        className="session-rules-modal"
-        closeOnOverlay={!sessionRulesBusy}
-        showClose={!sessionRulesBusy}
-        footer={
-          <div className="session-rules-modal__actions">
-            {sessionRulesTarget &&
+        sessionTitle={sessionRulesTarget?.title ?? null}
+        draft={sessionRulesDraft}
+        baseline={sessionRulesBaseline}
+        hadStored={sessions.some(
+          (row) =>
+            sessionRulesTarget &&
+            row.id === sessionRulesTarget.id &&
+            !!sanitizeExtraRules(row.extraRules),
+        )}
+        showClear={Boolean(
+          sessionRulesTarget &&
             (sessionRulesDraft.trim() ||
               sessions.some(
                 (row) =>
                   row.id === sessionRulesTarget.id &&
                   !!sanitizeExtraRules(row.extraRules),
-              )) ? (
-              <button
-                type="button"
-                className="btn btn--ghost"
-                disabled={sessionRulesBusy}
-                onClick={() => {
-                  void clearSessionRulesModal();
-                }}
-              >
-                {tr("session.rulesClear")}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={sessionRulesBusy}
-              onClick={closeSessionRulesModal}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={sessionRulesBusy}
-              onClick={() => {
-                void saveSessionRulesModal();
-              }}
-            >
-              {sessionRulesBusy ? tr("resources.saving") : tr("common.save")}
-            </button>
-          </div>
-        }
-      >
-        <p className="session-rules-modal__hint">
-          {tr("session.rulesHint", {
-            n: String(SESSION_EXTRA_RULES_MAX_CHARS),
-          })}
-        </p>
-        {sessionRulesTarget ? (
-          <p
-            className="session-rules-modal__session"
-            title={sessionRulesTarget.title}
-          >
-            {sessionRulesTarget.title}
-          </p>
-        ) : null}
-        {(() => {
-          const v = validateSessionTextField({
-            field: "extra_rules",
-            draft: sessionRulesDraft,
-            baseline: sessionRulesBaseline,
-            hadStored: sessions.some(
-              (row) =>
-                sessionRulesTarget &&
-                row.id === sessionRulesTarget.id &&
-                !!sanitizeExtraRules(row.extraRules),
-            ),
-          });
-          return (
-            <>
-              {v.statusKey ? (
-                <p
-                  className={
-                    "session-prompt-status" +
-                    (v.severity === "warn"
-                      ? " session-prompt-status--warn"
-                      : v.severity === "info"
-                        ? " session-prompt-status--info"
-                        : "")
-                  }
-                  role="status"
-                >
-                  {tr(v.statusKey)}
-                </p>
-              ) : null}
-              {sessionRulesError ? (
-                <p className="session-prompt-error" role="alert">
-                  {sessionRulesError}
-                </p>
-              ) : null}
-              <textarea
-                className={
-                  "session-rules-modal__textarea" +
-                  (v.severity === "warn"
-                    ? " session-prompt-textarea--warn"
-                    : "")
-                }
-                value={sessionRulesDraft}
-                onChange={(e) => {
-                  const next = clampSessionTextInput(
-                    e.target.value,
-                    SESSION_EXTRA_RULES_MAX_CHARS,
-                  );
-                  setSessionRulesDraft(next.value);
-                  setSessionRulesError(null);
-                }}
-                placeholder={tr("session.rulesPlaceholder")}
-                maxLength={SESSION_EXTRA_RULES_MAX_CHARS}
-                spellCheck={false}
-                disabled={sessionRulesBusy}
-                aria-label={tr("session.rulesTitle")}
-              />
-              <p
-                className={
-                  "session-rules-modal__count" +
-                  (v.severity === "warn"
-                    ? " session-prompt-count--warn"
-                    : "")
-                }
-                aria-live="polite"
-              >
-                {tr("session.rulesChars", {
-                  n: String(v.budget.rawLen),
-                  max: String(v.budget.max),
-                })}
-              </p>
-            </>
-          );
-        })()}
-      </GlassModal>
+              )),
+        )}
+        busy={sessionRulesBusy}
+        error={sessionRulesError}
+        onClose={closeSessionRulesModal}
+        onSave={() => {
+          void saveSessionRulesModal();
+        }}
+        onClear={() => {
+          void clearSessionRulesModal();
+        }}
+        onDraftChange={(value) => {
+          setSessionRulesDraft(value);
+          setSessionRulesError(null);
+        }}
+      />
 
-      <GlassModal
+      <ConfirmCopyModal
         open={sessionRulesDiscardOpen}
-        onClose={() => setSessionRulesDiscardOpen(false)}
         title={tr("resources.discardTitle")}
-        size="sm"
+        body={tr("session.promptDiscardBody")}
         closeLabel={tr("common.close")}
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setSessionRulesDiscardOpen(false)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              onClick={() => {
-                setSessionRulesDiscardOpen(false);
-                forceCloseSessionRulesModal();
-              }}
-            >
-              {tr("resources.discardConfirm")}
-            </button>
-          </>
-        }
-      >
-        <p className="rp-modal-copy">{tr("session.promptDiscardBody")}</p>
-      </GlassModal>
+        cancelLabel={tr("common.cancel")}
+        confirmLabel={tr("resources.discardConfirm")}
+        onClose={() => setSessionRulesDiscardOpen(false)}
+        onConfirm={() => {
+          setSessionRulesDiscardOpen(false);
+          forceCloseSessionRulesModal();
+        }}
+      />
 
-      <GlassModal
+      <SessionMaxTurnsModal
+        locale={locale}
         open={!!sessionMaxTurnsTarget}
-        onClose={closeSessionMaxTurnsModal}
-        title={tr("session.maxTurnsTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        wrapBody
-        className="session-max-turns-modal"
-        footer={
-          <div className="session-max-turns-modal__actions">
-            {sessionMaxTurnsTarget &&
+        sessionTitle={sessionMaxTurnsTarget?.title ?? null}
+        draft={sessionMaxTurnsDraft}
+        globalTurns={maxAgentTurns}
+        showClear={Boolean(
+          sessionMaxTurnsTarget &&
             (sessionMaxTurnsDraft.trim() ||
               sessions.some(
                 (row) =>
                   row.id === sessionMaxTurnsTarget.id &&
                   normalizeMaxAgentTurns(row.maxAgentTurns) != null,
-              )) ? (
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  void clearSessionMaxTurnsModal();
-                }}
-              >
-                {tr("session.maxTurnsClear")}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={closeSessionMaxTurnsModal}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => {
-                void saveSessionMaxTurnsModal();
-              }}
-            >
-              {tr("common.save")}
-            </button>
-          </div>
-        }
-      >
-        <p className="session-max-turns-modal__hint">
-          {tr("session.maxTurnsHint", {
-            max: String(MAX_AGENT_TURNS_CAP),
-            global:
-              maxAgentTurns > 0
-                ? String(maxAgentTurns)
-                : tr("session.maxTurnsGlobalUnlimited"),
-          })}
-        </p>
-        {sessionMaxTurnsTarget ? (
-          <p
-            className="session-max-turns-modal__session"
-            title={sessionMaxTurnsTarget.title}
-          >
-            {sessionMaxTurnsTarget.title}
-          </p>
-        ) : null}
-        <input
-          className="session-max-turns-modal__input"
-          type="number"
-          min={0}
-          max={MAX_AGENT_TURNS_CAP}
-          step={1}
-          value={sessionMaxTurnsDraft}
-          onChange={(e) => {
-            const raw = e.target.value;
-            if (!raw.trim()) {
-              setSessionMaxTurnsDraft("");
-              return;
-            }
-            const n = Number(raw);
-            if (!Number.isFinite(n)) return;
-            const clamped = Math.min(
-              MAX_AGENT_TURNS_CAP,
-              Math.max(0, Math.round(n)),
-            );
-            setSessionMaxTurnsDraft(String(clamped));
-          }}
-          placeholder={tr("session.maxTurnsPlaceholder")}
-          aria-label={tr("session.maxTurnsTitle")}
-        />
-      </GlassModal>
+              )),
+        )}
+        onClose={closeSessionMaxTurnsModal}
+        onSave={() => {
+          void saveSessionMaxTurnsModal();
+        }}
+        onClear={() => {
+          void clearSessionMaxTurnsModal();
+        }}
+        onDraftChange={setSessionMaxTurnsDraft}
+      />
 
-      <GlassModal
+      <SessionSysPromptModal
+        locale={locale}
         open={!!sessionSysPromptTarget}
-        onClose={closeSessionSysPromptModal}
-        title={tr("session.sysPromptTitle")}
-        size="md"
-        closeLabel={tr("common.close")}
-        wrapBody
-        className="session-sys-prompt-modal"
-        closeOnOverlay={!sessionSysPromptBusy}
-        showClose={!sessionSysPromptBusy}
-        footer={
-          <div className="session-sys-prompt-modal__actions">
-            {sessionSysPromptTarget &&
+        sessionTitle={sessionSysPromptTarget?.title ?? null}
+        draft={sessionSysPromptDraft}
+        baseline={sessionSysPromptBaseline}
+        hadStored={sessions.some(
+          (row) =>
+            sessionSysPromptTarget &&
+            row.id === sessionSysPromptTarget.id &&
+            !!sanitizeSystemPromptOverride(row.systemPromptOverride),
+        )}
+        showClear={Boolean(
+          sessionSysPromptTarget &&
             (sessionSysPromptDraft.trim() ||
               sessions.some(
                 (row) =>
                   row.id === sessionSysPromptTarget.id &&
                   !!sanitizeSystemPromptOverride(row.systemPromptOverride),
-              )) ? (
-              <button
-                type="button"
-                className="btn btn--ghost"
-                disabled={sessionSysPromptBusy}
-                onClick={() => {
-                  void clearSessionSysPromptModal();
-                }}
-              >
-                {tr("session.sysPromptClear")}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={sessionSysPromptBusy}
-              onClick={closeSessionSysPromptModal}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={sessionSysPromptBusy}
-              onClick={() => {
-                void saveSessionSysPromptModal();
-              }}
-            >
-              {sessionSysPromptBusy ? tr("resources.saving") : tr("common.save")}
-            </button>
-          </div>
-        }
-      >
-        <p className="session-sys-prompt-modal__hint">
-          {tr("session.sysPromptHint", {
-            n: String(SESSION_SYSTEM_PROMPT_MAX_CHARS),
-          })}
-        </p>
-        {sessionSysPromptTarget ? (
-          <p
-            className="session-sys-prompt-modal__session"
-            title={sessionSysPromptTarget.title}
-          >
-            {sessionSysPromptTarget.title}
-          </p>
-        ) : null}
-        {(() => {
-          const v = validateSessionTextField({
-            field: "system_prompt",
-            draft: sessionSysPromptDraft,
-            baseline: sessionSysPromptBaseline,
-            hadStored: sessions.some(
-              (row) =>
-                sessionSysPromptTarget &&
-                row.id === sessionSysPromptTarget.id &&
-                !!sanitizeSystemPromptOverride(row.systemPromptOverride),
-            ),
-          });
-          return (
-            <>
-              {v.statusKey ? (
-                <p
-                  className={
-                    "session-prompt-status" +
-                    (v.severity === "warn"
-                      ? " session-prompt-status--warn"
-                      : v.severity === "info"
-                        ? " session-prompt-status--info"
-                        : "")
-                  }
-                  role="status"
-                >
-                  {tr(v.statusKey)}
-                </p>
-              ) : null}
-              {sessionSysPromptError ? (
-                <p className="session-prompt-error" role="alert">
-                  {sessionSysPromptError}
-                </p>
-              ) : null}
-              <textarea
-                className={
-                  "session-sys-prompt-modal__textarea" +
-                  (v.severity === "warn"
-                    ? " session-prompt-textarea--warn"
-                    : "")
-                }
-                value={sessionSysPromptDraft}
-                onChange={(e) => {
-                  const next = clampSessionTextInput(
-                    e.target.value,
-                    SESSION_SYSTEM_PROMPT_MAX_CHARS,
-                  );
-                  setSessionSysPromptDraft(next.value);
-                  setSessionSysPromptError(null);
-                }}
-                placeholder={tr("session.sysPromptPlaceholder")}
-                maxLength={SESSION_SYSTEM_PROMPT_MAX_CHARS}
-                spellCheck={false}
-                disabled={sessionSysPromptBusy}
-                aria-label={tr("session.sysPromptTitle")}
-              />
-              <p
-                className={
-                  "session-sys-prompt-modal__count" +
-                  (v.severity === "warn"
-                    ? " session-prompt-count--warn"
-                    : "")
-                }
-                aria-live="polite"
-              >
-                {tr("session.sysPromptChars", {
-                  n: String(v.budget.rawLen),
-                  max: String(v.budget.max),
-                })}
-              </p>
-            </>
-          );
-        })()}
-      </GlassModal>
-
-      <GlassModal
-        open={sessionSysPromptDiscardOpen}
-        onClose={() => setSessionSysPromptDiscardOpen(false)}
-        title={tr("resources.discardTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setSessionSysPromptDiscardOpen(false)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              onClick={() => {
-                setSessionSysPromptDiscardOpen(false);
-                forceCloseSessionSysPromptModal();
-              }}
-            >
-              {tr("resources.discardConfirm")}
-            </button>
-          </>
-        }
-      >
-        <p className="rp-modal-copy">{tr("session.promptDiscardBody")}</p>
-      </GlassModal>
-
-      <GlassModal
-        open={!!exportMdTarget}
-        onClose={() => {
-          if (exportMdBusy) return;
-          setExportMdTarget(null);
+              )),
+        )}
+        busy={sessionSysPromptBusy}
+        error={sessionSysPromptError}
+        onClose={closeSessionSysPromptModal}
+        onSave={() => {
+          void saveSessionSysPromptModal();
         }}
-        title={tr("session.exportMdTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        closeOnOverlay={!exportMdBusy}
-        showClose={!exportMdBusy}
-        wrapBody
-        className="export-md-modal"
-      >
-        {/*
-          Layout: options first; action buttons on a second row (cancel / copy /
-          download) like edit+save dialogs — not in the modal header/top.
-        */}
-        <div className="export-md-options">
-          <p className="export-md-options__msg">{tr("session.exportMdHint")}</p>
-          <div
-            className="export-md-options__meta"
-            role="status"
-            aria-live="polite"
-          >
-            <span className="export-md-options__chip">
-              {tr(
-                sessionExportFormatNameKey(
-                  "markdown",
-                ) as Parameters<typeof tr>[0],
-              )}
-              {" · .md"}
-            </span>
-            {exportMdHonesty.path?.badgeKeys.map((key) => (
-              <span
-                key={key}
-                className={
-                  key === "session.exportPath.cli"
-                    ? "export-md-options__chip export-md-options__chip--cli"
-                    : "export-md-options__chip"
-                }
-              >
-                {tr(key as Parameters<typeof tr>[0])}
-              </span>
-            ))}
-            {exportMdHonesty.sizeClassKey ? (
-              <span className="export-md-options__chip">
-                {tr("session.exportSizeHint", {
-                  size: exportMdHonesty.sizeBytesLabel
-                    ? `${tr(exportMdHonesty.sizeClassKey as Parameters<typeof tr>[0])} · ${exportMdHonesty.sizeBytesLabel}`
-                    : tr(
-                        exportMdHonesty.sizeClassKey as Parameters<
-                          typeof tr
-                        >[0],
-                      ),
-                })}
-              </span>
-            ) : null}
-          </div>
-          {exportMdHonesty.path?.cliSkipReasonKey ? (
-            <p className="export-md-options__path-hint" role="status">
-              {tr(
-                exportMdHonesty.path.cliSkipReasonKey as Parameters<
-                  typeof tr
-                >[0],
-              )}
-            </p>
-          ) : null}
-          {exportMdHonesty.journalEmpty === true ? (
-            <p className="export-md-options__empty" role="status">
-              {tr("session.exportEmpty")}
-            </p>
-          ) : null}
-          <label className="export-md-options__row">
-            <input
-              type="checkbox"
-              checked={exportMdIncludeThoughts}
-              disabled={exportMdBusy}
-              onChange={(e) => setExportMdIncludeThoughts(e.target.checked)}
-            />
-            <span>{tr("session.exportMdIncludeThoughts")}</span>
-          </label>
-          <label className="export-md-options__row">
-            <input
-              type="checkbox"
-              checked={exportMdIncludeTools}
-              disabled={exportMdBusy}
-              onChange={(e) => setExportMdIncludeTools(e.target.checked)}
-            />
-            <span>{tr("session.exportMdIncludeTools")}</span>
-          </label>
-          <div className="export-md-options__actions" role="group">
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={exportMdBusy}
-              onClick={() => setExportMdTarget(null)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={
-                exportMdBusy ||
-                !exportMdTarget ||
-                !exportMdHonesty.canAct
-              }
-              onClick={() => void runExportSessionMd("copy")}
-            >
-              {tr("session.exportMdCopy")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              disabled={
-                exportMdBusy ||
-                !exportMdTarget ||
-                !exportMdHonesty.canAct
-              }
-              onClick={() => void runExportSessionMd("download")}
-            >
-              {exportMdBusy
-                ? tr("session.exportMdWorking")
-                : tr("session.exportMdDownload")}
-            </button>
-          </div>
-        </div>
-      </GlassModal>
+        onClear={() => {
+          void clearSessionSysPromptModal();
+        }}
+        onDraftChange={(value) => {
+          setSessionSysPromptDraft(value);
+          setSessionSysPromptError(null);
+        }}
+      />
 
-      <GlassModal
-        open={!!exportImageTarget}
-        onClose={closeExportSessionImage}
-        title={tr("session.exportImageTitle")}
-        size="md"
+      <ConfirmCopyModal
+        open={sessionSysPromptDiscardOpen}
+        title={tr("resources.discardTitle")}
+        body={tr("session.promptDiscardBody")}
         closeLabel={tr("common.close")}
-        closeOnOverlay={!exportImageBusy}
-        showClose={!exportImageBusy}
-        wrapBody
-        className="export-md-modal export-image-modal"
-      >
-        <div className="export-md-options">
-          <div
-            className="export-image-skins"
-            role="radiogroup"
-            aria-label={tr("session.exportImageTheme")}
-          >
-            {SHARE_CARD_SKIN_IDS.map((skinId) => (
-              <button
-                key={skinId}
-                type="button"
-                role="radio"
-                aria-checked={exportImageSkin === skinId}
-                className={
-                  "export-image-skin" +
-                  (exportImageSkin === skinId
-                    ? " export-image-skin--active"
-                    : "")
-                }
-                disabled={exportImageBusy}
-                data-skin={skinId}
-                onClick={() => {
-                  setExportImageSkin(skinId);
-                  saveExportImageSkinPref(skinId);
-                }}
-              >
-                <span
-                  className="export-image-skin__swatch"
-                  aria-hidden
-                  data-skin={skinId}
-                />
-                <span className="export-image-skin__label">
-                  {tr(
-                    shareCardSkinMessageKey(skinId) as Parameters<
-                      typeof tr
-                    >[0],
-                  )}
-                </span>
-              </button>
-            ))}
-          </div>
-          <div
-            className="export-image-meta"
-            aria-live="polite"
-            data-phase={exportImagePreviewPhase}
-          >
-            <span className="export-image-meta__chip">
-              {tr(
-                exportImageMetaParts.modeKey as Parameters<typeof tr>[0],
-              )}
-            </span>
-            <span className="export-image-meta__chip">
-              {tr(
-                exportImageMetaParts.skinKey as Parameters<typeof tr>[0],
-              )}
-            </span>
-            {exportImageMetaParts.layoutKey ? (
-              <span className="export-image-meta__chip export-image-style-chip">
-                {tr(
-                  exportImageMetaParts.layoutKey as Parameters<typeof tr>[0],
-                )}
-              </span>
-            ) : null}
-            {exportImageBytesLabel && exportImagePreviewPhase === "ready" ? (
-              <span
-                className="export-image-meta__chip export-image-meta__chip--muted"
-                title={tr("session.exportImageSize")}
-              >
-                {exportImageBytesLabel}
-              </span>
-            ) : null}
-          </div>
-          <div
-            key={
-              exportImagePreviewUrl && exportImageOptionsMatch
-                ? exportImagePreviewUrl
-                : "export-image-preview-empty"
-            }
-            className={
-              "export-image-preview" +
-              (exportImagePreviewPhase === "error"
-                ? " export-image-preview--error"
-                : "") +
-              (exportImagePreviewPhase === "rendering"
-                ? " export-image-preview--busy"
-                : "")
-            }
-            aria-busy={exportImageBusy}
-            aria-live="polite"
-            data-phase={exportImagePreviewPhase}
-          >
-            {exportImagePreviewUrl && exportImageOptionsMatch ? (
-              <img
-                src={exportImagePreviewUrl}
-                alt={tr("session.exportImagePreview")}
-                className="export-image-preview__img"
-              />
-            ) : exportImagePreviewError ? (
-              <p className="export-image-preview__err" role="alert">
-                {exportImagePreviewError}
-              </p>
-            ) : (
-              <p className="export-image-preview__placeholder">
-                {exportImagePreviewPhase === "rendering" || exportImageBusy
-                  ? tr("session.exportImageWorking")
-                  : tr("session.exportImagePreview")}
-              </p>
-            )}
-          </div>
-          <label className="export-md-options__row">
-            <input
-              type="checkbox"
-              checked={exportImageSmart}
-              disabled={exportImageBusy}
-              onChange={(e) => setExportImageSmart(e.target.checked)}
-            />
-            <span>
-              {tr("session.exportImageSmart")}
-              <span className="export-image-smart-hint">
-                {" "}
-                — {tr("session.exportImageSmartDesc")}
-              </span>
-            </span>
-          </label>
-          <div className="export-md-options__actions" role="group">
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={exportImageBusy}
-              onClick={closeExportSessionImage}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={!exportImageCanAct || exportImageBusy}
-              onClick={() => void runExportSessionImage("copy")}
-            >
-              {tr("session.exportImageCopy")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              disabled={!exportImageCanAct || exportImageBusy}
-              onClick={() => void runExportSessionImage("download")}
-            >
-              {exportImageBusy
-                ? tr("session.exportImageWorking")
-                : tr("session.exportImageDownload")}
-            </button>
-          </div>
-        </div>
-      </GlassModal>
+        cancelLabel={tr("common.cancel")}
+        confirmLabel={tr("resources.discardConfirm")}
+        onClose={() => setSessionSysPromptDiscardOpen(false)}
+        onConfirm={() => {
+          setSessionSysPromptDiscardOpen(false);
+          forceCloseSessionSysPromptModal();
+        }}
+      />
+
+      <ExportMdModal
+        locale={locale}
+        open={!!exportMdTarget}
+        busy={exportMdBusy}
+        includeThoughts={exportMdIncludeThoughts}
+        includeTools={exportMdIncludeTools}
+        honesty={exportMdHonesty}
+        onClose={() => setExportMdTarget(null)}
+        onCopy={() => {
+          void runExportSessionMd("copy");
+        }}
+        onDownload={() => {
+          void runExportSessionMd("download");
+        }}
+        onIncludeThoughtsChange={setExportMdIncludeThoughts}
+        onIncludeToolsChange={setExportMdIncludeTools}
+      />
+
+      <ExportImageModal
+        locale={locale}
+        open={!!exportImageTarget}
+        busy={exportImageBusy}
+        canAct={exportImageCanAct}
+        skin={exportImageSkin}
+        smart={exportImageSmart}
+        previewPhase={exportImagePreviewPhase}
+        previewUrl={exportImagePreviewUrl}
+        optionsMatch={exportImageOptionsMatch}
+        previewError={exportImagePreviewError}
+        bytesLabel={exportImageBytesLabel}
+        metaParts={exportImageMetaParts}
+        onClose={closeExportSessionImage}
+        onCopy={() => {
+          void runExportSessionImage("copy");
+        }}
+        onDownload={() => {
+          void runExportSessionImage("download");
+        }}
+        onSkinChange={(skinId) => {
+          setExportImageSkin(skinId);
+          saveExportImageSkinPref(skinId);
+        }}
+        onSmartChange={setExportImageSmart}
+      />
 
       {showCompactModal && (
-        <div
-          className="overlay"
-          role="presentation"
-          onClick={() => {
+        <CompactModal
+          locale={locale}
+          formRef={compactModalRef}
+          noteInputRef={compactNoteRef}
+          note={compactNote}
+          preset={compactPreset}
+          compactionMode={compactionMode}
+          compactionDetail={compactionDetail}
+          turnLive={
+            session.state === "streaming" ||
+            session.state === "awaiting_permission"
+          }
+          usage={contextUsageDisplay}
+          onClose={() => {
             setShowCompactModal(false);
             setCompactNote("");
             setCompactPreset(DEFAULT_COMPACT_PRESET);
           }}
-        >
-          <form
-            ref={compactModalRef}
-            className="modal compact-modal"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="compact-modal-title"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (
-                session.state === "streaming" ||
-                session.state === "awaiting_permission"
-              ) {
-                return;
+          onNoteChange={setCompactNote}
+          onPresetChange={selectCompactPreset}
+          onCompactionModeChange={(next) => {
+            setCompactionMode(next);
+            void api.settingsGet().then((s) =>
+              api.settingsSet({ ...s, compactionMode: next }),
+            );
+          }}
+          onCompactionDetailChange={(next) => {
+            setCompactionDetail(next);
+            void api.settingsGet().then((s) =>
+              api.settingsSet({ ...s, compactionDetail: next }),
+            );
+          }}
+          onSubmit={(note, preset) => {
+            const body = resolveCompactNoteBody(
+              note,
+              compactPresetNote(preset),
+            );
+            const uiBefore = contextUsageDisplay.tokens;
+            setShowCompactModal(false);
+            setCompactNote("");
+            setCompactPreset(DEFAULT_COMPACT_PRESET);
+            void (async () => {
+              const cmd = buildCompactSlashCommand(body, { preset });
+              try {
+                const sid = await ensureConnected();
+                if (!sid) {
+                  setLocalError(tr("slash.compactConnectFailed"));
+                  return;
+                }
+                pendingCompactBeforeRef.current = {
+                  sessionId: sid,
+                  tokensBefore:
+                    uiBefore != null && Number.isFinite(uiBefore)
+                      ? Math.floor(uiBefore)
+                      : null,
+                  at: Date.now(),
+                };
+                await api.sessionSend(cmd, null, sid);
+              } catch (err) {
+                pendingCompactBeforeRef.current = null;
+                setLocalError(String(err));
               }
-              const note = resolveCompactNoteBody(
-                compactNote,
-                compactPresetNote(compactPreset),
-              );
-              const uiBefore = contextUsageDisplay.tokens;
-              const preset = compactPreset;
-              setShowCompactModal(false);
-              setCompactNote("");
-              setCompactPreset(DEFAULT_COMPACT_PRESET);
-              void (async () => {
-                const cmd = buildCompactSlashCommand(note, { preset });
-                try {
-                  const sid = await ensureConnected();
-                  if (!sid) {
-                    setLocalError(tr("slash.compactConnectFailed"));
-                    return;
-                  }
-                  pendingCompactBeforeRef.current = {
-                    sessionId: sid,
-                    tokensBefore:
-                      uiBefore != null && Number.isFinite(uiBefore)
-                        ? Math.floor(uiBefore)
-                        : null,
-                    at: Date.now(),
-                  };
-                  await api.sessionSend(cmd, null, sid);
-                } catch (err) {
-                  pendingCompactBeforeRef.current = null;
-                  setLocalError(String(err));
-                }
-              })();
-            }}
-          >
-            <header className="modal-head">
-              <div className="compact-modal__title-row">
-                <h2 id="compact-modal-title" className="modal-title">
-                  {tr("slash.compact")}
-                </h2>
-                <Tip
-                  label={tr("slash.compactHelpTip")}
-                  placement="bottom"
-                  delayMs={280}
-                  className="ui-tip--wrap ui-tip--modal"
-                >
-                  <button
-                    type="button"
-                    className="settings-label-help"
-                    aria-label={tr("slash.compactHelp")}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                  >
-                    <IconHelp size={14} stroke={1.75} />
-                  </button>
-                </Tip>
-              </div>
-              <button
-                type="button"
-                className="icon-btn modal-close"
-                onClick={() => {
-                  setShowCompactModal(false);
-                  setCompactNote("");
-                  setCompactPreset(DEFAULT_COMPACT_PRESET);
-                }}
-                aria-label={tr("common.close")}
-              >
-                <IconClose size={16} />
-              </button>
-            </header>
-            <div className="compact-modal__body">
-            <div
-              className="compact-modal__presets"
-              role="radiogroup"
-              aria-label={tr("slash.compactPresets")}
-            >
-              {COMPACT_PRESET_IDS.map((id) => {
-                const labelKey =
-                  id === "light"
-                    ? "slash.compactPreset.light"
-                    : id === "aggressive"
-                      ? "slash.compactPreset.aggressive"
-                      : "slash.compactPreset.standard";
-                const hintKey =
-                  id === "light"
-                    ? "slash.compactPresetHint.light"
-                    : id === "aggressive"
-                      ? "slash.compactPresetHint.aggressive"
-                      : "slash.compactPresetHint.standard";
-                const active = compactPreset === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    className={
-                      "compact-modal__preset" + (active ? " is-active" : "")
-                    }
-                    onClick={() => selectCompactPreset(id)}
-                  >
-                    <span className="compact-modal__preset-label">
-                      {tr(labelKey)}
-                    </span>
-                    <span className="compact-modal__preset-hint">
-                      {tr(hintKey)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="compact-modal__cli-fields">
-              <div className="compact-modal__field-group">
-                <div className="compact-modal__field-label">
-                  {tr("slash.compactMode")}
-                </div>
-                <Select
-                  value={compactionMode}
-                  aria-label={tr("slash.compactMode")}
-                  onChange={(v) => {
-                    const next = normalizeCompactionMode(v);
-                    setCompactionMode(next);
-                    void api.settingsGet().then((s) =>
-                      api.settingsSet({ ...s, compactionMode: next }),
-                    );
-                  }}
-                  options={COMPACTION_MODES.map((id) => ({
-                    value: id,
-                    label: tr(
-                      id === "transcript"
-                        ? "settings.compactionMode.transcript"
-                        : id === "segments"
-                          ? "settings.compactionMode.segments"
-                          : "settings.compactionMode.summary",
-                    ),
-                  }))}
-                />
-              </div>
-              <div className="compact-modal__field-group">
-                <div className="compact-modal__field-label">
-                  {tr("slash.compactDetail")}
-                </div>
-                <Select
-                  value={compactionDetail}
-                  aria-label={tr("slash.compactDetail")}
-                  disabled={!compactionDetailApplies(compactionMode)}
-                  onChange={(v) => {
-                    const next = normalizeCompactionDetail(v);
-                    setCompactionDetail(next);
-                    void api.settingsGet().then((s) =>
-                      api.settingsSet({ ...s, compactionDetail: next }),
-                    );
-                  }}
-                  options={COMPACTION_DETAILS.map((id) => ({
-                    value: id,
-                    label: tr(
-                      id === "none"
-                        ? "settings.compactionDetail.none"
-                        : id === "minimal"
-                          ? "settings.compactionDetail.minimal"
-                          : id === "balanced"
-                            ? "settings.compactionDetail.balanced"
-                            : "settings.compactionDetail.verbose",
-                    ),
-                  }))}
-                />
-              </div>
-            </div>
-            <div className="compact-modal__usage" aria-live="polite">
-              <div className="compact-modal__usage-row">
-                <span className="compact-modal__usage-k">
-                  {tr("slash.compactBefore")}
-                </span>
-                <span className="compact-modal__usage-v">
-                  <span className="compact-modal__usage-tokens">
-                    {contextUsageDisplay.tokens != null
-                      ? contextUsageDisplay.label
-                      : tr("slash.compactCurrentUnknown")}
-                  </span>
-                  {contextUsageDisplay.tokens != null ? (
-                    <span className="compact-modal__usage-src">
-                      {contextUsageDisplay.source === "known"
-                        ? tr("context.sourceKnown")
-                        : contextUsageDisplay.source === "estimated"
-                          ? tr("context.sourceEstimated")
-                          : tr("context.sourceUnknown")}
-                    </span>
-                  ) : null}
-                </span>
-              </div>
-              {(() => {
-                const afterEst = estimateCompactAfterTokens(
-                  contextUsageDisplay.tokens,
-                  compactPreset,
-                );
-                if (afterEst == null) {
-                  return (
-                    <div className="compact-modal__usage-row">
-                      <span className="compact-modal__usage-k">
-                        {tr("slash.compactAfterEst")}
-                      </span>
-                      <span className="compact-modal__usage-v">
-                        <span className="compact-modal__usage-tokens">
-                          {tr("slash.compactAfterUnknown")}
-                        </span>
-                      </span>
-                    </div>
-                  );
-                }
-                return (
-                  <div className="compact-modal__usage-row">
-                    <span className="compact-modal__usage-k">
-                      {tr("slash.compactAfterEst")}
-                    </span>
-                    <span className="compact-modal__usage-v">
-                      <span className="compact-modal__usage-tokens">
-                        ~{formatTokenCount(afterEst, locale)}
-                      </span>
-                      <span className="compact-modal__usage-src">
-                        {tr("context.sourceEstimated")}
-                      </span>
-                    </span>
-                  </div>
-                );
-              })()}
-              {contextUsageDisplay.lastCompact &&
-              (contextUsageDisplay.lastCompact.tokensBefore != null ||
-                contextUsageDisplay.lastCompact.tokensAfter != null) ? (
-                <div className="compact-modal__usage-row compact-modal__usage-row--last">
-                  <span className="compact-modal__usage-k">
-                    {tr("context.lastCompact")}
-                  </span>
-                  <span className="compact-modal__usage-v">
-                    <span className="compact-modal__usage-tokens">
-                      {formatCompactBeforeAfterRange(
-                        contextUsageDisplay.lastCompact.tokensBefore,
-                        contextUsageDisplay.lastCompact.tokensAfter,
-                        {
-                          locale,
-                          template: tr("compact.tokensRange"),
-                        },
-                      ) ?? tr("context.lastCompactNone")}
-                    </span>
-                  </span>
-                </div>
-              ) : null}
-            </div>
-            <div className="compact-modal__field-group">
-            <label className="compact-modal__field-label" htmlFor="compact-note">
-              {tr("slash.compactNote")}
-            </label>
-            <input
-              id="compact-note"
-              ref={compactNoteRef}
-              className="compact-modal__field"
-              value={compactNote}
-              onChange={(e) => setCompactNote(e.target.value)}
-              placeholder={tr("slash.compactNoteOptional")}
-              autoFocus
-              autoComplete="off"
-            />
-            <div
-              className="compact-modal__chips"
-              role="group"
-              aria-label={tr("slash.compactNote")}
-            >
-              {(
-                [
-                  "slash.compactNoteChipDecisions",
-                  "slash.compactNoteChipErrors",
-                  "slash.compactNoteChipFiles",
-                  "slash.compactNoteChipTodos",
-                ] as const
-              ).map((key) => {
-                const label = tr(key);
-                const active = compactNote.trim() === label;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    className={
-                      "compact-modal__chip" + (active ? " is-active" : "")
-                    }
-                    aria-pressed={active}
-                    onClick={() =>
-                      setCompactNote((prev) =>
-                        prev.trim() === label ? "" : label,
-                      )
-                    }
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            </div>
-            {(session.state === "streaming" ||
-              session.state === "awaiting_permission") && (
-              <p className="compact-modal__busy" role="status">
-                {tr("slash.compactBusy")}
-              </p>
-            )}
-            </div>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  setShowCompactModal(false);
-                  setCompactNote("");
-                  setCompactPreset(DEFAULT_COMPACT_PRESET);
-                }}
-              >
-                {tr("slash.compactConfirmCancel")}
-              </button>
-              <button
-                type="submit"
-                className="btn btn--solid"
-                disabled={
-                  session.state === "streaming" ||
-                  session.state === "awaiting_permission"
-                }
-              >
-                {tr("slash.compactConfirmOk")}
-              </button>
-            </div>
-          </form>
-        </div>
+            })();
+          }}
+        />
       )}
 
       {/* Search / command palette (Codex-style) */}
       {showSearch && (
-        <div
-          className="overlay"
-          role="presentation"
-          onClick={() => setShowSearch(false)}
-        >
-          <div
-            ref={searchPanelRef}
-            className="search-panel"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={tr("search.title")}
-          >
-            <div className="search-panel__head">
-              <IconSearch size={16} />
-              <input
-                autoFocus
-                className="search-panel__input"
-                placeholder={
-                  tr("search.placeholder")
-                }
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                role="combobox"
-                aria-autocomplete="list"
-                aria-expanded="true"
-                aria-controls="search-panel-listbox"
-                aria-activedescendant={
-                  searchPaletteItems.length > 0
-                    ? `search-opt-${searchActiveIndex}`
-                    : undefined
-                }
-              />
-              <button
-                type="button"
-                className="icon-btn modal-close"
-                onClick={() => setShowSearch(false)}
-                aria-label={tr("common.close")}
-              >
-                <IconClose size={16} />
-              </button>
-            </div>
-            <div className="search-panel__filters">
-              <div
-                className="search-panel__modes"
-                role="tablist"
-                aria-label={tr("search.modeLabel")}
-              >
-                {SESSION_SEARCH_MODES.map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    role="tab"
-                    aria-selected={searchMode === mode}
-                    className={
-                      "search-panel__mode" +
-                      (searchMode === mode ? " is-active" : "")
-                    }
-                    onClick={() => applySearchMode(mode)}
-                  >
-                    {tr(sessionSearchModeLabelKey(mode))}
-                  </button>
-                ))}
-              </div>
-              <label className="search-panel__archived">
-                <input
-                  type="checkbox"
-                  checked={searchIncludeArchived}
-                  onChange={(e) =>
-                    applySearchIncludeArchived(e.target.checked)
-                  }
-                />
-                <span>{tr("search.includeArchived")}</span>
-              </label>
-              {searchFiltersActive ? (
-                <button
-                  type="button"
-                  className="search-panel__clear-filters"
-                  onClick={clearSearchFilters}
-                >
-                  {tr("search.clearFilters")}
-                </button>
-              ) : null}
-            </div>
-            <div className="search-panel__filters">
-              <div
-                className="search-panel__modes"
-                role="tablist"
-                aria-label={tr("search.rankModeLabel")}
-              >
-                {SESSION_SEARCH_RANK_MODES.map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    role="tab"
-                    aria-selected={searchRankMode === mode}
-                    className={
-                      "search-panel__mode" +
-                      (searchRankMode === mode ? " is-active" : "")
-                    }
-                    onClick={() => {
-                      setSearchRankMode(mode);
-                      saveSessionSearchRankPref(mode);
-                    }}
-                  >
-                    {tr(sessionSearchRankModeLabelKey(mode))}
-                  </button>
-                ))}
-              </div>
-              <span className="search-panel__rank-hint">
-                {searchRankMode === "hybrid"
-                  ? tr("search.rankHybridHint")
-                  : tr("search.rankKeywordHint")}
-              </span>
-            </div>
-            <OverlayScroll className="search-panel__results">
-            <div
-              id="search-panel-listbox"
-              role="listbox"
-              aria-label={tr("search.title")}
-            >
-            {paletteActionHits.length > 0 && (
-              <>
-                <div className="search-panel__section">
-                  {tr("search.actions")}
-                </div>
-                {paletteActionHits.map((action, i) => {
-                  const idx = i;
-                  const active = idx === searchActiveIndex;
-                  return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    id={`search-opt-${idx}`}
-                    data-search-idx={idx}
-                    role="option"
-                    aria-selected={active}
-                    tabIndex={-1}
-                    className={
-                      "search-panel__row" + (active ? " is-active" : "")
-                    }
-                    onMouseEnter={() => setSearchActiveIndex(idx)}
-                    onClick={() => runPaletteAction(action)}
-                  >
-                    {paletteActionIcon(action.id)}
-                    <span className="search-panel__title">
-                      {tr(action.labelKey)}
-                    </span>
-                    {action.group === "settings" ? (
-                      <kbd className="menu-shortcut" aria-hidden>
-                        {settingsShortcutHint}
-                      </kbd>
-                    ) : null}
-                  </button>
-                  );
-                })}
-              </>
-            )}
-            {searchHits.matchedProjects.length > 0 && (
-              <>
-                <div className="search-panel__section">
-                  {tr("sidebar.projects")}
-                </div>
-                {searchHits.matchedProjects.map((p, i) => {
-                  const idx = paletteActionHits.length + i;
-                  const active = idx === searchActiveIndex;
-                  return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    id={`search-opt-${idx}`}
-                    data-search-idx={idx}
-                    role="option"
-                    aria-selected={active}
-                    tabIndex={-1}
-                    className={
-                      "search-panel__row" + (active ? " is-active" : "")
-                    }
-                    onMouseEnter={() => setSearchActiveIndex(idx)}
-                    onClick={() => {
-                      setShowSearch(false);
-                      // Project is a folder: expand only; selection is for sessions.
-                      projectSpaces.revealProject(p.id);
-                      setProjectsOpen(true);
-                      setExpandedProjects((e) => ({ ...e, [p.id]: true }));
-                    }}
-                  >
-                    <IconFolder size={15} />
-                    <span className="search-panel__title">{p.name}</span>
-                    <span className="search-panel__meta">{p.path}</span>
-                  </button>
-                  );
-                })}
-              </>
-            )}
-            <div className="search-panel__section">
-              {tr("search.chats")}
-              {contentSearchLoading &&
-              shouldScanSessionContent(searchQuery, searchMode)
-                ? ` · ${tr("search.searchingContent")}`
-                : null}
-            </div>
-            {searchEmptyState ? (
-              <div
-                className="search-panel__empty"
-                role="status"
-                data-kind={searchEmptyState.kind}
-              >
-                <p className="search-panel__empty-title">
-                  {tr(searchEmptyState.titleKey)}
-                </p>
-                <p className="search-panel__empty-hint">
-                  {tr(searchEmptyState.hintKey)}
-                </p>
-                {searchEmptyState.showClearFilters ? (
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm search-panel__empty-clear"
-                    onClick={clearSearchFilters}
-                  >
-                    {tr("search.clearFilters")}
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-            {mergedSessionHits.map((hit, i) => {
-              const s = sessions.find((x) => x.id === hit.id);
-              // Content-only hits may lack a live row if the list is stale; still open by id.
-              const row: SessionRow = s ?? normalizeSessionRow({
-                id: hit.id,
-                title: hit.title,
-                projectId: hit.projectId ?? null,
-                updatedAt: "",
-                archived: hit.archived,
-              });
-              const proj = projects.find(
-                (p) => p.id === (row.projectId ?? hit.projectId),
-              );
-              const badge = sessionSearchBadge(hit);
-              const metaParts: string[] = [];
-              if (proj?.name) metaParts.push(proj.name);
-              if (hit.contentMatch && hit.matchCount && hit.matchCount > 0) {
-                metaParts.push(
-                  tr("search.matchCount", { n: String(hit.matchCount) }),
-                );
-              }
-              if (i < 9) metaParts.push(`⌘${i + 1}`);
-              const idx =
-                paletteActionHits.length +
-                searchHits.matchedProjects.length +
-                i;
-              const active = idx === searchActiveIndex;
-              return (
-                <button
-                  key={hit.id}
-                  type="button"
-                  id={`search-opt-${idx}`}
-                  data-search-idx={idx}
-                  role="option"
-                  aria-selected={active}
-                  tabIndex={-1}
-                  className={
-                    "search-panel__row" + (active ? " is-active" : "")
-                  }
-                  onMouseEnter={() => setSearchActiveIndex(idx)}
-                  onClick={() => {
-                    setShowSearch(false);
-                    void openSession(row, proj ?? null);
-                  }}
-                >
-                  <IconSquarePen size={15} />
-                  <span className="search-panel__body">
-                    <span className="search-panel__title">
-                      <span className="search-panel__title-text">
-                        {hit.title || s?.title || "Untitled"}
-                      </span>
-                      {badge ? (
-                        <span
-                          className={
-                            "search-panel__badge" +
-                            (badge === "content"
-                              ? " search-panel__badge--content"
-                              : badge === "both"
-                                ? " search-panel__badge--both"
-                                : "")
-                          }
-                        >
-                          {tr(sessionSearchBadgeLabelKey(badge))}
-                        </span>
-                      ) : null}
-                    </span>
-                    {hit.snippet ? (
-                      <span className="search-panel__snippet">
-                        {hit.snippet}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="search-panel__meta">
-                    {metaParts.join(" · ") || "—"}
-                  </span>
-                </button>
-              );
-            })}
-            </div>
-            </OverlayScroll>
-          </div>
-        </div>
+        <SearchPalette
+          locale={locale}
+          panelRef={searchPanelRef}
+          query={searchQuery}
+          mode={searchMode}
+          rankMode={searchRankMode}
+          includeArchived={searchIncludeArchived}
+          filtersActive={searchFiltersActive}
+          activeIndex={searchActiveIndex}
+          itemCount={searchPaletteItems.length}
+          actions={paletteActionHits}
+          projects={searchHits.matchedProjects}
+          sessionHits={mergedSessionHits}
+          sessions={sessions}
+          projectsCatalog={projects}
+          contentSearchLoading={contentSearchLoading}
+          emptyState={searchEmptyState}
+          settingsShortcutHint={settingsShortcutHint}
+          onClose={() => setShowSearch(false)}
+          onQueryChange={setSearchQuery}
+          onModeChange={applySearchMode}
+          onRankModeChange={(mode) => {
+            setSearchRankMode(mode);
+            saveSessionSearchRankPref(mode);
+          }}
+          onIncludeArchivedChange={applySearchIncludeArchived}
+          onClearFilters={clearSearchFilters}
+          onActiveIndexChange={setSearchActiveIndex}
+          onRunAction={runPaletteAction}
+          onPickProject={(p) => {
+            setShowSearch(false);
+            projectSpaces.revealProject(p.id);
+            setProjectsOpen(true);
+            setExpandedProjects((e) => ({ ...e, [p.id]: true }));
+          }}
+          onPickSession={(row, proj) => {
+            setShowSearch(false);
+            void openSession(row, proj);
+          }}
+        />
       )}
 
-      {/* Edit queued follow-up (textarea; not window.prompt) */}
-      <GlassModal
+      <QueueEditModal
+        locale={locale}
         open={queueEditItemId !== null}
+        text={queueEditText}
+        textareaRef={queueEditTextareaRef}
+        onTextChange={setQueueEditText}
         onClose={closeQueueEdit}
-        title={tr("composer.queueEditTitle")}
-        size="md"
-        closeLabel={tr("common.close")}
-        wrapBody
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={closeQueueEdit}
-            >
-              {tr("composer.queueEditCancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--solid"
-              onClick={saveQueueEdit}
-            >
-              {tr("composer.queueEditSave")}
-            </button>
-          </>
-        }
-      >
-        <label className="composer__queue-edit-field">
-          <span className="sr-only">{tr("composer.queueEditTitle")}</span>
-          <textarea
-            ref={queueEditTextareaRef}
-            className="composer__queue-edit-textarea settings-input"
-            value={queueEditText}
-            onChange={(e) => setQueueEditText(e.target.value)}
-            rows={6}
-            spellCheck={false}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                closeQueueEdit();
-              }
-              // ⌘/Ctrl+Enter saves (Enter alone inserts newline).
-              if (
-                e.key === "Enter" &&
-                (e.metaKey || e.ctrlKey) &&
-                !e.shiftKey &&
-                !e.altKey
-              ) {
-                e.preventDefault();
-                saveQueueEdit();
-              }
-            }}
-          />
-        </label>
-      </GlassModal>
+        onSave={saveQueueEdit}
+      />
 
-      {/* Clear all queued follow-ups (GlassModal; never window.confirm) */}
-      <GlassModal
+      <ConfirmCopyModal
         open={sendQueueClearOpen}
-        onClose={() => setSendQueueClearOpen(false)}
         title={tr("composer.queueClearConfirmTitle")}
-        size="sm"
-        closeLabel={tr("common.close")}
-        footer={
-          <>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => setSendQueueClearOpen(false)}
-            >
-              {tr("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--danger"
-              data-testid="queue-clear-confirm"
-              disabled={!sendQueueClearPlan.confirmNeeded}
-              onClick={confirmClearSendQueue}
-            >
-              {tr("composer.queueClearConfirmAction")}
-            </button>
-          </>
-        }
-      >
-        <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
-          {sendQueueClearPlan.confirmNeeded
+        body={
+          sendQueueClearPlan.confirmNeeded
             ? tr("composer.queueClearConfirmMessage", {
                 n: String(sendQueueClearPlan.count),
               })
-            : tr("composer.queueClearEmpty")}
-        </p>
-      </GlassModal>
+            : tr("composer.queueClearEmpty")
+        }
+        closeLabel={tr("common.close")}
+        cancelLabel={tr("common.cancel")}
+        confirmLabel={tr("composer.queueClearConfirmAction")}
+        danger
+        confirmTestId="queue-clear-confirm"
+        confirmDisabled={!sendQueueClearPlan.confirmNeeded}
+        onClose={() => setSendQueueClearOpen(false)}
+        onConfirm={confirmClearSendQueue}
+      />
 
       {/* In-app confirm / prompt (Tauri WebView has no reliable window.prompt/confirm) */}
-      {appDialog &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            className="overlay app-dialog-overlay"
-            role="presentation"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) dismissDialog();
-            }}
-          >
-            <div
-              ref={appDialogPanelRef}
-              className="modal app-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="app-dialog-title"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <header className="modal-head">
-                <h2 id="app-dialog-title" className="modal-title">
-                  {appDialog.title}
-                </h2>
-                <button
-                  type="button"
-                  className="icon-btn modal-close"
-                  onClick={() => dismissDialog()}
-                  aria-label={tr("common.close")}
-                >
-                  <IconClose size={16} />
-                </button>
-              </header>
-              {appDialog.kind === "confirm" ? (
-                <form
-                  className="app-dialog__form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    // Prefer the keyboard path's latest ref so chained
-                    // dialogs (YOLO step1 → step2) stay consistent.
-                    const dialog = appDialogRef.current;
-                    if (!dialog || dialog.kind !== "confirm") return;
-                    const run = dialog.onConfirm;
-                    setAppDialog(null);
-                    void run();
-                  }}
-                >
-                  <p className="app-dialog__msg">{appDialog.message}</p>
-                  <div className="app-dialog__actions modal-actions">
-                    <button
-                      type="button"
-                      className="btn btn--ghost"
-                      onClick={() => dismissDialog()}
-                    >
-                      {tr("common.cancel")}
-                    </button>
-                    <button
-                      ref={confirmBtnRef}
-                      type="submit"
-                      className={`btn ${appDialog.danger ? "btn--danger" : "btn--solid"}`}
-                    >
-                      {appDialog.confirmLabel || tr("common.confirm")}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <form
-                  className="app-dialog__form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const value = dialogInput;
-                    const submit = appDialog.onSubmit;
-                    void (async () => {
-                      const ok = await submit(value);
-                      if (typeof ok === "string") {
-                        setDialogError(ok);
-                        return;
-                      }
-                      if (ok === false) return;
-                      setDialogError("");
-                      setAppDialog((cur) =>
-                        cur &&
-                        cur.kind === "prompt" &&
-                        cur.onSubmit === submit
-                          ? null
-                          : cur,
-                      );
-                    })();
-                  }}
-                >
-                  {appDialog.message ? (
-                    <p className="app-dialog__msg">{appDialog.message}</p>
-                  ) : null}
-                  <input
-                    ref={dialogInputRef}
-                    className="app-dialog__input"
-                    value={dialogInput}
-                    placeholder={appDialog.placeholder}
-                    onChange={(e) => {
-                      setDialogInput(e.target.value);
-                      if (dialogError) setDialogError("");
-                    }}
-                    autoComplete="off"
-                    aria-invalid={dialogError ? true : undefined}
-                    aria-describedby={
-                      dialogError ? "app-dialog-error" : undefined
-                    }
-                  />
-                  <div className="app-dialog__actions modal-actions">
-                    {dialogError ? (
-                      <p
-                        id="app-dialog-error"
-                        className="app-dialog__error"
-                        role="alert"
-                      >
-                        {dialogError}
-                      </p>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="btn btn--ghost"
-                      onClick={() => dismissDialog()}
-                    >
-                      {tr("common.cancel")}
-                    </button>
-                    <button type="submit" className="btn btn--solid">
-                      {appDialog.submitLabel || tr("common.save")}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>,
-          document.body,
-        )}
+      {appDialog ? (
+        <AppDialogHost
+          locale={locale}
+          dialog={appDialog}
+          dialogRef={appDialogRef}
+          panelRef={appDialogPanelRef}
+          confirmBtnRef={confirmBtnRef}
+          inputRef={dialogInputRef}
+          inputValue={dialogInput}
+          error={dialogError}
+          onDismiss={dismissDialog}
+          onInputChange={setDialogInput}
+          onClearError={() => setDialogError("")}
+          onConfirm={(d) => {
+            const run = d.onConfirm;
+            setAppDialog(null);
+            void run();
+          }}
+          onPromptSubmit={(value) => {
+            if (appDialog.kind !== "prompt") return;
+            const submit = appDialog.onSubmit;
+            void (async () => {
+              const ok = await submit(value);
+              if (typeof ok === "string") {
+                setDialogError(ok);
+                return;
+              }
+              if (ok === false) return;
+              setDialogError("");
+              setAppDialog((cur) =>
+                cur && cur.kind === "prompt" && cur.onSubmit === submit
+                  ? null
+                  : cur,
+              );
+            })();
+          }}
+        />
+      ) : null}
 
       {/* Floating context menu (project / session) — unified ContextMenu */}
       {(() => {
