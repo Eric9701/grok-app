@@ -16,6 +16,8 @@ use serde::Deserialize;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
+use tauri::AppHandle;
+
 use super::auth::{extract_token_from_path, path_after_token, path_for_log, tokens_equal};
 use super::ws;
 use super::MirrorHost;
@@ -25,6 +27,27 @@ use super::MirrorHost;
 pub struct HttpState {
     pub host: Arc<MirrorHost>,
     pub dist_dir: PathBuf,
+    /// Packaged fallback: `frontendDist` via Tauri asset resolver.
+    pub app: Option<AppHandle>,
+}
+
+/// Filesystem dist wins; packaged apps fall back to embedded frontendDist.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MirrorStaticSource {
+    Filesystem,
+    Embedded,
+    Missing,
+}
+
+/// Decide which body to serve. Pure: callers supply the two hit flags.
+pub fn resolve_mirror_static_source(fs_hit: bool, embedded_hit: bool) -> MirrorStaticSource {
+    if fs_hit {
+        MirrorStaticSource::Filesystem
+    } else if embedded_hit {
+        MirrorStaticSource::Embedded
+    } else {
+        MirrorStaticSource::Missing
+    }
 }
 
 /// Bind `127.0.0.1:port` (port 0 = OS-assigned free port). Returns bound port + shutdown sender.
@@ -33,9 +56,11 @@ pub async fn start_server(
     port: u16,
     dist_dir: PathBuf,
 ) -> Result<(u16, oneshot::Sender<()>), String> {
+    let app = host.rpc_ctx().map(|(a, _)| a);
     let state = HttpState {
         host: host.clone(),
         dist_dir,
+        app,
     };
 
     // Token-gated routes (HTML shell, API, WS, static under /t/{token}/…).
@@ -210,7 +235,7 @@ async fn static_handler(State(state): State<HttpState>, req: Request) -> Respons
         return (StatusCode::NOT_FOUND, "Not Found").into_response();
     }
 
-    serve_static_file(&state.dist_dir, &rest)
+    serve_static_file(&state, &rest)
 }
 
 /// `GET /assets/*` — no token (dynamic-import chunks ignore `<base href>`).
@@ -225,7 +250,7 @@ async fn public_assets_handler(State(state): State<HttpState>, req: Request) -> 
     if state.host.active_token().is_none() {
         return unauthorized();
     }
-    serve_static_file(&state.dist_dir, rest)
+    serve_static_file(&state, rest)
 }
 
 async fn serve_index(state: &HttpState, headers: &HeaderMap) -> Response {
@@ -235,12 +260,20 @@ async fn serve_index(state: &HttpState, headers: &HeaderMap) -> Response {
     };
 
     let index_path = state.dist_dir.join("index.html");
-    let raw = match std::fs::read_to_string(&index_path) {
-        Ok(s) => s,
-        Err(e) => {
+    let fs_html = std::fs::read_to_string(&index_path).ok();
+    let embedded_html = if fs_html.is_none() {
+        state.app.as_ref().and_then(|app| {
+            serve_embedded(app, "index.html").and_then(|(b, _)| String::from_utf8(b).ok())
+        })
+    } else {
+        None
+    };
+    let raw = match resolve_mirror_static_source(fs_html.is_some(), embedded_html.is_some()) {
+        MirrorStaticSource::Filesystem => fs_html.expect("fs_hit"),
+        MirrorStaticSource::Embedded => embedded_html.expect("embedded_hit"),
+        MirrorStaticSource::Missing => {
             tracing::error!(
                 path = %index_path.display(),
-                error = %e,
                 "mirror: cannot read index.html — is dist built? set GROK_MIRROR_DIST"
             );
             // Temporary placeholder when dist missing (Slice 1 gate proof still works).
@@ -321,38 +354,37 @@ pub fn inject_mirror_shell(html: &str, token: &str) -> String {
     }
 }
 
-fn serve_static_file(dist_dir: &Path, rest: &str) -> Response {
-    // Reject path traversal.
-    if rest.contains("..") || rest.starts_with('/') || rest.contains('\\') {
-        return (StatusCode::NOT_FOUND, "Not Found").into_response();
+fn embedded_asset_key(rest: &str) -> Option<String> {
+    if rest.contains("..") || rest.contains('\\') || rest.starts_with('/') {
+        return None;
     }
+    Some(format!("/{}", rest.trim_start_matches('/')))
+}
 
+/// Packaged fallback: filesystem dist missing → embedded frontendDist.
+fn serve_embedded(app: &AppHandle, rest: &str) -> Option<(Vec<u8>, String)> {
+    let key = embedded_asset_key(rest)?;
+    let asset = app.asset_resolver().get(key)?;
+    Some((asset.bytes, asset.mime_type))
+}
+
+fn try_read_dist_file(dist_dir: &Path, rest: &str) -> Option<(Vec<u8>, PathBuf)> {
     let file_path = dist_dir.join(rest);
-    let Ok(canon_dist) = dist_dir.canonicalize() else {
-        return (StatusCode::NOT_FOUND, "Not Found").into_response();
-    };
-    let Ok(canon_file) = file_path.canonicalize() else {
-        return (StatusCode::NOT_FOUND, "Not Found").into_response();
-    };
-    if !canon_file.starts_with(&canon_dist) {
-        return (StatusCode::NOT_FOUND, "Not Found").into_response();
+    let canon_dist = dist_dir.canonicalize().ok()?;
+    let canon_file = file_path.canonicalize().ok()?;
+    if !canon_file.starts_with(&canon_dist) || !canon_file.is_file() {
+        return None;
     }
-    if !canon_file.is_file() {
-        return (StatusCode::NOT_FOUND, "Not Found").into_response();
-    }
+    let bytes = std::fs::read(&canon_file).ok()?;
+    Some((bytes, canon_file))
+}
 
-    let bytes = match std::fs::read(&canon_file) {
-        Ok(b) => b,
-        Err(_) => return (StatusCode::NOT_FOUND, "Not Found").into_response(),
-    };
-
-    let mime = mime_guess_from_path(&canon_file);
+fn static_ok(bytes: Vec<u8>, mime: &str, rest: &str) -> Response {
     let mut res = Response::new(Body::from(bytes));
     *res.status_mut() = StatusCode::OK;
     if let Ok(v) = HeaderValue::from_str(mime) {
         res.headers_mut().insert(header::CONTENT_TYPE, v);
     }
-    // Hashed assets under /assets/ can be cached long-lived.
     if rest.starts_with("assets/") {
         res.headers_mut().insert(
             header::CACHE_CONTROL,
@@ -360,6 +392,31 @@ fn serve_static_file(dist_dir: &Path, rest: &str) -> Response {
         );
     }
     res
+}
+
+fn serve_static_file(state: &HttpState, rest: &str) -> Response {
+    // Reject path traversal before filesystem or embedded lookup.
+    if rest.contains("..") || rest.starts_with('/') || rest.contains('\\') {
+        return (StatusCode::NOT_FOUND, "Not Found").into_response();
+    }
+
+    let fs_file = try_read_dist_file(&state.dist_dir, rest);
+    let embedded = if fs_file.is_none() {
+        state.app.as_ref().and_then(|app| serve_embedded(app, rest))
+    } else {
+        None
+    };
+    match resolve_mirror_static_source(fs_file.is_some(), embedded.is_some()) {
+        MirrorStaticSource::Filesystem => {
+            let (bytes, path) = fs_file.expect("fs_hit");
+            static_ok(bytes, mime_guess_from_path(&path), rest)
+        }
+        MirrorStaticSource::Embedded => {
+            let (bytes, mime) = embedded.expect("embedded_hit");
+            static_ok(bytes, &mime, rest)
+        }
+        MirrorStaticSource::Missing => (StatusCode::NOT_FOUND, "Not Found").into_response(),
+    }
 }
 
 fn mime_guess_from_path(path: &Path) -> &'static str {
@@ -405,6 +462,41 @@ mod tests {
         assert!(out.contains(r#"src="/t/tok123/assets/index-abc.js""#));
         assert!(out.contains(r#"href="/t/tok123/assets/index-abc.css""#));
         assert!(!out.contains(r#"src="/assets/"#));
+    }
+
+    #[test]
+    fn resolve_mirror_static_source_prefers_fs_then_embedded() {
+        assert_eq!(
+            resolve_mirror_static_source(true, true),
+            MirrorStaticSource::Filesystem
+        );
+        assert_eq!(
+            resolve_mirror_static_source(true, false),
+            MirrorStaticSource::Filesystem
+        );
+        assert_eq!(
+            resolve_mirror_static_source(false, true),
+            MirrorStaticSource::Embedded
+        );
+        assert_eq!(
+            resolve_mirror_static_source(false, false),
+            MirrorStaticSource::Missing
+        );
+    }
+
+    #[test]
+    fn embedded_asset_key_rejects_traversal() {
+        assert_eq!(
+            embedded_asset_key("index.html").as_deref(),
+            Some("/index.html")
+        );
+        assert_eq!(
+            embedded_asset_key("assets/app.js").as_deref(),
+            Some("/assets/app.js")
+        );
+        assert_eq!(embedded_asset_key("../secret"), None);
+        assert_eq!(embedded_asset_key("/etc/passwd"), None);
+        assert_eq!(embedded_asset_key("foo\\bar"), None);
     }
 
     #[test]
