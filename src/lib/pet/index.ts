@@ -77,6 +77,7 @@ export {
   petCompactOverlayWidth,
   petOverlayExtent,
   petOverlayHeight,
+  petOverlayOriginForSize,
   petOverlayWidth,
 } from "./petBubbleLayout";
 

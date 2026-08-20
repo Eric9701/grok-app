@@ -62,6 +62,24 @@ export function petBubblesEnabled(
 }
 
 /**
+ * Window origin that keeps the mark (bottom-center) still when overlay size changes.
+ * Live size-sync and Host reopen must use the same rule.
+ */
+export function petOverlayOriginForSize(input: {
+  x: number;
+  y: number;
+  curW: number;
+  curH: number;
+  nextW: number;
+  nextH: number;
+}): { x: number; y: number } {
+  return {
+    x: input.x - (input.nextW - input.curW) / 2,
+    y: input.y - (input.nextH - input.curH),
+  };
+}
+
+/**
  * Pixels to translate the chip stack (negative = left).
  * `leftGap` / `rightGap` are mark-center → work-area edges.
  * `maxOffset` is how far the stack can slide and still stay inside the overlay.

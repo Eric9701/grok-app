@@ -36,6 +36,7 @@ See `docs/llm-wiki/release.md`.
 - **工作台外壳拆分（#757）**：偏好/布局 hook、GlassModal、紧凑浮层、应用内对话框、命令面板进 `workbench-modals/`；会话 transcript 助手进 `src/lib/session/*`（barrel 保持 `@/lib/session`）。发送 / 打开会话 / rewind 仍在 AppWorkbench。
 
 ### Fixed
+- **Desktop pet remembers its last place after quit**: Drag origin is flushed on pointer-up, hide, and process exit. A stuck OS-drag flag can no longer persist 0,0 while hiding. Settings writes keep the live overlay instead of stale x/y. Reopen places the window so the mark (not just the frame’s top-left) stays put when overlay size changes.
 - **Long chats no longer flash on send and at turn settle (#760)**: This is not #714 / #703 (stick-lock no longer yanks a slight scroll-up, and send only sticks once). After send, the virtual list no longer fights two `itemCount`s; journal rewrite of the last user id no longer force-sticks.
 - **Windows paste of Explorer files (.dmp) no longer dies on NotReadableError (#755)**: Composer paste of an on-disk file (crash dumps, locked/large binaries) now reads the OS clipboard path list (`CF_HDROP`) and attaches `@path` like drag-drop. WebView `File.arrayBuffer()` is only used for in-memory blobs (screenshots). Unreadable blobs get a dedicated i18n hint instead of the Chromium English `NotReadableError`.
 - **Windows no longer freezes at end of a long turn (#754)**: A trailing `prompt_complete` after `session/prompt` RPC Ok used to re-arm the end-of-turn handler. The second pass emitted IPC while journal reconcile still held the store lock; the WebView WndProc waited on that lock inside `SendMessage` and the window stopped painting. Duplicate finish is now a no-op, and post-turn UI rehydrate reads App `messages.json` only (Host already merged agent history).
@@ -60,6 +61,7 @@ See `docs/llm-wiki/release.md`.
 - **`cargo fmt --check` is green on main (#725)**.
 
 **中文 · 修复**
+- **桌面宠物关闭再开会回到上次位置**：松手、隐藏、退出都会把坐标写盘。卡住的系统拖动标记不会在隐藏时把 0,0 存进去。改设置不再用过期的 x/y 覆盖现场。重新打开时按宠物（不是窗口左上角）对齐，浮层大小变了也不会把宠物挪走。
 - **长对话发送/回合结束不再整页闪（#760）**：不是 #714 / #703（那是贴底后轻滑被拽回、发送双吸底）。发送后虚拟列表不再用两套条数抢窗口；日记改写最后一条 user id 时不再强制吸底。
 - **Windows 粘贴资源管理器文件（.dmp）不再报 NotReadableError（#755）**：Explorer 复制的已有磁盘路径改为读系统剪贴板文件列表（`CF_HDROP`）并按 `@path` 附加，与拖放一致。截图等无路径内容仍走 `arrayBuffer`。读不了的 blob 用专用文案，不再把 Chromium 英文 `NotReadableError` 拼进横幅。
 - **Windows 长回合结束不再卡死整窗（#754）**：`session/prompt` RPC 已经结束之后，迟到的 `prompt_complete` 会再次武装结束逻辑。第二次结束在 journal 对账还占着 store 锁时发 IPC，WebView 的 WndProc 在 `SendMessage` 里等这把锁，窗口不再重绘。重复结束现在是空操作；回合结束后的 UI 补刷只读 App `messages.json`（Host 已经合并过 agent 历史）。

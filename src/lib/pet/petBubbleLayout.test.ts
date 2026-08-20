@@ -13,6 +13,7 @@ import {
   petCompactOverlayWidth,
   petOverlayExtent,
   petOverlayHeight,
+  petOverlayOriginForSize,
   petOverlayWidth,
 } from "./petBubbleLayout";
 
@@ -111,5 +112,33 @@ describe("petOverlayExtent", () => {
         expanded: true,
       }),
     ).toEqual({ w: petOverlayWidth(128, true), h: petOverlayHeight(128, true) });
+  });
+});
+
+describe("petOverlayOriginForSize", () => {
+  it("keeps the mark bottom-center when the overlay grows", () => {
+    expect(
+      petOverlayOriginForSize({
+        x: 100,
+        y: 200,
+        curW: 400,
+        curH: 300,
+        nextW: 500,
+        nextH: 400,
+      }),
+    ).toEqual({ x: 50, y: 100 });
+  });
+
+  it("keeps the saved origin when size is unchanged", () => {
+    expect(
+      petOverlayOriginForSize({
+        x: 100,
+        y: 200,
+        curW: 400,
+        curH: 300,
+        nextW: 400,
+        nextH: 300,
+      }),
+    ).toEqual({ x: 100, y: 200 });
   });
 });

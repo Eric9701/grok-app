@@ -42,4 +42,10 @@ describe("PetOverlay drag hit target", () => {
     expect(src).toContain("petPointerStep");
     expect(src).toContain("petNudge");
   });
+
+  it("persists the overlay origin after size-sync so reopen keeps the mark", () => {
+    expect(src).toContain(
+      "petSyncOverlaySize(overlaySize.w, overlaySize.h).then(persist, persist)",
+    );
+  });
 });

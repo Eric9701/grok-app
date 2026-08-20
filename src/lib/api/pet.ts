@@ -33,6 +33,8 @@ export type PetPrefs = {
   sizePx: number;
   x?: number | null;
   y?: number | null;
+  overlayW?: number | null;
+  overlayH?: number | null;
 };
 
 export const PET_PREFS_FALLBACK: PetPrefs = {
@@ -279,26 +281,31 @@ function workRectFromMonitor(
 }
 
 /**
- * Resize the overlay. When height changes, keep the bottom edge (the mark)
- * on screen so reserved bubble space grows upward instead of shoving the pet.
- * Open still restores the last drag origin — this is not an edge snap.
+ * Resize the overlay. Keep the mark (bottom-center) still so reserved bubble
+ * space grows around the pet instead of shoving it. Reopen uses the same rule.
  */
 export async function petSyncOverlaySize(w: number, h: number): Promise<void> {
   if (!isDesktopHost()) return;
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     const { LogicalPosition, LogicalSize } = await import("@tauri-apps/api/dpi");
+    const { petOverlayOriginForSize } = await import("@/lib/pet/petBubbleLayout");
     const win = getCurrentWindow();
     const scale = await win.scaleFactor();
     const [inner, pos] = await Promise.all([win.innerSize(), win.outerPosition()]);
     const curW = inner.width / scale;
     const curH = inner.height / scale;
     if (Math.abs(curW - w) < 1 && Math.abs(curH - h) < 1) return;
-    const nextY = Math.abs(curH - h) >= 1 ? pos.y / scale - (h - curH) : null;
+    const next = petOverlayOriginForSize({
+      x: pos.x / scale,
+      y: pos.y / scale,
+      curW,
+      curH,
+      nextW: w,
+      nextH: h,
+    });
     await win.setSize(new LogicalSize(w, h));
-    if (nextY != null) {
-      await win.setPosition(new LogicalPosition(pos.x / scale, nextY));
-    }
+    await win.setPosition(new LogicalPosition(next.x, next.y));
   } catch {
     /* best-effort */
   }

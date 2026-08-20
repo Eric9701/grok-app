@@ -91,6 +91,12 @@ pub struct PetPrefs {
     pub x: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub y: Option<f64>,
+    /// Logical overlay size at the last persist. Used so reopen can keep the
+    /// mark (bottom-center) when bubbles / compact / size_px change the frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overlay_w: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overlay_h: Option<f64>,
 }
 
 fn default_shape() -> String {
@@ -138,6 +144,8 @@ impl Default for PetPrefs {
             bubble_style: default_bubble_style(),
             x: None,
             y: None,
+            overlay_w: None,
+            overlay_h: None,
         }
     }
 }
@@ -495,6 +503,67 @@ fn default_pet_pos(work: WorkRect, overlay_w: f64, overlay_h: f64) -> (f64, f64)
     )
 }
 
+/// Settings / identity writes often carry stale x/y from the last `pet_prefs_get`.
+/// Drag persist does not emit, so those values must never replace the live origin.
+pub fn keep_live_overlay_pos(prev: &PetPrefs, next: &mut PetPrefs) {
+    next.x = prev.x;
+    next.y = prev.y;
+    next.overlay_w = prev.overlay_w;
+    next.overlay_h = prev.overlay_h;
+}
+
+/// Place the window so the mark (bottom-center) stays put when overlay size changes.
+pub fn restore_overlay_origin(
+    saved_x: f64,
+    saved_y: f64,
+    saved_w: Option<f64>,
+    saved_h: Option<f64>,
+    next_w: f64,
+    next_h: f64,
+) -> (f64, f64) {
+    let (Some(w), Some(h)) = (saved_w, saved_h) else {
+        return (saved_x, saved_y);
+    };
+    if w <= 0.0 || h <= 0.0 || !w.is_finite() || !h.is_finite() {
+        return (saved_x, saved_y);
+    }
+    let mark_x = saved_x + w / 2.0;
+    let mark_bottom = saved_y + h;
+    (mark_x - next_w / 2.0, mark_bottom - next_h)
+}
+
+/// `Moved` while hidden can report 0,0 if startDragging never cleared DRAGGING.
+pub fn should_persist_on_moved(dragging: bool, visible: bool) -> bool {
+    dragging && visible
+}
+
+/// Pointer-up persist must run even when `pet_set_dragging(true)` lost the race.
+pub fn should_persist_after_drag_flag(dragging: bool) -> bool {
+    !dragging
+}
+
+pub fn overlay_pos_is_persistable(x: f64, y: f64) -> bool {
+    x.is_finite() && y.is_finite()
+}
+
+fn clamped_saved_overlay_pos(
+    prefs: &PetPrefs,
+    overlay_w: f64,
+    overlay_h: f64,
+    app: &AppHandle,
+) -> Option<(f64, f64)> {
+    let (x, y) = (prefs.x?, prefs.y?);
+    if !overlay_pos_is_persistable(x, y) {
+        return None;
+    }
+    let (x, y) =
+        restore_overlay_origin(x, y, prefs.overlay_w, prefs.overlay_h, overlay_w, overlay_h);
+    let (works, primary) = monitor_work_rects(app);
+    Some(clamp_pet_overlay_pos(
+        x, y, overlay_w, overlay_h, &works, primary,
+    ))
+}
+
 /// Keep a saved overlay on a still-connected display. A disconnected monitor
 /// used to park the pet at prefs x/y forever (invisible, prefs still "on").
 fn clamp_pet_overlay_pos(
@@ -550,17 +619,38 @@ fn persist_window_pos(app: &AppHandle) {
     let Some(win) = app.get_webview_window(PET_WINDOW_LABEL) else {
         return;
     };
+    if !win.is_visible().unwrap_or(false) {
+        return;
+    }
     let Ok(scale) = win.scale_factor() else {
         return;
     };
     let Ok(pos) = win.outer_position() else {
         return;
     };
-    let logical = LogicalPosition::<f64>::from_physical(pos, scale.max(0.1));
+    let scale = scale.max(0.1);
+    let logical = LogicalPosition::<f64>::from_physical(pos, scale);
+    if !overlay_pos_is_persistable(logical.x, logical.y) {
+        return;
+    }
     let mut prefs = load_prefs();
     prefs.x = Some(logical.x);
     prefs.y = Some(logical.y);
+    if let Ok(size) = win.inner_size() {
+        let logical_size = LogicalSize::<f64>::from_physical(size, scale);
+        if logical_size.width.is_finite() && logical_size.width > 0.0 {
+            prefs.overlay_w = Some(logical_size.width);
+        }
+        if logical_size.height.is_finite() && logical_size.height > 0.0 {
+            prefs.overlay_h = Some(logical_size.height);
+        }
+    }
     let _ = save_prefs(&prefs);
+}
+
+/// Flush the live overlay origin (hide / quit). No-op when the HWND is already gone.
+pub fn persist_pet_window_pos(app: &AppHandle) {
+    persist_window_pos(app);
 }
 
 /// Physical cursor vs logical hit chrome (mark disc + task-bubble stack).
@@ -832,9 +922,7 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
         builder = builder.menu(empty);
     }
 
-    if let (Some(x), Some(y)) = (prefs.x, prefs.y) {
-        let (works, primary) = monitor_work_rects(app);
-        let (x, y) = clamp_pet_overlay_pos(x, y, side_w, side_h, &works, primary);
+    if let Some((x, y)) = clamped_saved_overlay_pos(&prefs, side_w, side_h, app) {
         builder = builder.position(x, y);
     }
 
@@ -845,7 +933,12 @@ pub fn ensure_pet_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String
         match ev {
             tauri::WindowEvent::Moved(_) => {
                 // Size-sync / show must not overwrite the user's drag position.
-                if DRAGGING.load(Ordering::Relaxed) {
+                // Hide/destroy can report 0,0 while startDragging left DRAGGING set.
+                let visible = handle
+                    .get_webview_window(PET_WINDOW_LABEL)
+                    .and_then(|w| w.is_visible().ok())
+                    .unwrap_or(false);
+                if should_persist_on_moved(DRAGGING.load(Ordering::Relaxed), visible) {
                     persist_window_pos(&handle);
                 }
             }
@@ -891,13 +984,17 @@ pub fn show_pet(app: &AppHandle) -> Result<(), String> {
     apply_window_chrome(&win);
     let (side_w, side_h) = overlay_extent_now(prefs.size_px, prefs.bubbles_enabled);
     let _ = win.set_size(LogicalSize::new(side_w, side_h));
-    if let (Some(x), Some(y)) = (prefs.x, prefs.y) {
-        let (works, primary) = monitor_work_rects(app);
-        let (x, y) = clamp_pet_overlay_pos(x, y, side_w, side_h, &works, primary);
+    if let Some((x, y)) = clamped_saved_overlay_pos(&prefs, side_w, side_h, app) {
         let _ = win.set_position(LogicalPosition::new(x, y));
-        if prefs.x != Some(x) || prefs.y != Some(y) {
+        if prefs.x != Some(x)
+            || prefs.y != Some(y)
+            || prefs.overlay_w != Some(side_w)
+            || prefs.overlay_h != Some(side_h)
+        {
             prefs.x = Some(x);
             prefs.y = Some(y);
+            prefs.overlay_w = Some(side_w);
+            prefs.overlay_h = Some(side_h);
             let _ = save_prefs(&prefs);
         }
     }
@@ -926,6 +1023,8 @@ pub fn show_pet(app: &AppHandle) -> Result<(), String> {
 
 pub fn hide_pet(app: &AppHandle) -> Result<(), String> {
     let _guard = lock_show();
+    persist_window_pos(app);
+    DRAGGING.store(false, Ordering::Relaxed);
     WANT_SHOW.store(false, Ordering::SeqCst);
     let mut prefs = normalize_prefs(load_prefs());
     prefs.visible = false;
@@ -1068,10 +1167,10 @@ pub fn pet_prefs_get() -> PetPrefs {
 
 #[tauri::command]
 pub fn pet_prefs_set(app: AppHandle, prefs: PetPrefs) -> Result<PetPrefs, String> {
+    persist_window_pos(&app);
     let prev = load_prefs();
     let mut next = normalize_prefs(prefs);
-    next.x = next.x.or(prev.x);
-    next.y = next.y.or(prev.y);
+    keep_live_overlay_pos(&prev, &mut next);
     save_prefs(&next)?;
     if next.enabled && next.visible {
         show_pet(&app)?;
@@ -1137,8 +1236,8 @@ pub fn pet_set_ignore_cursor(app: AppHandle, ignore: bool) -> Result<(), String>
 
 #[tauri::command]
 pub fn pet_set_dragging(app: AppHandle, dragging: bool) {
-    let was = DRAGGING.swap(dragging, Ordering::Relaxed);
-    if was && !dragging {
+    DRAGGING.store(dragging, Ordering::Relaxed);
+    if should_persist_after_drag_flag(dragging) {
         persist_window_pos(&app);
     }
 }
@@ -1592,5 +1691,70 @@ mod tests {
         let (w, h) = overlay_compact(128);
         assert_eq!(w, 128.0 + 8.0 * 2.0);
         assert_eq!(h, 128.0 + 8.0 + 16.0);
+    }
+
+    #[test]
+    fn settings_write_must_not_clobber_a_newer_drag_origin() {
+        let prev = PetPrefs {
+            x: Some(512.0),
+            y: Some(288.0),
+            overlay_w: Some(448.0),
+            overlay_h: Some(368.0),
+            color: "green".into(),
+            ..Default::default()
+        };
+        let mut next = PetPrefs {
+            x: Some(0.0),
+            y: Some(0.0),
+            overlay_w: Some(1.0),
+            overlay_h: Some(1.0),
+            color: "violet".into(),
+            ..Default::default()
+        };
+        keep_live_overlay_pos(&prev, &mut next);
+        assert_eq!(next.x, Some(512.0));
+        assert_eq!(next.y, Some(288.0));
+        assert_eq!(next.overlay_w, Some(448.0));
+        assert_eq!(next.overlay_h, Some(368.0));
+        assert_eq!(next.color, "violet");
+    }
+
+    #[test]
+    fn restore_keeps_the_mark_when_overlay_size_changes() {
+        assert_eq!(
+            restore_overlay_origin(100.0, 200.0, Some(400.0), Some(300.0), 400.0, 300.0),
+            (100.0, 200.0),
+            "same size must restore the window origin"
+        );
+        assert_eq!(
+            restore_overlay_origin(100.0, 200.0, Some(400.0), Some(300.0), 400.0, 400.0),
+            (100.0, 100.0),
+            "taller overlay grows upward so the mark stays put"
+        );
+        assert_eq!(
+            restore_overlay_origin(100.0, 200.0, Some(400.0), Some(300.0), 500.0, 300.0),
+            (50.0, 200.0),
+            "wider overlay keeps the mark horizontally centered"
+        );
+        assert_eq!(
+            restore_overlay_origin(100.0, 200.0, None, None, 500.0, 400.0),
+            (100.0, 200.0),
+            "legacy prefs without saved size keep the window origin"
+        );
+    }
+
+    #[test]
+    fn hide_must_not_persist_a_drag_move_after_the_window_is_gone() {
+        assert!(should_persist_on_moved(true, true));
+        assert!(
+            !should_persist_on_moved(true, false),
+            "hide/destroy can report 0,0 while DRAGGING is still set"
+        );
+        assert!(!should_persist_on_moved(false, true));
+        assert!(should_persist_after_drag_flag(false));
+        assert!(!should_persist_after_drag_flag(true));
+        assert!(overlay_pos_is_persistable(12.0, 40.0));
+        assert!(!overlay_pos_is_persistable(f64::NAN, 1.0));
+        assert!(!overlay_pos_is_persistable(1.0, f64::INFINITY));
     }
 }

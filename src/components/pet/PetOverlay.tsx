@@ -324,11 +324,17 @@ export function PetOverlay({
     originRef.current = null;
     draggedRef.current = false;
     setDragging(false);
-    void petSetDragging(false);
-    if (!moved) return;
-    void petSyncOverlaySize(overlaySize.w, overlaySize.h).then(() => {
-      void refreshBubbleOffset();
-    });
+    const persist = () => {
+      void petSetDragging(false);
+      if (moved) void refreshBubbleOffset();
+    };
+    // Size-sync first so persist writes the mark-stable origin, not the
+    // pre-resize frame. startDragging can swallow pointerup; hide/quit also persist.
+    if (moved) {
+      void petSyncOverlaySize(overlaySize.w, overlaySize.h).then(persist, persist);
+    } else {
+      persist();
+    }
   }, [overlaySize.h, overlaySize.w, refreshBubbleOffset]);
 
   useEffect(() => {

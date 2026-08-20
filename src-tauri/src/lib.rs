@@ -1563,6 +1563,8 @@ pub fn run() {
 
                 use tauri::Manager;
 
+                pet_window::persist_pet_window_pos(app);
+
                 crate::host_runtime::on_process_shutdown();
 
                 if let Some(host) = app.try_state::<Arc<MirrorHost>>() {
