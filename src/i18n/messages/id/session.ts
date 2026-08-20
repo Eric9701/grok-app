@@ -159,6 +159,7 @@ export const idSession = {
   "session.forkCliSessionNoAgentHint": "Sambungkan atau kirim pesan terlebih dahulu agar obrolan ini memiliki sesi agen tertaut. Hingga saat itu jurnal masih dapat dicabangkan tanpa id agen baru.",
   "session.resumeForkCliSessionHint": "Di worktree ini, alokasikan id sesi agen baru alih-alih memakai ulang yang asli (CLI --fork-session). Biarkan tidak dicentang untuk melanjutkan sesi agen yang sama.",
   "session.forkOkCli": "Dicabangkan · sesi agen baru · obrolan baru dibuka",
+  "session.forkOkBootstrap": "Dicabangkan · konteks agen adalah riwayat yang disalin (bukan giliran berikutnya dari aslinya)",
   "session.forkOkRestoreCli": "Dicabangkan · sesi agen baru · dibuka di worktree bersih",
   "session.resumeRestoreOkCli": "Dilanjutkan · sesi agen baru · dibuka di worktree bersih",
   "session.forkCliFailed": "Cabang sesi agen CLI tidak dapat disiapkan",

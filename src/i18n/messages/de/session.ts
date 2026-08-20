@@ -159,6 +159,7 @@ export const deSession = {
   "session.forkCliSessionNoAgentHint": "Zuerst verbinden oder eine Nachricht senden, damit dieser Chat eine verknüpfte Agentensitzung hat. Bis dahin kann das Journal trotzdem ohne neue Agent-ID geforkt werden.",
   "session.resumeForkCliSessionHint": "Auf diesem Worktree eine neue Agentensitzungs-ID zuweisen statt die Original-ID wiederzuverwenden (CLI --fork-session). Ungeprüft lassen, um dieselbe Agentensitzung fortzusetzen.",
   "session.forkOkCli": "Geforkt · neue Agentensitzung · neuer Chat geöffnet",
+  "session.forkOkBootstrap": "Abgezweigt · Agent-Kontext ist die kopierte Historie (nicht die späteren Vorgänge des Originals)",
   "session.forkOkRestoreCli": "Geforkt · neue Agentensitzung · auf sauberem Worktree geöffnet",
   "session.resumeRestoreOkCli": "Fortgesetzt · neue Agentensitzung · auf sauberem Worktree geöffnet",
   "session.forkCliFailed": "CLI-Agentensitzung-Fork konnte nicht vorbereitet werden",

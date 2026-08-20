@@ -25,6 +25,7 @@ import {
   lastRegenerableAssistantId,
   messageSegments,
   isTurnPromptMessage,
+  userPromptIndexContaining,
   weaveToolsIntoAssistantSegments,
   type ChatMessage,
   type MessageToolSegment,
@@ -81,6 +82,7 @@ import {
   IconRewind,
   IconTarget,
 } from "@/components/icons";
+import { shouldOfferAssistantFork } from "@/lib/sessionFork";
 import { setDraft } from "@/lib/composerDraftStore";
 import {
   clampThinkingStartToMessage,
@@ -635,10 +637,10 @@ export interface ConversationThreadProps {
   regenerateModels?: ModelOption[];
   /** Current composer/session model id (highlight + same-model baseline). */
   regenerateModelId?: string;
-  /** Idle session — allow rewind / fork from user bubbles. */
+  /** Idle session — allow rewind from user bubbles / fork from assistant. */
   canRewindSession?: boolean;
   onRewindToUserMessage?: (message: ChatMessage) => void;
-  onForkFromUserMessage?: (message: ChatMessage) => void;
+  onForkFromAssistantMessage?: (message: ChatMessage) => void;
   onOpenResource?: (
     target: import("@/components/ResourceViewer").ResourceOpenTarget,
   ) => void;
@@ -810,7 +812,8 @@ type TranscriptMessageRowProps = {
   onRemoveEditAttachment?: ConversationThreadProps["onRemoveEditAttachment"];
   onRegenerateAssistant?: ConversationThreadProps["onRegenerateAssistant"];
   onRewindToUserMessage?: ConversationThreadProps["onRewindToUserMessage"];
-  onForkFromUserMessage?: ConversationThreadProps["onForkFromUserMessage"];
+  onForkFromAssistantMessage?: ConversationThreadProps["onForkFromAssistantMessage"];
+  canForkFromAssistant?: boolean;
   onOpenResource?: ConversationThreadProps["onOpenResource"];
   onOpenError?: ConversationThreadProps["onOpenError"];
   onOpenExternalLink?: ConversationThreadProps["onOpenExternalLink"];
@@ -851,6 +854,7 @@ function transcriptRowPropsEqual(
   if (a.latestContinuableEndId !== b.latestContinuableEndId) return false;
   if (a.turnLive !== b.turnLive) return false;
   if (a.canRewindSession !== b.canRewindSession) return false;
+  if (a.canForkFromAssistant !== b.canForkFromAssistant) return false;
   if (a.regenerableAssistantId !== b.regenerableAssistantId) return false;
   if (a.regenerateModels !== b.regenerateModels) return false;
   if (a.regenerateModelId !== b.regenerateModelId) return false;
@@ -920,7 +924,8 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   onRemoveEditAttachment,
   onRegenerateAssistant,
   onRewindToUserMessage,
-  onForkFromUserMessage,
+  onForkFromAssistantMessage,
+  canForkFromAssistant,
   onOpenResource,
   onOpenError,
   onOpenExternalLink,
@@ -1247,18 +1252,6 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                   }}
                 >
                   <IconRewind size={15} />
-                </MessageActionButton>
-              ) : null}
-              {onForkFromUserMessage && !isInterjection ? (
-                <MessageActionButton
-                  label={tr("message.forkHere")}
-                  disabled={!canRewindSession}
-                  onClick={() => {
-                    if (!canRewindSession) return;
-                    onForkFromUserMessage(m);
-                  }}
-                >
-                  <IconFork size={15} />
                 </MessageActionButton>
               ) : null}
             </>
@@ -1655,13 +1648,14 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
         const showCopy = !!m.content.trim();
         const showRegen =
           !!onRegenerateAssistant && regenerableAssistantId === m.id;
-        if (!showCopy && !showRegen) return null;
+        const showFork =
+          !!onForkFromAssistantMessage && !!canForkFromAssistant;
         const deepLink =
           sessionId != null
             ? formatMessageDeepLink(sessionId, m.id)
             : "";
         const showCopyLink = !!deepLink;
-        if (!showCopy && !showRegen && !showCopyLink) return null;
+        if (!showCopy && !showRegen && !showCopyLink && !showFork) return null;
         return (
           <>
             {showCopy ? (
@@ -1714,6 +1708,18 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                 }}
               />
             ) : null}
+            {showFork ? (
+              <MessageActionButton
+                label={tr("message.forkHere")}
+                disabled={!canRewindSession}
+                onClick={() => {
+                  if (!canRewindSession) return;
+                  onForkFromAssistantMessage?.(m);
+                }}
+              >
+                <IconFork size={15} />
+              </MessageActionButton>
+            ) : null}
           </>
         );
       })()}
@@ -1746,7 +1752,7 @@ export function ConversationThread({
   regenerateModelId = "",
   canRewindSession = false,
   onRewindToUserMessage,
-  onForkFromUserMessage,
+  onForkFromAssistantMessage,
   onOpenResource,
   onOpenError,
   onOpenExternalLink,
@@ -2732,6 +2738,14 @@ export function ConversationThread({
                 sessionState === "awaiting_permission"
               }
               canRewindSession={canRewindSession}
+              canForkFromAssistant={shouldOfferAssistantFork({
+                streaming: m.streaming,
+                turnLive:
+                  sessionState === "streaming" ||
+                  sessionState === "awaiting_permission",
+                canRewindSession,
+                parentPromptIndex: userPromptIndexContaining(messages, m.id),
+              })}
               regenerableAssistantId={regenerableAssistantId}
               regenerateModels={regenerateModels}
               regenerateModelId={regenerateModelId}
@@ -2762,7 +2776,7 @@ export function ConversationThread({
               onRemoveEditAttachment={onRemoveEditAttachment}
               onRegenerateAssistant={onRegenerateAssistant}
               onRewindToUserMessage={onRewindToUserMessage}
-              onForkFromUserMessage={onForkFromUserMessage}
+              onForkFromAssistantMessage={onForkFromAssistantMessage}
               onOpenResource={onOpenResource}
               onOpenError={onOpenError}
               onOpenExternalLink={onOpenExternalLink}

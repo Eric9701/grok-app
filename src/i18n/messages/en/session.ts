@@ -159,6 +159,7 @@ export const enSession = {
   "session.forkCliSessionNoAgentHint": "Connect or send a message first so this chat has a linked agent session. Until then the journal can still be forked without a new agent id.",
   "session.resumeForkCliSessionHint": "On this worktree, allocate a new agent session id instead of reusing the original (CLI --fork-session). Leave unchecked to continue the same agent session.",
   "session.forkOkCli": "Forked · new agent session · opened new chat",
+  "session.forkOkBootstrap": "Forked · agent context is the copied history (not the original’s later turns)",
   "session.forkOkRestoreCli": "Forked · new agent session · opened on a clean worktree",
   "session.resumeRestoreOkCli": "Resumed · new agent session · opened on a clean worktree",
   "session.forkCliFailed": "Could not arm CLI agent session fork",

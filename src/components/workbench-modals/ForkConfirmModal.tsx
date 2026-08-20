@@ -1,7 +1,10 @@
 import { createT, type Locale, type MessageKey } from "@/i18n";
 import { GlassModal } from "@/components/GlassModal";
 import type { ForkConfirmState } from "@/hooks/useAppDialogs";
-import type { ForkAgentCheckboxState } from "@/lib/sessionFork";
+import {
+  shouldShowForkCliCheckbox,
+  type ForkAgentCheckboxState,
+} from "@/lib/sessionFork";
 
 export function ForkConfirmModal(props: {
   locale: Locale;
@@ -69,27 +72,31 @@ export function ForkConfirmModal(props: {
           <span>{tr("session.forkRestoreCode")}</span>
         </label>
         <p className="fork-confirm__hint">{tr("session.forkRestoreCodeHint")}</p>
-        <label
-          className={
-            "fork-confirm__restore" +
-            (box.disabled ? " fork-confirm__restore--disabled" : "")
-          }
-        >
-          <input
-            type="checkbox"
-            checked={box.checked}
-            disabled={props.busy || box.disabled}
-            onChange={(e) => {
-              if (box.disabled) return;
-              props.onForkCliSessionChange(e.target.checked);
-            }}
-            aria-disabled={box.disabled || undefined}
-          />
-          <span>{tr("session.forkCliSession")}</span>
-        </label>
-        <p className="fork-confirm__hint">
-          {tr(box.hintKey as MessageKey)}
-        </p>
+        {shouldShowForkCliCheckbox(props.confirm?.throughUserPromptIndex) ? (
+          <>
+            <label
+              className={
+                "fork-confirm__restore" +
+                (box.disabled ? " fork-confirm__restore--disabled" : "")
+              }
+            >
+              <input
+                type="checkbox"
+                checked={box.checked}
+                disabled={props.busy || box.disabled}
+                onChange={(e) => {
+                  if (box.disabled) return;
+                  props.onForkCliSessionChange(e.target.checked);
+                }}
+                aria-disabled={box.disabled || undefined}
+              />
+              <span>{tr("session.forkCliSession")}</span>
+            </label>
+            <p className="fork-confirm__hint">
+              {tr(box.hintKey as MessageKey)}
+            </p>
+          </>
+        ) : null}
       </div>
     </GlassModal>
   );

@@ -159,6 +159,7 @@ export const filSession = {
   "session.forkCliSessionNoAgentHint": "Kumonekta o magpadala muna ng mensahe para magkaroon ng naka-link na session ng agent ang chat na ito. Hanggang noon, puwede pa ring i-fork ang journal nang walang bagong agent id.",
   "session.resumeForkCliSessionHint": "Sa worktree na ito, maglaan ng bagong agent session id sa halip na muling gamitin ang orihinal (CLI --fork-session). Iwanang walang check para ipagpatuloy ang parehong session ng agent.",
   "session.forkOkCli": "Na-fork · bagong session ng agent · nabuksan ang bagong chat",
+  "session.forkOkBootstrap": "Na-fork · ang konteksto ng agent ay ang kinopyang history (hindi ang mga susunod na turn ng orihinal)",
   "session.forkOkRestoreCli": "Na-fork · bagong session ng agent · nabuksan sa malinis na worktree",
   "session.resumeRestoreOkCli": "Itinuloy · bagong session ng agent · nabuksan sa malinis na worktree",
   "session.forkCliFailed": "Hindi ma-arm ang CLI agent session fork",

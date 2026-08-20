@@ -161,6 +161,7 @@ export const zhSession = {
   "session.forkCliSessionNoAgentHint": "请先连接或发送消息，让本会话关联 agent session。在此之前仍可仅分叉对话内容（不新建 agent id）。",
   "session.resumeForkCliSessionHint": "在本 worktree 上分配新的 agent session id，而不是复用原会话（CLI --fork-session）。不勾选则继续同一 agent 会话。",
   "session.forkOkCli": "已分叉 · 新 agent 会话 · 已打开新会话",
+  "session.forkOkBootstrap": "已分叉 · Agent 上下文是复制的截断历史（不含原会话后续回合）",
   "session.forkOkRestoreCli": "已分叉 · 新 agent 会话 · 已在干净 worktree 中打开",
   "session.resumeRestoreOkCli": "已恢复 · 新 agent 会话 · 已在干净 worktree 中打开",
   "session.forkCliFailed": "无法启用 CLI Agent 会话分叉",

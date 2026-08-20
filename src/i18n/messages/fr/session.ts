@@ -159,6 +159,7 @@ export const frSession = {
   "session.forkCliSessionNoAgentHint": "Connectez ou envoyez d’abord un message pour que cette conversation ait une session d’agent liée. En attendant le journal peut encore être bifurqué sans nouvel id d’agent.",
   "session.resumeForkCliSessionHint": "Sur ce worktree, allouer un nouvel id de session d’agent au lieu de réutiliser l’original (CLI --fork-session). Laissez décoché pour continuer la même session d’agent.",
   "session.forkOkCli": "Bifurquée · nouvelle session d’agent · nouvelle conversation ouverte",
+  "session.forkOkBootstrap": "Bifurquée · le contexte de l’agent est l’historique copié (pas les tours suivants de l’original)",
   "session.forkOkRestoreCli": "Bifurquée · nouvelle session d’agent · ouverte sur un worktree propre",
   "session.resumeRestoreOkCli": "Reprise · nouvelle session d’agent · ouverte sur un worktree propre",
   "session.forkCliFailed": "Impossible d’armer la bifurcation de session d’agent CLI",

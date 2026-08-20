@@ -159,6 +159,7 @@ export const jaSession = {
   "session.forkCliSessionNoAgentHint": "先に接続するかメッセージを送り、このチャットにリンク済みエージェントセッションを持たせてください。それまではジャーナルは新しい agent id なしでもフォークできます。",
   "session.resumeForkCliSessionHint": "このワークツリーでは、元を再利用せず新しいエージェントセッション ID を割り当てます（CLI --fork-session）。同じエージェントセッションを続けるならオフのままにしてください。",
   "session.forkOkCli": "フォークしました · 新しいエージェントセッション · 新しいチャットを開きました",
+  "session.forkOkBootstrap": "フォーク済み · エージェントの文脈はコピーした履歴です（元の以降のターンは含みません）",
   "session.forkOkRestoreCli": "フォークしました · 新しいエージェントセッション · クリーンなワークツリーで開きました",
   "session.resumeRestoreOkCli": "再開しました · 新しいエージェントセッション · クリーンなワークツリーで開きました",
   "session.forkCliFailed": "CLI エージェントセッションのフォークを準備できませんでした",

@@ -159,6 +159,7 @@ export const zhTWSession = {
   "session.forkCliSessionNoAgentHint": "請先連線或傳送訊息，讓本對話關聯 agent session。在此之前仍可僅分叉對話內容（不新建 agent id）。",
   "session.resumeForkCliSessionHint": "在此 worktree 上分配新的 agent session id，而不是沿用原工作階段（CLI --fork-session）。不勾選則繼續同一 agent 工作階段。",
   "session.forkOkCli": "已分叉 · 新 agent 工作階段 · 已開啟新對話",
+  "session.forkOkBootstrap": "已分叉 · Agent 上下文是複製的截斷歷史（不含原工作階段後續回合）",
   "session.forkOkRestoreCli": "已分叉 · 新 agent 工作階段 · 已在乾淨 worktree 中開啟",
   "session.resumeRestoreOkCli": "已恢復 · 新 agent 工作階段 · 已在乾淨 worktree 中開啟",
   "session.forkCliFailed": "無法啟用 CLI Agent 工作階段分叉",

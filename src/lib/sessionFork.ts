@@ -709,6 +709,16 @@ export function forkSuccessToastKey(input: {
 }
 
 /**
+ * Follow-up toast after Host finishes child rewind / bootstrap.
+ * Rewound is silent (immediate fork toast already opened the chat).
+ */
+export function forkTrimmedToastKey(
+  outcome: string | null | undefined,
+): "session.forkOkBootstrap" | null {
+  return outcome === "bootstrap" ? "session.forkOkBootstrap" : null;
+}
+
+/**
  * Success toast key for resume-with-code restore.
  * Never claims “new agent session” without the fork flag.
  */

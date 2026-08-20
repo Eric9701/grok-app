@@ -159,6 +159,7 @@ export const esSession = {
   "session.forkCliSessionNoAgentHint": "Conecta o envía un mensaje primero para que este chat tenga una sesión de agente vinculada. Hasta entonces el diario se puede bifurcar sin un id de agente nuevo.",
   "session.resumeForkCliSessionHint": "En este worktree, asigna un id de sesión de agente nuevo en lugar de reutilizar el original (CLI --fork-session). Déjalo desmarcado para continuar la misma sesión de agente.",
   "session.forkOkCli": "Bifurcado · sesión de agente nueva · chat nuevo abierto",
+  "session.forkOkBootstrap": "Bifurcado · el contexto del agente es el historial copiado (no los turnos posteriores del original)",
   "session.forkOkRestoreCli": "Bifurcado · sesión de agente nueva · abierto en un worktree limpio",
   "session.resumeRestoreOkCli": "Reanudado · sesión de agente nueva · abierto en un worktree limpio",
   "session.forkCliFailed": "No se pudo armar la bifurcación de sesión de agente CLI",

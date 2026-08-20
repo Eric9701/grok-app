@@ -159,6 +159,7 @@ export const itSession = {
   "session.forkCliSessionNoAgentHint": "Connetti o invia prima un messaggio così questa chat ha una sessione agente collegata. Fino ad allora il journal può comunque essere forkato senza un nuovo id agente.",
   "session.resumeForkCliSessionHint": "Su questo worktree, alloca un nuovo id di sessione agente invece di riutilizzare l’originale (CLI --fork-session). Lascia deselezionato per continuare la stessa sessione agente.",
   "session.forkOkCli": "Fork creato · nuova sessione agente · nuova chat aperta",
+  "session.forkOkBootstrap": "Biforcata · il contesto dell’agente è la cronologia copiata (non i turni successivi dell’originale)",
   "session.forkOkRestoreCli": "Fork creato · nuova sessione agente · aperto su un worktree pulito",
   "session.resumeRestoreOkCli": "Ripresa · nuova sessione agente · aperta su un worktree pulito",
   "session.forkCliFailed": "Impossibile preparare il fork della sessione agente CLI",

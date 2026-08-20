@@ -159,6 +159,7 @@ export const koSession = {
   "session.forkCliSessionNoAgentHint": "이 대화에 연결된 에이전트 세션이 있도록 먼저 연결하거나 메시지를 보내세요. 그때까지 저널은 새 에이전트 id 없이 포크할 수 있습니다.",
   "session.resumeForkCliSessionHint": "이 worktree에서 원본을 재사용하지 않고 새 에이전트 세션 id를 할당합니다 (CLI --fork-session). 같은 에이전트 세션을 이어가려면 선택 해제하세요.",
   "session.forkOkCli": "포크됨 · 새 에이전트 세션 · 새 대화를 열었습니다",
+  "session.forkOkBootstrap": "포크됨 · 에이전트 컨텍스트는 복사된 기록입니다 (원본의 이후 턴은 포함하지 않음)",
   "session.forkOkRestoreCli": "포크됨 · 새 에이전트 세션 · 깨끗한 worktree에서 열었습니다",
   "session.resumeRestoreOkCli": "재개됨 · 새 에이전트 세션 · 깨끗한 worktree에서 열었습니다",
   "session.forkCliFailed": "CLI 에이전트 세션 포크를 준비하지 못했습니다",

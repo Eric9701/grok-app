@@ -17,6 +17,7 @@ import {
   resolveForkCliOnConfirm,
   shouldOfferAssistantFork,
   shouldShowForkCliCheckbox,
+  forkTrimmedToastKey,
   resolveSessionForkSoftFail,
   resumeRestoreGateMessageKey,
   resumeRestoreSuccessToastKey,
@@ -398,5 +399,11 @@ describe("forkSuccessToastKey / resumeRestoreSuccessToastKey", () => {
     expect(resumeRestoreSuccessToastKey({ forkedAgent: true })).toBe(
       "session.resumeRestoreOkCli",
     );
+  });
+
+  it("forkTrimmedToastKey is silent on rewound and honest on bootstrap", () => {
+    expect(forkTrimmedToastKey("rewound")).toBe(null);
+    expect(forkTrimmedToastKey("bootstrap")).toBe("session.forkOkBootstrap");
+    expect(forkTrimmedToastKey("nope")).toBe(null);
   });
 });

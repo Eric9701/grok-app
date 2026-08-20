@@ -183,6 +183,14 @@ Because cwd changes:
 6. Remote IM bindings that already point at this App session retarget cwd and drop their agent id.
 7. Drag a sidebar chat onto a project header (or Other sessions) uses the same confirm + Host path as the menu.
 
+### 3c. Agent-side fork (partial)
+
+Transcript **Fork from here** sits on completed idle **assistant** bubbles (not user prompts). The new App session copies the journal through the **containing user turn** (`through_user_prompt_index`: that user prompt + the turn’s assistant / thought / tools) and drops later follow-ups. The source chat is unchanged.
+
+When the source has a linked agent id, the child connect ACP-`session/fork`s, then immediately **rewinds the child** (`x.ai/rewind/execute`, `restoreFiles=false`) so agent memory matches the truncated journal. The parent agent is not rewound or stopped. If fork or rewind is unavailable, Host opens `session/new` and bootstraps from the copied journal — it never keeps an untrimmed forked agent id. Host emits `session://fork_trimmed` `{ sessionId, outcome: "rewound" | "bootstrap" }` for partial forks only.
+
+The partial-fork dialog hides the CLI `--fork-session` checkbox and auto-arms agent fork when a source id exists. Sidebar **Fork chat** (uncut) is unchanged, including that checkbox.
+
 ### 3b. Session data mode switch (E04)
 
 When Settings flips `session_data_mode` independent↔shared, Host calls `recycle_all_agents` on live + background + parked processes (same kill/soft-disconnect paths as idle recycle). Live `agentSessionId` is cleared so reconnect does not `session/load` against the previous `GROK_HOME`. Journals stay. Emits `session://agents_recycled` for a short toast.

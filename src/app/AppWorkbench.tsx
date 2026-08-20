@@ -138,6 +138,7 @@ import {
   canRewindToUserPrompt,
   canRegenerateAssistant,
   userPromptIndexOf,
+  userPromptIndexContaining,
   localRewindPoints,
   IDLE_SNAPSHOT,
   type AskUserPayload,
@@ -760,6 +761,7 @@ import {
   isWorktreeNameCollisionError,
   resolveForkAgentCheckbox,
   resolveForkAgentSession,
+  resolveForkCliOnConfirm,
   resolveSessionForkSoftFail,
   softFailKindFromRestoreGate
 } from "@/lib/sessionFork";
@@ -11440,7 +11442,11 @@ export function AppWorkbench() {
           tr(
             forkSuccessToastKey({
               restoredWorktree,
-              forkedAgent: forkResolved.fork,
+              // Partial forks wait for session://fork_trimmed before claiming a new agent id.
+              forkedAgent:
+                opts?.throughUserPromptIndex != null
+                  ? false
+                  : forkResolved.fork,
             }) as Parameters<typeof tr>[0],
           ),
           2800,
@@ -11923,7 +11929,7 @@ export function AppWorkbench() {
     ],
   );
 
-  const onForkFromUserMessage = useCallback(
+  const onForkFromAssistantMessage = useCallback(
     (msg: ChatMessage) => {
       const sid = session.sessionId ?? viewingSessionIdRef.current;
       if (!sid) {
@@ -11938,7 +11944,7 @@ export function AppWorkbench() {
           projectId: activeProject?.id ?? null,
           updatedAt: new Date().toISOString(),
         } satisfies SessionRow);
-      const idx = userPromptIndexOf(messages, msg.id);
+      const idx = userPromptIndexContaining(messages, msg.id);
       if (idx < 0) return;
       confirmForkSession(row, idx);
     },
@@ -20867,7 +20873,7 @@ export function AppWorkbench() {
             regenerateModelId={modelId}
             canRewindSession={canRewindSession && !!session.sessionId}
             onRewindToUserMessage={onRewindToUserMessage}
-            onForkFromUserMessage={onForkFromUserMessage}
+            onForkFromAssistantMessage={onForkFromAssistantMessage}
             turnStartedAt={turnStartedAt}
             onOpenSessionChanges={() => {
               openAsidePane();
@@ -22791,7 +22797,12 @@ export function AppWorkbench() {
             throughUserPromptIndex:
               forkConfirm.throughUserPromptIndex ?? null,
             restoreCode: forkRestoreCode,
-            forkCliSession: forkAgentCheckbox.checked,
+            forkCliSession: resolveForkCliOnConfirm({
+              throughUserPromptIndex:
+                forkConfirm.throughUserPromptIndex ?? null,
+              checkboxChecked: forkAgentCheckbox.checked,
+              agentSessionId: forkConfirm.source.agentSessionId,
+            }),
           });
         }}
       />

@@ -159,6 +159,7 @@ export const ptBRSession = {
   "session.forkCliSessionNoAgentHint": "Conecte ou envie uma mensagem primeiro para este chat ter uma sessão de agente vinculada. Até lá o diário ainda pode ser bifurcado sem um novo id de agente.",
   "session.resumeForkCliSessionHint": "Neste worktree, alocar um novo id de sessão de agente em vez de reutilizar o original (CLI --fork-session). Deixe desmarcado para continuar a mesma sessão de agente.",
   "session.forkOkCli": "Bifurcado · nova sessão de agente · novo chat aberto",
+  "session.forkOkBootstrap": "Bifurcado · o contexto do agente é o histórico copiado (não os turnos posteriores do original)",
   "session.forkOkRestoreCli": "Bifurcado · nova sessão de agente · aberto num worktree limpo",
   "session.resumeRestoreOkCli": "Retomado · nova sessão de agente · aberto num worktree limpo",
   "session.forkCliFailed": "Não foi possível armar a bifurcação da sessão do agente da CLI",

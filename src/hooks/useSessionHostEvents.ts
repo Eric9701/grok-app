@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 import * as api from "@/lib/api";
 import { isMirrorClient } from "@/lib/mirrorTransport";
 import { isValidAskUserPayload } from "@/lib/askUserPayload";
+import { forkTrimmedToastKey } from "@/lib/sessionFork";
 import {
   applyContextCompact,
   applyGeneratedImage,
@@ -1327,6 +1328,18 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
               c.setStreamStall(null);
             }
           }),
+        );
+       track(
+          listenWithRetry<{ sessionId?: string; outcome?: string }>(
+            "session://fork_trimmed",
+            (p) => {
+              if (cancelled || !p) return;
+              const key = forkTrimmedToastKey(p.outcome);
+              if (!key) return;
+              c.setToast(c.tr(key));
+              window.setTimeout(() => c.setToast(null), 4200);
+            },
+          ),
         );
        track(
           listenWithRetry<{ sessionId?: string; reason?: string }>(
