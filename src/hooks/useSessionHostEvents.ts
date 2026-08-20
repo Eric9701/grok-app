@@ -21,6 +21,7 @@ import {
   upgradeMessagesFromJournal,
   weaveToolsIntoAssistantSegments,
   ensureBusyTurnStreaming,
+  settleStreamingOnHostReady,
   type AskUserPayload,
   type ChatMessage,
   type GeneratedImagePayload,
@@ -411,9 +412,7 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
               const cached: ChatMessage[] =
                 c.messagesBySessionRef.current.get(sid) ?? [];
               const base = shouldClear
-                ? cached.map((m) =>
-                    m.streaming ? { ...m, streaming: false } : m,
-                  )
+                ? settleStreamingOnHostReady(cached)
                 : cached;
               // Empty cache → journal is sole source (openSession may race-write).
               // Non-empty → lift longer journal tails into this session only.
@@ -421,6 +420,11 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
                 base.length === 0
                   ? woven
                   : upgradeMessagesFromJournal(base, woven);
+              // Lift may have filled the queued pending from disk. Settle
+              // again so a complete body is frozen and replay cannot append.
+              if (shouldClear) {
+                next = settleStreamingOnHostReady(next);
+              }
               if (stillBusy) {
                 next = ensureBusyTurnStreaming(next, hostState);
                 next = weaveToolsIntoAssistantSegments(next);
@@ -649,13 +653,12 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
                 // Session-scoped: a background chat going idle must not stop the
                 // clock of the chat the user is watching.
                 c.clearTurnClock(s.sessionId);
-                // Ensure no assistant is left with streaming=true after the turn
-                // (missed done chunk) — otherwise the next send can bind to it.
+                // Freeze the turn that just finished. Do not settle an
+                // optimistic queued pending — auto-flush may already have
+                // painted the next shell on this same ready.
                 c.setMessages((prev) => {
-                  if (!prev.some((m) => m.streaming)) return prev;
-                  const next = prev.map((m) =>
-                    m.streaming ? { ...m, streaming: false } : m,
-                  );
+                  const next = settleStreamingOnHostReady(prev);
+                  if (next === prev) return prev;
                   if (s.sessionId) {
                     c.messagesBySessionRef.current.set(s.sessionId, next);
                   }
@@ -772,10 +775,8 @@ export function useSessionHostEvents(ctx: SessionHostEventsCtx) {
                 s.state !== "awaiting_permission"
               ) {
                 c.setMessages((prev) => {
-                  if (!prev.some((m) => m.streaming)) return prev;
-                  const next = prev.map((m) =>
-                    m.streaming ? { ...m, streaming: false } : m,
-                  );
+                  const next = settleStreamingOnHostReady(prev);
+                  if (next === prev) return prev;
                   c.messagesBySessionRef.current.set(s.sessionId!, next);
                   return next;
                 });
