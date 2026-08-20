@@ -1,6 +1,8 @@
 /** pt-BR messages — domain: settings-pet */
 export const ptBRSettingsPet = {
   "settings.nav.pet": "Pet",
+  "settings.tab.petLook": "Aparência",
+  "settings.tab.petBubbles": "Balões",
   "settings.pet.desc": "Um companheiro de desktop ao vivo que mostra a sessão de maior prioridade: precisa de você, erro, pronto ou trabalhando.",
   "settings.pet.enabled": "Mostrar pet de desktop",
   "settings.pet.enabledDesc": "Flutuar uma marca viva sobre outros apps. Oculte a qualquer momento no menu do pet ou com /pet.",

@@ -1,6 +1,8 @@
 /** uk messages — domain: settings-pet */
 export const ukSettingsPet = {
   "settings.nav.pet": "Улюбленець",
+  "settings.tab.petLook": "Вигляд",
+  "settings.tab.petBubbles": "Бульбашки",
   "settings.pet.desc": "Живий настільний компаньйон, який показує найпріоритетніший сесія: потрібні ви, помилка, готовий або працює.",
   "settings.pet.enabled": "Показувати настільного улюбленця",
   "settings.pet.enabledDesc": "Поставте живий знак над іншими застосунками. Сховайте будь-коли в меню улюбленця або /pet.",

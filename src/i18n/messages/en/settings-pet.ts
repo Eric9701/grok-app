@@ -1,6 +1,8 @@
 /** English messages — desktop pet settings */
 export const enSettingsPet = {
   "settings.nav.pet": "Pet",
+  "settings.tab.petLook": "Look",
+  "settings.tab.petBubbles": "Bubbles",
   "settings.pet.desc":
     "A live desktop companion that shows the highest-priority session: needs you, error, ready, or working.",
   "settings.pet.enabled": "Show desktop pet",

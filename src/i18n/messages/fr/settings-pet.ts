@@ -1,6 +1,8 @@
 /** fr messages — domain: settings-pet */
 export const frSettingsPet = {
   "settings.nav.pet": "Familier",
+  "settings.tab.petLook": "Apparence",
+  "settings.tab.petBubbles": "Bulles",
   "settings.pet.desc": "Un compagnon de bureau vivant qui montre la session prioritaire : action requise, erreur, prêt ou en cours.",
   "settings.pet.enabled": "Afficher le familier de bureau",
   "settings.pet.enabledDesc": "Faire flotter une marque vivante au-dessus des autres apps. Masquez-la à tout moment depuis le menu du familier ou /pet.",

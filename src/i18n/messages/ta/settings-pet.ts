@@ -1,6 +1,8 @@
 /** ta messages — domain: settings-pet */
 export const taSettingsPet = {
   "settings.nav.pet": "செல்லம்",
+  "settings.tab.petLook": "தோற்றம்",
+  "settings.tab.petBubbles": "குமிழ்கள்",
   "settings.pet.desc": "அதிக முன்னுரிமை கொண்ட அமர்வைக் காட்டும் நேரடி டெஸ்க்டாப் துணை: நீங்கள் தேவை, பிழை, தயாராக அல்லது வேலை.",
   "settings.pet.enabled": "டெஸ்க்டாப் செல்லப்பிராணியைக் காட்டு",
   "settings.pet.enabledDesc": "பிற பயன்பாடுகளின் மீது ஒரு வாழ்க்கை அடையாளத்தை மிதக்கவைக்கவும். செல்லப்பிராணி மெனு அல்லது / செல்லப் பிராணியிலிருந்து எப்போது வேண்டுமானாலும் மறைக்கவும்.",

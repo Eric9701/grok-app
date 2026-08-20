@@ -139,20 +139,34 @@ describe("settingsCatalog", () => {
     expect(isSettingsSectionId("nope")).toBe(false);
   });
 
-  it("pet is a first-class nav section and hash round-trips", () => {
+  it("pet is a first-class nav section with look · bubbles tabs", () => {
     expect(SETTINGS_NAV.some((n) => n.id === "pet")).toBe(true);
     expect(SETTINGS_ENTRIES.some((e) => e.section === "pet")).toBe(true);
-    expect(buildSettingsHash({ section: "pet" })).toBe("#/settings/pet");
+    expect(defaultTabFor("pet")).toBe("look");
+    expect(resolveTab("pet", "bubbles")).toBe("bubbles");
+    expect(resolveTab("pet", "nope")).toBe("look");
+    expect(buildSettingsHash({ section: "pet" })).toBe("#/settings/pet/look");
+    expect(buildSettingsHash({ section: "pet", tab: "bubbles" })).toBe(
+      "#/settings/pet/bubbles",
+    );
     expect(parseSettingsHash("#/settings/pet")).toEqual({
       section: "pet",
-      tab: null,
+      tab: "look",
     });
     expect(parseSettingsHash("settings/pet")).toEqual({
       section: "pet",
-      tab: null,
+      tab: "look",
+    });
+    expect(parseSettingsHash("settings/pet/bubbles")).toEqual({
+      section: "pet",
+      tab: "bubbles",
     });
     const loc = parseSettingsHash(buildSettingsHash({ section: "pet" }));
-    expect(loc).toEqual({ section: "pet", tab: null });
+    expect(loc).toEqual({ section: "pet", tab: "look" });
+    expect(SETTINGS_ENTRIES.find((e) => e.id === "pet.identity")?.tab).toBe("look");
+    expect(SETTINGS_ENTRIES.find((e) => e.id === "pet.bubbles")?.tab).toBe(
+      "bubbles",
+    );
   });
 
   it("search finds 宠物 / pet menu", () => {
@@ -175,6 +189,14 @@ describe("settingsCatalog", () => {
     expect(lookHits.some((h) => h.entry.id === "pet.bubbleLook")).toBe(true);
     const faceHits = searchSettingsEntries("表情", tZh, tEn);
     expect(faceHits.some((h) => h.entry.id === "pet.expression")).toBe(true);
+    const lookTabHits = searchSettingsEntries("外观设置", tZh, tEn);
+    expect(lookTabHits.some((h) => h.entry.id === "pet.companion" && h.entry.tab === "look")).toBe(
+      true,
+    );
+    const bubbleTabHits = searchSettingsEntries("气泡设置", tZh, tEn);
+    expect(
+      bubbleTabHits.some((h) => h.entry.id === "pet.bubbles" && h.entry.tab === "bubbles"),
+    ).toBe(true);
   });
 
   it("keywordKeysForSection includes appearance prefs and remote control", () => {

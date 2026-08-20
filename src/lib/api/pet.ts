@@ -11,6 +11,7 @@ import {
   normalizePetBubbleShape,
   normalizePetBubbleStyle,
   petBubbleOffsetX,
+  petSettingsHash,
   type PetFocus,
   type PetKind,
   type PetTask,
@@ -210,7 +211,7 @@ export async function petGetFocus(): Promise<PetFocus | null> {
 
 export async function petOpenSettings(): Promise<void> {
   if (!isDesktopHost()) {
-    window.location.hash = "#/settings/pet";
+    window.location.hash = petSettingsHash();
     return;
   }
   await invoke("pet_open_settings");

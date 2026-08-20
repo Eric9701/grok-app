@@ -53,7 +53,11 @@ export const SETTINGS_NAV: readonly SettingsNavDef[] = [
     icon: "pet",
     labelKey: "settings.nav.pet",
     group: "personal",
-    tabs: [],
+    defaultTab: "look",
+    tabs: [
+      { id: "look", labelKey: "settings.tab.petLook" },
+      { id: "bubbles", labelKey: "settings.tab.petBubbles" },
+    ],
   },
   {
     id: "extensions",

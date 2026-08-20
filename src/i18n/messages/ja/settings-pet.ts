@@ -1,6 +1,8 @@
 /** ja messages — domain: settings-pet */
 export const jaSettingsPet = {
   "settings.nav.pet": "ペット",
+  "settings.tab.petLook": "見た目",
+  "settings.tab.petBubbles": "吹き出し",
   "settings.pet.desc": "最優先のセッションを示すデスクトップの相棒。要対応、エラー、準備完了、実行中が一目で分かります。",
   "settings.pet.enabled": "デスクトップペットを表示",
   "settings.pet.enabledDesc": "他のアプリの上にペットを浮かべます。ペットメニューまたは /pet からいつでも隠せます。",

@@ -1,6 +1,8 @@
 /** id messages — domain: settings-pet */
 export const idSettingsPet = {
   "settings.nav.pet": "Pet",
+  "settings.tab.petLook": "Tampilan",
+  "settings.tab.petBubbles": "Gelembung",
   "settings.pet.desc": "Pendamping desktop langsung yang menampilkan sesi berprioritas tertinggi: perlu Anda, error, siap, atau sedang bekerja.",
   "settings.pet.enabled": "Tampilkan pet desktop",
   "settings.pet.enabledDesc": "Tampilkan tanda hidup di atas aplikasi lain. Sembunyikan kapan saja dari menu pet atau /pet.",

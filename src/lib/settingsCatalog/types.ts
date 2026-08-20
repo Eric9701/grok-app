@@ -64,7 +64,10 @@ export type SettingsTabId =
   | "privacy"
   // remote control (section id stays remote_im)
   | "im"
-  | "mirror";
+  | "mirror"
+  // pet
+  | "look"
+  | "bubbles";
 
 export type SettingsNavGroup = "personal" | "system";
 

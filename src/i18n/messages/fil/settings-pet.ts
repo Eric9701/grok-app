@@ -1,6 +1,8 @@
 /** fil messages — domain: settings-pet */
 export const filSettingsPet = {
   "settings.nav.pet": "Pet",
+  "settings.tab.petLook": "Hitsura",
+  "settings.tab.petBubbles": "Bula",
   "settings.pet.desc": "Isang buhay na kasama sa desktop na nagpapakita ng pinakamataas na prayoridad na session: kailangan ka, error, handa, o gumagawa.",
   "settings.pet.enabled": "Ipakita ang desktop pet",
   "settings.pet.enabledDesc": "Maglutang ng buhay na marka sa ibabaw ng ibang app. Itago anumang oras mula sa menu ng pet o /pet.",

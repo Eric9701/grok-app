@@ -1,6 +1,8 @@
 /** it messages — domain: settings-pet */
 export const itSettingsPet = {
   "settings.nav.pet": "Pet",
+  "settings.tab.petLook": "Aspetto",
+  "settings.tab.petBubbles": "Bolle",
   "settings.pet.desc": "Un compagno desktop live che mostra la sessione con priorità più alta: richiede te, errore, pronto o in lavorazione.",
   "settings.pet.enabled": "Mostra il pet desktop",
   "settings.pet.enabledDesc": "Fai fluttuare un segno vivente sopra le altre app. Nascondilo in qualsiasi momento dal menu del pet o con /pet.",

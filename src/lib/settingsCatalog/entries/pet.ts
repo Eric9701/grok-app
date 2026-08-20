@@ -4,21 +4,34 @@ export const PET_ENTRIES: readonly SettingsEntry[] = [
   {
     id: "pet.companion",
     section: "pet",
+    tab: "look",
     anchorId: "settings-anchor-pet",
     labelKey: "settings.nav.pet",
     descKeys: [
       "settings.pet.desc",
       "settings.pet.enabled",
       "settings.pet.enabledDesc",
+      "settings.tab.petLook",
     ],
-    keywords: ["pet", "宠物", "寵物", "desktop pet", "companion", "overlay", "mascot"],
+    keywords: [
+      "pet",
+      "宠物",
+      "寵物",
+      "desktop pet",
+      "companion",
+      "overlay",
+      "mascot",
+      "外观设置",
+      "外觀設定",
+    ],
   },
   {
     id: "pet.bubbles",
     section: "pet",
+    tab: "bubbles",
     anchorId: "settings-anchor-pet-bubbles",
     labelKey: "settings.pet.bubbles",
-    descKeys: ["settings.pet.bubblesDesc"],
+    descKeys: ["settings.pet.bubblesDesc", "settings.tab.petBubbles"],
     keywords: [
       "bubble",
       "bubbles",
@@ -29,11 +42,14 @@ export const PET_ENTRIES: readonly SettingsEntry[] = [
       "chip",
       "stage",
       "阶段性",
+      "气泡设置",
+      "氣泡設定",
     ],
   },
   {
     id: "pet.progressBar",
     section: "pet",
+    tab: "bubbles",
     anchorId: "settings-anchor-pet-progress",
     labelKey: "settings.pet.progressBar",
     descKeys: ["settings.pet.progressBarDesc"],
@@ -42,6 +58,7 @@ export const PET_ENTRIES: readonly SettingsEntry[] = [
   {
     id: "pet.bubbleDismiss",
     section: "pet",
+    tab: "bubbles",
     anchorId: "settings-anchor-pet-dismiss",
     labelKey: "settings.pet.bubbleDismiss",
     descKeys: ["settings.pet.bubbleDismissDesc", "settings.pet.bubbleDismiss.seconds"],
@@ -50,6 +67,7 @@ export const PET_ENTRIES: readonly SettingsEntry[] = [
   {
     id: "pet.bubbleLook",
     section: "pet",
+    tab: "bubbles",
     anchorId: "settings-anchor-pet-bubble-look",
     labelKey: "settings.pet.bubbleLook",
     descKeys: [
@@ -70,6 +88,7 @@ export const PET_ENTRIES: readonly SettingsEntry[] = [
   {
     id: "pet.identity",
     section: "pet",
+    tab: "look",
     anchorId: "settings-anchor-pet-identity",
     labelKey: "settings.pet.identity",
     descKeys: [
@@ -100,6 +119,7 @@ export const PET_ENTRIES: readonly SettingsEntry[] = [
   {
     id: "pet.expression",
     section: "pet",
+    tab: "look",
     anchorId: "settings-anchor-pet-expression",
     labelKey: "settings.pet.expression",
     descKeys: ["settings.pet.expressionDesc"],
@@ -116,6 +136,7 @@ export const PET_ENTRIES: readonly SettingsEntry[] = [
   {
     id: "pet.eyeColor",
     section: "pet",
+    tab: "look",
     anchorId: "settings-anchor-pet-eye",
     labelKey: "settings.pet.eyeColor",
     descKeys: ["settings.pet.eyeColorDesc", "settings.pet.eyeColor.auto"],
@@ -135,6 +156,7 @@ export const PET_ENTRIES: readonly SettingsEntry[] = [
   {
     id: "pet.size",
     section: "pet",
+    tab: "look",
     anchorId: "settings-anchor-pet-size",
     labelKey: "settings.pet.size",
     descKeys: ["settings.pet.sizeDesc"],

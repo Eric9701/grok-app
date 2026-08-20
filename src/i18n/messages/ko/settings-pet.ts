@@ -1,6 +1,8 @@
 /** ko messages — domain: settings-pet */
 export const koSettingsPet = {
   "settings.nav.pet": "펫",
+  "settings.tab.petLook": "외형",
+  "settings.tab.petBubbles": "말풍선",
   "settings.pet.desc": "우선순위가 가장 높은 세션을 보여주는 데스크톱 동반자입니다: 확인 필요, 오류, 준비됨, 작업 중.",
   "settings.pet.enabled": "데스크톱 펫 표시",
   "settings.pet.enabledDesc": "다른 앱 위에 살아있는 마크를 띄웁니다. 펫 메뉴나 /pet으로 언제든 숨길 수 있습니다.",

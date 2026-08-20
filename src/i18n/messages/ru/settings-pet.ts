@@ -1,6 +1,8 @@
 /** ru messages — domain: settings-pet */
 export const ruSettingsPet = {
   "settings.nav.pet": "Питомец",
+  "settings.tab.petLook": "Внешний вид",
+  "settings.tab.petBubbles": "Пузыри",
   "settings.pet.desc": "Живой настольный компаньон, который показывает сессию с наивысшим приоритетом: нужно действие, ошибка, готов или работает.",
   "settings.pet.enabled": "Показывать настольного питомца",
   "settings.pet.enabledDesc": "Плавающая живая метка поверх других приложений. Скрыть в любой момент из меню питомца или /pet.",

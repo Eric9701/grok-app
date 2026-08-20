@@ -1,6 +1,8 @@
 /** es messages — domain: settings-pet */
 export const esSettingsPet = {
   "settings.nav.pet": "Mascota",
+  "settings.tab.petLook": "Apariencia",
+  "settings.tab.petBubbles": "Burbujas",
   "settings.pet.desc": "Un compañero de escritorio en vivo que muestra la sesión de mayor prioridad: te necesita, error, listo o trabajando.",
   "settings.pet.enabled": "Mostrar mascota de escritorio",
   "settings.pet.enabledDesc": "Flota una marca viva sobre otras aplicaciones. Ocúltala cuando quieras desde el menú de la mascota o /pet.",

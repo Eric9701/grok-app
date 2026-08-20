@@ -43,4 +43,13 @@ describe("PetSection visibility switch", () => {
     expect(src).toContain("PET_BUBBLE_SHAPES");
     expect(src).toContain("PET_BUBBLE_STYLES");
   });
+
+  it("splits look and bubbles into settings tabs, look first", () => {
+    expect(src).toContain("SettingsTabStrip");
+    expect(src).toContain('activeTab === "look"');
+    expect(src).toContain('activeTab === "bubbles"');
+    expect(src.indexOf('activeTab === "look"')).toBeLessThan(
+      src.indexOf('activeTab === "bubbles"'),
+    );
+  });
 });

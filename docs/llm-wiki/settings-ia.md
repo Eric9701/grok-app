@@ -27,6 +27,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | extensions | `plugins` · `mcp` · `skills`（含 **探测 Claude/Cursor 技能** 开关，`#/settings/extensions/skills` → `settings-anchor-ext-skills-discover`）· `agents` · `hooks`（**无** `market` / `apps`；`#/settings/extensions/market` → `plugins` 可安装目录锚点） |
 | runtime | `cli` · `connection` · `network` · `pool` · `tools` · `privacy` |
 | remote_im（远程控制） | `im`（IM 通信）· `mirror`（手机镜像） |
+| pet | `look`（外观设置：显示开关、形体、表情、颜色、尺寸）· `bubbles`（气泡设置：提示框、进度条、自动关闭、形状/背景） |
 | 其余 | 无 tab（单页） |
 
 默认 tab 见 `SETTINGS_NAV[].defaultTab`。
@@ -45,7 +46,9 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 #/settings/remote_im/mirror         → 远程控制 · 手机镜像
 #/settings/appearance               → appearance/theme
 #/settings/appearance/interface     → 外观 · 界面（聊天展示）
-#/settings/pet                      → 宠物
+#/settings/pet                      → pet/look
+#/settings/pet/look                 → 宠物 · 外观设置
+#/settings/pet/bubbles              → 宠物 · 气泡设置
 ```
 
 - 仅 section 的旧链**永远有效**（落到 default tab）。

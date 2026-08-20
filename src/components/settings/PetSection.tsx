@@ -3,7 +3,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
-import { UiSwitch } from "./shared";
+import { SettingsTabStrip, UiSwitch } from "./shared";
 import { PetMark } from "@/components/pet/PetMark";
 import { Select } from "@/components/Select";
 import { listen } from "@/lib/api/host";
@@ -70,6 +70,10 @@ export function PetSection() {
   const s = useSettingsModel();
   const t = s.t;
   const rowHighlight = s.rowHighlight ?? ((_id: string) => "");
+  const activeTab = s.activeTab;
+  const setSectionTab = s.setSectionTab;
+  const sectionNav = s.sectionNav;
+  const title = s.title;
   const [prefs, setPrefs] = useState<PetPrefs>(DEFAULT_PREFS);
   const [busy, setBusy] = useState(false);
   const toggleGen = useRef(0);
@@ -132,139 +136,45 @@ export function PetSection() {
 
   return (
     <>
-      <div
-        className={"settings-card" + rowHighlight("settings-anchor-pet")}
-        id="settings-anchor-pet"
-      >
-        <div className="settings-row settings-row--stack">
-          <div className="settings-row__text">
-            <div className="settings-row__label">{t("settings.nav.pet")}</div>
-            <div className="settings-row__desc">{t("settings.pet.desc")}</div>
-          </div>
-        </div>
-        <div className="settings-row">
-          <div className="settings-row__text">
-            <div className="settings-row__label">{t("settings.pet.enabled")}</div>
-            <div className="settings-row__desc">{t("settings.pet.enabledDesc")}</div>
-          </div>
-          <UiSwitch
-            checked={shown}
-            disabled={busy}
-            label={t("settings.pet.enabled")}
-            onChange={(next) => void onToggleWindow(next)}
-          />
-        </div>
-        <div className="settings-row" id="settings-anchor-pet-bubbles">
-          <div className="settings-row__text">
-            <div className="settings-row__label">{t("settings.pet.bubbles")}</div>
-            <div className="settings-row__desc">{t("settings.pet.bubblesDesc")}</div>
-          </div>
-          <UiSwitch
-            checked={prefs.bubblesEnabled !== false}
-            disabled={busy}
-            label={t("settings.pet.bubbles")}
-            onChange={(next) => void commit({ ...prefs, bubblesEnabled: next })}
-          />
-        </div>
-        <div className="settings-row" id="settings-anchor-pet-progress">
-          <div className="settings-row__text">
-            <div className="settings-row__label">{t("settings.pet.progressBar")}</div>
-            <div className="settings-row__desc">{t("settings.pet.progressBarDesc")}</div>
-          </div>
-          <UiSwitch
-            checked={prefs.progressBarEnabled === true}
-            disabled={busy}
-            label={t("settings.pet.progressBar")}
-            onChange={(next) => void commit({ ...prefs, progressBarEnabled: next })}
-          />
-        </div>
-        <div className="settings-row" id="settings-anchor-pet-dismiss">
-          <div className="settings-row__text">
-            <div className="settings-row__label">{t("settings.pet.bubbleDismiss")}</div>
-            <div className="settings-row__desc">{t("settings.pet.bubbleDismissDesc")}</div>
-          </div>
-          <Select
-            value={String(normalizePetBubbleDismissSec(prefs.bubbleDismissSec))}
-            onChange={(v) =>
-              void commit({
-                ...prefs,
-                bubbleDismissSec: normalizePetBubbleDismissSec(Number(v)),
-              })
-            }
-            options={[5, 10, 15, 20, 30, 45, 60, 90]
-              .filter((n) => n >= PET_BUBBLE_DISMISS_MIN && n <= PET_BUBBLE_DISMISS_MAX)
-              .map((n) => ({
-                value: String(n),
-                label: t("settings.pet.bubbleDismiss.seconds", { n }),
-              }))}
-            aria-label={t("settings.pet.bubbleDismiss")}
-            disabled={busy}
-          />
-        </div>
-      </div>
+      <SettingsTabStrip
+        tabs={sectionNav?.tabs ?? []}
+        active={activeTab}
+        onChange={setSectionTab}
+        ariaLabel={title}
+        t={(k) => t(k)}
+      />
 
-      <div
-        className={"settings-card" + rowHighlight("settings-anchor-pet-bubble-look")}
-        id="settings-anchor-pet-bubble-look"
-      >
-        <div className="settings-row settings-row--stack">
-          <div className="settings-row__text">
-            <div className="settings-row__label">{t("settings.pet.bubbleLook")}</div>
-            <div className="settings-row__desc">{t("settings.pet.bubbleLookDesc")}</div>
-          </div>
-        </div>
-        <div className="settings-row settings-row--stack">
-          <div className="settings-row__label">{t("settings.pet.bubbleShape")}</div>
-          <div className="pet-settings-grid" role="group" aria-label={t("settings.pet.bubbleShape")}>
-            {PET_BUBBLE_SHAPES.map((sh) => (
-              <button
-                key={sh}
-                type="button"
-                className={
-                  "pet-settings-grid__btn" +
-                  (normalizePetBubbleShape(prefs.bubbleShape) === sh ? " is-on" : "")
-                }
-                aria-pressed={normalizePetBubbleShape(prefs.bubbleShape) === sh}
-                aria-label={t(BUBBLE_SHAPE_KEYS[sh])}
+      {(activeTab === "look" || activeTab == null) && (
+        <>
+          <h2 className="settings-page__h2">{t("settings.tab.petLook")}</h2>
+          <div
+            className={"settings-card" + rowHighlight("settings-anchor-pet")}
+            id="settings-anchor-pet"
+          >
+            <div className="settings-row settings-row--stack">
+              <div className="settings-row__text">
+                <div className="settings-row__label">{t("settings.nav.pet")}</div>
+                <div className="settings-row__desc">{t("settings.pet.desc")}</div>
+              </div>
+            </div>
+            <div className="settings-row">
+              <div className="settings-row__text">
+                <div className="settings-row__label">{t("settings.pet.enabled")}</div>
+                <div className="settings-row__desc">{t("settings.pet.enabledDesc")}</div>
+              </div>
+              <UiSwitch
+                checked={shown}
                 disabled={busy}
-                onClick={() => void commit({ ...prefs, bubbleShape: sh })}
-              >
-                <span
-                  className={`pet-bubble pet-bubble--${sh} pet-bubble--${normalizePetBubbleStyle(prefs.bubbleStyle)} pet-bubble-preview`}
-                />
-              </button>
-            ))}
+                label={t("settings.pet.enabled")}
+                onChange={(next) => void onToggleWindow(next)}
+              />
+            </div>
           </div>
-        </div>
-        <div className="settings-row settings-row--stack">
-          <div className="settings-row__label">{t("settings.pet.bubbleStyle")}</div>
-          <div className="pet-settings-grid" role="group" aria-label={t("settings.pet.bubbleStyle")}>
-            {PET_BUBBLE_STYLES.map((st) => (
-              <button
-                key={st}
-                type="button"
-                className={
-                  "pet-settings-grid__btn" +
-                  (normalizePetBubbleStyle(prefs.bubbleStyle) === st ? " is-on" : "")
-                }
-                aria-pressed={normalizePetBubbleStyle(prefs.bubbleStyle) === st}
-                aria-label={t(BUBBLE_STYLE_KEYS[st])}
-                disabled={busy}
-                onClick={() => void commit({ ...prefs, bubbleStyle: st })}
-              >
-                <span
-                  className={`pet-bubble pet-bubble--${normalizePetBubbleShape(prefs.bubbleShape)} pet-bubble--${st} pet-bubble-preview`}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      <div
-        className={"settings-card" + rowHighlight("settings-anchor-pet-identity")}
-        id="settings-anchor-pet-identity"
-      >
+          <div
+            className={"settings-card" + rowHighlight("settings-anchor-pet-identity")}
+            id="settings-anchor-pet-identity"
+          >
         <div className="settings-row settings-row--stack">
           <div className="settings-row__text">
             <div className="settings-row__label">{t("settings.pet.identity")}</div>
@@ -414,33 +324,151 @@ export function PetSection() {
         </div>
       </div>
 
-      <div
-        className={"settings-card" + rowHighlight("settings-anchor-pet-size")}
-        id="settings-anchor-pet-size"
-      >
-        <div className="settings-row">
-          <div className="settings-row__text">
-            <div className="settings-row__label">{t("settings.pet.size")}</div>
-            <div className="settings-row__desc">{t("settings.pet.sizeDesc")}</div>
+          <div
+            className={"settings-card" + rowHighlight("settings-anchor-pet-size")}
+            id="settings-anchor-pet-size"
+          >
+            <div className="settings-row">
+              <div className="settings-row__text">
+                <div className="settings-row__label">{t("settings.pet.size")}</div>
+                <div className="settings-row__desc">{t("settings.pet.sizeDesc")}</div>
+              </div>
+              <Select
+                value={String(sizePx)}
+                onChange={(v) =>
+                  void commit({ ...prefs, sizePx: normalizePetSize(Number(v)) })
+                }
+                options={PET_SIZES.map((n) => ({
+                  value: String(n),
+                  label:
+                    n === 96
+                      ? t("settings.pet.size.sm")
+                      : n === 160
+                        ? t("settings.pet.size.lg")
+                        : t("settings.pet.size.md"),
+                }))}
+                aria-label={t("settings.pet.size")}
+              />
+            </div>
           </div>
-          <Select
-            value={String(sizePx)}
-            onChange={(v) =>
-              void commit({ ...prefs, sizePx: normalizePetSize(Number(v)) })
-            }
-            options={PET_SIZES.map((n) => ({
-              value: String(n),
-              label:
-                n === 96
-                  ? t("settings.pet.size.sm")
-                  : n === 160
-                    ? t("settings.pet.size.lg")
-                    : t("settings.pet.size.md"),
-            }))}
-            aria-label={t("settings.pet.size")}
-          />
-        </div>
-      </div>
+        </>
+      )}
+
+      {activeTab === "bubbles" && (
+        <>
+          <h2 className="settings-page__h2">{t("settings.tab.petBubbles")}</h2>
+          <div
+            className={"settings-card" + rowHighlight("settings-anchor-pet-bubbles")}
+            id="settings-anchor-pet-bubbles"
+          >
+            <div className="settings-row">
+              <div className="settings-row__text">
+                <div className="settings-row__label">{t("settings.pet.bubbles")}</div>
+                <div className="settings-row__desc">{t("settings.pet.bubblesDesc")}</div>
+              </div>
+              <UiSwitch
+                checked={prefs.bubblesEnabled !== false}
+                disabled={busy}
+                label={t("settings.pet.bubbles")}
+                onChange={(next) => void commit({ ...prefs, bubblesEnabled: next })}
+              />
+            </div>
+            <div className="settings-row" id="settings-anchor-pet-progress">
+              <div className="settings-row__text">
+                <div className="settings-row__label">{t("settings.pet.progressBar")}</div>
+                <div className="settings-row__desc">{t("settings.pet.progressBarDesc")}</div>
+              </div>
+              <UiSwitch
+                checked={prefs.progressBarEnabled === true}
+                disabled={busy}
+                label={t("settings.pet.progressBar")}
+                onChange={(next) => void commit({ ...prefs, progressBarEnabled: next })}
+              />
+            </div>
+            <div className="settings-row" id="settings-anchor-pet-dismiss">
+              <div className="settings-row__text">
+                <div className="settings-row__label">{t("settings.pet.bubbleDismiss")}</div>
+                <div className="settings-row__desc">{t("settings.pet.bubbleDismissDesc")}</div>
+              </div>
+              <Select
+                value={String(normalizePetBubbleDismissSec(prefs.bubbleDismissSec))}
+                onChange={(v) =>
+                  void commit({
+                    ...prefs,
+                    bubbleDismissSec: normalizePetBubbleDismissSec(Number(v)),
+                  })
+                }
+                options={[5, 10, 15, 20, 30, 45, 60, 90]
+                  .filter((n) => n >= PET_BUBBLE_DISMISS_MIN && n <= PET_BUBBLE_DISMISS_MAX)
+                  .map((n) => ({
+                    value: String(n),
+                    label: t("settings.pet.bubbleDismiss.seconds", { n }),
+                  }))}
+                aria-label={t("settings.pet.bubbleDismiss")}
+                disabled={busy}
+              />
+            </div>
+          </div>
+
+          <div
+            className={"settings-card" + rowHighlight("settings-anchor-pet-bubble-look")}
+            id="settings-anchor-pet-bubble-look"
+          >
+            <div className="settings-row settings-row--stack">
+              <div className="settings-row__text">
+                <div className="settings-row__label">{t("settings.pet.bubbleLook")}</div>
+                <div className="settings-row__desc">{t("settings.pet.bubbleLookDesc")}</div>
+              </div>
+            </div>
+            <div className="settings-row settings-row--stack">
+              <div className="settings-row__label">{t("settings.pet.bubbleShape")}</div>
+              <div className="pet-settings-grid" role="group" aria-label={t("settings.pet.bubbleShape")}>
+                {PET_BUBBLE_SHAPES.map((sh) => (
+                  <button
+                    key={sh}
+                    type="button"
+                    className={
+                      "pet-settings-grid__btn" +
+                      (normalizePetBubbleShape(prefs.bubbleShape) === sh ? " is-on" : "")
+                    }
+                    aria-pressed={normalizePetBubbleShape(prefs.bubbleShape) === sh}
+                    aria-label={t(BUBBLE_SHAPE_KEYS[sh])}
+                    disabled={busy}
+                    onClick={() => void commit({ ...prefs, bubbleShape: sh })}
+                  >
+                    <span
+                      className={`pet-bubble pet-bubble--${sh} pet-bubble--${normalizePetBubbleStyle(prefs.bubbleStyle)} pet-bubble-preview`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="settings-row settings-row--stack">
+              <div className="settings-row__label">{t("settings.pet.bubbleStyle")}</div>
+              <div className="pet-settings-grid" role="group" aria-label={t("settings.pet.bubbleStyle")}>
+                {PET_BUBBLE_STYLES.map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    className={
+                      "pet-settings-grid__btn" +
+                      (normalizePetBubbleStyle(prefs.bubbleStyle) === st ? " is-on" : "")
+                    }
+                    aria-pressed={normalizePetBubbleStyle(prefs.bubbleStyle) === st}
+                    aria-label={t(BUBBLE_STYLE_KEYS[st])}
+                    disabled={busy}
+                    onClick={() => void commit({ ...prefs, bubbleStyle: st })}
+                  >
+                    <span
+                      className={`pet-bubble pet-bubble--${normalizePetBubbleShape(prefs.bubbleShape)} pet-bubble--${st} pet-bubble-preview`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

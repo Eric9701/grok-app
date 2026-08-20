@@ -1,6 +1,8 @@
 /** de messages — domain: settings-pet */
 export const deSettingsPet = {
   "settings.nav.pet": "Pet",
+  "settings.tab.petLook": "Aussehen",
+  "settings.tab.petBubbles": "Sprechblasen",
   "settings.pet.desc": "Ein Live-Desktop-Begleiter, der die Sitzung mit höchster Priorität zeigt: Aktion nötig, Fehler, bereit oder arbeitet.",
   "settings.pet.enabled": "Desktop-Pet zeigen",
   "settings.pet.enabledDesc": "Lebendes Zeichen über anderen Apps schweben lassen. Jederzeit über das Pet-Menü oder /pet ausblenden.",

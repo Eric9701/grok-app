@@ -1,6 +1,8 @@
 /** Chinese messages — desktop pet settings */
 export const zhSettingsPet = {
   "settings.nav.pet": "宠物",
+  "settings.tab.petLook": "外观设置",
+  "settings.tab.petBubbles": "气泡设置",
   "settings.pet.desc":
     "桌面活体伴侣：一眼看出最需要你的会话——等你、失败、完成未读，或正在干活。",
   "settings.pet.enabled": "显示桌面宠物",
