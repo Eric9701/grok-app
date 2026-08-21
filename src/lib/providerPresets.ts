@@ -8,6 +8,7 @@ import type { ProviderEffortEntry, ProviderModelEntry } from "@/lib/api";
 /** Known brand marks with dedicated logos (see ProviderBrandIcon). */
 export type ProviderBrandId =
   | "deepseek"
+  | "openrouter"
   | "amux"
   | "opencode-go"
   | "volcano-ark";
@@ -38,6 +39,11 @@ export type ProviderPreset = {
    * vision; set true when the channel is an explicit multimodal Grok relay.
    */
   supportsVision?: boolean;
+  /**
+   * Prefill per-channel `context_window` (bare integer in TOML).
+   * Missing → Host/composer default 200k for custom channels.
+   */
+  contextWindow?: number;
 };
 
 /**
@@ -142,7 +148,16 @@ export const DEEPSEEK_EFFORTS: ProviderEffortEntry[] = [
 
 export const DEEPSEEK_MODELS: ProviderModelEntry[] = [
   { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+  {
+    id: "deepseek-v4-flash-vision-exp",
+    name: "DeepSeek V4 Flash Vision Exp",
+  },
   { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro" },
+];
+
+/** OpenRouter OpenAI-compatible catalog (chat_completions). */
+export const OPENROUTER_MODELS: ProviderModelEntry[] = [
+  { id: "stealth/ox-alpha", name: "Ox Alpha" },
 ];
 
 /** Amux OpenAI-compatible relay (official Grok catalog ids). */
@@ -183,6 +198,24 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     blurbKey: "prov.preset.deepseek.blurb",
     apiKeyUrl: "https://platform.deepseek.com/",
     brandId: "deepseek",
+  },
+  /**
+   * OpenRouter unified API. Model slug is the OpenRouter id (`stealth/ox-alpha`);
+   * chat_completions — not Responses. Vision + 1M context from the model card.
+   */
+  {
+    id: "openrouter",
+    name: "OpenRouter",
+    suggestedId: "openrouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    apiBackend: "chat_completions",
+    models: OPENROUTER_MODELS,
+    efforts: GROK_CHANNEL_EFFORTS.map((e) => ({ ...e })),
+    blurbKey: "prov.preset.openrouter.blurb",
+    apiKeyUrl: "https://openrouter.ai/settings/keys",
+    brandId: "openrouter",
+    supportsVision: true,
+    contextWindow: 1_048_576,
   },
   {
     id: "amux",
@@ -296,6 +329,10 @@ function matchPreset(opts: {
     if (pid === "ai98pro" || pid.startsWith("ai98pro-")) {
       const ai98 = PROVIDER_PRESETS.find((p) => p.id === "ai98pro");
       if (ai98) return ai98;
+    }
+    if (pid === "openrouter" || pid.startsWith("openrouter-")) {
+      const or = PROVIDER_PRESETS.find((p) => p.id === "openrouter");
+      if (or) return or;
     }
   }
   let host = "";

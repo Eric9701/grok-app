@@ -114,6 +114,8 @@ type FormState = {
   /** External signup URL for “Get API Key” (from preset). */
   apiKeyUrl: string | null;
   extraHeaders: { name: string; value: string }[];
+  /** Prefill / keep per-channel context_window. Null = omit on create. */
+  contextWindow: number | null;
 };
 
 type RightMode = "empty" | "pick" | "create" | "edit" | "official";
@@ -137,6 +139,7 @@ const emptyForm = (): FormState => ({
   })),
   apiKeyUrl: null,
   extraHeaders: [],
+  contextWindow: null,
 });
 
 function modelsFromProvider(p: api.CustomProvider): FormModel[] {
@@ -196,6 +199,10 @@ function formFromPreset(preset: ProviderPreset): FormState {
     })),
     apiKeyUrl: preset.apiKeyUrl ?? null,
     extraHeaders: [],
+    contextWindow:
+      preset.contextWindow && preset.contextWindow > 0
+        ? preset.contextWindow
+        : null,
   };
 }
 
@@ -583,6 +590,10 @@ export function ProvidersPanel({
       extraHeaders: (p.extraHeaders ?? [])
         .map((h) => ({ name: h.name, value: h.value }))
         .filter((h) => h.name.trim() || h.value.trim()),
+      contextWindow:
+        p.contextWindow != null && p.contextWindow > 0
+          ? p.contextWindow
+          : null,
     });
     setDraftModelId("");
     setDraftModelName("");
@@ -691,11 +702,15 @@ export function ProvidersPanel({
       extraHeaders: form.extraHeaders
         .map((h) => ({ name: h.name.trim(), value: h.value.trim() }))
         .filter((h) => h.name && h.value),
-      // Keep composer-set context_window on provider form save (#538).
+      // Preset / form value wins; else keep composer-set context_window (#538).
       contextWindow:
-        !isCreate && existing?.contextWindow != null && existing.contextWindow > 0
-          ? existing.contextWindow
-          : undefined,
+        form.contextWindow != null && form.contextWindow > 0
+          ? form.contextWindow
+          : !isCreate &&
+              existing?.contextWindow != null &&
+              existing.contextWindow > 0
+            ? existing.contextWindow
+            : undefined,
     };
     try {
       // Wall-clock budget so a hung host IPC cannot leave the UI on “Saving…”.

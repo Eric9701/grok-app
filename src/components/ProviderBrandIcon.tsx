@@ -1,7 +1,8 @@
 /**
  * Brand marks for known custom-provider presets
- * (DeepSeek, Amux, OpenCode Go, Volcengine Ark, …).
+ * (DeepSeek, OpenRouter, Amux, OpenCode Go, Volcengine Ark, …).
  * Amux / OpenCode Go use currentColor so they follow light/dark theme;
+ * OpenRouter is purple in light theme, currentColor (ink) in dark;
  * DeepSeek / Volcano Ark keep brand colors.
  */
 
@@ -48,6 +49,38 @@ function AmuxMark({
         d="M4 96 C4 96, 24 12, 64 12 C104 12, 124 96, 124 96 Q124 102, 118 102 C94 102, 92 64, 64 64 C36 64, 34 102, 10 102 Q4 102, 4 96 Z"
         fill="currentColor"
       />
+    </svg>
+  );
+}
+
+/** OpenRouter mark (src/assets/providers/openrouter.svg). Wide word-icon. */
+function OpenRouterMark({
+  className = "",
+  title,
+  size = 20,
+}: {
+  className?: string;
+  title?: string;
+  size?: number;
+}) {
+  // Source art is ~365.6×258.3 (≈28.3×20). Keep height = size and width
+  // proportional so the mark is not squashed in square avatars.
+  const height = size;
+  const width = Math.round((size * 365.556) / 258.298);
+  return (
+    <svg
+      className={`provider-brand-icon provider-brand-icon--openrouter ${className}`.trim()}
+      width={width}
+      height={height}
+      viewBox="19.82 17.199 365.556 258.298"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      role={title ? "img" : "presentation"}
+      aria-hidden={title ? undefined : true}
+      aria-label={title}
+    >
+      {title ? <title>{title}</title> : null}
+      <path d="M303.9475,17.19926c42.79734,0,77.48933,34.69327,77.48933,77.48933s-34.69199,77.48933-77.48933,77.48933l76.86166,76.86244c9.76367,9.76313,2.84903,26.45667-10.95697,26.45667h-220.88335c-71.32686,0-129.14889-57.82202-129.14889-129.14889S77.64197,17.19926,148.96884,17.19926h154.97866ZM148.96884,68.85881c-42.79607,0-77.48933,34.69327-77.48933,77.48933s34.69327,77.48933,77.48933,77.48933,77.48933-34.69327,77.48933-77.48933-34.69327-77.48933-77.48933-77.48933Z" />
     </svg>
   );
 }
@@ -254,6 +287,9 @@ export const ProviderBrandIcon = memo(function ProviderBrandIcon({
     resolveProviderBrandId({ providerId, baseUrl });
   if (id === "amux") {
     return <AmuxMark className={className} title={title} size={size} />;
+  }
+  if (id === "openrouter") {
+    return <OpenRouterMark className={className} title={title} size={size} />;
   }
   if (id === "deepseek") {
     return <DeepSeekMark className={className} title={title} size={size} />;

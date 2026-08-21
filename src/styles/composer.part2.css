@@ -610,6 +610,16 @@
   color: var(--text-primary);
 }
 
+/* OpenRouter: brand purple in light; currentColor / ink in dark (night). */
+.provider-brand-icon--openrouter {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .provider-brand-icon--openrouter,
+[data-theme="light"] .provider-brand-icon--openrouter {
+  color: #7624f4;
+}
+
 /* DeepSeek: fixed brand blue */
 .provider-brand-icon--deepseek {
   color: #4d6bfe;

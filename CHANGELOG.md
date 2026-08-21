@@ -15,6 +15,7 @@ See `docs/llm-wiki/release.md`.
 - **Windows `install-latest.cmd`**: with Node / pnpm / Rust / VS Build Tools, double-click to fast-forward `origin/main` and silently install an unsigned side-by-side **grok-app-latest** under `%LOCALAPPDATA%\grok-app-latest`. Does not replace official **Grok**. For people waiting on the next GitHub Release; not a signed production build (`docs/BUILD.md`).
 - **Appearance packs (.grokskin)**: Settings → Appearance can save, import, and export the current skin + wallpaper + crop + clip + overlay. Apply always confirms first. `grok://` and `.grokskin` files write a pending import and never auto-apply. Export bakes the visible wallpaper crop (video uses system ffmpeg when present).
 - **Custom provider extra request headers (#812)**: Settings → Account → Providers can add key/value HTTP headers. They write Grok Build `extra_headers` on `[model.<id>]` (sent verbatim). Use for AgentRouter / AnyRouter WAF (`User-Agent`, `Originator`) or Anthropic `x-api-key`. Empty list omits the field.
+- **OpenRouter provider preset**: Add-provider gallery one-click fill — `https://openrouter.ai/api/v1` with **chat_completions**, model **`stealth/ox-alpha`** (Ox Alpha), Grok-style effort `low`/`medium`/`high`/`max` (default medium), vision on, 1 048 576 context, and the OpenRouter mark (purple `#7624F4` in light theme, ink in dark). Get API Key opens https://openrouter.ai/settings/keys. Existing auto-suffixed ids such as `openrouter-----…` resolve the same channel.
 - **Optional Windows taskbar overlay for unread sessions** (#775): Settings → General → App toggle, **off by default**, independent of the dock/tray unread badge. When on, the host paints 1–9 / 10+ via `set_overlay_icon` (Tauri `set_badge_count` is a no-op on Windows). Hide-to-tray restore re-applies the last overlay count after Explorer AddTab.
 - **Shortcuts help (Ctrl+/)**: the overlay now searches by label / id / chord, groups like Settings → Keyboard, and lists zoom, newline, prompt history, and type-to-focus. The list scrolls instead of clipping the last rows.
 
@@ -22,6 +23,7 @@ See `docs/llm-wiki/release.md`.
 - **Windows `install-latest.cmd`**：已有 Node / pnpm / Rust / VS Build Tools 时可双击，把 `origin/main` fast-forward 后静默安装一份未签名的并排 **grok-app-latest**（`%LOCALAPPDATA%\grok-app-latest`），不覆盖正式版 **Grok**。给等不及下一版 GitHub Release 的人用，不是签名生产包（`docs/BUILD.md`）。
 - **外观包（.grokskin）**：设置 → 外观可保存/导入/导出当前皮肤 + 壁纸 + 裁切 + 片段 + 遮罩。套用前必须确认。`grok://` 和 `.grokskin` 只写入待导入槽，从不静默套用。导出按当前窗口可见区域烘焙壁纸（视频在本机有 ffmpeg 时裁切）。
 - **自定义提供商可填额外请求头（#812）**：设置 → 账号 → 提供商可添加键/值 HTTP 头，写入 Grok Build `[model.<id>].extra_headers`（推理请求原样发送）。用于 AgentRouter / AnyRouter 校验 `User-Agent` / `Originator`，或 Anthropic 的 `x-api-key`。空列表不写该字段。
+- **OpenRouter 服务商预设**：添加提供商图库一键填入 `https://openrouter.ai/api/v1`（chat_completions）、模型 **`stealth/ox-alpha`**（Ox Alpha）、思考档 `low`/`medium`/`high`/`max`（默认 medium）、开启视觉、上下文 1 048 576，并带 OpenRouter 标（浅色主题紫色 `#7624F4`，深色跟当前文字色）。获取 Key 打开 https://openrouter.ai/settings/keys。本地已有带随机后缀的 `openrouter-----…` 仍识别为同一渠道。
 - **可选 Windows 任务栏未读 overlay**（#775）：设置 → 通用 → 应用里开关，**默认关闭**，与程序坞/托盘未读角标互不绑定。开启后 Host 用 `set_overlay_icon` 画 1–9 / 10+（Tauri 的 `set_badge_count` 在 Windows 上是空操作）。从托盘还原时按上次 overlay 计数在 Explorer AddTab 后再贴一次。
 - **快捷键帮助（Ctrl+/）**：面板可按名称 / id / 组合键筛选，按设置页同样的分组列出；补上缩放、换行、历史提示、打字聚焦；列表可滚动，不再裁掉末尾几项。
 
@@ -50,6 +52,7 @@ See `docs/llm-wiki/release.md`.
 - **Streaming markdown keeps a stable ReactMarkdown component map**: `remarkPlugins` and leaf tags are module-level; path/code/img handlers memoize so a token tick does not remount the tree.
 - **Streamdown CSS no longer loads at boot**: Chat uses `MarkdownChat`, not Streamdown. Styles move onto the unused `MessageResponse` module so a later import still looks right.
 - **Vendor JS split for markdown / TipTap / xterm**: Vite emits separate chunks so those stacks can cache independently of the app shell (and drop off first paint once their call sites are lazy).
+- **DeepSeek preset adds V4 Flash Vision Exp**: The add-provider catalog now includes `deepseek-v4-flash-vision-exp` alongside Flash and Pro. Existing saved DeepSeek channels are unchanged until re-added or edited.
 - **Official site on GitHub About and README**: Repo homepage, `package.json` `homepage`, and public READMEs now point to [https://grok-app.com/](https://grok-app.com/).
 
 **中文 · 变更**
@@ -77,6 +80,7 @@ See `docs/llm-wiki/release.md`.
 - **流式 markdown 不再每跳一次 token 换一套 components**：`remarkPlugins` 和叶子标签提到模块级；路径/代码/图片处理器 memo，避免 ReactMarkdown 整树重挂。
 - **启动不再加载 Streamdown CSS**：聊天走 `MarkdownChat`，不走 Streamdown。样式挪到未接入的 `MessageResponse`，以后真用到时才会带上。
 - **markdown / TipTap / xterm 拆成独立 JS chunk**：Vite 单独打包这三坨，壳改动不再带着重库一起失效；后续 lazy 后它们可以离开首屏。
+- **DeepSeek 预设增加 V4 Flash Vision Exp**：添加提供商目录现含 `deepseek-v4-flash-vision-exp`，与 Flash / Pro 并列。已保存的 DeepSeek 渠道不会自动改，直到重新添加或编辑。
 - **仓库 About 与 README 挂上官网**：GitHub 仓库网站、`package.json` `homepage` 与各语言 README 现指向 [https://grok-app.com/](https://grok-app.com/)。
 
 ### Fixed

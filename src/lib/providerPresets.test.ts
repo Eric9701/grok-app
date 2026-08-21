@@ -4,7 +4,9 @@ import {
   AMUX_MODELS,
   DEEPSEEK_EFFORTS,
   DEEPSEEK_MODELS,
+  GROK_CHANNEL_EFFORTS,
   GROK_OFFICIAL_EFFORTS,
+  OPENROUTER_MODELS,
   PROVIDER_PRESETS,
   VOLCANO_ARK_MODELS,
   YUN_API_MODELS,
@@ -17,14 +19,15 @@ import {
 } from "./providerPresets";
 
 describe("providerPresets", () => {
-  it("ships DeepSeek with both models and low/high/xhigh/max efforts", () => {
+  it("ships DeepSeek with flash, vision-exp, and pro plus thinking efforts", () => {
     const ds = findProviderPreset("deepseek");
     expect(ds).toBeDefined();
     expect(ds!.models.map((m) => m.id)).toEqual([
       "deepseek-v4-flash",
+      "deepseek-v4-flash-vision-exp",
       "deepseek-v4-pro",
     ]);
-    expect(DEEPSEEK_MODELS).toHaveLength(2);
+    expect(DEEPSEEK_MODELS).toHaveLength(3);
     expect(DEEPSEEK_EFFORTS.map((e) => e.id)).toEqual([
       "low",
       "high",
@@ -85,6 +88,38 @@ describe("providerPresets", () => {
       GROK_OFFICIAL_EFFORTS.map((e) => e.id),
     );
     expect(yun!.efforts.find((e) => e.isDefault)?.id).toBe("xhigh");
+  });
+
+  it("ships OpenRouter with Ox Alpha, chat_completions, vision, and 1M context", () => {
+    const p = findProviderPreset("openrouter");
+    expect(p).toBeDefined();
+    expect(findProviderPreset("OpenRouter")?.id).toBe("openrouter");
+    expect(p!.name).toBe("OpenRouter");
+    expect(p!.suggestedId).toBe("openrouter");
+    expect(p!.baseUrl).toBe("https://openrouter.ai/api/v1");
+    expect(p!.apiBackend).toBe("chat_completions");
+    expect(p!.supportsVision).toBe(true);
+    expect(p!.contextWindow).toBe(1_048_576);
+    expect(p!.brandId).toBe("openrouter");
+    expect(OPENROUTER_MODELS).toEqual([
+      { id: "stealth/ox-alpha", name: "Ox Alpha" },
+    ]);
+    expect(p!.models).toEqual(OPENROUTER_MODELS);
+    expect(p!.efforts.map((e) => e.id)).toEqual(
+      GROK_CHANNEL_EFFORTS.map((e) => e.id),
+    );
+    expect(p!.efforts.find((e) => e.isDefault)?.id).toBe("medium");
+    expect(p!.apiKeyUrl).toBe("https://openrouter.ai/settings/keys");
+    expect(
+      resolveProviderApiKeyUrl({
+        providerId: "openrouter-----123",
+      }),
+    ).toBe("https://openrouter.ai/settings/keys");
+    expect(
+      resolveProviderApiKeyUrl({
+        baseUrl: "https://openrouter.ai/api/v1",
+      }),
+    ).toBe("https://openrouter.ai/settings/keys");
   });
 
   it("resolves get-api-key URLs by id or base host", () => {
@@ -152,10 +187,18 @@ describe("providerPresets", () => {
     ).toBe("https://ai98pro.xyz");
   });
 
-  it("resolves brand logos for DeepSeek/Amux/OpenCode Go/Volcano Ark", () => {
+  it("resolves brand logos for DeepSeek/OpenRouter/Amux/OpenCode Go/Volcano Ark", () => {
     expect(resolveProviderBrandId({ providerId: "deepseek" })).toBe(
       "deepseek",
     );
+    expect(resolveProviderBrandId({ providerId: "openrouter" })).toBe(
+      "openrouter",
+    );
+    expect(
+      resolveProviderBrandId({
+        baseUrl: "https://openrouter.ai/api/v1",
+      }),
+    ).toBe("openrouter");
     expect(resolveProviderBrandId({ baseUrl: "https://api.amux.ai/v1" })).toBe(
       "amux",
     );
