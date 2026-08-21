@@ -11,12 +11,6 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
-### Changed
-- **Pet settings use Look / Bubbles tabs**: Settings → Pet no longer stacks appearance and bubble chrome on one long page. Default tab is Look (show switch, shape, rest face, colors, size); Bubbles holds the chip toggle, progress bar, auto-hide, and bubble shape/background. `#/settings/pet` still opens Look.
-
-**中文 · 变更**
-- **宠物设置拆成「外观设置 / 气泡设置」两个 tab**：默认打开外观（显示开关、形体、表情、颜色、尺寸）；气泡（提示框、进度条、自动关闭、形状/背景）单独一页。旧链 `#/settings/pet` 仍落到外观。
-
 ### Added
 - **Fork from an assistant reply**: “Fork from here” sits on completed Grok bubbles (not user prompts). The new chat copies through that turn; the child agent is rewound to match (bootstrap fallback if rewind is unavailable).
 - **AI98PRO provider preset**: Add-provider gallery ships a one-click Grok relay — `https://ai98pro.xyz/v1` with Responses, models **`grok-4.6`** + **`grok-4.5`**, official effort `low`/`medium`/`high`/`xhigh` (default Extra high), vision on, and config id **`AI98PRO`** (stored slug `ai98pro`). Existing auto-suffixed local ids such as `ai98pro-----…` resolve the same channel.
@@ -34,9 +28,11 @@ See `docs/llm-wiki/release.md`.
 - **宠物换成完整 bloub 形变目录**：浮层改用测过的 SVG 引擎（静止、思考、眨眼、通知、警示、六边形、轨道、彗星等），不再用旧的 clip-path 表情。设置可选 8 种休息形体和 16 种休息表情。输入框打字会走目录里的警示（斜感叹号），停打后回到所选休息形体；未读完成会话是显眼的橙红圆点（身体已经很热时改用柠黄），不再用视频里的蓝色。
 
 ### Changed
+- **Pet settings use Look / Bubbles tabs**: Settings → Pet no longer stacks appearance and bubble chrome on one long page. Default tab is Look (show switch, shape, rest face, colors, size); Bubbles holds the chip toggle, progress bar, auto-hide, and bubble shape/background. `#/settings/pet` still opens Look.
 - **Workbench shell split (#757)**: Prefs/layout hooks, GlassModals, compact overlay, in-app dialog host, and command palette live under `workbench-modals/`. Transcript helpers move to `src/lib/session/*` with a stable barrel. Send / open-session / rewind stay in AppWorkbench.
 
 **中文 · 变更**
+- **宠物设置拆成「外观设置 / 气泡设置」两个 tab**：默认打开外观（显示开关、形体、表情、颜色、尺寸）；气泡（提示框、进度条、自动关闭、形状/背景）单独一页。旧链 `#/settings/pet` 仍落到外观。
 - **工作台外壳拆分（#757）**：偏好/布局 hook、GlassModal、紧凑浮层、应用内对话框、命令面板进 `workbench-modals/`；会话 transcript 助手进 `src/lib/session/*`（barrel 保持 `@/lib/session`）。发送 / 打开会话 / rewind 仍在 AppWorkbench。
 
 ### Fixed
