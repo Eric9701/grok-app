@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { createT } from "@/i18n";
+import { beforeAll, describe, expect, it } from "vitest";
+import { createT, loadAllLocaleCatalogs } from "@/i18n";
 import {
   SETTINGS_ENTRIES,
   SETTINGS_NAV,
@@ -15,6 +15,10 @@ import {
 } from "./settingsCatalog";
 
 describe("settingsCatalog", () => {
+  beforeAll(async () => {
+    await loadAllLocaleCatalogs();
+  });
+
   it("has no structural invariants broken", () => {
     expect(catalogInvariants()).toEqual([]);
   });

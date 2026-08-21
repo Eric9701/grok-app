@@ -21,6 +21,16 @@ export const zhTWProviders = {
   "prov.appendPromptPh": "留空則不追加。例如：一律以繁體中文回覆。",
   "prov.appendPromptHint":
     "追加到系統提示詞末尾，用於該中轉需要的針對性指令；不會覆蓋內建提示詞。僅對此提供商生效。",
+  "prov.extraHeaders": "自訂請求標頭",
+  "prov.extraHeadersHint":
+    "隨每次推理請求原樣送出（Grok Build extra_headers）。公益站 / AgentRouter 等若校驗 User-Agent、Originator、x-api-key，在此填寫。只靠 Authorization Bearer 即可接入時留空。",
+  "prov.extraHeadersName": "請求標頭",
+  "prov.extraHeadersNamePh": "例如 User-Agent",
+  "prov.extraHeadersValue": "值",
+  "prov.extraHeadersValuePh": "例如 grok-app",
+  "prov.addHeader": "新增請求標頭",
+  "prov.removeHeader": "刪除請求標頭",
+  "prov.extraHeadersEmpty": "尚無額外請求標頭。中轉拒絕預設用戶端時再新增。",
   "prov.baseUrlFullPathOnHint": "已開啟完整路徑：不會自動追加 /v1。適用於火山方舟 Coding Plan 等非 /v1 根路徑。",
   "prov.baseUrlFullPathOffHint": "預設會自動補全 /v1（OpenAI 相容中轉）。若上游已是完整路徑，請打開「完整路徑」。",
   "prov.protocol": "訊息格式",

@@ -21,6 +21,16 @@ export const enProviders = {
   "prov.appendPromptPh": "Empty = append nothing. e.g. Always answer in English.",
   "prov.appendPromptHint":
     "Appended to the end of the system prompt for relays that need specific instructions. Does not replace the built-in prompt. Applies to this provider only.",
+  "prov.extraHeaders": "Extra request headers",
+  "prov.extraHeadersHint":
+    "Sent verbatim on every inference request (Grok Build extra_headers). Use for gateways that require User-Agent, Originator, or x-api-key. Leave empty if Authorization Bearer is enough.",
+  "prov.extraHeadersName": "Header",
+  "prov.extraHeadersNamePh": "e.g. User-Agent",
+  "prov.extraHeadersValue": "Value",
+  "prov.extraHeadersValuePh": "e.g. grok-app",
+  "prov.addHeader": "Add header",
+  "prov.removeHeader": "Remove header",
+  "prov.extraHeadersEmpty": "No extra headers — add one if this relay rejects the default client.",
   "prov.baseUrlFullPathOnHint": "Full path on: base URL is stored as typed (no /v1 auto-append). Use for gateways like Volcengine Ark Coding Plan.",
   "prov.baseUrlFullPathOffHint": "Default: auto-append /v1 for OpenAI-compatible relays. Turn on Full path when the upstream root is already complete.",
   "prov.protocol": "Message format",

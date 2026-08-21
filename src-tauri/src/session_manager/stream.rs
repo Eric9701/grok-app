@@ -566,6 +566,7 @@ impl SessionManager {
 
     /// True when the journal has a non-empty, non-error assistant body (any turn).
     /// Used only as a silent heal signal when Host is stuck Streaming after work finished.
+    #[allow(dead_code)]
     pub(super) fn journal_has_assistant_body(app_session_id: &str) -> bool {
         store::load_messages(app_session_id)
             .iter()

@@ -39,6 +39,7 @@ Custom providers are written to **`$GROK_HOME/config.toml`** as `[model.<id>]` s
 | `contextWindow` | Optional token cap → TOML `context_window` as a **bare integer** (never `"1000000"`). Grok Build rejects string type and falls back to 200k (#538). Composer can set it; list/upsert preserves and reloads. Missing → UI chip uses `DEFAULT_CUSTOM_CONTEXT_WINDOW` (200k) only. |
 | `apiBackend` | Message format: `responses` (default) \| `chat_completions` \| `messages` |
 | `supportsVision` | App field `app_supports_vision`. When **true**, this custom channel is treated as multimodal: image `@path` stays in the prompt (CLI injects pixels) and the custom-main hook does **not** block `read_file` on PNG/JPG. Names / model ids that look like Grok / GPT-4o / Claude / Gemini already count as vision even when this is off. Unknown relays stay text-only (Host vision / path note) so DeepSeek-style APIs do not 400 on `image_url`. |
+| `extraHeaders` | Extra HTTP headers written as Grok Build `[model.<id>].extra_headers` (inline TOML table, sent verbatim on inference). Settings → Account → Providers editor. Use for gateways that WAF-check `User-Agent` / `Originator` (e.g. AgentRouter) or Anthropic `x-api-key`. Empty = omit the field. Newlines in values are rejected. |
 | `providerMode` | Explicit transport semantics: `generic` (default) or `grok_build_proxy`. Never infer this from a provider id or hostname. |
 | `isDefault` | Maps to `[models].default` (set only via **Use** / composer pick activate, not a form checkbox) |
 

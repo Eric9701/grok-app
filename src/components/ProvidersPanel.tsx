@@ -113,6 +113,7 @@ type FormState = {
   supportsVision: boolean;
   /** External signup URL for “Get API Key” (from preset). */
   apiKeyUrl: string | null;
+  extraHeaders: { name: string; value: string }[];
 };
 
 type RightMode = "empty" | "pick" | "create" | "edit" | "official";
@@ -135,6 +136,7 @@ const emptyForm = (): FormState => ({
     isDefault: !!e.isDefault,
   })),
   apiKeyUrl: null,
+  extraHeaders: [],
 });
 
 function modelsFromProvider(p: api.CustomProvider): FormModel[] {
@@ -193,6 +195,7 @@ function formFromPreset(preset: ProviderPreset): FormState {
       isDefault: !!e.isDefault,
     })),
     apiKeyUrl: preset.apiKeyUrl ?? null,
+    extraHeaders: [],
   };
 }
 
@@ -577,6 +580,9 @@ export function ProvidersPanel({
         providerId: p.id,
         baseUrl: p.baseUrl,
       }),
+      extraHeaders: (p.extraHeaders ?? [])
+        .map((h) => ({ name: h.name, value: h.value }))
+        .filter((h) => h.name.trim() || h.value.trim()),
     });
     setDraftModelId("");
     setDraftModelName("");
@@ -682,6 +688,9 @@ export function ProvidersPanel({
       // Always sent: "" clears the channel rules, so an emptied box sticks.
       appendPrompt: form.appendPrompt.trim(),
       supportsVision: form.supportsVision,
+      extraHeaders: form.extraHeaders
+        .map((h) => ({ name: h.name.trim(), value: h.value.trim() }))
+        .filter((h) => h.name && h.value),
       // Keep composer-set context_window on provider form save (#538).
       contextWindow:
         !isCreate && existing?.contextWindow != null && existing.contextWindow > 0
@@ -1649,6 +1658,97 @@ export function ProvidersPanel({
                     >
                       {showKey ? tr("prov.keyHide") : tr("prov.keyShow")}
                     </button>
+                  </div>
+                </div>
+
+                <div
+                  className="prov-field prov-field--full"
+                  id="settings-anchor-prov-extra-headers"
+                >
+                  <span className="prov-field__label">
+                    {tr("prov.extraHeaders")}
+                  </span>
+                  <p className="prov-field__hint">{tr("prov.extraHeadersHint")}</p>
+                  <div
+                    className="prov-models"
+                    role="group"
+                    aria-label={tr("prov.extraHeaders")}
+                  >
+                    <div className="prov-models__head" aria-hidden>
+                      <span>{tr("prov.extraHeadersName")}</span>
+                      <span>{tr("prov.extraHeadersValue")}</span>
+                      <span />
+                    </div>
+                    {form.extraHeaders.length === 0 ? (
+                      <p className="prov-models__empty">
+                        {tr("prov.extraHeadersEmpty")}
+                      </p>
+                    ) : (
+                      form.extraHeaders.map((row, i) => (
+                        <div className="prov-models__row" key={i}>
+                          <input
+                            className="settings-input"
+                            value={row.name}
+                            onChange={(e) => {
+                              const name = e.target.value;
+                              setForm((f) => {
+                                const extraHeaders = f.extraHeaders.slice();
+                                extraHeaders[i] = { ...extraHeaders[i]!, name };
+                                return { ...f, extraHeaders };
+                              });
+                            }}
+                            placeholder={tr("prov.extraHeadersNamePh")}
+                            aria-label={tr("prov.extraHeadersName")}
+                            autoComplete="off"
+                            spellCheck={false}
+                          />
+                          <input
+                            className="settings-input"
+                            value={row.value}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setForm((f) => {
+                                const extraHeaders = f.extraHeaders.slice();
+                                extraHeaders[i] = { ...extraHeaders[i]!, value };
+                                return { ...f, extraHeaders };
+                              });
+                            }}
+                            placeholder={tr("prov.extraHeadersValuePh")}
+                            aria-label={tr("prov.extraHeadersValue")}
+                            autoComplete="off"
+                            spellCheck={false}
+                          />
+                          <button
+                            type="button"
+                            className="icon-btn prov-models__remove"
+                            onClick={() =>
+                              setForm((f) => ({
+                                ...f,
+                                extraHeaders: f.extraHeaders.filter((_, j) => j !== i),
+                              }))
+                            }
+                            aria-label={tr("prov.removeHeader")}
+                            title={tr("prov.removeHeader")}
+                          >
+                            <IconClose size={14} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                    <div className="prov-models__actions">
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            extraHeaders: [...f.extraHeaders, { name: "", value: "" }],
+                          }))
+                        }
+                      >
+                        {tr("prov.addHeader")}
+                      </button>
+                    </div>
                   </div>
                 </div>
 

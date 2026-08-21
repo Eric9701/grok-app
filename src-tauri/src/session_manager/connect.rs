@@ -1667,6 +1667,7 @@ impl SessionManager {
 
     /// Process ids that currently host a mid-turn live or background session.
     /// Parked is never mid-turn (`prompt_in_flight` blocks parking).
+    #[allow(dead_code)]
     pub(super) fn busy_process_ids_for_warm_reuse(&self) -> HashSet<String> {
         let live_pid = {
             let guard = self.inner.lock();
@@ -1697,6 +1698,7 @@ impl SessionManager {
     /// Sandbox: the CLI normalizes "off" to no `--sandbox` flag (stored as
     /// `None` on the client), while settings resolve to the string "off".
     /// Treat None as "off" so both representations match.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn reuse_gate(
         alive: bool,
         p_policy: PermissionPolicy,
@@ -1757,6 +1759,7 @@ impl SessionManager {
 /// `live` is included only when that live shell is itself mid-turn on a
 /// real ACP (the Connecting placeholder with a fresh UUID is omitted by
 /// the caller).
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn collect_busy_reuse_process_ids<'a>(
     live: Option<&'a str>,
     backgrounds: impl IntoIterator<Item = &'a str>,
@@ -1776,6 +1779,7 @@ pub(super) fn collect_busy_reuse_process_ids<'a>(
 }
 
 /// True when this process currently hosts a mid-turn co-tenant.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn process_blocked_for_warm_reuse(
     process_id: &str,
     busy_process_ids: &HashSet<String>,
@@ -1790,6 +1794,7 @@ pub(super) fn process_blocked_for_warm_reuse(
 /// Parked entries are per-session; the ACP child is shared. Killing on the
 /// parked grain would abort a cohabitant's in-flight turn. The parked row
 /// stays gone so this chat cold-spawns on next connect.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn should_kill_parked_after_flag_mismatch(
     process_id: &str,
     busy_process_ids: &HashSet<String>,
@@ -1860,18 +1865,18 @@ mod connect_preserve_tests {
         assert!(!should_fail_connect_on_wall_clock(SessionState::Ready));
         assert!(stop_should_abort_handshake(SessionState::Connecting));
         assert!(!stop_should_abort_handshake(SessionState::Streaming));
-        assert!(CONNECT_WALL_CLOCK_SECS >= 60);
-        assert!(CONNECT_WALL_CLOCK_SECS <= 90);
+        const { assert!(CONNECT_WALL_CLOCK_SECS >= 60) };
+        const { assert!(CONNECT_WALL_CLOCK_SECS <= 90) };
     }
 
     #[test]
     fn wall_clock_covers_lock_wait_and_handshake() {
         assert_eq!(connect_gave_up_reason(false), "connect lock busy");
         assert_eq!(connect_gave_up_reason(true), "connect timed out");
-        assert!(CONNECT_LOCK_WATCHDOG_SECS < CONNECT_WALL_CLOCK_SECS);
-        assert!(ACP_KILL_TIMEOUT_SECS <= CONNECT_LOCK_WATCHDOG_SECS);
-        assert!(CONNECT_HANDSHAKE_BUDGET_SECS < CONNECT_WALL_CLOCK_SECS);
-        assert!(CONNECT_HANDSHAKE_BUDGET_SECS >= 45);
+        const { assert!(CONNECT_LOCK_WATCHDOG_SECS < CONNECT_WALL_CLOCK_SECS) };
+        const { assert!(ACP_KILL_TIMEOUT_SECS <= CONNECT_LOCK_WATCHDOG_SECS) };
+        const { assert!(CONNECT_HANDSHAKE_BUDGET_SECS < CONNECT_WALL_CLOCK_SECS) };
+        const { assert!(CONNECT_HANDSHAKE_BUDGET_SECS >= 45) };
     }
 
     #[test]

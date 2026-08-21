@@ -8,6 +8,11 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 
 use crate::paths::{agent_config_toml, agent_home_dir, ensure_app_dirs};
+use crate::provider_headers::{
+    decode_extra_headers, encode_extra_headers_toml, normalize_extra_headers, EXTRA_HEADERS_KEY,
+};
+
+pub use crate::provider_headers::ProviderHeaderEntry;
 
 /// One selectable request model under a custom provider channel.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -73,6 +78,9 @@ pub struct CustomProvider {
     /// name/model heuristics in `models_aux` to decide text-only vs vision.
     #[serde(default)]
     pub supports_vision: bool,
+    /// Extra HTTP headers written as Grok Build `extra_headers` (verbatim).
+    #[serde(default)]
+    pub extra_headers: Vec<ProviderHeaderEntry>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -106,6 +114,9 @@ pub struct UpsertProviderInput {
     /// Explicit vision capability. `None` keeps previous flag on edit; create defaults false.
     #[serde(default)]
     pub supports_vision: Option<bool>,
+    /// Extra request headers. `None` keeps existing on edit; `Some([])` clears.
+    #[serde(default)]
+    pub extra_headers: Option<Vec<ProviderHeaderEntry>>,
 }
 
 /// TOML field (ignored by Grok Build) storing JSON array of `{id,name}`.
@@ -312,6 +323,13 @@ fn format_toml_field_value(key: &str, value: &str) -> String {
         let raw = unquote(value.trim());
         if let Ok(n) = raw.parse::<u64>() {
             return n.to_string();
+        }
+    }
+    // CLI inline table — never JSON-quote (Grok would treat it as a string).
+    if key == EXTRA_HEADERS_KEY {
+        let raw = value.trim();
+        if raw.starts_with('{') {
+            return raw.to_string();
         }
     }
     // App-managed bool flags: write bare `true` / `false` when clearly boolean.
@@ -1018,6 +1036,7 @@ pub fn maybe_migrate_legacy_relay(
         base_url_full_path: None,
         append_prompt: None,
         supports_vision: None,
+        extra_headers: None,
     })?;
     Ok(())
 }
@@ -1167,6 +1186,8 @@ fn build_list_result(home: PathBuf, path: PathBuf, text: &str) -> ProvidersListR
         let append_prompt =
             crate::store::sanitize_extra_rules(s.fields.get(APP_APPEND_PROMPT_KEY).cloned());
         let supports_vision = supports_vision_from_fields(&s.fields);
+        let extra_headers =
+            decode_extra_headers(s.fields.get(EXTRA_HEADERS_KEY).map(|s| s.as_str()));
         providers.push(CustomProvider {
             id: s.id,
             model,
@@ -1182,6 +1203,7 @@ fn build_list_result(home: PathBuf, path: PathBuf, text: &str) -> ProvidersListR
             base_url_full_path,
             append_prompt,
             supports_vision,
+            extra_headers,
         });
     }
     let (active_source, active_provider_id) = route_from_default(def.as_deref(), &providers);
@@ -1632,6 +1654,15 @@ pub fn upsert_custom_provider(input: UpsertProviderInput) -> Result<ProvidersLis
             .unwrap_or(false),
     };
 
+    let extra_headers = match input.extra_headers {
+        Some(ref list) => normalize_extra_headers(list),
+        None => decode_extra_headers(
+            existing
+                .and_then(|s| s.fields.get(EXTRA_HEADERS_KEY))
+                .map(|s| s.as_str()),
+        ),
+    };
+
     text = remove_section(&text, &id);
     let mut fields: Vec<(String, String)> = vec![
         ("model".into(), model),
@@ -1661,6 +1692,10 @@ pub fn upsert_custom_provider(input: UpsertProviderInput) -> Result<ProvidersLis
     if let Some(n) = resolved_context_window {
         fields.push(("context_window".into(), n.to_string()));
     }
+    let extra_headers_toml = encode_extra_headers_toml(&extra_headers);
+    if !extra_headers_toml.is_empty() {
+        fields.push((EXTRA_HEADERS_KEY.into(), extra_headers_toml));
+    }
     if let Some(up) = app_upstream {
         fields.push((
             crate::relay_stream_proxy::APP_UPSTREAM_BASE_URL_KEY.into(),
@@ -1683,8 +1718,10 @@ pub fn upsert_custom_provider(input: UpsertProviderInput) -> Result<ProvidersLis
         }
     }
     if let Some(ex) = existing {
-        let known: std::collections::HashSet<String> =
+        let mut known: std::collections::HashSet<String> =
             fields.iter().map(|(k, _)| k.clone()).collect();
+        // Always treated as managed — empty list must not copy the old table back.
+        known.insert(EXTRA_HEADERS_KEY.into());
         for (k, v) in &ex.fields {
             if !known.contains(k) {
                 fields.push((k.clone(), v.clone()));
@@ -2779,6 +2816,7 @@ mod tests {
                 base_url_full_path: false,
                 append_prompt: None,
                 supports_vision: false,
+                extra_headers: vec![],
             }],
             default_model: Some("relay".into()),
             active_source: "custom".into(),
@@ -3112,6 +3150,7 @@ api_backend = \"responses\"";
             base_url_full_path: Some(false),
             append_prompt: None,
             supports_vision: Some(false),
+            extra_headers: None,
         })
         .and_then(|_| std::fs::read_to_string(agent_config_toml()).map_err(|e| e.to_string()));
 
@@ -3311,5 +3350,129 @@ context_window = "1000000"
         assert!(should_sync_cli_auth_after_account_change(
             &ActiveRoute::Official
         ));
+    }
+
+    #[test]
+    fn extra_headers_write_cli_inline_table() {
+        let _lock = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let home = std::env::temp_dir().join(format!(
+            "grok-app-provider-headers-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let previous_home = std::env::var("GROK_APP_HOME").ok();
+        std::env::set_var("GROK_APP_HOME", &home);
+
+        let listed = upsert_custom_provider(UpsertProviderInput {
+            id: "agentrouter".into(),
+            model: "claude-opus-4-6".into(),
+            base_url: "https://agentrouter.org/v1".into(),
+            name: Some("AgentRouter".into()),
+            api_key: Some("sk-test".into()),
+            api_backend: Some("chat_completions".into()),
+            provider_mode: Some(PROVIDER_MODE_GENERIC.into()),
+            set_as_default: Some(false),
+            create_only: Some(true),
+            models: None,
+            efforts: None,
+            context_window: None,
+            base_url_full_path: Some(false),
+            append_prompt: None,
+            supports_vision: Some(false),
+            extra_headers: Some(vec![ProviderHeaderEntry {
+                name: "Originator".into(),
+                value: "codex_cli_rs".into(),
+            }]),
+        });
+
+        let config = std::fs::read_to_string(agent_config_toml()).ok();
+        match previous_home {
+            Some(value) => std::env::set_var("GROK_APP_HOME", value),
+            None => std::env::remove_var("GROK_APP_HOME"),
+        }
+        let _ = std::fs::remove_dir_all(&home);
+
+        let listed = listed.expect("upsert");
+        assert_eq!(listed.providers[0].extra_headers.len(), 1);
+        assert_eq!(listed.providers[0].extra_headers[0].name, "Originator");
+        let config = config.expect("config");
+        assert!(
+            config.contains("extra_headers = {") && config.contains("\"Originator\""),
+            "CLI extra_headers must be an inline table:\n{config}"
+        );
+        assert!(
+            !config.contains("extra_headers = \"{"),
+            "must not quote the table as a string:\n{config}"
+        );
+    }
+
+    #[test]
+    fn extra_headers_empty_list_clears_inline_table() {
+        let _lock = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let home = std::env::temp_dir().join(format!(
+            "grok-app-provider-headers-clear-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let previous_home = std::env::var("GROK_APP_HOME").ok();
+        std::env::set_var("GROK_APP_HOME", &home);
+
+        upsert_custom_provider(UpsertProviderInput {
+            id: "agentrouter".into(),
+            model: "claude-opus-4-6".into(),
+            base_url: "https://agentrouter.org/v1".into(),
+            name: Some("AgentRouter".into()),
+            api_key: Some("sk-test".into()),
+            api_backend: Some("chat_completions".into()),
+            provider_mode: Some(PROVIDER_MODE_GENERIC.into()),
+            set_as_default: Some(false),
+            create_only: Some(true),
+            models: None,
+            efforts: None,
+            context_window: None,
+            base_url_full_path: Some(false),
+            append_prompt: None,
+            supports_vision: Some(false),
+            extra_headers: Some(vec![ProviderHeaderEntry {
+                name: "Originator".into(),
+                value: "codex_cli_rs".into(),
+            }]),
+        })
+        .expect("create");
+
+        let listed = upsert_custom_provider(UpsertProviderInput {
+            id: "agentrouter".into(),
+            model: "claude-opus-4-6".into(),
+            base_url: "https://agentrouter.org/v1".into(),
+            name: Some("AgentRouter".into()),
+            api_key: None,
+            api_backend: Some("chat_completions".into()),
+            provider_mode: Some(PROVIDER_MODE_GENERIC.into()),
+            set_as_default: Some(false),
+            create_only: Some(false),
+            models: None,
+            efforts: None,
+            context_window: None,
+            base_url_full_path: Some(false),
+            append_prompt: None,
+            supports_vision: Some(false),
+            extra_headers: Some(vec![]),
+        });
+        let config = std::fs::read_to_string(agent_config_toml()).ok();
+        match previous_home {
+            Some(value) => std::env::set_var("GROK_APP_HOME", value),
+            None => std::env::remove_var("GROK_APP_HOME"),
+        }
+        let _ = std::fs::remove_dir_all(&home);
+
+        let listed = listed.expect("clear");
+        assert!(listed.providers[0].extra_headers.is_empty());
+        let config = config.expect("config");
+        assert!(
+            !config.contains("extra_headers"),
+            "empty list must drop extra_headers, not copy the old table:\n{config}"
+        );
     }
 }

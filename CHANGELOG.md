@@ -12,14 +12,17 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- **Custom provider extra request headers (#812)**: Settings → Account → Providers can add key/value HTTP headers. They write Grok Build `extra_headers` on `[model.<id>]` (sent verbatim). Use for AgentRouter / AnyRouter WAF (`User-Agent`, `Originator`) or Anthropic `x-api-key`. Empty list omits the field.
 - **Optional Windows taskbar overlay for unread sessions** (#775): Settings → General → App toggle, **off by default**, independent of the dock/tray unread badge. When on, the host paints 1–9 / 10+ via `set_overlay_icon` (Tauri `set_badge_count` is a no-op on Windows). Hide-to-tray restore re-applies the last overlay count after Explorer AddTab.
 - **Shortcuts help (Ctrl+/)**: the overlay now searches by label / id / chord, groups like Settings → Keyboard, and lists zoom, newline, prompt history, and type-to-focus. The list scrolls instead of clipping the last rows.
 
 **中文 · 新增**
+- **自定义提供商可填额外请求头（#812）**：设置 → 账号 → 提供商可添加键/值 HTTP 头，写入 Grok Build `[model.<id>].extra_headers`（推理请求原样发送）。用于 AgentRouter / AnyRouter 校验 `User-Agent` / `Originator`，或 Anthropic 的 `x-api-key`。空列表不写该字段。
 - **可选 Windows 任务栏未读 overlay**（#775）：设置 → 通用 → 应用里开关，**默认关闭**，与程序坞/托盘未读角标互不绑定。开启后 Host 用 `set_overlay_icon` 画 1–9 / 10+（Tauri 的 `set_badge_count` 在 Windows 上是空操作）。从托盘还原时按上次 overlay 计数在 Explorer AddTab 后再贴一次。
 - **快捷键帮助（Ctrl+/）**：面板可按名称 / id / 组合键筛选，按设置页同样的分组列出；补上缩放、换行、历史提示、打字聚焦；列表可滚动，不再裁掉末尾几项。
 
 ### Changed
+- **Clippy is silent on macOS host builds again (#785)**: Windows-only overlay/WSL/shim items use the existing `cfg_attr(not(windows), allow(dead_code))` idiom so cross-platform tests stay; mechanical style lints and Tauri `too_many_arguments` allows restore zero `cargo clippy --all-targets` warnings without behavior change.
 - **Locale catalogs load on demand**: English stays in the main bundle. The other 14 languages `import()` when selected; UI falls back to English until that chunk arrives.
 - **Heavy surfaces leave first paint**: Bottom terminal (xterm) mounts after first open; project-rules TipTap and the image lightbox load on demand.
 - **Live tool title rows keep activity VirtualList**: Only streaming thought bodies (variable height) drop windowing. Running 36px tool titles no longer dump the whole step list into the DOM.
@@ -35,6 +38,7 @@ See `docs/llm-wiki/release.md`.
 - **Official site on GitHub About and README**: Repo homepage, `package.json` `homepage`, and public READMEs now point to [https://grok-app.com/](https://grok-app.com/).
 
 **中文 · 变更**
+- **macOS 上 clippy 再次零警告（#785）**：Windows 专用 overlay/WSL/shim 用既有 `cfg_attr(not(windows), allow(dead_code))`，跨平台测试仍跑；机械风格与 Tauri `too_many_arguments` allow 恢复 `cargo clippy --all-targets` 零警告，无行为变化。
 - **语言包按需加载**：主包只带英文。另外 14 种语言选中后再 `import()`；chunk 到达前界面先用英文。
 - **重表面离开首屏**：底栏终端（xterm）第一次打开才挂载；项目规则 TipTap 和图片灯箱按需加载。
 - **进行中的 tool 标题行仍走活动列表虚拟化**：只有流式 thought（变高）才关掉窗口化；36px 的 running tool 不再把整表打进 DOM。

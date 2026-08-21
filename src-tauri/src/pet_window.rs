@@ -209,7 +209,7 @@ pub struct PetTaskPayload {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct PetHitChrome {
+pub(crate) struct PetHitChrome {
     valid: bool,
     mark_cx: f64,
     mark_cy: f64,
@@ -218,7 +218,9 @@ struct PetHitChrome {
     bubble_y: f64,
     bubble_w: f64,
     bubble_h: f64,
+    #[allow(dead_code)]
     window_w: f64,
+    #[allow(dead_code)]
     window_h: f64,
 }
 
@@ -670,6 +672,7 @@ pub fn persist_pet_window_pos(app: &AppHandle) {
 }
 
 /// Physical cursor vs logical hit chrome (mark disc + task-bubble stack).
+#[allow(clippy::too_many_arguments)]
 pub fn pet_cursor_over_chrome(
     cursor_x: f64,
     cursor_y: f64,
@@ -705,6 +708,7 @@ pub fn pet_hit_radius(size_px: u32, scale_factor: f64) -> f64 {
     f64::from(size_px.max(64)) * scale_factor.max(0.5) * 0.52
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn pet_cursor_over_mark(
     cursor_x: f64,
     cursor_y: f64,

@@ -436,6 +436,7 @@ where
             // Import URLs as typed; existing /v1 suffix preserved by normalizer.
             base_url_full_path: None,
             supports_vision: None,
+            extra_headers: None,
         }) {
             Ok(list) => {
                 existing.insert(id);
@@ -1103,9 +1104,7 @@ app_provider_mode = "grok_build_proxy"
             );",
         )
         .expect("schema");
-        let config = format!(
-            "[models]\ndefault = \"grok-4.6\"\n\n[model.\"grok-4.6\"]\nmodel = \"grok-4.6\"\nbase_url = \"https://relay.example/v1\"\nname = \"Relay\"\napi_backend = \"responses\"\napi_key = \"runtime-key\"\n"
-        );
+        let config = "[models]\ndefault = \"grok-4.6\"\n\n[model.\"grok-4.6\"]\nmodel = \"grok-4.6\"\nbase_url = \"https://relay.example/v1\"\nname = \"Relay\"\napi_backend = \"responses\"\napi_key = \"runtime-key\"\n".to_string();
         let settings = serde_json::json!({ "config": config }).to_string();
         conn.execute(
             "INSERT INTO providers (id, app_type, name, settings_config, category, is_current)

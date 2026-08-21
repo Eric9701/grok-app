@@ -262,8 +262,10 @@ pub(crate) struct PrewarmedProcess {
     pub(super) policy: PermissionPolicy,
     pub(super) effort: Option<String>,
     pub(super) sandbox_profile: Option<String>,
+    #[allow(dead_code)]
     pub(super) model_id: Option<String>,
     pub(super) created_at: Instant,
+    #[allow(dead_code)]
     pub(super) backend: String,
 }
 
@@ -292,6 +294,7 @@ pub(crate) struct ParkedAgent {
     pub(super) project_path: Option<String>,
     pub(super) policy: PermissionPolicy,
     /// Process-level `--sandbox` profile at spawn (reuse gate).
+    #[allow(dead_code)]
     pub(super) sandbox_profile: Option<String>,
     pub(super) needs_history_bootstrap: bool,
     pub(super) backend: String,
@@ -536,7 +539,7 @@ pub(super) fn tool_meta_str(raw: &serde_json::Value, field: &str) -> Option<Stri
 /// (`{toolCallId, status, content, rawOutput, locations}`) — without this map
 /// the journal would record bare `tool_step|completed|tool|tool`.
 #[derive(Debug, Clone, Default)]
-pub(super) struct ToolIdentity {
+pub(crate) struct ToolIdentity {
     /// Machine tool name, e.g. `read_file` (from `toolName`).
     pub(super) name: String,
     /// Human title, e.g. `Read` / `Run Command`.
@@ -627,7 +630,7 @@ pub(super) fn remember_tool_identity(
         return;
     }
     let existing = per.get(tool_call_id);
-    let richer = existing.map_or(true, |e| {
+    let richer = existing.is_none_or(|e| {
         let e_sparse =
             e.name.is_empty() && e.title.is_empty() && e.kind.is_empty() && e.input.is_none();
         let mine_sparse = name.is_empty() && t.is_empty() && k.is_empty() && input.is_none();

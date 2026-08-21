@@ -1611,6 +1611,7 @@ yolo = false
             base_url_full_path: false,
             append_prompt: None,
             supports_vision,
+            extra_headers: vec![],
         }
     }
 
@@ -1752,6 +1753,7 @@ A red button.
                 base_url_full_path: false,
                 append_prompt: None,
                 supports_vision: false,
+                extra_headers: vec![],
             }],
             default_model: Some("deepseek".into()),
             active_source: "custom".into(),
@@ -1810,6 +1812,7 @@ A red button.
                 base_url_full_path: false,
                 append_prompt: None,
                 supports_vision: false,
+                extra_headers: vec![],
             }],
             default_model: Some("deepseek".into()),
             active_source: "custom".into(),

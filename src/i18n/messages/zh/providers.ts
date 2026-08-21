@@ -21,6 +21,16 @@ export const zhProviders = {
   "prov.appendPromptPh": "留空则不追加。例如：始终用简体中文回复。",
   "prov.appendPromptHint":
     "追加到系统提示词末尾，用于该中转需要的针对性指令；不会覆盖内置提示词。仅对此提供商生效。",
+  "prov.extraHeaders": "自定义请求头",
+  "prov.extraHeadersHint":
+    "随每次推理请求原样发送（Grok Build extra_headers）。公益站 / AgentRouter 等若校验 User-Agent、Originator、x-api-key，在此填写。只靠 Authorization Bearer 即可接入时留空。",
+  "prov.extraHeadersName": "请求头",
+  "prov.extraHeadersNamePh": "例如 User-Agent",
+  "prov.extraHeadersValue": "值",
+  "prov.extraHeadersValuePh": "例如 grok-app",
+  "prov.addHeader": "添加请求头",
+  "prov.removeHeader": "删除请求头",
+  "prov.extraHeadersEmpty": "暂无额外请求头。中转拒绝默认客户端时再添加。",
   "prov.baseUrlFullPathOnHint": "已开启完整路径：不会自动追加 /v1。适用于火山方舟 Coding Plan 等非 /v1 根路径。",
   "prov.baseUrlFullPathOffHint": "默认会自动补全 /v1（OpenAI 兼容中转）。若上游已是完整路径，请打开「完整路径」。",
   "prov.protocol": "消息格式",

@@ -21,6 +21,13 @@ export interface ProviderEffortEntry {
   isDefault?: boolean;
 }
 
+export interface ProviderHeaderEntry {
+  /** HTTP header name (RFC 7230 token). */
+  name: string;
+  /** Header value. Newlines are rejected by the host. */
+  value: string;
+}
+
 export interface CustomProvider {
   id: string;
   model: string;
@@ -52,6 +59,11 @@ export interface CustomProvider {
    * heuristics so Grok / gpt-4o / claude channels are vision even when off.
    */
   supportsVision?: boolean;
+  /**
+   * Extra HTTP headers written as Grok Build `extra_headers`.
+   * Sent verbatim on inference requests (AgentRouter WAF, Anthropic x-api-key, …).
+   */
+  extraHeaders?: ProviderHeaderEntry[];
 }
 
 export interface ProvidersListResult {
@@ -306,6 +318,8 @@ export async function providersUpsert(body: {
   appendPrompt?: string | null;
   /** Persist vision capability. Omit to keep the existing flag on edit. */
   supportsVision?: boolean;
+  /** Extra request headers. `[]` clears; omit to keep on edit. */
+  extraHeaders?: ProviderHeaderEntry[];
 }) {
   return invoke<ProvidersListResult>("providers_upsert", {
     id: body.id,
@@ -323,6 +337,7 @@ export async function providersUpsert(body: {
     baseUrlFullPath: body.baseUrlFullPath ?? null,
     appendPrompt: body.appendPrompt ?? null,
     supportsVision: body.supportsVision ?? null,
+    extraHeaders: body.extraHeaders ?? null,
   });
 }
 

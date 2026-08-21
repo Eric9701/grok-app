@@ -8,6 +8,8 @@
 //! Priority: `acp_server_addr` (API mode) still wins over WSL and native spawn.
 //! Non-Windows builds ignore `cli_backend=wsl` and stay on native.
 
+#![cfg_attr(not(windows), allow(dead_code))]
+
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use std::time::{Duration, Instant};
@@ -42,7 +44,7 @@ pub fn wsl_backend_active(settings: &AppSettings) -> bool {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = settings;
-        return false;
+        false
     }
     #[cfg(target_os = "windows")]
     {
@@ -188,7 +190,7 @@ pub fn list_wsl_distros() -> Vec<String> {
 }
 
 fn decode_wsl_list_output(bytes: &[u8]) -> String {
-    if bytes.len() >= 2 && bytes.len() % 2 == 0 {
+    if bytes.len() >= 2 && bytes.len().is_multiple_of(2) {
         // UTF-16 LE BOM or high null density → treat as UTF-16 LE
         let looks_utf16 = bytes[0] == 0xFF && bytes[1] == 0xFE
             || bytes
@@ -367,7 +369,7 @@ echo "$CLI"
                     .map(|s| s.to_string())
                     .or_else(|| {
                         // Single-line --version sometimes only on first line after path
-                        path.as_ref().and_then(|_| None)
+                        path.as_ref().and(None)
                     });
                 // If path line itself looks like a version banner, treat carefully
                 let (resolved_path, version) = match (&path, &version_line) {
@@ -532,14 +534,14 @@ pub fn wsl_status(settings: &AppSettings) -> WslStatus {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = settings;
-        return WslStatus {
+        WslStatus {
             available: false,
             wsl_exe: None,
             distros: Vec::new(),
             backend_active: false,
             probe: None,
             error: Some("WSL backend is only available on Windows".into()),
-        };
+        }
     }
     #[cfg(target_os = "windows")]
     {

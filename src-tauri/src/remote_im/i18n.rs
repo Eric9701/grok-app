@@ -13,6 +13,7 @@ pub enum MessageKey {
 }
 
 /// Canonical catalog id: `en` | `de` | … | `zh-TW`.
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn normalize_lang(lang: &str) -> &'static str {
     Locale::parse(lang).as_tag()
 }

@@ -367,7 +367,7 @@ mod tests {
         assert_eq!(DEFAULT_STREAM_STALL_SECONDS, 600);
         assert_eq!(MIN_STREAM_STALL_SECONDS, 15);
         assert_eq!(PRE_FIRST_TOKEN_STALL_SECONDS, 90);
-        assert!(MAX_SOFT_STALL_EMITS_PER_TURN >= 8);
+        const { assert!(MAX_SOFT_STALL_EMITS_PER_TURN >= 8) };
         assert!(LEGACY_STREAM_STALL_SECONDS.contains(&180));
     }
 

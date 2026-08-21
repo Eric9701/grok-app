@@ -4323,7 +4323,7 @@ mod tests {
 
         // `base` models a snapshot taken before the stream append.
         append_message(&session.id, appended.clone()).expect("append stream row");
-        save_messages(&session.id, &[base.clone()]).expect("merge stale snapshot");
+        save_messages(&session.id, std::slice::from_ref(&base)).expect("merge stale snapshot");
         let merged = load_messages(&session.id);
         assert!(merged.iter().any(|message| message.id == base.id));
         assert!(merged
@@ -4357,7 +4357,7 @@ mod tests {
 
         let session = create_session(None, Some("compact journal".into()), false).expect("session");
         let row = stored_msg("u1", "user", "hello", None);
-        save_messages(&session.id, &[row.clone()]).expect("save");
+        save_messages(&session.id, std::slice::from_ref(&row)).expect("save");
         let path = session_dir(&session.id).join("messages.json");
         let raw = fs::read_to_string(&path).expect("read journal");
         assert!(raw.starts_with('['), "journal is a JSON array");

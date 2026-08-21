@@ -129,6 +129,7 @@ pub async fn providers_upsert(
     base_url_full_path: Option<bool>,
     append_prompt: Option<String>,
     supports_vision: Option<bool>,
+    extra_headers: Option<Vec<crate::providers::ProviderHeaderEntry>>,
 ) -> Result<crate::providers::ProvidersListResult, String> {
     let normalized_provider_mode = match provider_mode.as_deref() {
         Some(raw) => crate::providers::normalize_provider_mode(Some(raw)),
@@ -179,6 +180,7 @@ pub async fn providers_upsert(
                 base_url_full_path,
                 append_prompt,
                 supports_vision,
+                extra_headers,
             })?;
         // Keep legacy secrets in sync for Doctor / account channel display.
         if let Some(p) = result

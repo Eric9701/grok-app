@@ -51,6 +51,7 @@ const MAX_BLOB_BYTES: usize = 1_500 * 1024 * 1024;
 const PULL_CHUNK_B64: usize = 512 * 1024;
 const MAX_HTTP_DOWNLOAD_BYTES: u64 = 1_500 * 1024 * 1024;
 
+#[cfg_attr(not(test), allow(dead_code))]
 static SAVE_SEQ: AtomicU64 = AtomicU64::new(1);
 /// Dedupe concurrent title + Image signals for the same blob id / url.
 static INFLIGHT: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
@@ -1277,6 +1278,7 @@ fn system_downloads_dir() -> PathBuf {
     crate::process_util::user_home().join("Downloads")
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn unique_download_path(dir: &Path, suggested: &str) -> PathBuf {
     let name = sanitize_filename(suggested);
     let (stem, ext) = match name.rsplit_once('.') {

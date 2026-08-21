@@ -438,6 +438,7 @@ fn mentions_param(body: &str, param: &str) -> bool {
 /// (which may be a local service). Keeps 401/403 and connectivity failures in
 /// the right buckets so the UI can show accurate copy.
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 enum SttErrorCtx {
     Official,
     Custom { local: bool },

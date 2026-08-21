@@ -367,6 +367,7 @@ pub struct SessionApiCliLink {
     pub desired_target: String,
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 const WIN_SHIM_MARKER: &str = "grok-app session-api shim (managed by Grok App)";
 
 pub fn cli_link_name() -> &'static str {
@@ -399,10 +400,12 @@ fn paths_match(a: &std::path::Path, b: &std::path::Path) -> bool {
     ca == cb
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 fn is_windows_shim(contents: &str) -> bool {
     contents.contains(WIN_SHIM_MARKER)
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 fn parse_windows_shim_target(contents: &str) -> Option<PathBuf> {
     if !is_windows_shim(contents) {
         return None;
@@ -423,6 +426,7 @@ fn parse_windows_shim_target(contents: &str) -> Option<PathBuf> {
     })
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn render_windows_shim(target: &std::path::Path) -> String {
     format!(
         "@echo off\r\nREM {WIN_SHIM_MARKER}\r\n\"{}\" %*\r\n",
@@ -592,9 +596,9 @@ pub enum CliCommand {
 
 pub fn parse_cli(argv: &[String]) -> Result<CliCommand, String> {
     let args: Vec<&str> = argv.iter().skip(1).map(String::as_str).collect();
-    if args.iter().any(|a| *a == SESSIONS_FLAG) {
+    if args.contains(&SESSIONS_FLAG) {
         return Ok(CliCommand::List {
-            include_archived: args.iter().any(|a| *a == INCLUDE_ARCHIVED_FLAG),
+            include_archived: args.contains(&INCLUDE_ARCHIVED_FLAG),
         });
     }
     if let Some(i) = args.iter().position(|a| *a == SESSION_SEND_FLAG) {
@@ -822,45 +826,45 @@ pub fn classify_send_error(err: &str) -> TurnStatus {
     TurnStatus::Error
 }
 
-pub fn prepare_send(session_id: &str, prompt: &str) -> Result<PreparedSend, TurnResult> {
+pub fn prepare_send(session_id: &str, prompt: &str) -> Result<PreparedSend, Box<TurnResult>> {
     let prompt = prompt.trim();
     if prompt.is_empty() {
-        return Err(TurnResult::fail(
+        return Err(Box::new(TurnResult::fail(
             TurnStatus::Error,
             session_id,
             "empty prompt",
-        ));
+        )));
     }
     let list = store::load_sessions_index();
     let Some(meta) = list.into_iter().find(|s| s.id == session_id) else {
-        return Err(TurnResult::fail(
+        return Err(Box::new(TurnResult::fail(
             TurnStatus::NotFound,
             session_id,
             "session not found",
-        ));
+        )));
     };
     let projects = store::load_projects();
     if let Some(ref pid) = meta.project_id {
         let Some(p) = projects.iter().find(|p| &p.id == pid) else {
-            return Err(TurnResult::fail(
+            return Err(Box::new(TurnResult::fail(
                 TurnStatus::Error,
                 session_id,
                 format!("project not found: {pid}"),
-            ));
+            )));
         };
         if !p.trusted {
-            return Err(TurnResult::fail(
+            return Err(Box::new(TurnResult::fail(
                 TurnStatus::Error,
                 session_id,
                 format!("project not trusted: {}", p.name),
-            ));
+            )));
         }
         if !p.path_ok {
-            return Err(TurnResult::fail(
+            return Err(Box::new(TurnResult::fail(
                 TurnStatus::Error,
                 session_id,
                 format!("project path missing: {}", p.name),
-            ));
+            )));
         }
     }
     // Prefer a linked worktree cwd (same as the composer), else the project path.
@@ -989,7 +993,7 @@ async fn handle_turn(
             if let Some(ref k) = key {
                 remember_idempotency(k, &r);
             }
-            return (status_for(&r.status), Json(r));
+            return (status_for(&r.status), Json(*r));
         }
     };
     let mut result = dispatch_turn_or_timeout(&state.app, &state.mgr, prepared).await;
@@ -1489,8 +1493,8 @@ mod tests {
         );
         let raw = serde_json::to_value(TurnStatus::RetryLater).unwrap();
         assert_eq!(raw, serde_json::json!("retry_later"));
-        assert!(DISPATCH_TURN_TIMEOUT_SECS < 90);
-        assert!(CLI_HTTP_TIMEOUT_SECS > DISPATCH_TURN_TIMEOUT_SECS);
+        const { assert!(DISPATCH_TURN_TIMEOUT_SECS < 90) };
+        const { assert!(CLI_HTTP_TIMEOUT_SECS > DISPATCH_TURN_TIMEOUT_SECS) };
     }
 
     #[test]

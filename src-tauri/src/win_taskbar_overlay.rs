@@ -6,6 +6,8 @@
 //! `DeleteTab` / `AddTab` can put it back. Driven by `tray_set_windows_overlay`,
 //! not `tray_set_busy_count`.
 
+#![cfg_attr(not(windows), allow(dead_code))]
+
 use std::sync::atomic::{AtomicU32, Ordering};
 
 pub const SIZE: u32 = 16;

@@ -129,6 +129,8 @@ mod project_codebase_search;
 
 mod project_rules;
 
+mod provider_headers;
+
 mod providers;
 
 mod proxy;
@@ -466,11 +468,10 @@ pub fn run() {
                         schedule_persist_main_window_state(window.app_handle());
                     }
                 }
-                WindowEvent::Resized(_) => {
-                    if window.label() == "main" {
+                WindowEvent::Resized(_)
+                    if window.label() == "main" => {
                         schedule_persist_main_window_state(window.app_handle());
                     }
-                }
                 _ => {}
             }
         })
@@ -828,7 +829,7 @@ pub fn run() {
 
             let pet_prefs = pet_window::load_prefs();
             if pet_prefs.enabled && pet_prefs.visible {
-                if let Err(e) = pet_window::show_pet(&app.handle()) {
+                if let Err(e) = pet_window::show_pet(app.handle()) {
                     tracing::warn!("pet restore: {e}");
                 }
             }
