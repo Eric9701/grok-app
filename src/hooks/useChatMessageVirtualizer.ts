@@ -11,6 +11,8 @@
  * - Per-row ResizeObserver so image/video decode updates height cache (callback
  *   refs alone only fire on mount).
  * - Debounced recompute so measure storms cannot oscillate the window.
+ * - Pinned: no per-row scrollTop snap. Image/PDF decode used to snap on
+ *   every commit, then the window layout snapped again (bounce-up).
  *
  * Long-session perf:
  * - rAF-coalesce scroll recomputes (one window update per frame while flinging).
@@ -35,6 +37,7 @@ import {
   resolveChatOverscanPx,
   scrollTopAfterHeightChange,
   shouldCommitRowHeight,
+  shouldWriteScrollOnRowCommit,
   shouldVirtualizeChat,
   type ChatVirtualWindow,
 } from "@/lib/chatVirtualList";
@@ -49,6 +52,7 @@ import {
   isPaneSplitMotionActive,
   runAfterPaneSplitMotion,
 } from "@/lib/paneSplitMotion";
+import { shouldSnapPinnedLayoutToBottom } from "@/lib/stickToBottom";
 
 export type UseChatMessageVirtualizerArgs = {
   itemCount: number;
@@ -382,10 +386,20 @@ export function useChatMessageVirtualizer(
     const v = viewportRef.current;
     if (!v) return;
     const top = Math.max(0, v.scrollHeight - v.clientHeight);
-    if (Math.abs(v.scrollTop - top) > 0.5) {
-      ignoreScrollAdjustRef.current = true;
-      v.scrollTop = top;
+    if (Math.abs(v.scrollTop - top) <= 0.5) return;
+    // User already left the bottom (trackpad ticks). Snapping here is the
+    // "wheel turns, screen does not move" freeze until a hard flick.
+    if (
+      !shouldSnapPinnedLayoutToBottom({
+        scrollTop: v.scrollTop,
+        scrollHeight: v.scrollHeight,
+        clientHeight: v.clientHeight,
+      })
+    ) {
+      return;
     }
+    ignoreScrollAdjustRef.current = true;
+    v.scrollTop = top;
   }, [
     virtualized,
     win.start,
@@ -473,9 +487,10 @@ export function useChatMessageVirtualizer(
       }
 
       recompute();
-      // Sync (not rAF): RO already ran after layout and before paint.
-      // Deferring one frame painted the stale scrollTop — bottom jitter.
-      if (pin && viewport) {
+      // Pinned: do not snap here. Each image/PDF decode used to write
+      // scrollTop, then the debounced window layout wrote it again — bounce.
+      // One snap lives in the window-metrics layout effect after coalesce.
+      if (pin && viewport && shouldWriteScrollOnRowCommit(true)) {
         const top = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
         if (Math.abs(viewport.scrollTop - top) > 0.5) {
           ignoreScrollAdjustRef.current = true;

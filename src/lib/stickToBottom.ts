@@ -32,6 +32,15 @@ export const STICK_HARD_BOTTOM_PX = 2;
 export const STICK_HEIGHT_NOISE_PX = 8;
 
 /**
+ * Content growth this large is media / virtual-window rebuild, not a stream
+ * token. Follow immediately and every image decode snaps the transcript up.
+ */
+export const STICK_MEDIA_HEIGHT_PX = 24;
+
+/** Trailing delay so a decode storm becomes one pin snap. */
+export const STICK_MEDIA_FOLLOW_DELAY_MS = 64;
+
+/**
  * Minimum upward scroll (px) to leave stick-lock.
  * Keep this aligned with {@link STICK_ESCAPE_WHEEL_DELTA}: a 10–12px
  * trackpad nudge used to be clamped by the scroll handler and then
@@ -99,6 +108,55 @@ export function stabilizeStickUserId(input: {
     return input.prevId;
   }
   return input.nextId;
+}
+
+/**
+ * Escape pin when the viewport has moved far enough off the absolute
+ * bottom, even if no single wheel/scroll event was large.
+ *
+ * Pixel-mode trackpads send many 2–8px ticks. Escape used to require ≥10px
+ * in *one* event (`isMeaningfulScrollUp`), so those ticks never released
+ * the pin. The list kept using the "stuck at bottom" window and the screen
+ * did not walk into history until a harder flick.
+ */
+export function shouldReleaseStickOnDistanceFromBottom(input: {
+  pinned: boolean;
+  escaped?: boolean;
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+  minDeltaPx?: number;
+}): boolean {
+  if (!input.pinned || input.escaped) return false;
+  const min = input.minDeltaPx ?? STICK_ESCAPE_MIN_DELTA_PX;
+  return (
+    distanceFromBottom(
+      input.scrollTop,
+      input.scrollHeight,
+      input.clientHeight,
+    ) >= min
+  );
+}
+
+/**
+ * Virtual-list layout may snap to max while stick is still pinned. Do that
+ * only if the user is still on the bottom. If they already scrolled away,
+ * snapping is the "wheel turns, screen does not move" freeze.
+ */
+export function shouldSnapPinnedLayoutToBottom(input: {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+  minLeavePx?: number;
+}): boolean {
+  const min = input.minLeavePx ?? STICK_ESCAPE_MIN_DELTA_PX;
+  return (
+    distanceFromBottom(
+      input.scrollTop,
+      input.scrollHeight,
+      input.clientHeight,
+    ) < min
+  );
 }
 
 /**
@@ -190,6 +248,21 @@ export function isHeightDeltaNoise(
   noisePx: number = STICK_HEIGHT_NOISE_PX,
 ): boolean {
   return Math.abs(difference) < noisePx;
+}
+
+/**
+ * Delay before stick-follow after a content-height change.
+ * Stream tokens (small) follow this frame. Image/PDF decode jumps wait so
+ * a row of screenshots does not bounce the chat once per file.
+ */
+export function pinnedFollowDelayMs(
+  heightDelta: number,
+  mediaPx: number = STICK_MEDIA_HEIGHT_PX,
+  delayMs: number = STICK_MEDIA_FOLLOW_DELAY_MS,
+): number {
+  if (!Number.isFinite(heightDelta)) return 0;
+  if (Math.abs(heightDelta) < mediaPx) return 0;
+  return delayMs;
 }
 
 /**

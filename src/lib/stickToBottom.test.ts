@@ -11,11 +11,16 @@ import {
   isMeaningfulScrollUp,
   isNearBottom,
   nextStickPinState,
+  pinnedFollowDelayMs,
   shouldBumpStickOnBusyEdge,
   stabilizeStickUserId,
   shouldClampPinnedOverscroll,
   shouldClampPinnedStreamDrift,
+  shouldReleaseStickOnDistanceFromBottom,
   shouldReleaseStickOnScrollUp,
+  shouldSnapPinnedLayoutToBottom,
+  STICK_MEDIA_FOLLOW_DELAY_MS,
+  STICK_MEDIA_HEIGHT_PX,
 } from "./stickToBottom";
 
 describe("distanceFromBottom", () => {
@@ -70,6 +75,25 @@ describe("bottomScrollTop", () => {
   });
 });
 
+describe("pinnedFollowDelayMs", () => {
+  it("follows stream-sized growth this frame", () => {
+    expect(pinnedFollowDelayMs(0)).toBe(0);
+    expect(pinnedFollowDelayMs(8)).toBe(0);
+    expect(pinnedFollowDelayMs(23)).toBe(0);
+  });
+
+  it("coalesces image/PDF-sized jumps", () => {
+    expect(STICK_MEDIA_HEIGHT_PX).toBe(24);
+    expect(pinnedFollowDelayMs(24)).toBe(STICK_MEDIA_FOLLOW_DELAY_MS);
+    expect(pinnedFollowDelayMs(400)).toBe(STICK_MEDIA_FOLLOW_DELAY_MS);
+    expect(pinnedFollowDelayMs(-180)).toBe(STICK_MEDIA_FOLLOW_DELAY_MS);
+  });
+
+  it("treats non-finite as immediate", () => {
+    expect(pinnedFollowDelayMs(Number.NaN)).toBe(0);
+  });
+});
+
 describe("isHeightDeltaNoise", () => {
   it("ignores sub-noise reflows (thinking stream flicker)", () => {
     expect(isHeightDeltaNoise(0)).toBe(true);
@@ -111,6 +135,102 @@ describe("shouldClampPinnedStreamDrift", () => {
 
   it("does not clamp when unpinned without escape flag either", () => {
     expect(shouldClampPinnedStreamDrift(false, false, 200, sh, ch)).toBe(false);
+  });
+});
+
+describe("shouldReleaseStickOnDistanceFromBottom", () => {
+  const sh = 1000;
+  const ch = 400;
+  // maxTop = 600
+
+  it("stays pinned for tiny ticks under 10px from the bottom", () => {
+    expect(
+      shouldReleaseStickOnDistanceFromBottom({
+        pinned: true,
+        scrollTop: 595,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false); // 5px
+    expect(
+      shouldReleaseStickOnDistanceFromBottom({
+        pinned: true,
+        scrollTop: 591,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false); // 9px
+  });
+
+  it("releases after accumulated 10px even if no single tick was 10px", () => {
+    // Three 4px trackpad ticks: 600 → 596 → 592 → 588. Last event is 4px,
+    // so isMeaningfulScrollUp is false; distance from bottom is 12px.
+    expect(isMeaningfulScrollUp(588, 592)).toBe(false);
+    expect(
+      shouldReleaseStickOnDistanceFromBottom({
+        pinned: true,
+        scrollTop: 588,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not release when unpinned or already escaped", () => {
+    const away = {
+      scrollTop: 500,
+      scrollHeight: sh,
+      clientHeight: ch,
+    };
+    expect(
+      shouldReleaseStickOnDistanceFromBottom({ pinned: false, ...away }),
+    ).toBe(false);
+    expect(
+      shouldReleaseStickOnDistanceFromBottom({
+        pinned: true,
+        escaped: true,
+        ...away,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("shouldSnapPinnedLayoutToBottom", () => {
+  const sh = 1000;
+  const ch = 400;
+
+  it("snaps only while still near the absolute bottom", () => {
+    expect(
+      shouldSnapPinnedLayoutToBottom({
+        scrollTop: 600,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSnapPinnedLayoutToBottom({
+        scrollTop: 592,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(true); // 8px, still under leave threshold
+  });
+
+  it("does not snap once the user has left by 10px", () => {
+    expect(
+      shouldSnapPinnedLayoutToBottom({
+        scrollTop: 590,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSnapPinnedLayoutToBottom({
+        scrollTop: 400,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false);
   });
 });
 
