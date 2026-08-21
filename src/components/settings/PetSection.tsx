@@ -3,7 +3,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
-import { SettingsTabStrip, UiSwitch } from "./shared";
+import { SettingsLabelWithTip, SettingsTabStrip, UiSwitch } from "./shared";
 import { PetMark } from "@/components/pet/PetMark";
 import { Select } from "@/components/Select";
 import { listen } from "@/lib/api/host";
@@ -145,23 +145,18 @@ export function PetSection() {
       />
 
       {(activeTab === "look" || activeTab == null) && (
-        <>
-          <h2 className="settings-page__h2">{t("settings.tab.petLook")}</h2>
-          <div
-            className={"settings-card" + rowHighlight("settings-anchor-pet")}
-            id="settings-anchor-pet"
-          >
-            <div className="settings-row settings-row--stack">
-              <div className="settings-row__text">
-                <div className="settings-row__label">{t("settings.nav.pet")}</div>
-                <div className="settings-row__desc">{t("settings.pet.desc")}</div>
-              </div>
-            </div>
-            <div className="settings-row">
-              <div className="settings-row__text">
-                <div className="settings-row__label">{t("settings.pet.enabled")}</div>
-                <div className="settings-row__desc">{t("settings.pet.enabledDesc")}</div>
-              </div>
+        <div className="settings-card pet-look">
+          <div className="pet-look__toolbar">
+            <div
+              className={
+                "pet-look__toolbar-item" + rowHighlight("settings-anchor-pet")
+              }
+              id="settings-anchor-pet"
+            >
+              <SettingsLabelWithTip
+                label={t("settings.pet.enabled")}
+                tip={t("settings.pet.enabledDesc")}
+              />
               <UiSwitch
                 checked={shown}
                 disabled={busy}
@@ -169,170 +164,17 @@ export function PetSection() {
                 onChange={(next) => void onToggleWindow(next)}
               />
             </div>
-          </div>
-
-          <div
-            className={"settings-card" + rowHighlight("settings-anchor-pet-identity")}
-            id="settings-anchor-pet-identity"
-          >
-        <div className="settings-row settings-row--stack">
-          <div className="settings-row__text">
-            <div className="settings-row__label">{t("settings.pet.identity")}</div>
-            <div className="settings-row__desc">{t("settings.pet.identityDesc")}</div>
-          </div>
-          <PetMark
-            shape={shape}
-            color={color}
-            eyeColor={eyeColor}
-            expression={expression}
-            verb="idle"
-            sizePx={72}
-            restOnly
-          />
-        </div>
-        <div className="settings-row settings-row--stack">
-          <div className="settings-row__label">{t("settings.pet.shape")}</div>
-          <div className="pet-settings-grid" role="group" aria-label={t("settings.pet.shape")}>
-            {PET_PICKER_SHAPES.map((sh) => (
-              <button
-                key={sh}
-                type="button"
-                className={
-                  "pet-settings-grid__btn" + (shape === sh ? " is-on" : "")
-                }
-                aria-pressed={shape === sh}
-                aria-label={t(`settings.pet.shape.${sh}`)}
-                disabled={busy}
-                onClick={() => void commit({ ...prefs, shape: sh })}
-              >
-                <PetMark
-                  shape={sh}
-                  color={color}
-                  eyeColor={eyeColor}
-                  expression={expression}
-                  verb="idle"
-                  sizePx={28}
-                  paused
-                  restOnly
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-        <div
-          className="settings-row settings-row--stack"
-          id="settings-anchor-pet-expression"
-        >
-          <div className="settings-row__label">{t("settings.pet.expression")}</div>
-          <div
-            className="pet-settings-grid"
-            role="group"
-            aria-label={t("settings.pet.expression")}
-          >
-            {PET_EXPRESSIONS.map((ex) => (
-              <button
-                key={ex}
-                type="button"
-                className={
-                  "pet-settings-grid__btn" + (expression === ex ? " is-on" : "")
-                }
-                aria-pressed={expression === ex}
-                aria-label={t(`settings.pet.expression.${ex}`)}
-                disabled={busy}
-                onClick={() => void commit({ ...prefs, expression: ex })}
-              >
-                <PetMark
-                  shape={shape}
-                  color={color}
-                  eyeColor={eyeColor}
-                  expression={ex}
-                  verb="idle"
-                  sizePx={28}
-                  paused
-                  restOnly
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="settings-row settings-row--stack">
-          <div className="settings-row__label">{t("settings.pet.color")}</div>
-          <div className="pet-settings-grid" role="group" aria-label={t("settings.pet.color")}>
-            {PET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={
-                  "pet-settings-grid__btn" + (color === c ? " is-on" : "")
-                }
-                aria-pressed={color === c}
-                aria-label={PET_COLOR_SWATCH[c].label}
-                disabled={busy}
-                onClick={() => void commit({ ...prefs, color: c })}
-              >
-                <span
-                  className={
-                    "pet-settings-swatch" +
-                    (c === "white" ? " pet-settings-swatch--light" : "")
-                  }
-                  style={{ background: PET_COLOR_SWATCH[c].value }}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-        <div
-          className="settings-row settings-row--stack"
-          id="settings-anchor-pet-eye"
-        >
-          <div className="settings-row__label">{t("settings.pet.eyeColor")}</div>
-          <div className="pet-settings-grid" role="group" aria-label={t("settings.pet.eyeColor")}>
-            <button
-              type="button"
+            <div
               className={
-                "pet-settings-grid__btn" + (eyeColor === "auto" ? " is-on" : "")
+                "pet-look__toolbar-item" +
+                rowHighlight("settings-anchor-pet-size")
               }
-              aria-pressed={eyeColor === "auto"}
-              aria-label={t("settings.pet.eyeColor.auto")}
-              disabled={busy}
-              onClick={() => void commit({ ...prefs, eyeColor: "auto" })}
+              id="settings-anchor-pet-size"
             >
-              <span className="pet-settings-swatch pet-settings-swatch--auto" />
-            </button>
-            {PET_COLORS.map((c) => (
-              <button
-                key={`eye-${c}`}
-                type="button"
-                className={
-                  "pet-settings-grid__btn" + (eyeColor === c ? " is-on" : "")
-                }
-                aria-pressed={eyeColor === c}
-                aria-label={PET_COLOR_SWATCH[c].label}
-                disabled={busy}
-                onClick={() => void commit({ ...prefs, eyeColor: c })}
-              >
-                <span
-                  className={
-                    "pet-settings-swatch" +
-                    (c === "white" ? " pet-settings-swatch--light" : "")
-                  }
-                  style={{ background: PET_COLOR_SWATCH[c].value }}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-          <div
-            className={"settings-card" + rowHighlight("settings-anchor-pet-size")}
-            id="settings-anchor-pet-size"
-          >
-            <div className="settings-row">
-              <div className="settings-row__text">
-                <div className="settings-row__label">{t("settings.pet.size")}</div>
-                <div className="settings-row__desc">{t("settings.pet.sizeDesc")}</div>
-              </div>
+              <SettingsLabelWithTip
+                label={t("settings.pet.size")}
+                tip={t("settings.pet.sizeDesc")}
+              />
               <Select
                 value={String(sizePx)}
                 onChange={(v) =>
@@ -351,7 +193,186 @@ export function PetSection() {
               />
             </div>
           </div>
-        </>
+
+          <div
+            className={
+              "pet-look__body" + rowHighlight("settings-anchor-pet-identity")
+            }
+            id="settings-anchor-pet-identity"
+          >
+            <div className="pet-look__preview">
+              <PetMark
+                shape={shape}
+                color={color}
+                eyeColor={eyeColor}
+                expression={expression}
+                verb="idle"
+                sizePx={96}
+                restOnly
+              />
+            </div>
+            <div className="pet-look__fields">
+              <div className="pet-look__field">
+                <div className="pet-look__field-label">{t("settings.pet.shape")}</div>
+                <div
+                  className="pet-settings-grid"
+                  role="group"
+                  aria-label={t("settings.pet.shape")}
+                >
+                  {PET_PICKER_SHAPES.map((sh) => (
+                    <button
+                      key={sh}
+                      type="button"
+                      className={
+                        "pet-settings-grid__btn" + (shape === sh ? " is-on" : "")
+                      }
+                      aria-pressed={shape === sh}
+                      aria-label={t(`settings.pet.shape.${sh}`)}
+                      disabled={busy}
+                      onClick={() => void commit({ ...prefs, shape: sh })}
+                    >
+                      <PetMark
+                        shape={sh}
+                        color={color}
+                        eyeColor={eyeColor}
+                        expression={expression}
+                        verb="idle"
+                        sizePx={26}
+                        paused
+                        restOnly
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div
+                className={
+                  "pet-look__field" +
+                  rowHighlight("settings-anchor-pet-expression")
+                }
+                id="settings-anchor-pet-expression"
+              >
+                <SettingsLabelWithTip
+                  label={t("settings.pet.expression")}
+                  tip={t("settings.pet.expressionDesc")}
+                />
+                <div
+                  className="pet-settings-grid"
+                  role="group"
+                  aria-label={t("settings.pet.expression")}
+                >
+                  {PET_EXPRESSIONS.map((ex) => (
+                    <button
+                      key={ex}
+                      type="button"
+                      className={
+                        "pet-settings-grid__btn" +
+                        (expression === ex ? " is-on" : "")
+                      }
+                      aria-pressed={expression === ex}
+                      aria-label={t(`settings.pet.expression.${ex}`)}
+                      disabled={busy}
+                      onClick={() => void commit({ ...prefs, expression: ex })}
+                    >
+                      <PetMark
+                        shape={shape}
+                        color={color}
+                        eyeColor={eyeColor}
+                        expression={ex}
+                        verb="idle"
+                        sizePx={26}
+                        paused
+                        restOnly
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="pet-look__field">
+                <div className="pet-look__field-label">{t("settings.pet.color")}</div>
+                <div
+                  className="pet-settings-grid"
+                  role="group"
+                  aria-label={t("settings.pet.color")}
+                >
+                  {PET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={
+                        "pet-settings-grid__btn" + (color === c ? " is-on" : "")
+                      }
+                      aria-pressed={color === c}
+                      aria-label={PET_COLOR_SWATCH[c].label}
+                      disabled={busy}
+                      onClick={() => void commit({ ...prefs, color: c })}
+                    >
+                      <span
+                        className={
+                          "pet-settings-swatch" +
+                          (c === "white" ? " pet-settings-swatch--light" : "")
+                        }
+                        style={{ background: PET_COLOR_SWATCH[c].value }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div
+                className={
+                  "pet-look__field" + rowHighlight("settings-anchor-pet-eye")
+                }
+                id="settings-anchor-pet-eye"
+              >
+                <SettingsLabelWithTip
+                  label={t("settings.pet.eyeColor")}
+                  tip={t("settings.pet.eyeColorDesc")}
+                />
+                <div
+                  className="pet-settings-grid"
+                  role="group"
+                  aria-label={t("settings.pet.eyeColor")}
+                >
+                  <button
+                    type="button"
+                    className={
+                      "pet-settings-grid__btn" +
+                      (eyeColor === "auto" ? " is-on" : "")
+                    }
+                    aria-pressed={eyeColor === "auto"}
+                    aria-label={t("settings.pet.eyeColor.auto")}
+                    disabled={busy}
+                    onClick={() => void commit({ ...prefs, eyeColor: "auto" })}
+                  >
+                    <span className="pet-settings-swatch pet-settings-swatch--auto" />
+                  </button>
+                  {PET_COLORS.map((c) => (
+                    <button
+                      key={`eye-${c}`}
+                      type="button"
+                      className={
+                        "pet-settings-grid__btn" +
+                        (eyeColor === c ? " is-on" : "")
+                      }
+                      aria-pressed={eyeColor === c}
+                      aria-label={PET_COLOR_SWATCH[c].label}
+                      disabled={busy}
+                      onClick={() => void commit({ ...prefs, eyeColor: c })}
+                    >
+                      <span
+                        className={
+                          "pet-settings-swatch" +
+                          (c === "white" ? " pet-settings-swatch--light" : "")
+                        }
+                        style={{ background: PET_COLOR_SWATCH[c].value }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {activeTab === "bubbles" && (

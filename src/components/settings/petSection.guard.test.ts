@@ -52,4 +52,14 @@ describe("PetSection visibility switch", () => {
       src.indexOf('activeTab === "bubbles"'),
     );
   });
+
+  it("packs look controls: enable+size on one toolbar, preview left of pickers", () => {
+    expect(src).toContain("pet-look__toolbar");
+    expect(src).toContain("settings-anchor-pet-size");
+    expect(src).toContain("pet-look__preview");
+    expect(src).toContain("pet-look__fields");
+    expect(src.indexOf("pet-look__preview")).toBeLessThan(
+      src.indexOf("pet-look__fields"),
+    );
+  });
 });
