@@ -40,7 +40,7 @@ export const zhSettingsPet = {
   "settings.pet.identityDesc": "活体标记的形状、休息表情、身体颜色和眼睛颜色。",
   "settings.pet.shape": "形状",
   "settings.pet.expression": "表情",
-  "settings.pet.expressionDesc": "休息时的脸。干活时仍会走完整套形变动画。",
+  "settings.pet.expressionDesc": "休息时的脸。干活时仍显示你选的形体；完成后未读会在右上角亮一个小圆点。",
   "settings.pet.expression.neutre": "平静",
   "settings.pet.expression.attentif": "专注",
   "settings.pet.expression.surpris": "惊讶",

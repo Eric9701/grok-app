@@ -11,21 +11,17 @@ export function petDoneTaskIds(tasks: readonly PetTask[]): string[] {
 }
 
 /**
- * Fire the colorful spin once when a session actually finishes.
+ * Fire the colorful spin once when live work ends in an unread-ready pet.
  * Skip the first snapshot so opening the pet on an already-ready chat
- * does not replay the celebration.
+ * does not replay the celebration. Mid-turn chips and peer completions
+ * while another session is still live must not retrigger ribbons.
  */
 export function shouldTriggerPetSpin(input: {
   primed: boolean;
   prevKind: PetKind | null;
   nextKind: PetKind;
-  prevDoneIds: ReadonlySet<string>;
-  nextDoneIds: ReadonlySet<string>;
 }): boolean {
   if (!input.primed) return false;
-  if (input.nextKind === "ready" && input.prevKind !== "ready") return true;
-  for (const id of input.nextDoneIds) {
-    if (!input.prevDoneIds.has(id)) return true;
-  }
-  return false;
+  if (input.nextKind !== "ready") return false;
+  return input.prevKind !== "ready";
 }

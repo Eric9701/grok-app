@@ -88,16 +88,11 @@ export function bloubShapeRadii(shape: string | null | undefined): number[] | nu
 
 const VERB_STATE: Record<string, StateId> = {
   idle: "idle",
-  thinking: "thinking",
-  searching: "comet",
-  working: "orbit",
-  writing: "alert",
   waiting: "wide",
   notifying: "notify",
   sleeping: "sleep",
-  waking: "swirl",
+  waking: "idle",
   dragging: "egg",
-  sad: "exclaim",
 };
 
 const VERB_EXPRESSION: Record<string, ExpressionId> = {
@@ -116,6 +111,11 @@ const VERB_EXPRESSION: Record<string, ExpressionId> = {
   scared: "effraye",
   angry: "colere",
   suspicious: "mefiant",
+  thinking: "attentif",
+  searching: "curieux",
+  working: "attentif",
+  writing: "attentif",
+  sad: "triste",
 };
 
 export type BloubPlay = {
@@ -139,15 +139,13 @@ export function bloubExpressionOf(id: string | null | undefined) {
   return EXPRESSION_BY_ID.get(normalizePetExpression(id)) ?? null;
 }
 
-const HOLD_LOOP = new Set<StateId>(["orbit", "comet", "alert"]);
-
 export function bloubStateDuration(id: StateId): number {
   return STATE_BY_ID.get(id)?.duration ?? 2;
 }
 
 /** Narrative states that should restart while the session verb stays put. */
-export function bloubShouldLoop(id: StateId): boolean {
-  return HOLD_LOOP.has(id);
+export function bloubShouldLoop(_id: StateId): boolean {
+  return false;
 }
 
 const YAW_MAX = 16;
@@ -197,15 +195,15 @@ export function petVerbForComposer(input: {
     input.composing &&
     (input.sessionVerb === "idle" || input.sessionVerb === "waking")
   ) {
-    return "writing";
+    return "listening";
   }
   return input.sessionVerb;
 }
 
-/** How long after the last keystroke the pet holds the catalog alert morph. */
+/** How long after the last keystroke the pet holds the attentive rest face. */
 export const PET_COMPOSING_HOLD_MS = 1500;
 
-/** Typing → catalog `alert` (slanted !); empty draft or a pause → original rest shape. */
+/** Typing → attentive rest face; empty draft or a pause → original rest shape. */
 export function petIsComposing(input: {
   empty: boolean;
   lastTypeAt: number;

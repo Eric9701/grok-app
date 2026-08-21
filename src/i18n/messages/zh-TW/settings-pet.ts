@@ -40,7 +40,7 @@ export const zhTWSettingsPet = {
   "settings.pet.identityDesc": "活體標記的形狀、休息表情、身體顏色與眼睛顏色。",
   "settings.pet.shape": "形狀",
   "settings.pet.expression": "表情",
-  "settings.pet.expressionDesc": "休息時的臉。工作時仍會走完整套形變動畫。",
+  "settings.pet.expressionDesc": "休息時的臉。工作時仍顯示你選的形體；完成後未讀會在右上角亮一個小圓點。",
   "settings.pet.expression.neutre": "平靜",
   "settings.pet.expression.attentif": "專注",
   "settings.pet.expression.surpris": "驚訝",

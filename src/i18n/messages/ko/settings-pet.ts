@@ -35,7 +35,7 @@ export const koSettingsPet = {
   "settings.pet.identityDesc": "살아있는 마크의 형태, 휴식 표정, 몸 색, 눈 색입니다.",
   "settings.pet.shape": "형태",
   "settings.pet.expression": "표정",
-  "settings.pet.expressionDesc": "대기 중 얼굴입니다. 작업 중에는 전체 애니메이션이 이어집니다.",
+  "settings.pet.expressionDesc": "대기 중 얼굴입니다. 작업 중에도 고른 모양이 유지되고, 읽지 않은 완료 채팅은 모서리에 작은 점을 보여 줍니다.",
   "settings.pet.expression.neutre": "무표정",
   "settings.pet.expression.attentif": "집중",
   "settings.pet.expression.surpris": "놀람",

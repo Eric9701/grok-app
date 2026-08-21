@@ -35,7 +35,7 @@ export const idSettingsPet = {
   "settings.pet.identityDesc": "Bentuk, ekspresi istirahat, warna tubuh, dan warna mata.",
   "settings.pet.shape": "Bentuk",
   "settings.pet.expression": "Ekspresi",
-  "settings.pet.expressionDesc": "Wajah saat diam. Saat bekerja, katalog animasi lengkap tetap diputar.",
+  "settings.pet.expressionDesc": "Wajah saat diam. Bentuk yang dipilih tetap tampil saat bekerja; chat selesai yang belum dibaca menampilkan titik di sudut.",
   "settings.pet.expression.neutre": "Netral",
   "settings.pet.expression.attentif": "Fokus",
   "settings.pet.expression.surpris": "Terkejut",

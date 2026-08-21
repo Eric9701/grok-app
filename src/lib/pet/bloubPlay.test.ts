@@ -22,14 +22,29 @@ describe("bloub product mapping", () => {
     expect(bloubShapeId("nope")).toBe("cercle");
   });
 
-  it("maps session verbs onto measured animation states", () => {
-    expect(resolveBloubPlay("writing", "neutre").state).toBe("alert");
+  it("maps session verbs onto rest-body states", () => {
+    expect(resolveBloubPlay("writing", "neutre")).toEqual({
+      state: "idle",
+      expression: "attentif",
+    });
     expect(resolveBloubPlay("notifying", "neutre").state).toBe("notify");
     expect(resolveBloubPlay("waiting", "neutre").state).toBe("wide");
-    expect(resolveBloubPlay("thinking", "neutre").state).toBe("thinking");
-    expect(resolveBloubPlay("searching", "neutre").state).toBe("comet");
-    expect(resolveBloubPlay("working", "neutre").state).toBe("orbit");
-    expect(resolveBloubPlay("sad", "neutre").state).toBe("exclaim");
+    expect(resolveBloubPlay("thinking", "neutre")).toEqual({
+      state: "idle",
+      expression: "attentif",
+    });
+    expect(resolveBloubPlay("searching", "neutre")).toEqual({
+      state: "idle",
+      expression: "curieux",
+    });
+    expect(resolveBloubPlay("working", "neutre")).toEqual({
+      state: "idle",
+      expression: "attentif",
+    });
+    expect(resolveBloubPlay("sad", "neutre")).toEqual({
+      state: "idle",
+      expression: "triste",
+    });
     expect(resolveBloubPlay("celebrate", "neutre").state).toBe("idle");
   });
 
@@ -41,10 +56,14 @@ describe("bloub product mapping", () => {
     expect(normalizePetExpression("nope")).toBe("neutre");
   });
 
-  it("turns composer typing into the catalog alert morph while idle", () => {
+  it("turns composer typing into an attentive rest face while idle", () => {
     expect(
       petVerbForComposer({ sessionVerb: "idle", composing: true }),
-    ).toBe("writing");
+    ).toBe("listening");
+    expect(resolveBloubPlay("listening", "neutre")).toEqual({
+      state: "idle",
+      expression: "attentif",
+    });
     expect(
       petVerbForComposer({ sessionVerb: "working", composing: true }),
     ).toBe("working");
@@ -53,7 +72,7 @@ describe("bloub product mapping", () => {
     ).toBe("idle");
   });
 
-  it("drops the alert morph when typing pauses or the draft is empty", () => {
+  it("drops the attentive hold when typing pauses or the draft is empty", () => {
     expect(
       petIsComposing({ empty: true, lastTypeAt: 1000, now: 1100 }),
     ).toBe(false);

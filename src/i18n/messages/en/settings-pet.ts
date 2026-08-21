@@ -40,7 +40,7 @@ export const enSettingsPet = {
   "settings.pet.identityDesc": "Shape, rest face, body color, and eye color of the living mark.",
   "settings.pet.shape": "Shape",
   "settings.pet.expression": "Rest face",
-  "settings.pet.expressionDesc": "Idle expression. Session work still morphs through the full animation catalogue.",
+  "settings.pet.expressionDesc": "Idle expression. The chosen shape stays on screen while you work; a finished unread chat shows a small corner pastille.",
   "settings.pet.expression.neutre": "Neutral",
   "settings.pet.expression.attentif": "Attentive",
   "settings.pet.expression.surpris": "Surprised",

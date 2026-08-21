@@ -74,8 +74,6 @@ describe("shouldTriggerPetSpin", () => {
         primed: false,
         prevKind: null,
         nextKind: "ready",
-        prevDoneIds: new Set(),
-        nextDoneIds: new Set(["a"]),
       }),
     ).toBe(false);
   });
@@ -86,22 +84,18 @@ describe("shouldTriggerPetSpin", () => {
         primed: true,
         prevKind: "working",
         nextKind: "ready",
-        prevDoneIds: new Set(),
-        nextDoneIds: new Set(["a"]),
       }),
     ).toBe(true);
   });
 
-  it("fires when a new done chip appears", () => {
+  it("stays quiet while another session is still working", () => {
     expect(
       shouldTriggerPetSpin({
         primed: true,
         prevKind: "working",
         nextKind: "working",
-        prevDoneIds: new Set(),
-        nextDoneIds: new Set(["done-1"]),
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("stays quiet while the same ready chip remains", () => {
@@ -110,8 +104,6 @@ describe("shouldTriggerPetSpin", () => {
         primed: true,
         prevKind: "ready",
         nextKind: "ready",
-        prevDoneIds: new Set(["a"]),
-        nextDoneIds: new Set(["a"]),
       }),
     ).toBe(false);
   });

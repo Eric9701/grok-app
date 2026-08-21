@@ -847,6 +847,22 @@ pub fn pet_ignore_cursor_should_apply(prev: Option<bool>, next: bool) -> bool {
     prev != Some(next)
 }
 
+/// Quantize screen-space look so a still cursor does not wake the overlay.
+pub fn pet_cursor_quant(dx: f64, dy: f64, local_r: f64) -> (i32, i32, i32) {
+    (
+        (dx * 0.5).round() as i32,
+        (dy * 0.5).round() as i32,
+        local_r.round() as i32,
+    )
+}
+
+pub fn pet_cursor_should_emit(
+    prev: Option<(i32, i32, i32)>,
+    next: (i32, i32, i32),
+) -> bool {
+    prev != Some(next)
+}
+
 fn last_ignore_cursor() -> Option<bool> {
     match LAST_IGNORE_CURSOR.load(Ordering::Relaxed) {
         0 => Some(false),
@@ -1068,6 +1084,7 @@ pub fn start_cursor_watch(app: AppHandle) {
     }
     tauri::async_runtime::spawn(async move {
         let wayland = pet_wayland_display();
+        let mut last_cursor: Option<(i32, i32, i32)> = None;
         loop {
             let want = WANT_SHOW.load(Ordering::SeqCst);
             let dragging = DRAGGING.load(Ordering::Relaxed);
@@ -1111,6 +1128,8 @@ pub fn start_cursor_watch(app: AppHandle) {
             }
             let visible = win.is_visible().unwrap_or(false);
             if !visible {
+                // Stale quant would swallow the first look event on re-show.
+                last_cursor = None;
                 continue;
             }
             let Ok(cursor) = app.cursor_position() else {
@@ -1166,14 +1185,25 @@ pub fn start_cursor_watch(app: AppHandle) {
                 fallback_cy
             };
             let local_r = pet_hit_radius(size_px, scale);
-            let _ = app.emit(
-                "pet://cursor",
-                serde_json::json!({
-                    "dx": cursor.x - mark_cx,
-                    "dy": cursor.y - mark_cy,
-                    "localR": local_r,
-                }),
-            );
+            let dx = cursor.x - mark_cx;
+            let dy = cursor.y - mark_cy;
+            let quant = pet_cursor_quant(dx, dy, local_r);
+            if pet_cursor_should_emit(last_cursor, quant) {
+                last_cursor = Some(quant);
+                // Overlay-only: targeted emit so the workbench webview is never
+                // woken by cursor polling (plain JS listen() still receives it).
+                let _ = app.emit_to(
+                    tauri::EventTarget::WebviewWindow {
+                        label: PET_WINDOW_LABEL.into(),
+                    },
+                    "pet://cursor",
+                    serde_json::json!({
+                        "dx": dx,
+                        "dy": dy,
+                        "localR": local_r,
+                    }),
+                );
+            }
         }
     });
 }
@@ -1730,6 +1760,16 @@ mod tests {
         assert_eq!(pet_poll_ignore_cursor(true, true), None);
         assert_eq!(pet_poll_ignore_cursor(false, false), Some(true));
         assert_eq!(pet_poll_ignore_cursor(false, true), Some(false));
+    }
+
+    #[test]
+    fn still_cursor_does_not_re_emit_look_events() {
+        let a = pet_cursor_quant(10.4, -3.1, 64.2);
+        let b = pet_cursor_quant(10.1, -3.4, 64.4);
+        let c = pet_cursor_quant(40.0, -3.1, 64.2);
+        assert!(!pet_cursor_should_emit(Some(a), b));
+        assert!(pet_cursor_should_emit(Some(a), c));
+        assert!(pet_cursor_should_emit(None, a));
     }
 
     #[test]

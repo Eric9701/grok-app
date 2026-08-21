@@ -96,7 +96,7 @@ describe("resolvePetFocus (shipped picker)", () => {
     expect(got.sessionId).toBe("ask");
   });
 
-  it("ready unread beats a streaming peer", () => {
+  it("streaming peer beats a ready unread so live work keeps the body", () => {
     const liveMap: SessionLiveMap = {
       busy: snap("busy", { state: "streaming", updatedAt: 9_000 }),
       done: snap("done", { state: "idle", updatedAt: 1_000 }),
@@ -113,8 +113,8 @@ describe("resolvePetFocus (shipped picker)", () => {
         ],
       }),
     );
-    expect(got.kind).toBe("ready");
-    expect(got.sessionId).toBe("done");
+    expect(got.kind).toBe("working");
+    expect(got.sessionId).toBe("busy");
   });
 
   it("error beats ready and working", () => {
@@ -180,7 +180,7 @@ describe("resolvePetFocus (shipped picker)", () => {
       sessionId: "a",
       title: "a",
       toolTitle: "npm",
-      rank: 3,
+      rank: 2,
       updatedAt: 100,
     };
     const liveMap: SessionLiveMap = {

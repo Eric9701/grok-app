@@ -143,6 +143,11 @@ export {
 export { petDoneTaskIds, shouldTriggerPetSpin } from "./petCelebrate";
 
 export {
+  petLookIsNear,
+  petPaintMinMs,
+} from "./petMarkPaint";
+
+export {
   PET_HOVER_LISTEN_MS,
   PET_REST_MOODS,
   isPetRestMood,

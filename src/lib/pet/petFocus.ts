@@ -2,8 +2,9 @@
  * Multi-session desktop-pet focus picker.
  *
  * Highest-priority live work wins:
- *   needs_you > error > ready (finished + unread) > working > idle
- *   (connecting handshake is ignored so switching chats stays quiet)
+ *   needs_you > error > working > ready (finished + unread) > idle
+ *   (connecting handshake is ignored so switching chats stays quiet.
+ *    Unread-ready must not steal the mark while another session is still live.)
  *
  * Tool-title chatter must not flip session/kind: {@link resolvePetFocus} sticks
  * to the previous session while it still qualifies for the winning kind.
@@ -52,8 +53,8 @@ export type PetFocusInput = {
 const KIND_RANK: Record<PetKind, number> = {
   needs_you: 0,
   error: 1,
-  ready: 2,
-  working: 3,
+  working: 2,
+  ready: 3,
   connecting: 4,
   idle: 5,
 };

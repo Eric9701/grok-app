@@ -35,7 +35,7 @@ export const ptBRSettingsPet = {
   "settings.pet.identityDesc": "Forma, rosto em repouso, cor do corpo e dos olhos.",
   "settings.pet.shape": "Forma",
   "settings.pet.expression": "Expressão",
-  "settings.pet.expressionDesc": "Rosto em repouso. O trabalho da sessão ainda usa o catálogo completo.",
+  "settings.pet.expressionDesc": "Rosto em repouso. A forma escolhida permanece enquanto você trabalha; um chat concluído não lido mostra um ponto no canto.",
   "settings.pet.expression.neutre": "Neutro",
   "settings.pet.expression.attentif": "Atento",
   "settings.pet.expression.surpris": "Surpreso",

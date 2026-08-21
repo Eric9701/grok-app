@@ -19,7 +19,6 @@ import {
   PET_DRAG_SLOP,
   petBubbleViewportHeight,
   petBubblesEnabled,
-  petDoneTaskIds,
   PET_DBLCLICK_MS,
   normalizePetBubbleShape,
   normalizePetBubbleStyle,
@@ -100,8 +99,7 @@ export function PetOverlay({
   const spinWatchRef = useRef<{
     primed: boolean;
     kind: PetFocus["kind"] | null;
-    done: Set<string>;
-  }>({ primed: false, kind: null, done: new Set() });
+  }>({ primed: false, kind: null });
   const originRef = useRef<{ x: number; y: number } | null>(null);
   const lastScreenRef = useRef({ x: 0, y: 0 });
   const accumRef = useRef({ x: 0, y: 0 });
@@ -224,21 +222,18 @@ export function PetOverlay({
   }, []);
 
   useEffect(() => {
-    const nextDone = new Set(petDoneTaskIds(tasks));
     const prev = spinWatchRef.current;
     if (
       shouldTriggerPetSpin({
         primed: prev.primed,
         prevKind: prev.kind,
         nextKind: focus.kind,
-        prevDoneIds: prev.done,
-        nextDoneIds: nextDone,
       })
     ) {
       setSpinSignal((n) => n + 1);
     }
-    spinWatchRef.current = { primed: true, kind: focus.kind, done: nextDone };
-  }, [focus.kind, tasks]);
+    spinWatchRef.current = { primed: true, kind: focus.kind };
+  }, [focus.kind]);
 
   const closeMenu = useCallback(() => {
     setMenu(null);

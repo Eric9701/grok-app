@@ -35,7 +35,7 @@ export const filSettingsPet = {
   "settings.pet.identityDesc": "Hugis, mukha sa pahinga, kulay ng katawan, at kulay ng mata.",
   "settings.pet.shape": "Hugis",
   "settings.pet.expression": "Ekspresyon",
-  "settings.pet.expressionDesc": "Mukha sa pahinga. Habang nagtatrabaho, buong katalogo pa rin ng animation.",
+  "settings.pet.expressionDesc": "Mukha sa pahinga. Mananatili ang napiling hugis habang nagtatrabaho; may maliit na tuldok sa kanto ang tapos na unread na chat.",
   "settings.pet.expression.neutre": "Neutral",
   "settings.pet.expression.attentif": "Nakatuon",
   "settings.pet.expression.surpris": "Nagulat",
