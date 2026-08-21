@@ -6,6 +6,7 @@
 
 <p align="center"><strong>本机 Grok Build 的桌面指挥台</strong></p>
 <p align="center"><em>Sessions, projects, media, automations — for the real <code>grok</code> CLI</em></p>
+<p align="center"><a href="https://grok-app.com/">https://grok-app.com/</a></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -14,6 +15,7 @@
 </p>
 
 <p align="center">
+  <a href="https://grok-app.com/"><img src="https://img.shields.io/badge/website-grok--app.com-0ea5e9" alt="Website" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <a href="https://github.com/RongleCat/grok-app/stargazers"><img src="https://img.shields.io/github/stars/RongleCat/grok-app?style=social" alt="GitHub stars" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" alt="Platforms" />
@@ -116,7 +118,7 @@
 
 ### 1. 下载
 
-从 [Releases](https://github.com/RongleCat/grok-app/releases) 下载对应平台安装包：
+从官网 [grok-app.com](https://grok-app.com/) 或 [GitHub Releases](https://github.com/RongleCat/grok-app/releases) 下载对应平台安装包：
 
 | 平台 | 文件 |
 |------|------|
@@ -169,7 +171,7 @@ open /Applications/Grok.app
 - Finder 中 **右键** App → **打开** → 再次确认打开  
 - **系统设置 → 隐私与安全性** → 对拦截项点 **仍要打开**  
 
-请仅从本仓库官方 [Releases](https://github.com/RongleCat/grok-app/releases) 下载。
+请仅从官网 [grok-app.com](https://grok-app.com/) 或本仓库官方 [Releases](https://github.com/RongleCat/grok-app/releases) 下载。
 
 ---
 

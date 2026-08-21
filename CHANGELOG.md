@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Changed
+- **Official site on GitHub About and README**: Repo homepage, `package.json` `homepage`, and public READMEs now point to [https://grok-app.com/](https://grok-app.com/).
+
+**中文 · 变更**
+- **仓库 About 与 README 挂上官网**：GitHub 仓库网站、`package.json` `homepage` 与各语言 README 现指向 [https://grok-app.com/](https://grok-app.com/)。
+
 ## [0.2.24] - 2026-08-21
 
 > **Highlight:** Full bloub pet with compact Look/Bubbles settings; fork from an assistant reply; Windows no longer freezes at end of turn; Explorer-file paste and local session API stall are fixed.

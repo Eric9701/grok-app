@@ -276,8 +276,7 @@ https://github.com/RongleCat/grok-app/releases
 
 ### 5.5 域名
 
-- 站点：`https://grok-app.com`（已注册，官网仓绑 Pages / Cloudflare）
-- 本仓库 `package.json` `homepage` 仍是 GitHub，站点上线前不要改
+- 站点：`https://grok-app.com/`（已上线；GitHub About website 与 `package.json` `homepage` 指向此地址）
 - 皮肤目录 `OFFICIAL_SKIN_CATALOG_URL` 仍是空串；本文不覆盖皮肤 Apply
 
 ## 6. 校验与旁路文件

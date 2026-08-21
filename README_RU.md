@@ -6,6 +6,7 @@
 
 <p align="center"><strong>Настольная рабочая среда для локального Grok Build</strong></p>
 <p align="center"><em>Сессии, проекты, медиа и автоматизации — для настоящего <code>grok</code> CLI</em></p>
+<p align="center"><a href="https://grok-app.com/">https://grok-app.com/</a></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -14,6 +15,7 @@
 </p>
 
 <p align="center">
+  <a href="https://grok-app.com/"><img src="https://img.shields.io/badge/website-grok--app.com-0ea5e9" alt="Website" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <a href="https://github.com/RongleCat/grok-app/stargazers"><img src="https://img.shields.io/github/stars/RongleCat/grok-app?style=social" alt="GitHub stars" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" alt="Platforms" />
@@ -116,7 +118,7 @@ CLI `grok` очень мощный в терминале, но в повседн
 
 ### 1. Загрузка
 
-Установочные файлы доступны в [Releases](https://github.com/RongleCat/grok-app/releases):
+Установочные файлы доступны на официальном сайте [grok-app.com](https://grok-app.com/) или в [GitHub Releases](https://github.com/RongleCat/grok-app/releases):
 
 | Платформа | Файл |
 |----------|----------|
@@ -192,7 +194,7 @@ open /Applications/Grok.app
 - Finder: **правый клик** → **Open** → подтвердить  
 - **System Settings → Privacy & Security** → **Open Anyway**  
 
-Загружайте приложение только из официальных [Releases](https://github.com/RongleCat/grok-app/releases) этого репозитория.
+Загружайте приложение только с [grok-app.com](https://grok-app.com/) или из официальных [Releases](https://github.com/RongleCat/grok-app/releases) этого репозитория.
 
 ---
 

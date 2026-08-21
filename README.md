@@ -6,6 +6,7 @@
 
 <p align="center"><strong>Desktop workbench for local Grok Build</strong></p>
 <p align="center"><em>Sessions, projects, media, automations — for the real <code>grok</code> CLI</em></p>
+<p align="center"><a href="https://grok-app.com/">https://grok-app.com/</a></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -14,6 +15,7 @@
 </p>
 
 <p align="center">
+  <a href="https://grok-app.com/"><img src="https://img.shields.io/badge/website-grok--app.com-0ea5e9" alt="Website" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <a href="https://github.com/RongleCat/grok-app/stargazers"><img src="https://img.shields.io/github/stars/RongleCat/grok-app?style=social" alt="GitHub stars" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" alt="Platforms" />
@@ -116,7 +118,7 @@ The `grok` CLI is powerful in a terminal. Day-to-day work still needs multi-proj
 
 ### 1. Download
 
-Get installers from [Releases](https://github.com/RongleCat/grok-app/releases):
+Get installers from the official site [grok-app.com](https://grok-app.com/) or [GitHub Releases](https://github.com/RongleCat/grok-app/releases):
 
 | Platform | Artifact |
 |----------|----------|
@@ -192,7 +194,7 @@ open /Applications/Grok.app
 - Finder: **right-click** → **Open** → confirm  
 - **System Settings → Privacy & Security** → **Open Anyway**  
 
-Only download from this repo’s official [Releases](https://github.com/RongleCat/grok-app/releases).
+Only download from [grok-app.com](https://grok-app.com/) or this repo’s official [Releases](https://github.com/RongleCat/grok-app/releases).
 
 ---
 
