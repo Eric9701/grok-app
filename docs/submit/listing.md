@@ -14,7 +14,7 @@
 
 仓库：https://github.com/RongleCat/grok-app  
 许可证：MIT  
-当前版本：0.2.23  
+当前版本：0.2.24  
 平台：macOS（ARM / Intel）· Windows x64 · Linux x64
 
 ---
@@ -27,7 +27,7 @@
 
 - 仓库：https://github.com/RongleCat/grok-app
 - 许可证：MIT · 跨平台 · Tauri 2 + React
-- 当前版本：0.2.23
+- 当前版本：0.2.24
 
 ## 它解决什么
 

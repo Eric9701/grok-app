@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.24] - 2026-08-21
+
+> **Highlight:** Full bloub pet with compact Look/Bubbles settings; fork from an assistant reply; Windows no longer freezes at end of turn; Explorer-file paste and local session API stall are fixed.
+>
+> **中文 · 亮点：** 宠物换完整 bloub 形变、设置拆成紧凑的外观/气泡；可从助手回复分叉；Windows 回合结束不再卡死；资源管理器文件可粘贴，本地 session API 不再一轮后卡死。
+
 ### Added
 - **Fork from an assistant reply**: “Fork from here” sits on completed Grok bubbles (not user prompts). The new chat copies through that turn; the child agent is rewound to match (bootstrap fallback if rewind is unavailable).
 - **AI98PRO provider preset**: Add-provider gallery ships a one-click Grok relay — `https://ai98pro.xyz/v1` with Responses, models **`grok-4.6`** + **`grok-4.5`**, official effort `low`/`medium`/`high`/`xhigh` (default Extra high), vision on, and config id **`AI98PRO`** (stored slug `ai98pro`). Existing auto-suffixed local ids such as `ai98pro-----…` resolve the same channel.

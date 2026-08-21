@@ -21,7 +21,7 @@
 | `package.json` | `version` |
 | `src-tauri/tauri.conf.json` | `version` |
 | `src-tauri/Cargo.toml` | `[package].version` |
-| `src/i18n/messages.ts` | `app.versionFooter` 内 `Grok vX.Y.Z`（中英两条） |
+| `src/i18n/messages/*/core.ts` | `app.versionFooter` 内 `Grok vX.Y.Z`（全部 locale，与 `en` 锁步） |
 
 `scripts/release-tag.sh` 会改以上文件。Tag 格式：`v0.1.0`（`v` + semver）。
 
