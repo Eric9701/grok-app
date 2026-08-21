@@ -24,9 +24,11 @@ See `docs/llm-wiki/release.md`.
 - **仓库 About 与 README 挂上官网**：GitHub 仓库网站、`package.json` `homepage` 与各语言 README 现指向 [https://grok-app.com/](https://grok-app.com/)。
 
 ### Fixed
+- **Win+Right snap is true half on short displays (#765)**: Comfort `minWidth` stays 900. The Host caps the OS min to half the current monitor work area (height too), so a 1440×900 work area snaps to 720 instead of sticking at 900 (~2/3). A larger display restores the 900 floor.
 - **Windows Alt+Tab can type without a click first (#768)**: Tauri `unstable` (side-browser multi-webview) builds the page as a child `WRY_WEBVIEW`, so Alt-Tab / taskbar only activates the outer HWND. The host now forwards `WM_SETFOCUS` / `WM_ACTIVATE` into that child so composer and shortcuts work immediately.
 
 **中文 · 修复**
+- **Win+Right 在矮屏上能贴真正半屏（#765）**：舒适下限仍是 900。Host 把系统 min 限制在当前显示器工作区的一半（高度同样），1440×900 会贴 720 而不是卡在 900（约 2/3）。拖到更大屏后 900 下限会回来。
 - **Windows Alt+Tab 后不用先点一下就能打字（#768）**：Tauri `unstable`（资源栏内嵌浏览器）把页面建成子窗口 `WRY_WEBVIEW`，Alt+Tab / 任务栏只激活外层 HWND。Host 现在把 `WM_SETFOCUS` / `WM_ACTIVATE` 转进该子窗口，输入框和快捷键立刻可用。
 
 ## [0.2.24] - 2026-08-21
