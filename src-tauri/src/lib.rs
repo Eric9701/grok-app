@@ -186,6 +186,8 @@ mod tray;
 
 mod tray_i18n;
 
+mod win_taskbar_overlay;
+
 mod os_theme;
 
 mod desktop_notify;
@@ -1305,6 +1307,8 @@ pub fn run() {
             tray::tray_refresh,
 
             tray::tray_set_busy_count,
+
+            tray::tray_set_windows_overlay,
 
             os_theme::os_theme_current,
 
