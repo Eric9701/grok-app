@@ -4,9 +4,9 @@
 
 <h1 align="center">Grok App</h1>
 
-<p align="center"><strong>本机 Grok Build 的桌面指挥台</strong></p>
-<p align="center"><em>Sessions, projects, media, automations — for the real <code>grok</code> CLI</em></p>
-<p align="center"><a href="https://grok-app.com/">https://grok-app.com/</a></p>
+<p align="center"><strong>本机 Grok Build 的桌面工作台</strong></p>
+<p align="center"><em>真正的 <code>grok</code> CLI 宿主 — 会话、文件、远程控制、自动化、桌面宠物</em></p>
+<p align="center"><a href="https://grok-app.com">https://grok-app.com</a></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://grok-app.com/"><img src="https://img.shields.io/badge/website-grok--app.com-0ea5e9" alt="Website" /></a>
+  <a href="https://grok-app.com"><img src="https://img.shields.io/badge/website-grok--app.com-0ea5e9" alt="Website" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <a href="https://github.com/RongleCat/grok-app/stargazers"><img src="https://img.shields.io/github/stars/RongleCat/grok-app?style=social" alt="GitHub stars" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" alt="Platforms" />
@@ -39,7 +39,7 @@
 > [!NOTE]
 > ## 说明
 >
-> **Grok App 不是 xAI 官方产品。** 它把本机 [Grok Build](https://x.ai) CLI（`grok agent stdio`）收成桌面工作台：会话、项目、权限、媒体预览与已安排任务。
+> **Grok App 不是 xAI 官方产品。** 它是本机 [Grok Build](https://x.ai) CLI（`grok agent stdio`）的桌面 **Host**。应用不内置模型后端；对话、工具和推理强度都走你安装的 `grok`。
 >
 > 真 Agent 能力依赖本机已安装并可登录的 **Grok Build CLI**。没有 CLI 时可用首次向导安装，或开发态 `GROK_APP_ACP=mock` 做 UI 联调。
 
@@ -48,63 +48,129 @@
 ## 目录
 
 1. [简介](#简介)
-2. [功能特性](#功能特性)
-3. [界面预览](#界面预览)
-4. [安装与使用](#安装与使用)
-5. [macOS 无法打开 / 提示已损坏](#macos-无法打开--提示已损坏)
-6. [Linux 黑屏 / 空白窗（WebKit）](#linux-黑屏--空白窗webkit)
-7. [Linux 沙箱 / 用户命名空间（Ubuntu 24.04+）](#linux-沙箱--用户命名空间ubuntu-2404)
-8. [配置目录](#配置目录)
-9. [开发与构建](#开发与构建)
-10. [文档与贡献](#文档与贡献)
-11. [贡献者](#贡献者)
-12. [关注作者](#关注作者)
+2. [亮点](#亮点)
+3. [能力一览](#能力一览)
+4. [它不是什么](#它不是什么)
+5. [界面预览](#界面预览)
+6. [安装与使用](#安装与使用)
+7. [macOS 无法打开 / 提示已损坏](#macos-无法打开--提示已损坏)
+8. [Linux 黑屏 / 空白窗（WebKit）](#linux-黑屏--空白窗webkit)
+9. [Linux 沙箱 / 用户命名空间（Ubuntu 24.04+）](#linux-沙箱--用户命名空间ubuntu-2404)
+10. [配置目录](#配置目录)
+11. [开发与构建](#开发与构建)
+12. [文档与贡献](#文档与贡献)
+13. [贡献者](#贡献者)
+14. [关注作者](#关注作者)
 
 ---
 
 ## 简介
 
-在终端里跑 `grok` 很强，但日常工作台还缺一块：多项目、多会话、权限条、富媒体预览、定时任务、中英文界面。
+在终端里跑 `grok` 已经很强，日常还缺一块工作台：多项目、诚实的工具时间线、文件预览、定时任务、远程渠道、以及跟随系统语言的界面。
 
-**Grok App** 解决的是「指挥台」问题：
+**Grok App** 补的是这一层，**不替代 CLI**。
 
-1. 安装 App，准备好 Grok Build CLI  
-2. 添加项目 / 新建会话  
-3. 连接 Agent，用 Ask 或 YOLO 发消息  
-4. 预览产物、安排自动化、在设置里管账号与中转  
+1. 安装 App，准备好 Grok Build CLI
+2. 添加项目 / 新建会话
+3. 连接 Agent，用默认的 **Ask** 或 **YOLO** 发消息
+4. 预览产物、安排自动化、从 IM 远程对话、在设置里管账号与中转
 
-技术栈：**Tauri 2 + Rust · React + TypeScript + Vite · Tailwind CSS**
+**默认模型：** Grok **4.6** + 极高推理（`xhigh`）。Grok 4.5 仍可选。  
+**技术栈：** Tauri 2 + Rust · React + TypeScript + Vite · Tailwind CSS  
+**更新日志：** [CHANGELOG.md](./CHANGELOG.md)
 
 ---
 
-## 功能特性
+## 亮点
+
+- **真 Build 会话** — ACP `grok agent stdio`，Host 独占会话状态；Ask / 允许一次 / 本会话 / 拒绝；可按项目开 YOLO；默认 Grok 4.6 极高
+- **多项目工作台** — 项目空间、智能体看板、Git 工作树、从助手回复分叉、附加另一段对话、聊天下方终端
+- **文件在回路里** — 图 / 视频 / PDF / Office / 代码预览与编辑、Changes、输入框创作图像 / 视频、推荐 ChatCut 插件
+- **离开电脑也能用** — 远程 IM（飞书/Lark、Telegram、Discord、Slack、钉钉、企微、微信个人、QQ、Matrix、LINE、微博）、手机镜像、给本机其他应用的会话接口
+- **桌面伴侣** — 宠物浮层（外观 / 气泡）、实时语音、输入框听写（可自定义 STT）、皮肤与壁纸
+- **密钥和 CLI 都在你这边** — 官方 SuperGrok 额度与热力图、自定义中转（OpenRouter、DeepSeek、AI98PRO、Grok Build 兼容）、系统钥匙串、**十五种界面语言**
+
+---
+
+## 能力一览
+
+### 工作台
 
 | 类别 | 说明 |
 |------|------|
-| **真 Build 会话** | 默认 `grok agent stdio`（ACP）；Host 独占会话 FSM；可选远程 ACP |
-| **项目与会话** | 多项目信任目录、侧栏虚拟列表、归档 / orphan、分叉与回退；**shared 模式导入 CLI 会话** |
-| **多会话流式** | 切换聊天时后台继续流式 / 权限；并发上限与闲置回收 |
+| **项目与会话** | 信任目录、项目空间、侧栏虚拟列表、归档 / orphan、会话在项目间移动、导入 / 打开 CLI 会话 |
+| **并行聊天** | 切换会话后台继续流式；进程上限与闲置回收；看板：需要你 / 工作中 / 已完成 |
 | **Git 工作树** | 项目 chip 列出 linked worktree，一键切换会话 cwd（非 git 不展示） |
-| **权限** | 默认 Ask；Allow once / session / Deny；YOLO；**按项目**默认权限阶梯 |
-| **Plan / Goal** | 顶部执行进度；资源面板 Markdown 审阅与步骤；Goal 入口 |
-| **斜杠 · 扩展** | 斜杠面板、Skills；设置 → 扩展管理 MCP / Plugins |
-| **Composer** | 忙时后续消息队列；粘贴截图附件；上下文用量芯片 |
-| **媒体与文件** | 图 / 视频 / PDF / Office / 代码预览；资源窗可**编辑保存**文本；Changes（会话 diff + 工作区 git） |
-| **Agent 运行时** | 卡顿取消；结构化错误卡；会话**诊断包**导出；工具/权限未完不提前「就绪」 |
-| **自动化** | 已安排任务列表；对话里自然语言创建（静默 fence，不展示 JSON） |
-| **账号与额度** | 多账号切换、官方登录、SuperGrok 额度与热力图、自定义中转本地用量 |
-| **自定义中转** | 独立 `GROK_HOME` agent 配置，避免污染默认 `~/.grok` |
-| **安全** | API Key 可选系统钥匙串（默认 `secrets.json` 0600）；store 写锁；应用内确认框 |
-| **i18n** | 简体中文 / 繁體中文 / English 与托盘 |
+| **分叉与回退** | 从已完成的助手回复「从这里分叉」；子 Agent rewind / bootstrap 对齐截断历史 |
+| **附加对话** | `/attach-chat`、输入框 `+`、或把侧栏会话拖到输入框（最多 3 段；来源对话不改） |
+
+### 对话与 Agent
+
+| 类别 | 说明 |
+|------|------|
+| **时间线** | 思考 → 工具 → 正文按流式顺序；进行中的「工作中」保持展开；工具 / 权限未完不提前「就绪」 |
+| **Composer** | 忙时后续消息队列；**Ctrl+Enter** 引导当前回合；打字聚焦输入框；提示词历史；选区批注芯片 |
+| **权限** | 默认 Ask；允许一次 / 本会话 / 拒绝；YOLO；按项目默认阶梯；工作区沙箱（Linux 见下文） |
+| **Plan / Goal** | 顶部执行进度；资源面板 Markdown 与步骤；Goal 是有限目标，不是定时器 |
+| **运行时** | 卡顿取消；结构化错误卡；诊断包；Doctor；崩溃后再打开不会把中断回合画成已完成 |
+
+### 文件、媒体、Imagine
+
+| 类别 | 说明 |
+|------|------|
+| **资源窗** | 预览并可**编辑保存**文本 / 代码（CodeMirror）；多文件标签；Agent 写完可从磁盘刷新 |
+| **Changes** | 会话 diff + 工作区 git；接受 / 拒绝 / 还原，空态和失败诚实展示 |
+| **媒体** | 图、视频、PDF、Office；相对路径 markdown 图能对上 `curl -o`；分享卡片 PNG 导出 |
+| **创作** | 有 Imagine 技能时，输入框可**创作图像 / 创作视频**；侧栏浏览器设计模式可点选本机预览 |
+
+### 扩展与自动化
+
+| 类别 | 说明 |
+|------|------|
+| **斜杠 · 技能** | 对齐 Grok Build 的斜杠面板、行内技能芯片、`/workflow` / `/workflows` |
+| **MCP / 插件** | 设置 → 扩展：MCP、插件目录（openai/plugins + 自建源）、技能、Agents、Hooks — 从不自动安装 |
+| **ChatCut** | 推荐的 Codex 插件；Host 负责 OAuth 刷新；编辑器走系统浏览器 |
+| **自动化** | 已安排任务列表；对话里自然语言创建（静默 fence，不把 JSON 甩到界面上） |
+
+### 远程、语音、宠物
+
+| 类别 | 说明 |
+|------|------|
+| **远程 IM** | 设置 → 远程控制：GUI 绑定飞书/Lark、Telegram、Discord、Slack、钉钉、企微、微信个人、QQ、Matrix、LINE、微博（`/p` 选项目，`/r` 恢复） |
+| **手机镜像** | 令牌门控的本机 SPA；可选 Cloudflare Quick Tunnel（本机 `cloudflared` 或 Docker 镜像） |
+| **会话接口** | 回环列出并按 id 续跑（`GET /v1/sessions`、`POST /v1/sessions/{id}/turns`）；可选安装 `grok-app` 终端命令 |
+| **语音** | 实时语音；输入框听写；自定义 OpenAI 兼容 STT，Key 按提供方存系统钥匙串 |
+| **桌面宠物** | 置顶 bloub 浮层；外观 / 气泡两套设置；最后一个进行中的回合完成时撒彩带 |
+
+### 账号、外观、语言
+
+| 类别 | 说明 |
+|------|------|
+| **账号与额度** | 多账号切换、官方登录、SuperGrok 额度条 + 热力图（`/usage`、`/cost`）、自定义中转本地用量 |
+| **自定义中转** | 需要 App 写 `config.toml` 时用独立 `GROK_HOME`；**shared**（产品默认）不改写 `~/.grok` |
+| **预设** | 一键 OpenRouter、DeepSeek、AI98PRO、Amux / 云驿，以及通用 OpenAI 兼容和 Grok Build 原生兼容模式 |
+| **外观** | 浅 / 深 / 跟随系统、皮肤、壁纸（文件 / X / Imagine）、界面与终端字体、分享卡片 Logo |
+| **i18n** | 十五种界面语言（de、en、es、fil、fr、id、it、ja、ko、pt-BR、ru、ta、uk、zh、zh-TW）。首次安装跟随系统语言 |
 | **跨平台打包** | macOS ARM / Intel · Windows x64（安装版 + 绿色版）· Linux x64（AppImage / deb / rpm） |
+| **安全** | API Key 优先系统钥匙串（回退 `secrets.json` 0600）；store 写锁；只用应用内确认框 — 不用 `window.confirm` |
+
+---
+
+## 它不是什么
+
+- **非官方。** 不附带 SuperGrok 额度。没有可用的 Grok Build CLI / 登录态时，不能当完整 Agent 用。
+- **不内置模型。** 官方 Grok、自定义中转和工具都走本机 CLI。
+- **账号可选。** CLI 已登录即可干活；App 内登录只为额度、多账号、官方能力。
+- **权限默认 Ask。** YOLO / 完全访问是显式选择。
+- **shared 模式不会改写 `~/.grok` 的 `config.toml`。** 要让 App 写提供商、隐私、workflows，请用 **independent** 模式。
 
 ---
 
 ## 界面预览
 
-> 截图来自当前开发版（macOS）。
+> 截图来自近期开发版（macOS）。布局与当前工作台一致。
 
-| 工作台 · SuperGrok | 账户与额度 |
+| 工作台 | 账户与额度 |
 |:---:|:---:|
 | ![Workbench](assets/screenshots/workbench.png) | ![Account](assets/screenshots/account.png) |
 
@@ -118,7 +184,7 @@
 
 ### 1. 下载
 
-从官网 [grok-app.com](https://grok-app.com/) 或 [GitHub Releases](https://github.com/RongleCat/grok-app/releases) 下载对应平台安装包：
+从官网 [grok-app.com](https://grok-app.com) 或 [GitHub Releases](https://github.com/RongleCat/grok-app/releases) 下载对应平台安装包：
 
 | 平台 | 文件 |
 |------|------|
@@ -131,6 +197,21 @@
 
 **Arch / Manjaro / EndeavourOS 等：** **AppImage** 不依赖发行版打包格式（`chmod +x` 后运行）。官方 CI 不单独发布 AUR 包。在 **Wayland（如 Hyprland）+ AMD** 上，部分主机的 AppImage 会黑屏——可改用 **`.deb` / `.rpm`**（系统 WebKit），或见 [Linux 黑屏 / 空白窗](#linux-黑屏--空白窗webkit)。
 
+> **预编译包不需要构建工具。** Node / pnpm / Rust 只在 [从源码构建](#开发与构建) 时才要 — 不要为了用 App 去跑 `pnpm install && tauri build`。
+
+#### 校验下载
+
+每个 Release 附带 `SHA256SUMS`。下载后：
+
+```bash
+# macOS / Linux
+shasum -a 256 -c SHA256SUMS --ignore-missing
+# Windows (PowerShell)
+Get-FileHash .\Grok_*_x64-setup.exe -Algorithm SHA256
+```
+
+把 PowerShell 的哈希对照 `SHA256SUMS` 里对应那一行。
+
 #### Windows SmartScreen
 
 社区 / 未 Authenticode 签名的 Windows 安装包首次运行时，SmartScreen 可能提示「Windows 已保护你的电脑 / 未知发布者」——点 **更多信息 → 仍要运行**；有疑虑时请对照 Release 中的 `SHA256SUMS` 校验哈希。CI 在配置了 `WINDOWS_CERTIFICATE` + `WINDOWS_CERTIFICATE_PASSWORD` 时可对安装包签名（见 `docs/BUILD.md`）；已签名包显示证书上的发布者名称。
@@ -141,16 +222,25 @@
 
 ### 2. 首次使用
 
-1. 启动 App → **Setup 向导** 确认 CLI 已安装（可一键多镜像安装）  
-2. （可选）登录官方账号 / 填 API Key / 配置自定义中转；可跳过  
-3. **添加项目** → 选择并信任文件夹  
-4. **连接 Agent** → Ready 后发消息  
-5. 权限条默认 **Ask**；需要无人值守时再开 YOLO  
+1. 启动 App → **Setup 向导** 确认 CLI 已安装（可一键多镜像安装）
+2. （可选）登录官方账号 / 填 API Key / 配置自定义中转；可跳过。若本机 `grok` CLI 已经登录，选 **使用现有 CLI 登录** 即可，不必再授权
+3. **添加项目** → 选择并信任文件夹
+4. **连接 Agent** → Ready 后发消息
+5. 权限条默认 **Ask**；需要无人值守时再开 YOLO
 
 ### 3. 依赖
 
-- 本机 **Grok Build CLI**（`grok`），常见路径：`~/.grok/bin/grok` 或 PATH  
-- Windows：`%USERPROFILE%\.grok\bin\grok.exe` 或 PATH  
+- 本机 **Grok Build CLI**（`grok`）**0.2.112 或更新**，常见路径：`~/.grok/bin/grok` 或 PATH。更旧的 CLI 会拒绝 App 依赖的参数（装好后执行一次 `grok update`，然后彻底重启 App）
+- Windows：`%USERPROFILE%\.grok\bin\grok.exe` 或 PATH；需要 **WebView2 Runtime**（Windows 11 通常已预装；否则安装包会引导）
+
+### 4. 受限网络（例如中国大陆）
+
+Grok 后端（`auth.x.ai` / `grok.com` / `cli-chat-proxy.grok.com`）可能无法直连。若登录卡住，或每条消息都以 `NETWORK_PROVIDER` 超时：
+
+1. **设置 → 运行环境 → 网络**：设代理（系统 / 手动，例如 `http://127.0.0.1:7890`），再用 **测试连接** 核对三个端点
+2. 优先 **系统 HTTP** 或 **手动** `http://127.0.0.1:7890`（Clash / Surge 混合端口），不要用 TUN。App 会解析回环 PAC，并把 `HTTP_PROXY` 注入 Agent 进程 — 只有别的方式都绕不过去时才需要 TUN
+3. 若 `grok` CLI 已经登录，在向导里复用（或把 **会话数据模式** 切到 *shared*），不要走浏览器 OAuth
+4. 不需要启动脚本或自己 export `HTTP_PROXY` — App 会把配置好的代理注入所有 Agent 进程
 
 ---
 
@@ -168,10 +258,10 @@ open /Applications/Grok.app
 
 **其他方式：**
 
-- Finder 中 **右键** App → **打开** → 再次确认打开  
-- **系统设置 → 隐私与安全性** → 对拦截项点 **仍要打开**  
+- Finder 中 **右键** App → **打开** → 再次确认打开
+- **系统设置 → 隐私与安全性** → 对拦截项点 **仍要打开**
 
-请仅从官网 [grok-app.com](https://grok-app.com/) 或本仓库官方 [Releases](https://github.com/RongleCat/grok-app/releases) 下载。
+请仅从官网 [grok-app.com](https://grok-app.com) 或本仓库官方 [Releases](https://github.com/RongleCat/grok-app/releases) 下载。
 
 ---
 
@@ -263,8 +353,8 @@ echo 'kernel.apparmor_restrict_unprivileged_userns=0' | sudo tee /etc/sysctl.d/9
 API 密钥优先写入系统钥匙串（macOS Keychain / Windows Credential Manager /
 Linux Secret Service）；不可用时回退到 `secrets.json`（mode `0600`）。请勿提交密钥。
 
-Grok Build 自身配置仍在 **`~/.grok`**（CLI 登录、`auth.json` 等）。  
-**shared** 会话模式可与 CLI 共用 `~/.grok`；**independent** 模式使用 `agent-home/`。
+Grok Build 自身配置仍在 **`~/.grok`**（CLI 登录、`auth.json` 等）。
+**shared** 会话模式（产品默认）可与 CLI 共用 `~/.grok`；**independent** 模式使用 `agent-home/`。
 
 ---
 

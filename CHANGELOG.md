@@ -52,8 +52,9 @@ See `docs/llm-wiki/release.md`.
 - **Streaming markdown keeps a stable ReactMarkdown component map**: `remarkPlugins` and leaf tags are module-level; path/code/img handlers memoize so a token tick does not remount the tree.
 - **Streamdown CSS no longer loads at boot**: Chat uses `MarkdownChat`, not Streamdown. Styles move onto the unused `MessageResponse` module so a later import still looks right.
 - **Vendor JS split for markdown / TipTap / xterm**: Vite emits separate chunks so those stacks can cache independently of the app shell (and drop off first paint once their call sites are lazy).
+- **README refresh for the current workbench**: Public README (en / zh / ru) now leads with Highlights + grouped capabilities — 15 locales, desktop pet, Remote IM + phone mirror, local session API, Imagine / ChatCut, Kanban / Project Spaces, Grok 4.6 Extra High, custom-provider presets — instead of the early session-and-preview feature table. Install, Gatekeeper, and Linux troubleshooting stay.
 - **DeepSeek preset adds V4 Flash Vision Exp**: The add-provider catalog now includes `deepseek-v4-flash-vision-exp` alongside Flash and Pro. Existing saved DeepSeek channels are unchanged until re-added or edited.
-- **Official site on GitHub About and README**: Repo homepage, `package.json` `homepage`, and public READMEs now point to [https://grok-app.com/](https://grok-app.com/).
+- **Official site on GitHub About and README**: Repo homepage, `package.json` `homepage`, and public READMEs now point to [https://grok-app.com](https://grok-app.com) (no trailing slash).
 
 **中文 · 变更**
 - **资源栏 Markdown 对长文件做窗口化**：侧栏 `.md` 短文件仍整树渲染。200 行以上按标题（及长度上限）切块，只挂可见节，不再对整份 buffer 跑 ReactMarkdown。
@@ -80,11 +81,13 @@ See `docs/llm-wiki/release.md`.
 - **流式 markdown 不再每跳一次 token 换一套 components**：`remarkPlugins` 和叶子标签提到模块级；路径/代码/图片处理器 memo，避免 ReactMarkdown 整树重挂。
 - **启动不再加载 Streamdown CSS**：聊天走 `MarkdownChat`，不走 Streamdown。样式挪到未接入的 `MessageResponse`，以后真用到时才会带上。
 - **markdown / TipTap / xterm 拆成独立 JS chunk**：Vite 单独打包这三坨，壳改动不再带着重库一起失效；后续 lazy 后它们可以离开首屏。
+- **README 按当前工作台重装**：公开 README（英 / 中 / 俄）改为亮点 + 分组能力：十五种语言、桌面宠物、远程 IM + 手机镜像、本机会话接口、Imagine / ChatCut、看板 / 项目空间、Grok 4.6 极高、自定义提供商预设；不再沿用早期「会话 + 预览」功能表。安装、Gatekeeper、Linux 排障保留。
 - **DeepSeek 预设增加 V4 Flash Vision Exp**：添加提供商目录现含 `deepseek-v4-flash-vision-exp`，与 Flash / Pro 并列。已保存的 DeepSeek 渠道不会自动改，直到重新添加或编辑。
-- **仓库 About 与 README 挂上官网**：GitHub 仓库网站、`package.json` `homepage` 与各语言 README 现指向 [https://grok-app.com/](https://grok-app.com/)。
+- **仓库 About 与 README 挂上官网**：GitHub 仓库网站、`package.json` `homepage` 与各语言 README 现指向 [https://grok-app.com](https://grok-app.com)（无末尾斜杠）。
 
 ### Fixed
 - **Windows titlebar drag-up no longer grows height (#786)**: Follow-up to #783/#784. Caption maximize stayed up, but dragging the titlebar still stretched the frame. Windows skips JS `start_dragging` (`data-tauri-drag-region="false"`) and keeps compositor caption drag. Host `set_min_size` no longer runs on every `Moved` (tao re-applies inner size and double-counts the shadow offset); it skips while maximized, while the pointer is down, and when the min is unchanged.
+- **Desktop pet stays the chosen body, celebrates once, and no longer stalls on Windows**: Typing and in-progress tools no longer morph the mark into the catalog `!` or orbit/comet ribbons — the rest shape stays, with an attentive/curious face. Colorful belts fire only when the last live turn becomes unread-ready, then a corner pastille. Overlay paint throttles after idle, pauses while hidden, and cursor look events stay on the pet window (no duplicate still-cursor wakeups) so a long-running Windows overlay no longer freezes until restart.
 - **Windows caption maximize stays maximized; titlebar drag moves the window (#783)**: Follow-up to #773/#774. The button defers `maximize()` until after mouse-up so Aero does not drag-to-restore (flash). The `body` visualViewport transform pin is gone — it broke `-webkit-app-region: drag`, so pulling the titlebar up north-resized (bottom never lifted). An 8px top no-drag strip keeps native HTTOP.
 - **Windows maximize button is a real maximize (#773)**: The caption square used a Linux work-area `setSize` fill when `isMaximized()` lagged ~40ms. That cancelled the OS maximize, left the glyph as a square, and after restore, dragging the top edge panned the WebView inside the frame. Windows now waits for the OS flag and never fakes geometry; the button switches to the restore glyph.
 - **In-app update waits for Install and restart (#777)**: Settings → About Check for updates only checks and downloads. Sidebar and Install and restart open an in-app confirm (version + restart) before install+relaunch. Cancel does nothing. Unsigned GitHub download is unchanged.
@@ -96,6 +99,7 @@ See `docs/llm-wiki/release.md`.
 
 **中文 · 修复**
 - **Windows 标题栏往上拖不再把窗口拉高（#786）**：#783/#784 的后续。最大化能站住，但拖标题栏仍会拉长窗口。Windows 关掉 JS `start_dragging`（`data-tauri-drag-region="false"`），保留 compositor 标题栏拖动。`set_min_size` 不再在每次 `Moved` 里重设客户区（tao 会把阴影边框加两次）；最大化、按住鼠标、min 没变时都跳过。
+- **桌面宠物以本体为主、只在全部完成时撒彩带，Windows 长跑不再卡死**：打字和工具进行中不再把标记变成感叹号或轨道/彗星彩带，始终显示所选形体（专注/好奇脸）。彩带只在最后一个进行中的回合变成未读完成时播一次，然后右上角亮未读小圆点。空闲后降低绘制频率、隐藏时暂停，光标看向事件只发给宠物窗且静止不再重复唤醒，避免 Windows 透明浮层用久了卡顿卡死、重启才恢复。
 - **Windows 点最大化不再闪回，标题栏往上拖是移动窗口（#783）**：#773/#774 的后续。最大化推迟到鼠标松开之后，避免 Aero 当成拖拽立刻还原。去掉会破坏标题栏拖动的 `body` transform；顶边留 8px 非拖动带，标题栏中部往上拖会把整窗抬起来，不再把下沿无限拉高。
 - **Windows 右上角最大化是系统最大化（#773）**：按钮在 `isMaximized()` 还没跟上时会走 Linux 的铺满工作区 `setSize`，把真正的最大化取消掉，图标也不变；还原后再从上沿往下拉，页面会在窗口里往下挪。Windows 现在等系统标志、不再假铺满，按钮换成还原图标。
 - **应用内更新须确认「安装并重启」（#777）**：设置 → 关于「检查更新」只检查和下载。侧栏与「安装并重启」会先弹出应用内确认（版本 + 即将重启），取消不安装。未签名的 GitHub 下载路径不变。

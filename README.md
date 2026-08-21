@@ -5,8 +5,8 @@
 <h1 align="center">Grok App</h1>
 
 <p align="center"><strong>Desktop workbench for local Grok Build</strong></p>
-<p align="center"><em>Sessions, projects, media, automations — for the real <code>grok</code> CLI</em></p>
-<p align="center"><a href="https://grok-app.com/">https://grok-app.com/</a></p>
+<p align="center"><em>A real <code>grok</code> CLI host — sessions, files, remote IM, automations, and a desktop companion</em></p>
+<p align="center"><a href="https://grok-app.com">https://grok-app.com</a></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://grok-app.com/"><img src="https://img.shields.io/badge/website-grok--app.com-0ea5e9" alt="Website" /></a>
+  <a href="https://grok-app.com"><img src="https://img.shields.io/badge/website-grok--app.com-0ea5e9" alt="Website" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <a href="https://github.com/RongleCat/grok-app/stargazers"><img src="https://img.shields.io/github/stars/RongleCat/grok-app?style=social" alt="GitHub stars" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" alt="Platforms" />
@@ -39,72 +39,138 @@
 > [!NOTE]
 > ## Note
 >
-> **Grok App is not an official xAI product.** It wraps the local [Grok Build](https://x.ai) CLI (`grok agent stdio`) into a desktop workbench: sessions, projects, permissions, media previews, and scheduled tasks.
+> **Grok App is not an official xAI product.** It is a desktop **host** for the local [Grok Build](https://x.ai) CLI (`grok agent stdio`). The app does not ship a model backend. Chat, tools, and reasoning effort all go through your installed `grok`.
 >
-> Real agent power needs a working **Grok Build CLI** installed and signed in. Without CLI you can install from the first-run wizard, or use `GROK_APP_ACP=mock` for UI-only development.
+> Real agent power needs **Grok Build CLI** installed and signed in. First-run setup can install the CLI. For UI-only development, use `GROK_APP_ACP=mock`.
 
 ---
 
 ## Contents
 
 1. [Overview](#overview)
-2. [Features](#features)
-3. [Screenshots](#screenshots)
-4. [Install & first run](#install--first-run)
-5. [macOS “damaged” / Gatekeeper](#macos-damaged--gatekeeper)
-6. [Linux blank/black window (WebKit)](#linux-blankblack-window-webkit)
-7. [Linux sandbox / user namespaces (Ubuntu 24.04+)](#linux-sandbox--user-namespaces-ubuntu-2404)
-8. [Config paths](#config-paths)
-9. [Develop & build](#develop--build)
-10. [Docs & contributing](#docs--contributing)
-11. [Contributors](#contributors)
-12. [Follow the author](#follow-the-author)
+2. [Highlights](#highlights)
+3. [Capabilities](#capabilities)
+4. [What this is not](#what-this-is-not)
+5. [Screenshots](#screenshots)
+6. [Install & first run](#install--first-run)
+7. [macOS “damaged” / Gatekeeper](#macos-damaged--gatekeeper)
+8. [Linux blank/black window (WebKit)](#linux-blankblack-window-webkit)
+9. [Linux sandbox / user namespaces (Ubuntu 24.04+)](#linux-sandbox--user-namespaces-ubuntu-2404)
+10. [Config paths](#config-paths)
+11. [Develop & build](#develop--build)
+12. [Docs & contributing](#docs--contributing)
+13. [Contributors](#contributors)
+14. [Follow the author](#follow-the-author)
 
 ---
 
 ## Overview
 
-The `grok` CLI is powerful in a terminal. Day-to-day work still needs multi-project sessions, a permission bar, rich previews, scheduled jobs, and multilingual UI.
+The `grok` CLI is already a strong agent in a terminal. Day-to-day work still needs a workbench: many projects, honest tool timelines, file previews, scheduled jobs, remote channels, and a UI that follows the OS language.
 
-**Grok App** is that workbench:
+**Grok App** is that workbench — it does not replace the CLI.
 
-1. Install the app and prepare Grok Build CLI  
-2. Add a project / new session  
-3. Connect the agent; chat under Ask or YOLO  
-4. Preview artifacts, schedule automations, manage account & relays in Settings  
+1. Install the app and prepare Grok Build CLI
+2. Add a project / new session
+3. Connect the agent; chat under **Ask** (default) or **YOLO**
+4. Preview artifacts, schedule automations, talk from IM, manage account and relays in Settings
 
-**Stack:** Tauri 2 + Rust · React + TypeScript + Vite · Tailwind CSS
+**Default model:** Grok **4.6** with Extra High (`xhigh`). Grok 4.5 stays selectable.  
+**Stack:** Tauri 2 + Rust · React + TypeScript + Vite · Tailwind CSS  
+**Release notes:** [CHANGELOG.md](./CHANGELOG.md)
 
 ---
 
-## Features
+## Highlights
+
+- **Real Build sessions** — ACP `grok agent stdio`, host-owned session state, Ask / once / session / Deny, per-project YOLO, Grok 4.6 Extra High by default
+- **Multi-project workbench** — project spaces, agent Kanban, git worktrees, fork from a reply, attach another chat as context, chat-column terminal
+- **Files in the loop** — image / video / PDF / Office / code preview and edit, Changes, Imagine image & video from the composer, recommended ChatCut plugin
+- **Away from the desk** — Remote IM (Feishu/Lark, Telegram, Discord, Slack, DingTalk, WeCom, WeChat, QQ, Matrix, LINE, Weibo), phone mirror, local session API for other apps on this machine
+- **Desktop companion** — pet overlay (Look / Bubbles), Live Voice, composer dictation with custom STT, skins and wallpaper
+- **Your keys, your CLI** — official SuperGrok quota + heatmap, custom relays (OpenRouter, DeepSeek, AI98PRO, Grok Build-compatible), OS keychain, **15 UI languages**
+
+---
+
+## Capabilities
+
+### Workbench
 
 | Area | What you get |
 |------|----------------|
-| **Real Build sessions** | Default `grok agent stdio` (ACP); host-owned session FSM; optional remote ACP |
-| **Projects & sessions** | Trusted dirs, virtualized sidebar, archive / orphan, fork & rewind; **import / open CLI sessions** (path clarity in independent mode) |
-| **Multi-session stream** | Keep busy turns streaming after switching chats; process limits & idle recycle |
-| **Git worktrees** | Project chip lists linked worktrees; switch cwd in one click (hidden for non-git) |
-| **Permissions** | Default Ask; allow once / session / deny; YOLO; **per-project** permission tier |
-| **Plan / Goal** | Sticky execution progress; resource-pane Markdown review + steps; Goal entry |
-| **Slash · Extensions** | Slash palette, Skills; Settings → Extensions for MCP / Plugins |
-| **Composer** | Follow-up send queue while busy; paste screenshots; context usage chip |
-| **Media & files** | Image / video / PDF / Office / code preview; **edit & save** text in Resources; Changes (session diffs + workspace git) |
-| **Agent runtime** | Stall cancel; structured error deck; **diagnostic zip** export; no early “ready” while tools/permissions open |
-| **Automations** | Scheduled list; natural-language create-from-chat (silent fence, no JSON in UI) |
-| **Account & quota** | Multi-account switcher, official login, SuperGrok quota + heatmap, custom-provider local usage |
-| **Custom relays** | Independent `GROK_HOME` agent profile (keeps `~/.grok` clean when desired) |
-| **Security** | Optional OS keychain for API keys (default `secrets.json` 0600); store write locks; in-app confirms only |
-| **i18n** | Simplified Chinese / Traditional Chinese / English / Russian + tray |
+| **Projects & sessions** | Trusted folders, project spaces, virtualized sidebar, archive / orphan, move chats between projects, import / open CLI sessions |
+| **Parallel chats** | Busy turns keep streaming after you switch; process limits and idle recycle; Kanban: Needs you / Working / Done |
+| **Git worktrees** | Project chip lists linked worktrees; one-click cwd switch (hidden for non-git) |
+| **Fork & rewind** | Fork from a completed assistant reply; rewind / bootstrap the child agent to match |
+| **Attach chat** | `/attach-chat`, composer `+`, or drag a sidebar chat onto the composer (max 3; source chat unchanged) |
+
+### Chat & agent
+
+| Area | What you get |
+|------|----------------|
+| **Timeline** | Think → tools → answer in stream order; live “working” rail; no early Ready while tools or permissions are open |
+| **Composer** | Follow-up queue while busy; **Ctrl+Enter** steers the live turn; type-to-focus; prompt history; quote / comment chips |
+| **Permissions** | Default Ask; allow once / session / deny; YOLO; per-project default tier; workspace sandbox (Linux notes below) |
+| **Plan / Goal** | Sticky execution progress; resource-pane Markdown + steps; Goal is a finite objective, not a timer |
+| **Runtime** | Stall cancel; structured error cards; diagnostic zip; Doctor; interrupted turns stay interrupted after a crash |
+
+### Files, media, Imagine
+
+| Area | What you get |
+|------|----------------|
+| **Resources** | Preview and **edit & save** text / code (CodeMirror); multi-tab files; refresh from disk after the agent writes |
+| **Changes** | Session diffs + workspace git; accept / reject / restore with honest empty and error states |
+| **Media** | Image, video, PDF, Office; relative markdown images resolve after `curl -o`; share-card PNG export |
+| **Create** | Composer **Create Image / Create Video** when the Imagine skill is available; side-browser Design Mode for localhost previews |
+
+### Extensions & automations
+
+| Area | What you get |
+|------|----------------|
+| **Slash · Skills** | Slash palette (aligned with Grok Build), inline skill chips, `/workflow` / `/workflows` |
+| **MCP / Plugins** | Settings → Extensions: MCP, plugins catalog (openai/plugins + user sources), Skills, Agents, Hooks — never auto-install |
+| **ChatCut** | Recommended Codex plugin; OAuth refresh on the host; editor opens in the system browser |
+| **Automations** | Scheduled list; natural-language create-from-chat (silent fence, no JSON in the UI) |
+
+### Remote, voice, companion
+
+| Area | What you get |
+|------|----------------|
+| **Remote IM** | Settings → Remote control: GUI bind for Feishu/Lark, Telegram, Discord, Slack, DingTalk, WeCom, WeChat, QQ, Matrix, LINE, Weibo (`/p` project, `/r` resume) |
+| **Phone mirror** | Token-gated local SPA; optional Cloudflare Quick Tunnel (`cloudflared` or Docker image) |
+| **Session API** | Loopback list + continue-by-id (`GET /v1/sessions`, `POST /v1/sessions/{id}/turns`); optional `grok-app` shell command |
+| **Voice** | Live Voice; composer dictation; custom OpenAI-compatible STT with per-provider keys in the OS keychain |
+| **Desktop pet** | Always-on-top bloub overlay; Look / Bubbles settings; celebrates when the last live turn is ready |
+
+### Account, appearance, languages
+
+| Area | What you get |
+|------|----------------|
+| **Account & quota** | Multi-account switcher, official login, SuperGrok bar + heatmap (`/usage`, `/cost`), custom-provider local usage |
+| **Custom relays** | Independent `GROK_HOME` when you need App to write `config.toml`; **shared** (default) keeps `~/.grok` untouched |
+| **Presets** | One-click OpenRouter, DeepSeek, AI98PRO, Amux / Yun, plus generic OpenAI-compatible and Grok Build-compatible modes |
+| **Appearance** | Light / dark / follow system, skins, wallpaper (file / X / Imagine), UI and terminal fonts, share-card logo |
+| **i18n** | 15 locales (de, en, es, fil, fr, id, it, ja, ko, pt-BR, ru, ta, uk, zh, zh-TW). First launch follows the OS language |
 | **Packaging** | macOS ARM / Intel · Windows x64 (setup + portable) · Linux x64 (AppImage / deb / rpm) |
+| **Security** | OS keychain for API keys (`secrets.json` 0600 fallback); store write locks; in-app confirms only — never `window.confirm` |
+
+---
+
+## What this is not
+
+- **Not official xAI.** No bundled SuperGrok quota. Without a working Grok Build CLI / login, it is not a full agent.
+- **Not a model host.** Official Grok, custom relays, and tools all run through the local CLI.
+- **Account is optional.** A signed-in CLI is enough to work. In-app login is for quota, multi-account, and official extras.
+- **Permissions default to Ask.** YOLO / full access is an explicit choice.
+- **Shared mode does not rewrite `~/.grok` `config.toml`.** Use **independent** mode when the App should write providers, privacy, or workflows.
 
 ---
 
 ## Screenshots
 
-> From the current macOS development build.
+> From a recent macOS development build. Layout matches the current workbench.
 
-| Workbench · SuperGrok | Account & quota |
+| Workbench | Account & quota |
 |:---:|:---:|
 | ![Workbench](assets/screenshots/workbench.png) | ![Account](assets/screenshots/account.png) |
 
@@ -118,7 +184,7 @@ The `grok` CLI is powerful in a terminal. Day-to-day work still needs multi-proj
 
 ### 1. Download
 
-Get installers from the official site [grok-app.com](https://grok-app.com/) or [GitHub Releases](https://github.com/RongleCat/grok-app/releases):
+Get installers from the official site [grok-app.com](https://grok-app.com) or [GitHub Releases](https://github.com/RongleCat/grok-app/releases):
 
 | Platform | Artifact |
 |----------|----------|
@@ -156,25 +222,25 @@ Silent updates from **Settings → About** only work on **signed production buil
 
 ### 2. First run
 
-1. Launch → **Setup wizard** ensures CLI is installed (multi-mirror install supported)  
-2. (Optional) Official login / API key / custom relay — skippable. If your local `grok` CLI is already signed in, pick **Use existing CLI sign-in** — no re-authorization needed  
-3. **Add project** → trust a folder  
-4. **Connect agent** → chat when Ready  
-5. Permission bar defaults to **Ask**; use YOLO only when you want unattended runs  
+1. Launch → **Setup wizard** ensures CLI is installed (multi-mirror install supported)
+2. (Optional) Official login / API key / custom relay — skippable. If your local `grok` CLI is already signed in, pick **Use existing CLI sign-in** — no re-authorization needed
+3. **Add project** → trust a folder
+4. **Connect agent** → chat when Ready
+5. Permission bar defaults to **Ask**; use YOLO only when you want unattended runs
 
 ### 3. Requirements
 
-- Local **Grok Build CLI** (`grok`) **0.2.112 or newer**, often `~/.grok/bin/grok` or on `PATH` — older CLIs reject flags the app depends on (run `grok update` once after installing, then fully restart the app)  
-- Windows: `%USERPROFILE%\.grok\bin\grok.exe` or `PATH`; **WebView2 Runtime** (preinstalled on Windows 11; the installer bootstraps it otherwise)  
+- Local **Grok Build CLI** (`grok`) **0.2.112 or newer**, often `~/.grok/bin/grok` or on `PATH` — older CLIs reject flags the app depends on (run `grok update` once after installing, then fully restart the app)
+- Windows: `%USERPROFILE%\.grok\bin\grok.exe` or `PATH`; **WebView2 Runtime** (preinstalled on Windows 11; the installer bootstraps it otherwise)
 
 ### 4. Restricted networks (e.g. mainland China)
 
 Grok backends (`auth.x.ai` / `grok.com` / `cli-chat-proxy.grok.com`) may be unreachable by direct connection. If sign-in hangs or every message times out with `NETWORK_PROVIDER`:
 
-1. **Settings → Runtime → Network**: set the proxy (System / Manual, e.g. `http://127.0.0.1:7890`), then use **Test connection** to verify all three endpoints  
-2. Prefer **System HTTP** or **Manual** `http://127.0.0.1:7890` (Clash / Surge mixed-port) over TUN. The app resolves loopback PAC and injects `HTTP_PROXY` into agent processes — TUN is only needed when nothing else can route traffic  
-3. If your `grok` CLI is already signed in, reuse it via the setup wizard (or switch **Session data mode** to *shared*) instead of Browser OAuth  
-4. No launcher scripts or manually exported `HTTP_PROXY` variables are needed — the app injects the configured proxy into all agent processes  
+1. **Settings → Runtime → Network**: set the proxy (System / Manual, e.g. `http://127.0.0.1:7890`), then use **Test connection** to verify all three endpoints
+2. Prefer **System HTTP** or **Manual** `http://127.0.0.1:7890` (Clash / Surge mixed-port) over TUN. The app resolves loopback PAC and injects `HTTP_PROXY` into agent processes — TUN is only needed when nothing else can route traffic
+3. If your `grok` CLI is already signed in, reuse it via the setup wizard (or switch **Session data mode** to *shared*) instead of Browser OAuth
+4. No launcher scripts or manually exported `HTTP_PROXY` variables are needed — the app injects the configured proxy into all agent processes
 
 ---
 
@@ -191,10 +257,10 @@ open /Applications/Grok.app
 
 **Also works:**
 
-- Finder: **right-click** → **Open** → confirm  
-- **System Settings → Privacy & Security** → **Open Anyway**  
+- Finder: **right-click** → **Open** → confirm
+- **System Settings → Privacy & Security** → **Open Anyway**
 
-Only download from [grok-app.com](https://grok-app.com/) or this repo’s official [Releases](https://github.com/RongleCat/grok-app/releases).
+Only download from [grok-app.com](https://grok-app.com) or this repo’s official [Releases](https://github.com/RongleCat/grok-app/releases).
 
 ---
 
@@ -287,8 +353,8 @@ API keys prefer the OS secret store (macOS Keychain / Windows Credential Manager
 Linux Secret Service) with a `secrets.json` (mode `0600`) fallback when the OS store
 is unavailable. Do not commit secrets.
 
-Grok Build’s own config remains under **`~/.grok`** (CLI login, `auth.json`, …).  
-**shared** session mode can use `~/.grok`; **independent** mode uses `agent-home/`.
+Grok Build’s own config remains under **`~/.grok`** (CLI login, `auth.json`, …).
+**shared** session mode (product default) can use `~/.grok`; **independent** mode uses `agent-home/`.
 
 ---
 
