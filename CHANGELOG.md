@@ -12,6 +12,24 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+
+**中文 · 新增**
+
+### Changed
+
+**中文 · 变更**
+
+### Fixed
+
+**中文 · 修复**
+
+## [0.2.25] - 2026-08-23
+
+> **Highlight:** Desktop pet mirrors on the right of the screen and no longer wakes the workbench; appearance packs; long chats, files, and Settings stay full-window and responsive; Windows caption/titlebar geometry is honest.
+>
+> **中文 · 亮点：** 桌面宠物在屏幕右侧水平镜像且按下不再唤醒主窗；外观包；长对话、文件树和设置页铺满且更跟手；Windows 标题栏/最大化几何正确。
+
+### Added
 - **Windows `install-latest.cmd`**: with Node / pnpm / Rust / VS Build Tools, double-click to fast-forward `origin/main` and silently install an unsigned side-by-side **grok-app-latest** under `%LOCALAPPDATA%\grok-app-latest`. Does not replace official **Grok**. For people waiting on the next GitHub Release; not a signed production build (`docs/BUILD.md`).
 - **Appearance packs (.grokskin)**: Settings → Appearance can save, import, and export the current skin + wallpaper + crop + clip + overlay. Apply always confirms first. `grok://` and `.grokskin` files write a pending import and never auto-apply. Export bakes the visible wallpaper crop (video uses system ffmpeg when present).
 - **Custom provider extra request headers (#812)**: Settings → Account → Providers can add key/value HTTP headers. They write Grok Build `extra_headers` on `[model.<id>]` (sent verbatim). Use for AgentRouter / AnyRouter WAF (`User-Agent`, `Originator`) or Anthropic `x-api-key`. Empty list omits the field.
