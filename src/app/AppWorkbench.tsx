@@ -3,7 +3,6 @@ import {
   Suspense,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -84,32 +83,13 @@ import { savePermissionTimeoutSec } from "@/lib/permissionTimeout";
 import { saveAskUserTimeoutSec } from "@/lib/askUserTimeout";
 import { WallpaperMediaLayer } from "@/components/WallpaperMediaLayer";
 import {
-  ASIDE_WIDTH_MIN,
   DEFAULT_LAYOUT,
-  WINDOW_CONTROLS_INSET,
-  clampAsideWidth,
-  clampSidebarDragWidth,
-  clampSidebarWidth,
-  resolveSidebarDragEnd,
   SIDEBAR_DEFAULT_WIDTH,
   SIDEBAR_WIDTH_MIN,
-  saveLayout,
 } from "@/lib/layout";
-import {
-  applyLiveSplitWidth,
-  queryWorkbenchSplitPane,
-} from "@/lib/paneDragLive";
 import { resolveWorkbenchPaneOverlay } from "@/lib/paneOverlay";
-import {
-  ensureWindowFitsLayout,
-  isWindowFitSuppressed
-} from "@/lib/windowFit";
 import { isFakeMaximized } from "@/lib/windowChrome";
-import {
-  bumpPaneSplitMotion,
-  isPaneSplitMotionActive,
-  paneSplitSizeStyle,
-} from "@/lib/paneSplitMotion";
+import { paneSplitSizeStyle } from "@/lib/paneSplitMotion";
 import { usePaneSplitMotion } from "@/hooks/usePaneSplitMotion";
 import { useOpenPresence, VIEW_PRESENCE_MS } from "@/lib/openPresence";
 import { acquireNativeWebviewCover } from "@/lib/nativeWebviewCover";
@@ -223,11 +203,7 @@ import {
 } from "@/lib/processBudget";
 import {
   buildReliabilityCenter,
-  DEFAULT_RELIABILITY_MAX_ERRORS,
-  prependReliabilityRing,
   reliabilityErrorFromDeck,
-  type ReliabilityErrorEntry,
-  type ReliabilityStallSignal
 } from "@/lib/reliabilityCenter";
 import {
   buildGoalControlSummary,
@@ -250,12 +226,6 @@ import {
   sandboxProfileLabelKey,
   type SandboxProfileId
 } from "@/lib/sandboxProfile";
-import {
-  loadSandboxWizardDismissed,
-  markSandboxWizardDismissed,
-  shouldOfferSandboxWizard,
-  type SandboxWizardMode,
-} from "@/lib/sandboxWizard";
 import { shouldRestoreLastSession } from "@/lib/sessionRestore";
 import {
   listArchiveAgeOptionPreviews,
@@ -353,37 +323,7 @@ import {
   mapPermissionButtons
 } from "@/lib/permissionOptions";
 import { AskUserModal, dropAskUserClocks } from "@/components/AskUserModal";
-import {
-  clearSessionSearchFilters,
-  filterSessionSearch,
-  hasActiveSessionSearchFilters,
-  mergeSessionSearchHits,
-  resolveSessionSearchEmptyState,
-  shouldScanSessionContent,
-  type SessionContentHit,
-  type SessionSearchMode,
-  type SessionSearchRankMode
-} from "@/lib/sessionSearch";
-import {
-  loadSessionSearchFilterPref,
-  saveSessionSearchFilterPref,
-  SESSION_SEARCH_FILTER_CHANGE_EVENT
-} from "@/lib/sessionSearchFilterPref";
-import {
-  loadSessionSearchRankPref,
-  saveSessionSearchRankPref,
-  SESSION_SEARCH_RANK_CHANGE_EVENT
-} from "@/lib/sessionSearchRankPref";
-import {
-  defaultPaletteActions,
-  filterPaletteActions,
-  type PaletteActionDef
-} from "@/lib/paletteActions";
-import {
-  flattenSearchPanelItems,
-  type SearchPanelItem,
-} from "@/lib/searchPanelNav";
-import { useSearchPanelNav } from "@/hooks/useSearchPanelNav";
+import { type PaletteActionDef } from "@/lib/paletteActions";
 import {
   canOfferContinueCwd,
   classifyContinueCwdEmptyResult,
@@ -394,64 +334,12 @@ import {
   type ContinueCwdSoftFailKind
 } from "@/lib/continueCwd";
 import {
-  sessionExportMimeType,
-  sessionToHtml,
-  sessionToJson,
-  sessionToMarkdown,
-  sessionToPlain
-} from "@/lib/sessionExport";
-import {
-  buildStreamSessionNdjson,
-  streamSessionExportFilename,
-  streamSessionExportMimeType,
-  type StreamSessionExportFormat
-} from "@/lib/streamSessionExport";
-import {
-  canSessionExportActions,
-  classifySessionExportCliError,
-  estimateSessionExportSizeClass,
-  formatSessionExportBytes,
   isSessionExportJournalEmpty,
   joinSessionExportMenuSuffix,
   resolveSessionExportPath,
-  resolveSessionExportSoftFail,
-  sessionExportCliSoftFailsToJournal,
-  sessionExportDoneMessageKey,
   sessionExportFormatNameKey,
-  sessionExportMenuSuffixKeys,
-  sessionExportSafeFilename,
-  sessionExportSizeClassLabelKey
+  sessionExportMenuSuffixKeys
 } from "@/lib/sessionExportPro";
-import {
-  blobToBase64 as pngBlobToBase64,
-  buildExportImagePipeline,
-  copyPngBlob,
-  downloadPngBlob,
-  exportableToShareMessages,
-  sessionExportImageFilename,
-  type ShareCardMessage
-} from "@/lib/sessionExportImage";
-import {
-  buildSessionFilePathMap,
-  mergePathMaps
-} from "@/lib/sessionPathMap";
-import {
-  loadExportImageSkinPref,
-  saveExportImageSkinPref,
-  type ShareCardSkinId
-} from "@/lib/shareCardSkins";
-import {
-  buildExportImageMetaParts,
-  canExportImageActions,
-  deriveExportImagePreviewPhase,
-  exportImageBlobMatchesOptions,
-  formatExportImageBytes,
-  resolveExportImageError,
-  stampFromPipelineResult,
-  type ExportImageBlobStamp
-} from "@/lib/exportSharePro";
-import { loadExportLogoPref } from "@/lib/exportLogoPref";
-import { recordTraceExport } from "@/lib/traceHistory";
 import {
   clearPlanHistory,
   loadPlanHistory,
@@ -530,7 +418,6 @@ import { ChatFindLive } from "@/components/ChatFindLive";
 import {
   applyResolvedSessionMedia,
   buildAgentPrompt,
-  buildInlineMediaPathMap,
   collectSessionRelativeMediaRefs,
   isDisplayableAttachmentPath,
   isImagePath,
@@ -1140,6 +1027,13 @@ import { useGhostStreamingHeal } from "@/hooks/useGhostStreamingHeal";
 import { useAccountQuotaAutoRefresh } from "@/hooks/useAccountQuotaAutoRefresh";
 import { useWorkbenchDisplayPrefs } from "@/hooks/useWorkbenchDisplayPrefs";
 import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
+import { useSearchPalette } from "@/hooks/useSearchPalette";
+import { useSessionExportText } from "@/hooks/useSessionExportText";
+import { useSessionExportImage } from "@/hooks/useSessionExportImage";
+import {
+  useReliabilityCenter,
+  useSandboxWizard,
+} from "@/hooks/useSandboxReliability";
 import { createDebouncedSkillsReload } from "@/lib/skillCatalogRefresh";
 
 /** App-local plan chrome state (session-scoped via planBySessionRef). */
@@ -1379,16 +1273,35 @@ export function AppWorkbench() {
     resumeRestoreBusy,
     setResumeRestoreBusy,
   } = useAppDialogs();
+  const asideCloseExtrasRef = useRef<() => void>(() => {});
   const {
     layout,
-    setLayout,
     layoutRef,
     zenMode,
     setZenModeEnabled,
     transcriptFilter,
     toggleTranscriptFilter,
     phoneLayout,
-  } = useWorkbenchLayout();
+    viewportWidth,
+    sidebarOpenW,
+    asideOpenW,
+    sidebarOverlay,
+    resizingAside,
+    resizingSidebar,
+    openAsidePane,
+    openAsidePaneRef,
+    closeAsidePane,
+    collapseAsidePersisted,
+    collapseChromeEphemeral,
+    openSidebarPane,
+    closeSidebarPane,
+    closePhoneDrawer,
+    openPhoneDrawer,
+    beginSidebarResize,
+    beginAsideResize,
+  } = useWorkbenchLayout({
+    onAsideClose: () => asideCloseExtrasRef.current(),
+  });
   /** Side Workbench multi-kind tabs (session-local; Phase 0+). */
   const [sideWorkbench, setSideWorkbench] = useState<SideWorkbenchState>(
     emptySideWorkbenchState,
@@ -1759,27 +1672,14 @@ export function AppWorkbench() {
     path: string;
     name: string;
   } | null>(null);
-  const searchPanelRef = useRef<HTMLDivElement>(null);
   const compactModalRef = useRef<HTMLFormElement>(null);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  /** Keyword hybrid scope: all | title | content (no embeddings). Persisted. */
-  const [searchMode, setSearchMode] = useState<SessionSearchMode>(
-    () => loadSessionSearchFilterPref().mode,
-  );
-  const [searchIncludeArchived, setSearchIncludeArchived] = useState(
-    () => loadSessionSearchFilterPref().includeArchived,
-  );
-  /** Keyword vs local hybrid ranking for palette session search. */
-  const [searchRankMode, setSearchRankMode] = useState<SessionSearchRankMode>(
-    () => loadSessionSearchRankPref(),
-  );
-  /** Debounced journal content hits from `sessions_search`. */
-  const [contentSearchHits, setContentSearchHits] = useState<
-    SessionContentHit[]
-  >([]);
-  const [contentSearchLoading, setContentSearchLoading] = useState(false);
-  const contentSearchSeq = useRef(0);
+  /** Filled after `useSearchPalette` mounts; shortcuts bind before that. */
+  const searchPaletteApiRef = useRef({
+    openPalette: () => {},
+    openBlank: () => {},
+    closePalette: () => {},
+    open: false,
+  });
   /** Floating composer shell — height drives chat bottom padding. */
   const composerWrapRef = useRef<HTMLDivElement>(null);
   /** Set by newChat; applied after chat pane + textarea mount. */
@@ -1832,17 +1732,6 @@ export function AppWorkbench() {
 
   // ContextMenu handles outside click + Escape for sidebar menus.
 
-  // Command palette: Tab trap + Escape (autoFocus on input).
-  useEffect(() => {
-    if (!showSearch) return;
-    return installDialogFocus(() => searchPanelRef.current, {
-      onEscape: () => setShowSearch(false),
-      capture: true,
-      initialFocus: "none",
-      restoreFocus: true,
-    });
-  }, [showSearch]);
-
   // Compact slash dialog — focus trap + Escape.
   useEffect(() => {
     if (!showCompactModal) return;
@@ -1858,56 +1747,6 @@ export function AppWorkbench() {
     });
   }, [showCompactModal]);
 
-  // Settings (or other windows) may change hybrid rank pref via localStorage event.
-  // Settings (or other windows) may change hybrid rank / filter prefs.
-  useEffect(() => {
-    const syncRank = () => setSearchRankMode(loadSessionSearchRankPref());
-    const syncFilters = () => {
-      const f = loadSessionSearchFilterPref();
-      setSearchMode(f.mode);
-      setSearchIncludeArchived(f.includeArchived);
-    };
-    const syncAll = () => {
-      syncRank();
-      syncFilters();
-    };
-    const onRank = (e: Event) => {
-      const detail = (e as CustomEvent<SessionSearchRankMode>).detail;
-      if (detail === "hybrid" || detail === "keyword") {
-        setSearchRankMode(detail);
-      } else {
-        syncRank();
-      }
-    };
-    const onFilter = (e: Event) => {
-      const detail = (
-        e as CustomEvent<{ mode?: SessionSearchMode; includeArchived?: boolean }>
-      ).detail;
-      if (detail && typeof detail === "object") {
-        if (
-          detail.mode === "all" ||
-          detail.mode === "title" ||
-          detail.mode === "content"
-        ) {
-          setSearchMode(detail.mode);
-        }
-        if (typeof detail.includeArchived === "boolean") {
-          setSearchIncludeArchived(detail.includeArchived);
-        }
-      } else {
-        syncFilters();
-      }
-    };
-    window.addEventListener(SESSION_SEARCH_RANK_CHANGE_EVENT, onRank);
-    window.addEventListener(SESSION_SEARCH_FILTER_CHANGE_EVENT, onFilter);
-    window.addEventListener("storage", syncAll);
-    return () => {
-      window.removeEventListener(SESSION_SEARCH_RANK_CHANGE_EVENT, onRank);
-      window.removeEventListener(SESSION_SEARCH_FILTER_CHANGE_EVENT, onFilter);
-      window.removeEventListener("storage", syncAll);
-    };
-  }, []);
-
   useEffect(() => {
     if (!sessionSelectMode) return;
     const onKey = (e: KeyboardEvent) => {
@@ -1920,51 +1759,6 @@ export function AppWorkbench() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [sessionSelectMode]);
-
-  // Debounced content search over App journals (title filter stays instant).
-  // Title-only mode skips the journal scan entirely.
-  useEffect(() => {
-    if (!showSearch) {
-      setContentSearchHits([]);
-      setContentSearchLoading(false);
-      return;
-    }
-    const q = searchQuery.trim();
-    if (!shouldScanSessionContent(q, searchMode)) {
-      setContentSearchHits([]);
-      setContentSearchLoading(false);
-      return;
-    }
-    setContentSearchLoading(true);
-    const seq = ++contentSearchSeq.current;
-    const t = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const hits = await api.sessionsSearch(q, 20);
-          if (contentSearchSeq.current !== seq) return;
-          setContentSearchHits(
-            hits.map((h) => ({
-              id: h.id,
-              title: h.title,
-              projectId: h.projectId,
-              snippet: h.snippet,
-              matchCount: h.matchCount,
-              updatedAt: h.updatedAt,
-              archived: h.archived,
-            })),
-          );
-        } catch {
-          if (contentSearchSeq.current !== seq) return;
-          setContentSearchHits([]);
-        } finally {
-          if (contentSearchSeq.current === seq) {
-            setContentSearchLoading(false);
-          }
-        }
-      })();
-    }, 280);
-    return () => window.clearTimeout(t);
-  }, [searchQuery, showSearch, searchMode]);
 
   // Global shortcuts: search, find-in-chat, help, doctor, copy last reply, toggle sidebar, new chat, settings, voice, Esc-stop.
   // Handlers go through refs so we don't re-bind every render.
@@ -2154,7 +1948,7 @@ export function AppWorkbench() {
           shortcutHandlersRef.current.openChatFind();
           return;
         case "search":
-          setShowSearch(true);
+          searchPaletteApiRef.current.openPalette();
           return;
         case "help":
           setShowShortcuts((v) => !v);
@@ -2288,23 +2082,19 @@ export function AppWorkbench() {
    */
   const planCompletedRecordedRef = useRef(new Set<string>());
   /** Reliability / Observability center (busy · stalls · error deck). */
-  const [showReliability, setShowReliability] = useState(false);
-  /** In-session ring of recent stall events (soft/hard); no secrets. */
-  const [recentStallSignals, setRecentStallSignals] = useState<
-    ReliabilityStallSignal[]
-  >([]);
-  /** In-session ring of recent error-deck cards. */
-  const [recentErrorEntries, setRecentErrorEntries] = useState<
-    ReliabilityErrorEntry[]
-  >([]);
+  const {
+    open: showReliability,
+    openCenter: openReliability,
+    closeCenter: closeReliability,
+    recentStallSignals,
+    setRecentStallSignals,
+    recentErrorEntries,
+    recordError: recordReliabilityError,
+  } = useReliabilityCenter();
   const [showShortcuts, setShowShortcuts] = useState(false);
   /** Optional product tour (not first-run account setup). */
   const [showProductTutorial, setShowProductTutorial] = useState(false);
   const productTutorialAutoOfferedRef = useRef(false);
-  /** Sandbox profile wizard after trust / Settings guide. */
-  const [sandboxWizardOpen, setSandboxWizardOpen] = useState(false);
-  const [sandboxWizardMode, setSandboxWizardMode] =
-    useState<SandboxWizardMode>("trust");
   // Soft one-time product tour after setup gate — never blocks setup wizard.
   useEffect(() => {
     if (appGate !== "ready") return;
@@ -2441,6 +2231,11 @@ export function AppWorkbench() {
    * open is a clean files pane, not a stuck Plan workbench.
    */
   const planOpenedAsideRef = useRef(false);
+  asideCloseExtrasRef.current = () => {
+    planOpenedAsideRef.current = false;
+    setSideWorkbench((s) => (s.expanded ? { ...s, expanded: false } : s));
+    setSideDockComposer(false);
+  };
   /** Live drag-drop target for zone overlays (null = not dragging). */
   const [dragZone, setDragZone] = useState<"sidebar" | "main" | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -2478,6 +2273,15 @@ export function AppWorkbench() {
   const [backgroundWaitTimeoutSec, setBackgroundWaitTimeoutSec] = useState(600);
   const [storeApiKeysInKeychain, setStoreApiKeysInKeychain] = useState(false);
   const [sandboxProfile, setSandboxProfile] = useState(DEFAULT_SANDBOX_PROFILE);
+  const {
+    open: sandboxWizardOpen,
+    mode: sandboxWizardMode,
+    maybeOfferAfterTrust: maybeOfferSandboxWizardAfterTrust,
+    openGuide: openSandboxWizardGuide,
+    close: closeSandboxWizard,
+    skip: skipSandboxWizard,
+    finishApply: finishSandboxWizardApply,
+  } = useSandboxWizard({ sandboxProfile });
   /** Preferred CLI agent definition for spawn (`""` = CLI default). */
   const [preferredAgent, setPreferredAgent] = useState("");
   /** Optional `grok agent --agent-profile <PATH>` (empty = omit). */
@@ -2733,26 +2537,6 @@ export function AppWorkbench() {
     },
     [syncViewedTurnClock],
   );
-  const [resizingAside, setResizingAside] = useState(false);
-  const [resizingSidebar, setResizingSidebar] = useState(false);
-  const [viewportWidth, setViewportWidth] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth : 1280,
-  );
-  const sidebarOpenW = layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH;
-  const asideOpenW = Math.max(
-    layout.asideWidth || 0,
-    DEFAULT_LAYOUT.asideWidth,
-    ASIDE_WIDTH_MIN,
-  );
-  const sidebarOverlay =
-    !phoneLayout &&
-    resolveWorkbenchPaneOverlay({
-      viewportWidth,
-      sidebarOpen: true,
-      sidebarWidth: sidebarOpenW,
-      asideOpen: !layout.asideCollapsed,
-      asideWidth: asideOpenW,
-    }).sidebarOverlay;
   const asideOverlay =
     !phoneLayout &&
     !shouldHideChatForSideExpand({
@@ -2772,14 +2556,6 @@ export function AppWorkbench() {
     phoneLayout,
     asideOverlay,
   });
-  const asideFitGenRef = useRef(0);
-  const sidebarFitGenRef = useRef(0);
-  /** Pointer-drag origin for left-rail resize (clientX + width at down). */
-  const sidebarResizeStartRef = useRef<{ x: number; width: number } | null>(
-    null,
-  );
-  const liveSidebarWidthRef = useRef(sidebarOpenW);
-  const liveAsideWidthRef = useRef(asideOpenW);
   const [account, setAccount] = useState<api.AccountStatus | null>(null);
   const [accountLoading, setAccountLoading] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
@@ -2805,175 +2581,9 @@ export function AppWorkbench() {
     enabled: !phoneLayout && !isMirrorClient(),
   });
   const dragRegion = tauriDragRegion(platform);
-  /** Right inset so resource chrome icons clear min/max/close. */
-  const windowControlsInset = useCustomWindowChrome ? WINDOW_CONTROLS_INSET : 0;
   const [windowMaximized, setWindowMaximized] = useState(false);
 
-  const asideClampOpts = useCallback((): {
-    windowControlsInset: number;
-    viewportWidth?: number;
-    sidebarOccupiedWidth?: number;
-  } => {
-    const sidebarOpen =
-      !layout.sidebarCollapsed && !phoneLayout && !sidebarOverlay;
-    return {
-      windowControlsInset,
-      viewportWidth:
-        typeof window !== "undefined" ? window.innerWidth : undefined,
-      // Match open `.sidebar` width so aside max leaves chat ≥ MAIN_CHAT_MIN_WIDTH.
-      sidebarOccupiedWidth: sidebarOpen
-        ? layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH
-        : 0,
-    };
-  }, [
-    windowControlsInset,
-    layout.sidebarCollapsed,
-    layout.sidebarWidth,
-    phoneLayout,
-    sidebarOverlay,
-  ]);
-
-  /**
-   * Soft-grow the right resource pane from content hints (preview kind, tree,
-   * tabs). Never auto-shrink a wider user width; always enforce chrome-safe min
-   * so action icons do not sit under window controls.
-   */
-  /**
-   * Single grow + optional aside clamp. One setSize only — no multi-pass
-   * measure loops (those caused grow↔clamp flicker).
-   */
-  const fitWindowThenClampAside = useCallback(
-    async (projected: {
-      sidebarCollapsed: boolean;
-      sidebarWidth: number;
-      asideCollapsed: boolean;
-      asideWidth: number;
-    }) => {
-      if (phoneLayout) return projected.asideWidth;
-      const preferredAside = projected.asideCollapsed
-        ? projected.asideWidth
-        : Math.max(
-            projected.asideWidth || 0,
-            DEFAULT_LAYOUT.asideWidth,
-            ASIDE_WIDTH_MIN,
-          );
-      const target = {
-        ...projected,
-        sidebarWidth: projected.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-        asideWidth: preferredAside,
-      };
-      await ensureWindowFitsLayout(target);
-      if (projected.asideCollapsed) return projected.asideWidth;
-      const opts = {
-        ...asideClampOpts(),
-        viewportWidth:
-          typeof window !== "undefined" ? window.innerWidth : undefined,
-        sidebarOccupiedWidth: projected.sidebarCollapsed
-          ? 0
-          : target.sidebarWidth,
-      };
-      return clampAsideWidth(preferredAside, opts);
-    },
-    [asideClampOpts, phoneLayout],
-  );
-
-  /**
-   * Open the right pane immediately, then fit/clamp the window in the
-   * background. Waiting on Tauri window APIs before uncollapsing made chat
-   * file-card preview feel like the side pane was frozen for a long time.
-   */
-  const openAsidePane = useCallback(() => {
-    if (phoneLayout) {
-      setLayout((l) => {
-        if (!l.asideCollapsed) return l;
-        const n = { ...l, asideCollapsed: false };
-        saveLayout(localStorage, n);
-        return n;
-      });
-      return;
-    }
-    const cur = layoutRef.current;
-    const preferredAside = Math.max(
-      cur.asideWidth || 0,
-      DEFAULT_LAYOUT.asideWidth,
-      ASIDE_WIDTH_MIN,
-    );
-    const vw =
-      typeof window !== "undefined" ? window.innerWidth : viewportWidth;
-    const overlay = resolveWorkbenchPaneOverlay({
-      viewportWidth: vw,
-      sidebarOpen: !cur.sidebarCollapsed,
-      sidebarWidth: cur.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-      asideOpen: true,
-      asideWidth: preferredAside,
-    });
-    // Sync-clamp to the *current* viewport before paint. Opening at preferred
-    // width first (old path) made sidebar + main min + aside overflow narrow
-    // non-maximized windows, clipping the side chrome close control off-screen.
-    const syncWidth = overlay.asideOverlay
-      ? preferredAside
-      : clampAsideWidth(preferredAside, {
-          ...asideClampOpts(),
-          viewportWidth: vw,
-          sidebarOccupiedWidth:
-            cur.sidebarCollapsed || overlay.sidebarOverlay
-              ? 0
-              : cur.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-        });
-    // If the frame is too tight for any aside (syncWidth 0), still paint a
-    // small pane and let window fit / expand try to recover.
-    const paintWidth = overlay.asideOverlay
-      ? preferredAside
-      : syncWidth > 0
-        ? syncWidth
-        : Math.min(preferredAside, ASIDE_WIDTH_MIN);
-    setLayout((l) => {
-      if (!l.asideCollapsed && (l.asideWidth || 0) === paintWidth) return l;
-      const n = {
-        ...l,
-        asideCollapsed: false,
-        asideWidth: paintWidth,
-      };
-      saveLayout(localStorage, n);
-      return n;
-    });
-    const projected = {
-      sidebarCollapsed: cur.sidebarCollapsed,
-      sidebarWidth: cur.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-      asideCollapsed: false as const,
-      asideWidth: preferredAside,
-    };
-    if (overlay.asideOverlay) return;
-    const fitGen = ++asideFitGenRef.current;
-    void fitWindowThenClampAside(projected).then((width) => {
-      if (asideFitGenRef.current !== fitGen) return;
-      setLayout((l) => {
-        // User may have closed the pane while the window fit was in flight.
-        if (l.asideCollapsed) return l;
-        if (l.asideWidth === width) return l;
-        if (isPaneSplitMotionActive()) bumpPaneSplitMotion();
-        const n = { ...l, asideWidth: width };
-        saveLayout(localStorage, n);
-        return n;
-      });
-    });
-  }, [asideClampOpts, fitWindowThenClampAside, phoneLayout, viewportWidth]);
-
-  /** Collapse the right Side Workbench (and exit expand / dock composer). */
-  const closeAsidePane = useCallback(() => {
-    asideFitGenRef.current += 1;
-    planOpenedAsideRef.current = false;
-    setSideWorkbench((s) => (s.expanded ? { ...s, expanded: false } : s));
-    setSideDockComposer(false);
-    setLayout((l) => {
-      if (l.asideCollapsed) return l;
-      const n = { ...l, asideCollapsed: true };
-      saveLayout(localStorage, n);
-      return n;
-    });
-  }, []);
-
-  /** Route chat context opens into Side Workbench tabs (Phase 6).
+  /** Route chat context opens into Side Workbench tabs.
    * When the aside is mounted, SideWorkbench `openRequest` is the only consumer. */
   useEffect(() => {
     if (!resourceOpenTarget) return;
@@ -2991,95 +2601,6 @@ export function AppWorkbench() {
     setResourceOpenTarget(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume once per target
   }, [resourceOpenTarget, layout.asideCollapsed]);
-
-  /**
-   * Open the left rail immediately, then fit/clamp the window in the
-   * background. Waiting on Tauri setSize first skipped the CSS width
-   * interpolation (same freeze we already fixed on the right pane).
-   */
-  const openSidebarPane = useCallback(() => {
-    if (phoneLayout) {
-      setLayout((l) => {
-        if (!l.sidebarCollapsed) return l;
-        const n = { ...l, sidebarCollapsed: false };
-        saveLayout(localStorage, n);
-        return n;
-      });
-      return;
-    }
-    const cur = layoutRef.current;
-    if (!cur.sidebarCollapsed) return;
-    const vw =
-      typeof window !== "undefined" ? window.innerWidth : viewportWidth;
-    const asideW = Math.max(
-      cur.asideWidth || 0,
-      DEFAULT_LAYOUT.asideWidth,
-      ASIDE_WIDTH_MIN,
-    );
-    const overlay = resolveWorkbenchPaneOverlay({
-      viewportWidth: vw,
-      sidebarOpen: true,
-      sidebarWidth: cur.sidebarWidth || SIDEBAR_WIDTH_MIN,
-      asideOpen: !cur.asideCollapsed,
-      asideWidth: asideW,
-    });
-    // After auto-collapse (drag below threshold) width is stored as MIN;
-    // always open at least SIDEBAR_WIDTH_MIN.
-    const openWidth = clampSidebarWidth(
-      cur.sidebarWidth || SIDEBAR_WIDTH_MIN,
-      {
-        viewportWidth: vw,
-        asideOccupiedWidth:
-          cur.asideCollapsed || overlay.asideOverlay
-            ? 0
-            : cur.asideWidth || 0,
-      },
-    );
-    setLayout((l) => {
-      if (!l.sidebarCollapsed && (l.sidebarWidth || 0) === openWidth) return l;
-      const n = {
-        ...l,
-        sidebarCollapsed: false,
-        sidebarWidth: openWidth,
-      };
-      saveLayout(localStorage, n);
-      return n;
-    });
-    const projected = {
-      sidebarCollapsed: false as const,
-      sidebarWidth: openWidth,
-      asideCollapsed: cur.asideCollapsed,
-      asideWidth: cur.asideCollapsed
-        ? cur.asideWidth
-        : Math.max(cur.asideWidth || 0, DEFAULT_LAYOUT.asideWidth),
-    };
-    if (overlay.sidebarOverlay) return;
-    const fitGen = ++sidebarFitGenRef.current;
-    void fitWindowThenClampAside(projected).then((width) => {
-      if (sidebarFitGenRef.current !== fitGen) return;
-      setLayout((l) => {
-        if (l.sidebarCollapsed) return l;
-        if (projected.asideCollapsed || l.asideWidth === width) return l;
-        if (isPaneSplitMotionActive()) bumpPaneSplitMotion();
-        const n = { ...l, asideWidth: width };
-        saveLayout(localStorage, n);
-        return n;
-      });
-    });
-  }, [fitWindowThenClampAside, phoneLayout, viewportWidth]);
-
-  const closeSidebarPane = useCallback(() => {
-    sidebarFitGenRef.current += 1;
-    setLayout((l) => {
-      if (l.sidebarCollapsed) return l;
-      const n = { ...l, sidebarCollapsed: true };
-      saveLayout(localStorage, n);
-      return n;
-    });
-  }, []);
-
-  const openAsidePaneRef = useRef(openAsidePane);
-  openAsidePaneRef.current = openAsidePane;
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -3227,11 +2748,7 @@ export function AppWorkbench() {
         }
         // Collapse chrome in secondary so the chat is front-and-center.
         if (secondary) {
-          setLayout((l) => {
-            if (l.sidebarCollapsed && l.asideCollapsed) return l;
-            // Do not persist secondary layout over the main window's prefs.
-            return { ...l, sidebarCollapsed: true, asideCollapsed: true };
-          });
+          collapseChromeEphemeral();
           setAppView("workbench");
           setMainPane("chat");
         }
@@ -4084,76 +3601,6 @@ export function AppWorkbench() {
     };
   }, [tr]);
 
-  useEffect(() => {
-    const sync = () => setViewportWidth(window.innerWidth);
-    sync();
-    window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
-  }, []);
-
-  // User-driven window resize only: clamp open aside. Ignore programmatic setSize
-  // (isWindowFitSuppressed) so open-pane fit does not fight resize handlers.
-  useEffect(() => {
-    if (phoneLayout) return;
-    let resizeTimer: number | null = null;
-    const onResize = () => {
-      if (isWindowFitSuppressed() || isPaneSplitMotionActive()) return;
-      if (resizeTimer != null) window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(() => {
-        if (isWindowFitSuppressed() || isPaneSplitMotionActive()) return;
-        const opts = asideClampOpts();
-        setLayout((l) => {
-          if (l.asideCollapsed) return l;
-          const next = clampAsideWidth(l.asideWidth, opts);
-          if (next === l.asideWidth) return l;
-          const n = { ...l, asideWidth: next };
-          saveLayout(localStorage, n);
-          return n;
-        });
-      }, 150);
-    };
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      if (resizeTimer != null) window.clearTimeout(resizeTimer);
-    };
-  }, [asideClampOpts, phoneLayout]);
-
-  // Cold start once: if panes restored open, clamp aside to the *current*
-  // window only. Do NOT grow the OS window here — geometry was restored before
-  // show; a post-show setSize flashes size (large↔small). Pane open handlers
-  // still call fitWindowThenClampAside when the user opens a rail.
-  useEffect(() => {
-    if (phoneLayout || !api.isDesktopHost()) return;
-    let cancelled = false;
-    const t = window.setTimeout(() => {
-      if (cancelled) return;
-      const l = layoutRef.current;
-      if (l.asideCollapsed) return;
-      const opts = {
-        ...asideClampOpts(),
-        viewportWidth:
-          typeof window !== "undefined" ? window.innerWidth : undefined,
-        sidebarOccupiedWidth: l.sidebarCollapsed
-          ? 0
-          : l.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-      };
-      const width = clampAsideWidth(l.asideWidth, opts);
-      if (width === l.asideWidth) return;
-      setLayout((prev) => {
-        if (prev.asideCollapsed || prev.asideWidth === width) return prev;
-        const n = { ...prev, asideWidth: width };
-        saveLayout(localStorage, n);
-        return n;
-      });
-    }, 200);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only cold clamp
-  }, [phoneLayout]);
-
   // Keep composer above the soft keyboard via visualViewport inset.
   useEffect(() => {
     if (!phoneLayout) {
@@ -4184,23 +3631,6 @@ export function AppWorkbench() {
     };
   }, [phoneLayout]);
 
-  const closePhoneDrawer = useCallback(() => {
-    setLayout((l) => {
-      if (l.sidebarCollapsed) return l;
-      const n = { ...l, sidebarCollapsed: true };
-      saveLayout(localStorage, n);
-      return n;
-    });
-  }, []);
-
-  const openPhoneDrawer = useCallback(() => {
-    setLayout((l) => {
-      if (!l.sidebarCollapsed) return l;
-      const n = { ...l, sidebarCollapsed: false };
-      saveLayout(localStorage, n);
-      return n;
-    });
-  }, []);
 
   /**
    * Debounced skills_list reload after conversation skill installs.
@@ -5031,6 +4461,43 @@ export function AppWorkbench() {
 
   const openSessionRef = useRef(openSession);
   openSessionRef.current = openSession;
+
+  const searchPaletteHostRef = useRef({
+    runAction: (_action: PaletteActionDef) => {},
+  });
+  const searchPalette = useSearchPalette({
+    sessions,
+    projects,
+    tr,
+    onRunAction: (action) => searchPaletteHostRef.current.runAction(action),
+    onPickProject: (p) => {
+      projectSpaces.revealProject(p.id);
+      setProjectsOpen(true);
+      setExpandedProjects((e) => ({ ...e, [p.id]: true }));
+    },
+    onPickSession: (hit) => {
+      const s = sessions.find((x) => x.id === hit.id);
+      const row: SessionRow =
+        s ??
+        normalizeSessionRow({
+          id: hit.id,
+          title: hit.title,
+          projectId: hit.projectId ?? null,
+          updatedAt: "",
+          archived: hit.archived,
+        });
+      const proj = projects.find(
+        (p) => p.id === (row.projectId ?? hit.projectId),
+      );
+      void openSessionRef.current(row, proj ?? null);
+    },
+  });
+  searchPaletteApiRef.current = {
+    openPalette: searchPalette.openPalette,
+    openBlank: searchPalette.openBlank,
+    closePalette: searchPalette.closePalette,
+    open: searchPalette.open,
+  };
 
   // Persist sidebar project collapse (only false entries) after hydrate.
   useEffect(() => {
@@ -7409,109 +6876,6 @@ export function AppWorkbench() {
     setCtxMenu({ kind: "project", id: proj.id, x: e.clientX, y: e.clientY });
   };
 
-  const searchHits = useMemo(
-    () =>
-      filterSessionSearch(
-        searchQuery,
-        sessions.map((s) => ({
-          id: s.id,
-          title: s.title,
-          projectId: s.projectId,
-          archived: s.archived,
-        })),
-        projects.map((p) => ({ id: p.id, name: p.name, path: p.path })),
-        {
-          includeArchived: searchIncludeArchived,
-          mode: searchMode,
-          rankMode: searchRankMode,
-        },
-      ),
-    [searchQuery, sessions, projects, searchIncludeArchived, searchMode, searchRankMode],
-  );
-
-  const mergedSessionHits = useMemo(
-    () =>
-      mergeSessionSearchHits(
-        searchQuery,
-        searchHits.matchedSessions,
-        contentSearchHits,
-        {
-          includeArchived: searchIncludeArchived,
-          mode: searchMode,
-          rankMode: searchRankMode,
-        },
-      ),
-    [
-      searchQuery,
-      searchHits.matchedSessions,
-      contentSearchHits,
-      searchIncludeArchived,
-      searchMode,
-      searchRankMode,
-    ],
-  );
-
-  const paletteActionHits = useMemo(
-    () => filterPaletteActions(searchQuery, defaultPaletteActions(), tr),
-    [searchQuery, tr],
-  );
-
-  const searchPaletteItems = useMemo(
-    () =>
-      flattenSearchPanelItems({
-        actions: paletteActionHits,
-        projects: searchHits.matchedProjects,
-        sessions: mergedSessionHits,
-      }),
-    [paletteActionHits, searchHits.matchedProjects, mergedSessionHits],
-  );
-
-  const searchEmptyState = useMemo(
-    () =>
-      resolveSessionSearchEmptyState({
-        query: searchQuery,
-        sessionHitCount: mergedSessionHits.length,
-        contentLoading: contentSearchLoading,
-        mode: searchMode,
-        includeArchived: searchIncludeArchived,
-        rankMode: searchRankMode,
-      }),
-    [
-      searchQuery,
-      mergedSessionHits.length,
-      contentSearchLoading,
-      searchMode,
-      searchIncludeArchived,
-      searchRankMode,
-    ],
-  );
-
-  const searchFiltersActive = useMemo(
-    () =>
-      hasActiveSessionSearchFilters({
-        mode: searchMode,
-        includeArchived: searchIncludeArchived,
-      }),
-    [searchMode, searchIncludeArchived],
-  );
-
-  const applySearchMode = useCallback((mode: SessionSearchMode) => {
-    setSearchMode(mode);
-    saveSessionSearchFilterPref({ mode });
-  }, []);
-
-  const applySearchIncludeArchived = useCallback((includeArchived: boolean) => {
-    setSearchIncludeArchived(includeArchived);
-    saveSessionSearchFilterPref({ includeArchived });
-  }, []);
-
-  const clearSearchFilters = useCallback(() => {
-    const next = clearSessionSearchFilters();
-    setSearchMode(next.mode);
-    setSearchIncludeArchived(next.includeArchived);
-    saveSessionSearchFilterPref(next);
-  }, []);
-
   const agentDashboardRows = useMemo(
     () =>
       collectAgentDashboardRows({
@@ -9271,164 +8635,6 @@ export function AppWorkbench() {
     tr,
   ]);
 
-  // Drag-resize right resource pane.
-  // Live clamp only — do NOT fitWindowThenClampAside on pointer-up (that
-  // re-applied preferred min / window grow and bounced the divider back).
-  // Width is written on the aside element during move; layout commits on up.
-  useEffect(() => {
-    if (!resizingAside) return;
-    const clampOpts = () => ({
-      ...asideClampOpts(),
-      viewportWidth: window.innerWidth,
-    });
-    const pane = queryWorkbenchSplitPane("aside");
-    liveAsideWidthRef.current = clampAsideWidth(
-      layoutRef.current.asideWidth,
-      clampOpts(),
-    );
-    applyLiveSplitWidth(pane, liveAsideWidthRef.current);
-    const onMove = (e: PointerEvent) => {
-      if (isWindowFitSuppressed()) return;
-      const desired = Math.round(window.innerWidth - e.clientX);
-      const next = clampAsideWidth(desired, clampOpts());
-      if (next === liveAsideWidthRef.current) return;
-      liveAsideWidthRef.current = next;
-      applyLiveSplitWidth(pane, next);
-    };
-    const onUp = () => {
-      setResizingAside(false);
-      // Persist the last live width (same clamp as drag). No window grow /
-      // preferredAside bump — those caused a visible spring-back at chat min.
-      const width = clampAsideWidth(liveAsideWidthRef.current, clampOpts());
-      setLayout((l) => {
-        const n = {
-          ...l,
-          asideCollapsed: false,
-          asideWidth: width,
-        };
-        saveLayout(localStorage, n);
-        return n;
-      });
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-  }, [asideClampOpts, resizingAside]);
-
-  // Drag-resize left session rail.
-  // Collapse as soon as desired width crosses below the open min — never paint
-  // a crushed rail, and do not wait for pointer-up.
-  useEffect(() => {
-    if (!resizingSidebar) return;
-    const clampOpts = () => {
-      const cur = layoutRef.current;
-      return {
-        viewportWidth: window.innerWidth,
-        asideOccupiedWidth: cur.asideCollapsed ? 0 : cur.asideWidth || 0,
-      };
-    };
-    const endResizeChrome = () => {
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-    const pane = queryWorkbenchSplitPane("sidebar");
-    liveSidebarWidthRef.current =
-      layoutRef.current.sidebarWidth || SIDEBAR_DEFAULT_WIDTH;
-    applyLiveSplitWidth(pane, liveSidebarWidthRef.current);
-    const applyCollapseLive = () => {
-      const cur = layoutRef.current;
-      const n = {
-        ...cur,
-        sidebarCollapsed: true,
-        sidebarWidth: SIDEBAR_WIDTH_MIN,
-      };
-      setLayout(n);
-      saveLayout(localStorage, n);
-      sidebarResizeStartRef.current = null;
-      setResizingSidebar(false);
-      endResizeChrome();
-    };
-    const onMove = (e: PointerEvent) => {
-      if (isWindowFitSuppressed()) return;
-      const start = sidebarResizeStartRef.current;
-      if (!start) return;
-      const desired = Math.round(start.width + (e.clientX - start.x));
-      // Live collapse before any compressed layout is shown.
-      if (desired < SIDEBAR_WIDTH_MIN) {
-        applyCollapseLive();
-        return;
-      }
-      const next = clampSidebarDragWidth(desired, clampOpts());
-      if (next === liveSidebarWidthRef.current) return;
-      liveSidebarWidthRef.current = next;
-      applyLiveSplitWidth(pane, next);
-    };
-    const onUp = () => {
-      // If we already live-collapsed, effect teardown cleared state — still safe.
-      if (!sidebarResizeStartRef.current && layoutRef.current.sidebarCollapsed) {
-        setResizingSidebar(false);
-        endResizeChrome();
-        return;
-      }
-      setResizingSidebar(false);
-      sidebarResizeStartRef.current = null;
-      const cur = layoutRef.current;
-      if (cur.sidebarCollapsed) {
-        endResizeChrome();
-        return;
-      }
-      const resolved = resolveSidebarDragEnd(
-        liveSidebarWidthRef.current || SIDEBAR_DEFAULT_WIDTH,
-        clampOpts(),
-      );
-      const n =
-        resolved.action === "collapse"
-          ? {
-              ...cur,
-              sidebarCollapsed: true,
-              sidebarWidth: resolved.sidebarWidth,
-            }
-          : {
-              ...cur,
-              sidebarCollapsed: false,
-              sidebarWidth: resolved.sidebarWidth,
-            };
-      setLayout(n);
-      saveLayout(localStorage, n);
-      endResizeChrome();
-    };
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-  }, [resizingSidebar]);
-
-  useLayoutEffect(() => {
-    if (resizingSidebar) {
-      applyLiveSplitWidth(
-        queryWorkbenchSplitPane("sidebar"),
-        liveSidebarWidthRef.current,
-      );
-    }
-    if (resizingAside) {
-      applyLiveSplitWidth(
-        queryWorkbenchSplitPane("aside"),
-        liveAsideWidthRef.current,
-      );
-    }
-  }, [resizingSidebar, resizingAside]);
-
   /** Programmatic draft / layout changes: recompute height after paint. */
   const syncComposerHeight = useCallback(() => {
     // Double rAF: wait for React commit + layout after mainPane switch.
@@ -10980,12 +10186,7 @@ export function AppWorkbench() {
         // files open is not stuck on the Plan workbench.
         if (planOpenedAsideRef.current) {
           planOpenedAsideRef.current = false;
-          setLayout((l) => {
-            if (l.asideCollapsed) return l;
-            const n = { ...l, asideCollapsed: true };
-            saveLayout(localStorage, n);
-            return n;
-          });
+          collapseAsidePersisted();
         }
       },
     });
@@ -13611,30 +12812,6 @@ export function AppWorkbench() {
     session.state,
   ]);
 
-  /** Soft offer sandbox guide after a successful project trust. */
-  const maybeOfferSandboxWizardAfterTrust = useCallback(() => {
-    try {
-      if (
-        !shouldOfferSandboxWizard({
-          justTrusted: true,
-          currentProfile: sandboxProfile,
-          dismissed: loadSandboxWizardDismissed(),
-        })
-      ) {
-        return;
-      }
-      setSandboxWizardMode("trust");
-      window.setTimeout(() => setSandboxWizardOpen(true), 0);
-    } catch {
-      /* private storage / ignore */
-    }
-  }, [sandboxProfile]);
-
-  const openSandboxWizardGuide = useCallback(() => {
-    setSandboxWizardMode("info");
-    setSandboxWizardOpen(true);
-  }, []);
-
   /**
    * After a project is created/updated: refresh list, expand, optionally trust
    * via in-app confirm, then set active (+ bind session when requested).
@@ -14356,10 +13533,6 @@ export function AppWorkbench() {
     setShowDoctor(true);
   };
 
-  const openReliability = () => {
-    setShowReliability(true);
-  };
-
   const openBatchAgents = useCallback(() => {
     setBatchAgentsOpen(true);
   }, []);
@@ -14610,8 +13783,6 @@ export function AppWorkbench() {
   );
 
   const runPaletteAction = (action: PaletteActionDef) => {
-    setShowSearch(false);
-    setSearchQuery("");
     switch (action.id) {
       case "new-chat":
         void newChat(activeProject);
@@ -14680,7 +13851,7 @@ export function AppWorkbench() {
         setShowTraces(true);
         break;
       case "reliability":
-        setShowReliability(true);
+        openReliability();
         break;
       case "shortcuts-help":
         setShowShortcuts(true);
@@ -14818,59 +13989,7 @@ export function AppWorkbench() {
         break;
     }
   };
-
-  const activateSearchPanelItem = (item: SearchPanelItem) => {
-    if (item.kind === "action") {
-      const action = paletteActionHits.find((a) => a.id === item.id);
-      if (action) runPaletteAction(action);
-      return;
-    }
-    if (item.kind === "project") {
-      const p = searchHits.matchedProjects.find((x) => x.id === item.id);
-      if (!p) return;
-      setShowSearch(false);
-      // Project is a folder: expand only; selection is for sessions.
-      setProjectsOpen(true);
-      setExpandedProjects((e) => ({ ...e, [p.id]: true }));
-      return;
-    }
-    const hit = mergedSessionHits.find((h) => h.id === item.id);
-    if (!hit) return;
-    const s = sessions.find((x) => x.id === hit.id);
-    const row: SessionRow =
-      s ??
-      normalizeSessionRow({
-        id: hit.id,
-        title: hit.title,
-        projectId: hit.projectId ?? null,
-        updatedAt: "",
-        archived: hit.archived,
-      });
-    const proj = projects.find(
-      (p) => p.id === (row.projectId ?? hit.projectId),
-    );
-    setShowSearch(false);
-    void openSession(row, proj ?? null);
-  };
-
-  const { activeIndex: searchActiveIndex, setActiveIndex: setSearchActiveIndex } =
-    useSearchPanelNav({
-      open: showSearch,
-      items: searchPaletteItems,
-      sessionCount: mergedSessionHits.length,
-      resetKey: [
-        searchQuery,
-        searchMode,
-        searchRankMode,
-        String(searchIncludeArchived),
-      ].join("\0"),
-      getRoot: () => searchPanelRef.current,
-      onActivate: activateSearchPanelItem,
-      onActivateSessionIndex: (sessionIndex) => {
-        const hit = mergedSessionHits[sessionIndex];
-        if (hit) activateSearchPanelItem({ kind: "session", id: hit.id });
-      },
-    });
+  searchPaletteHostRef.current.runAction = runPaletteAction;
 
   // Keep tray menu actions on latest closures (listeners registered once).
   const trayHandlersRef = useRef({
@@ -15258,15 +14377,14 @@ export function AppWorkbench() {
       sessionId: session.sessionId,
       source: error ? "session" : "local",
     });
-    setRecentErrorEntries((prev) =>
-      prependReliabilityRing(prev, entry, DEFAULT_RELIABILITY_MAX_ERRORS),
-    );
+    recordReliabilityError(entry);
   }, [
     errorBanner?.code,
     errorBanner?.summary,
     errorBanner?.cause,
     error,
     session.sessionId,
+    recordReliabilityError,
   ]);
 
   const reliabilityView = useMemo(() => {
@@ -15722,1301 +14840,63 @@ export function AppWorkbench() {
     }
   }, [activeProject?.id, projects, showToast, tr]);
 
-  type ExportMdTarget = {
-    id: string;
-    title: string;
-    projectId?: string | null;
-  };
-  const [exportMdTarget, setExportMdTarget] = useState<ExportMdTarget | null>(
-    null,
-  );
-  const [exportMdIncludeThoughts, setExportMdIncludeThoughts] = useState(true);
-  const [exportMdIncludeTools, setExportMdIncludeTools] = useState(true);
-  const [exportMdBusy, setExportMdBusy] = useState(false);
-
-  type ExportImageTarget = {
-    id: string;
-    title: string;
-    projectId?: string | null;
-  };
-  const [exportImageTarget, setExportImageTarget] =
-    useState<ExportImageTarget | null>(null);
-  /** Smart summary poster vs full transcript card. */
-  const [exportImageSmart, setExportImageSmart] = useState(true);
-  /** Curated visual skin for smart + full export cards. */
-  const [exportImageSkin, setExportImageSkin] = useState<ShareCardSkinId>(() =>
-    loadExportImageSkinPref(),
-  );
-  const [exportImageBusy, setExportImageBusy] = useState(false);
-  /** Object URL for share-card preview (revoked on close / re-render). */
-  const [exportImagePreviewUrl, setExportImagePreviewUrl] = useState<
-    string | null
-  >(null);
-  const [exportImagePreviewError, setExportImagePreviewError] = useState<
-    string | null
-  >(null);
-  /** Honest meta for the last successful preview (skin / layout / bytes). */
-  const [exportImagePreviewStamp, setExportImagePreviewStamp] =
-    useState<ExportImageBlobStamp | null>(null);
-  const exportImagePreviewBlobRef = useRef<Blob | null>(null);
-  const exportImagePreviewStampRef = useRef<ExportImageBlobStamp | null>(null);
-  /**
-   * Freeze chat rows when the export dialog opens so live streaming does not
-   * re-trigger rasterization (modal flicker).
-   */
-  const exportImageMsgsSnapRef = useRef<ChatMessage[] | null>(null);
-  const exportImageGenRef = useRef(0);
-
-  /** Build markdown for a session; used by download + copy. */
-  const buildSessionMarkdown = useCallback(
-    async (
-      sessionMeta: ExportMdTarget | undefined,
-      options: { includeThoughts: boolean; includeToolSummary: boolean },
-    ) => {
-      const id = sessionMeta?.id ?? session.sessionId;
-      if (!id) {
-        const err = new Error("no target");
-        (err as Error & { code?: string }).code = "no_target";
-        throw err;
-      }
-      const title =
-        sessionMeta?.title ||
-        sessions.find((s) => s.id === id)?.title ||
-        session.title ||
-        tr("session.untitled");
-      const projectId =
-        sessionMeta?.projectId ??
-        sessions.find((s) => s.id === id)?.projectId ??
-        null;
-      const proj =
-        projects.find((p) => p.id === projectId) || activeProject || null;
-      let msgs = messages;
-      if (id !== session.sessionId) {
-        try {
-          msgs = (await api.sessionMessages(id)) as ChatMessage[];
-        } catch (e) {
-          const err = e instanceof Error ? e : new Error(String(e));
-          (err as Error & { code?: string }).code = "load_failed";
-          throw err;
-        }
-      }
-      const exportable = msgs.map((m) => ({
-        role: m.role,
-        content: m.content,
-        thought: m.thought,
-        createdAt: m.createdAt,
-        marker: m.marker,
-      }));
-      const journalEmpty = isSessionExportJournalEmpty(exportable, {
-        format: "markdown",
-        options,
-      });
-      const md = sessionToMarkdown({
-        title,
-        projectName: proj?.name,
-        projectPath: proj?.path,
-        sessionId: id,
-        options: {
-          includeThoughts: options.includeThoughts,
-          includeToolSummary: options.includeToolSummary,
-        },
-        messages: exportable,
-      });
-      return { id, title, md, journalEmpty, exportable };
-    },
-    [
-      session.sessionId,
-      session.title,
-      sessions,
-      messages,
-      projects,
-      activeProject,
-      tr,
-    ],
-  );
-
-  /** Toast classified soft-fail for text-format export (silent on cancel). */
-  const toastSessionExportSoftFail = useCallback(
-    (err: unknown) => {
-      const r = resolveSessionExportSoftFail(err);
-      if (r.silent) return;
-      const base = tr(r.messageKey as Parameters<typeof tr>[0]);
-      showToast(r.detail ? `${base}: ${r.detail}` : base);
-    },
-    [showToast, tr],
-  );
-
-  /** Open export options (thoughts / tools / download / copy). */
-  const openExportSessionMd = useCallback(
-    (sessionMeta?: {
-      id: string;
-      title: string;
-      projectId?: string | null;
-    }) => {
-      const id = sessionMeta?.id ?? session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportNoTarget"));
-        return;
-      }
-      setExportMdIncludeThoughts(true);
-      setExportMdIncludeTools(true);
-      setExportMdTarget({
-        id,
-        title:
-          sessionMeta?.title ||
-          sessions.find((s) => s.id === id)?.title ||
-          session.title ||
-          tr("session.untitled"),
-        projectId:
-          sessionMeta?.projectId ??
-          sessions.find((s) => s.id === id)?.projectId ??
-          null,
-      });
-    },
-    [session.sessionId, session.title, sessions, showToast, tr],
-  );
-
-  /**
-   * Honest empty + size estimate + path badges for the open Markdown export
-   * dialog (options toggle updates emptiness and Journal vs CLI path).
-   */
-  const exportMdHonesty = useMemo(() => {
-    const options = {
-      includeThoughts: exportMdIncludeThoughts,
-      includeToolSummary: exportMdIncludeTools,
-    };
-    const resolveAgent = (sessionId: string | null | undefined) => {
-      const id = (sessionId || "").trim();
-      if (!id) return null as string | null;
-      if (id === session.sessionId) {
-        const live = (session.agentSessionId || "").trim();
-        if (live) return live;
-      }
-      const row = sessions.find((x) => x.id === id);
-      const linked = (row?.agentSessionId || "").trim();
-      return linked || null;
-    };
-    const pathFor = (sessionId: string | null | undefined) =>
-      resolveSessionExportPath({
-        format: "markdown",
-        mode: "download",
-        hasAgentSession: resolveAgent(sessionId),
-        cliHostAvailable: api.isTauri(),
-        options,
-      });
-
-    if (!exportMdTarget) {
-      return {
-        journalEmpty: null as boolean | null,
-        sizeClassKey: null as string | null,
-        sizeBytesLabel: null as string | null,
-        canAct: false,
-        path: null as ReturnType<typeof resolveSessionExportPath> | null,
-      };
-    }
-    if (exportMdTarget.id !== session.sessionId) {
-      const path = pathFor(exportMdTarget.id);
-      return {
-        journalEmpty: null as boolean | null,
-        sizeClassKey: null as string | null,
-        sizeBytesLabel: null as string | null,
-        canAct: canSessionExportActions({
-          hasTarget: true,
-          journalEmpty: null,
-          busy: exportMdBusy,
-        }),
-        path,
-      };
-    }
-    const exportable = messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-      thought: m.thought,
-      createdAt: m.createdAt,
-      marker: m.marker,
-    }));
-    const journalEmpty = isSessionExportJournalEmpty(exportable, {
-      format: "markdown",
-      options,
-    });
-    const md = sessionToMarkdown({
-      title: exportMdTarget.title || tr("session.untitled"),
-      sessionId: exportMdTarget.id,
-      options,
-      messages: exportable,
-    });
-    const est = estimateSessionExportSizeClass(journalEmpty ? "" : md);
-    const path = pathFor(exportMdTarget.id);
-    return {
-      journalEmpty,
-      sizeClassKey: sessionExportSizeClassLabelKey(est.sizeClass),
-      sizeBytesLabel: formatSessionExportBytes(est.byteLength),
-      canAct: canSessionExportActions({
-        hasTarget: true,
-        journalEmpty,
-        busy: exportMdBusy,
-      }),
-      path,
-    };
-  }, [
+  const {
     exportMdTarget,
-    exportMdIncludeThoughts,
-    exportMdIncludeTools,
     exportMdBusy,
-    session.sessionId,
-    session.agentSessionId,
+    exportMdIncludeThoughts,
+    setExportMdIncludeThoughts,
+    exportMdIncludeTools,
+    setExportMdIncludeTools,
+    exportMdHonesty,
+    closeExportSessionMd,
+    runExportSessionMd,
+    openExportSessionMd,
+    exportActiveSessionMd,
+    copyConversationMarkdown,
+    exportSessionJson,
+    exportSessionPlain,
+    exportSessionHtml,
+    exportSessionStreamNdjson,
+    exportSessionDiagnostic,
+    exportSessionTrace,
+    confirmExportSessionTraceUpload,
+  } = useSessionExportText({
+    session,
     sessions,
     messages,
+    projects,
+    activeProject,
     tr,
-  ]);
-
-  const runExportSessionMd = useCallback(
-    async (mode: "download" | "copy") => {
-      if (!exportMdTarget) return;
-      setExportMdBusy(true);
-      try {
-        const exportOpts = {
-          includeThoughts: exportMdIncludeThoughts,
-          includeToolSummary: exportMdIncludeTools,
-        };
-        const agentLinked = (() => {
-          const id = exportMdTarget.id;
-          if (id === session.sessionId) {
-            const live = (session.agentSessionId || "").trim();
-            if (live) return live;
-          }
-          const row = sessions.find((x) => x.id === id);
-          return (row?.agentSessionId || "").trim() || null;
-        })();
-        const path = resolveSessionExportPath({
-          format: "markdown",
-          mode,
-          hasAgentSession: agentLinked,
-          cliHostAvailable: api.isTauri(),
-          options: exportOpts,
-        });
-        // Prefer CLI `grok export` for full-transcript download when path says so;
-        // soft-fail to local journal (thoughts/tools options always apply locally).
-        if (mode === "download" && path.preferCli) {
-          try {
-            const cli = await api.sessionCliExport(exportMdTarget.id);
-            const md = typeof cli?.markdown === "string" ? cli.markdown : "";
-            if (cli?.ok && md.trim()) {
-              const blob = new Blob([md], {
-                type: sessionExportMimeType("markdown"),
-              });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = sessionExportSafeFilename(
-                "markdown",
-                exportMdTarget.title,
-                exportMdTarget.id,
-              );
-              a.click();
-              URL.revokeObjectURL(url);
-              showToast(
-                tr(
-                  sessionExportDoneMessageKey(
-                    "cli",
-                  ) as Parameters<typeof tr>[0],
-                ),
-              );
-              setExportMdTarget(null);
-              return;
-            }
-          } catch (e) {
-            // Soft-fail policy: classify then always fall through to journal.
-            const kind = classifySessionExportCliError(e);
-            if (!sessionExportCliSoftFailsToJournal(kind)) {
-              toastSessionExportSoftFail(e);
-              return;
-            }
-          }
-        }
-        const { id, title, md, journalEmpty } = await buildSessionMarkdown(
-          exportMdTarget,
-          exportOpts,
-        );
-        if (journalEmpty) {
-          showToast(tr("session.exportEmpty"));
-          return;
-        }
-        if (mode === "copy") {
-          try {
-            await navigator.clipboard.writeText(md);
-          } catch (e) {
-            const err = e instanceof Error ? e : new Error(String(e));
-            (err as Error & { code?: string }).code = "clipboard";
-            toastSessionExportSoftFail(err);
-            return;
-          }
-          showToast(tr("session.exportCopied"));
-        } else {
-          try {
-            const blob = new Blob([md], {
-              type: sessionExportMimeType("markdown"),
-            });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = sessionExportSafeFilename("markdown", title, id);
-            a.click();
-            URL.revokeObjectURL(url);
-          } catch (e) {
-            const err = e instanceof Error ? e : new Error(String(e));
-            (err as Error & { code?: string }).code = "write_failed";
-            toastSessionExportSoftFail(err);
-            return;
-          }
-          showToast(
-            tr(
-              sessionExportDoneMessageKey(
-                "journal",
-              ) as Parameters<typeof tr>[0],
-            ),
-          );
-        }
-        setExportMdTarget(null);
-      } catch (e) {
-        toastSessionExportSoftFail(e);
-      } finally {
-        setExportMdBusy(false);
-      }
-    },
-    [
-      exportMdTarget,
-      exportMdIncludeThoughts,
-      exportMdIncludeTools,
-      buildSessionMarkdown,
-      session.sessionId,
-      session.agentSessionId,
-      sessions,
-      showToast,
-      toastSessionExportSoftFail,
-      tr,
-    ],
-  );
-
-  /**
-   * One-click copy of the full conversation as Markdown.
-   * Skips pure tool_step noise by default (unlike the export dialog).
-   */
-  const copyConversationMarkdown = useCallback(
-    async (sessionMeta?: {
-      id: string;
-      title: string;
-      projectId?: string | null;
-    }) => {
-      const id = sessionMeta?.id ?? session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportNoTarget"));
-        return;
-      }
-      try {
-        const { md, journalEmpty } = await buildSessionMarkdown(
-          {
-            id,
-            title:
-              sessionMeta?.title ||
-              sessions.find((s) => s.id === id)?.title ||
-              session.title ||
-              tr("session.untitled"),
-            projectId:
-              sessionMeta?.projectId ??
-              sessions.find((s) => s.id === id)?.projectId ??
-              null,
-          },
-          {
-            includeThoughts: true,
-            includeToolSummary: false,
-          },
-        );
-        if (journalEmpty || !md.trim()) {
-          showToast(tr("session.copyMdEmpty"));
-          return;
-        }
-        await navigator.clipboard.writeText(md);
-      } catch (e) {
-        toastSessionExportSoftFail(e);
-      }
-    },
-    [
-      session.sessionId,
-      session.title,
-      sessions,
-      buildSessionMarkdown,
-      showToast,
-      toastSessionExportSoftFail,
-      tr,
-    ],
-  );
-
-  /** Quick export with defaults (slash /export, message actions). */
-  const exportActiveSessionMd = useCallback(
-    async (sessionMeta?: {
-      id: string;
-      title: string;
-      projectId?: string | null;
-    }) => {
-      openExportSessionMd(sessionMeta);
-    },
-    [openExportSessionMd],
-  );
-
-  /**
-   * Download session as import-friendly JSON (user/assistant only; no modal).
-   * Reuses the same message loading path as Markdown export.
-   */
-  const exportSessionJson = useCallback(
-    async (sessionMeta?: {
-      id: string;
-      title: string;
-      projectId?: string | null;
-    }) => {
-      const id = sessionMeta?.id ?? session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportNoTarget"));
-        return;
-      }
-      const title =
-        sessionMeta?.title ||
-        sessions.find((s) => s.id === id)?.title ||
-        session.title ||
-        tr("session.untitled");
-      try {
-        let msgs = messages;
-        if (id !== session.sessionId) {
-          try {
-            msgs = (await api.sessionMessages(id)) as ChatMessage[];
-          } catch (e) {
-            const err = e instanceof Error ? e : new Error(String(e));
-            (err as Error & { code?: string }).code = "load_failed";
-            toastSessionExportSoftFail(err);
-            return;
-          }
-        }
-        const exportable = msgs.map((m) => ({
-          role: m.role,
-          content: m.content,
-          thought: m.thought,
-          createdAt: m.createdAt,
-          marker: m.marker,
-        }));
-        if (
-          isSessionExportJournalEmpty(exportable, {
-            format: "json",
-            options: { includeThoughts: false, includeToolSummary: false },
-          })
-        ) {
-          showToast(tr("session.exportEmpty"));
-          return;
-        }
-        const json = sessionToJson({
-          title,
-          sessionId: id,
-          // Clean re-import: omit thoughts/tools by default.
-          options: { includeThoughts: false, includeToolSummary: false },
-          messages: exportable,
-        });
-        const blob = new Blob([json], {
-          type: sessionExportMimeType("json"),
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = sessionExportSafeFilename("json", title, id);
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        toastSessionExportSoftFail(e);
-      }
-    },
-    [
-      session.sessionId,
-      session.title,
-      sessions,
-      messages,
-      showToast,
-      toastSessionExportSoftFail,
-      tr,
-    ],
-  );
-
-  const revokeExportImagePreview = useCallback(() => {
-    setExportImagePreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
-    exportImagePreviewBlobRef.current = null;
-    exportImagePreviewStampRef.current = null;
-    setExportImagePreviewStamp(null);
-    setExportImagePreviewError(null);
-  }, []);
-
-  const closeExportSessionImage = useCallback(() => {
-    if (exportImageBusy) return;
-    revokeExportImagePreview();
-    exportImageMsgsSnapRef.current = null;
-    setExportImageTarget(null);
-  }, [exportImageBusy, revokeExportImagePreview]);
-
-  /** Open share-card export (PNG) options dialog. */
-  const openExportSessionImage = useCallback(
-    (sessionMeta?: {
-      id: string;
-      title: string;
-      projectId?: string | null;
-    }) => {
-      const id = sessionMeta?.id ?? session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportImageNoTarget"));
-        return;
-      }
-      // Invalidate any prior session's preview immediately so session B never
-      // shows/saves session A's blob while B is still rendering (AC cross-session).
-      exportImageGenRef.current += 1;
-      revokeExportImagePreview();
-      setExportImagePreviewError(null);
-      setExportImageBusy(true);
-
-      // Snapshot live transcript once — do not follow streaming updates.
-      // Other sessions: null → builder loads via sessionMessages(id).
-      const snap =
-        id === session.sessionId
-          ? (messages as ChatMessage[]).map((m) => ({ ...m }))
-          : null;
-      exportImageMsgsSnapRef.current = snap;
-      setExportImageSmart(true);
-      setExportImageSkin(loadExportImageSkinPref());
-      setExportImageTarget({
-        id,
-        title:
-          sessionMeta?.title ||
-          sessions.find((s) => s.id === id)?.title ||
-          session.title ||
-          tr("session.untitled"),
-        projectId:
-          sessionMeta?.projectId ??
-          sessions.find((s) => s.id === id)?.projectId ??
-          null,
-      });
-    },
-    [
-      session.sessionId,
-      session.title,
-      sessions,
-      messages,
-      showToast,
-      tr,
-      revokeExportImagePreview,
-    ],
-  );
-
-  /** Build share-card model + PNG blob for the open export dialog. */
-  const buildExportImageBlob = useCallback(async () => {
-    if (!exportImageTarget) throw new Error("no target");
-    const id = exportImageTarget.id;
-    const title =
-      exportImageTarget.title ||
-      sessions.find((s) => s.id === id)?.title ||
-      session.title ||
-      tr("session.untitled");
-    const projectId =
-      exportImageTarget.projectId ??
-      sessions.find((s) => s.id === id)?.projectId ??
-      null;
-    const proj =
-      projects.find((p) => p.id === projectId) || activeProject || null;
-
-    let msgs = exportImageMsgsSnapRef.current;
-    if (!msgs) {
-      if (id !== session.sessionId) {
-        msgs = (await api.sessionMessages(id)) as ChatMessage[];
-      } else {
-        msgs = messages as ChatMessage[];
-      }
-      exportImageMsgsSnapRef.current = msgs.map((m) => ({ ...m }));
-    }
-
-    // Resolve session-relative media (`images/1.jpg`) into message attachments —
-    // same path chat uses before MarkdownChat / ImageUi render.
-    let msgsForExport = msgs;
-    if (api.isTauri() && !exportImageSmart) {
-      try {
-        const rels = collectSessionRelativeMediaRefs(msgs);
-        if (rels.length) {
-          const list = await api.sessionResolveRelativeMedia(id, rels);
-          if (list.length) {
-            msgsForExport = applyResolvedSessionMedia(
-              msgs.map((m) => ({
-                ...m,
-                attachments: m.attachments?.map((a) => ({ ...a })),
-              })),
-              list.map((a) => ({
-                path: a.path,
-                name: a.name || a.path.split(/[/\\]/).pop() || a.path,
-                isDir: !!a.isDir,
-              })),
-            ) as typeof msgs;
-          }
-        }
-      } catch {
-        /* best-effort */
-      }
-    }
-
-    const projectPath = proj?.path ?? activeProject?.path ?? null;
-    let shareMsgs: ShareCardMessage[];
-    if (exportImageSmart) {
-      shareMsgs = exportableToShareMessages(
-        msgsForExport.map((m) => ({
-          role: m.role,
-          content: m.content,
-          thought: m.thought,
-          createdAt: m.createdAt,
-          marker: m.marker,
-        })),
-      );
-    } else {
-      // Mirror lobe ConversationThread path map construction.
-      const sessionPathMap = buildSessionFilePathMap(
-        msgsForExport as ChatMessage[],
-        projectPath,
-      );
-      shareMsgs = [];
-      for (const m of msgsForExport) {
-        if (m.role === "tool" || m.marker === "tool_step") continue;
-        const atts = (m.attachments ?? []).map((a) => ({
-          path: a.path,
-          name: a.name || a.path.split(/[/\\]/).pop() || a.path,
-          isDir: !!a.isDir,
-        }));
-        const imagePathMap = mergePathMaps(
-          buildInlineMediaPathMap(atts),
-          sessionPathMap,
-        );
-        shareMsgs.push({
-          role: m.role,
-          content: m.content || "",
-          thought: m.thought,
-          createdAt: m.createdAt,
-          attachments: atts.length ? atts : undefined,
-          imagePathMap:
-            Object.keys(imagePathMap).length > 0 ? imagePathMap : undefined,
-        });
-      }
-    }
-
-    const logoDataUrl = loadExportLogoPref();
-    const result = await buildExportImagePipeline({
-      title,
-      projectName: proj?.name,
-      projectPath,
-      sessionId: id,
-      messages: shareMsgs,
-      smart: exportImageSmart,
-      skinId: exportImageSkin,
-      logoDataUrl,
-      pixelRatio: 2,
-      locale,
-    });
-    const stamp = stampFromPipelineResult(
-      { sessionId: id, skinId: exportImageSkin, smart: exportImageSmart },
-      {
-        skinId: result.skinId,
-        mode: result.mode,
-        layout: result.layout ?? null,
-        byteLength: result.byteLength,
-        messageCount: result.messageCount,
-      },
-    );
-    return {
-      blob: result.blob,
-      title,
-      id,
-      skinId: result.skinId,
-      stamp,
-    };
-  }, [
+    showToast,
+    setAppDialog,
+  });
+  const {
     exportImageTarget,
+    exportImageBusy,
     exportImageSmart,
+    setExportImageSmart,
     exportImageSkin,
-    session.sessionId,
-    session.title,
+    applyExportImageSkin,
+    exportImageCanAct,
+    exportImagePreviewPhase,
+    exportImagePreviewUrl,
+    exportImageOptionsMatch,
+    exportImagePreviewError,
+    exportImageBytesLabel,
+    exportImageMetaParts,
+    closeExportSessionImage,
+    runExportSessionImage,
+    openExportSessionImage,
+  } = useSessionExportImage({
+    session,
     sessions,
     messages,
     projects,
     activeProject,
     locale,
     tr,
-  ]);
-
-  // Keep latest builder without re-firing the preview effect on every stream tick.
-  const buildExportImageBlobRef = useRef(buildExportImageBlob);
-  buildExportImageBlobRef.current = buildExportImageBlob;
-
-  /** Preview refresh: dialog target, smart toggle, or skin change. */
-  useEffect(() => {
-    if (!exportImageTarget) {
-      revokeExportImagePreview();
-      exportImageMsgsSnapRef.current = null;
-      return;
-    }
-    const gen = ++exportImageGenRef.current;
-    let cancelled = false;
-    // Always invalidate prior preview when rebuilding (session / smart / skin).
-    // Leaving the old blob makes Save/Copy export the wrong mode or skin.
-    revokeExportImagePreview();
-    setExportImageBusy(true);
-    setExportImagePreviewError(null);
-    void (async () => {
-      try {
-        const built = await buildExportImageBlobRef.current();
-        if (cancelled || gen !== exportImageGenRef.current) return;
-        // Guard: never attach a blob built for another session id.
-        const targetId = exportImageTarget?.id;
-        if (targetId && built.id !== targetId) return;
-        const { blob, stamp } = built;
-        // Honesty: stamp must match the options this effect was built for.
-        if (
-          !exportImageBlobMatchesOptions(stamp, {
-            sessionId: targetId || stamp.sessionId,
-            skinId: exportImageSkin,
-            smart: exportImageSmart,
-          })
-        ) {
-          return;
-        }
-        const url = URL.createObjectURL(blob);
-        setExportImagePreviewUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return url;
-        });
-        exportImagePreviewBlobRef.current = blob;
-        exportImagePreviewStampRef.current = stamp;
-        setExportImagePreviewStamp(stamp);
-        setExportImagePreviewError(null);
-      } catch (e) {
-        if (cancelled || gen !== exportImageGenRef.current) return;
-        revokeExportImagePreview();
-        const resolved = resolveExportImageError(e);
-        if (resolved.silent) {
-          setExportImagePreviewError(null);
-        } else {
-          const base = tr(resolved.messageKey as Parameters<typeof tr>[0]);
-          setExportImagePreviewError(
-            resolved.detail ? `${base}: ${resolved.detail}` : base,
-          );
-        }
-      } finally {
-        if (!cancelled && gen === exportImageGenRef.current) {
-          setExportImageBusy(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    exportImageTarget?.id,
-    exportImageTarget?.title,
-    exportImageTarget?.projectId,
-    exportImageSmart,
-    exportImageSkin,
-    revokeExportImagePreview,
-    tr,
-  ]);
-
-  const exportImageOptionsMatch = exportImageBlobMatchesOptions(
-    exportImagePreviewStamp,
-    {
-      sessionId: exportImageTarget?.id ?? "",
-      skinId: exportImageSkin,
-      smart: exportImageSmart,
-    },
-  );
-  // Ready for Save/Copy only when preview URL + stamp match current options.
-  const exportImageCanAct = canExportImageActions({
-    open: !!exportImageTarget,
-    hasMatchingBlob: !!exportImagePreviewUrl && exportImageOptionsMatch,
+    showToast,
   });
-  const exportImagePreviewPhase = deriveExportImagePreviewPhase({
-    open: !!exportImageTarget,
-    busy: exportImageBusy,
-    hasPreviewUrl: !!exportImagePreviewUrl && exportImageOptionsMatch,
-    hasError: !!exportImagePreviewError,
-  });
-  const exportImageMetaParts = buildExportImageMetaParts({
-    stamp: exportImageOptionsMatch ? exportImagePreviewStamp : null,
-    skinId: exportImageSkin,
-    smart: exportImageSmart,
-  });
-  const exportImageBytesLabel = formatExportImageBytes(
-    exportImageOptionsMatch ? exportImagePreviewStamp?.byteLength : null,
-  );
-
-  const runExportSessionImage = useCallback(
-    async (mode: "download" | "copy") => {
-      if (!exportImageTarget) return;
-      // Never save a mid-rebuild / stale-skin preview.
-      const options = {
-        sessionId: exportImageTarget.id,
-        skinId: exportImageSkin,
-        smart: exportImageSmart,
-      };
-      const stampOk = exportImageBlobMatchesOptions(
-        exportImagePreviewStampRef.current,
-        options,
-      );
-      if (exportImageBusy && !(exportImagePreviewBlobRef.current && stampOk)) {
-        return;
-      }
-      setExportImageBusy(true);
-      try {
-        let blob = stampOk ? exportImagePreviewBlobRef.current : null;
-        let title = exportImageTarget.title;
-        let id = exportImageTarget.id;
-        // Rebuild when no matching blob (cleared on smart/skin toggle / open).
-        if (!blob) {
-          const built = await buildExportImageBlob();
-          blob = built.blob;
-          title = built.title;
-          id = built.id;
-          exportImagePreviewBlobRef.current = blob;
-          exportImagePreviewStampRef.current = built.stamp;
-          setExportImagePreviewStamp(built.stamp);
-        } else {
-          title =
-            exportImageTarget.title ||
-            sessions.find((s) => s.id === id)?.title ||
-            session.title ||
-            tr("session.untitled");
-        }
-        const filename = sessionExportImageFilename(title, id);
-        if (mode === "copy") {
-          // Prefer native OS clipboard (arboard). WebView ClipboardItem often fails.
-          if (api.isTauri()) {
-            const b64 = await pngBlobToBase64(blob);
-            await api.clipboardWriteImage(b64);
-          } else {
-            const ok = await copyPngBlob(blob);
-            if (!ok) {
-              const err = new Error("clipboard blocked");
-              (err as Error & { code?: string }).code = "clipboard";
-              throw err;
-            }
-          }
-        } else if (api.isTauri()) {
-          const b64 = await pngBlobToBase64(blob);
-          const result = await api.exportBytesSave({
-            bytesBase64: b64,
-            defaultName: filename,
-            dialogTitle: tr("session.exportImageSaveTitle"),
-            filterName: "PNG",
-            extensions: ["png"],
-          });
-          if (result.cancelled) {
-            // User dismissed the native save dialog — keep modal open (silent).
-            return;
-          }
-          if (!result.ok) {
-            const err = new Error(result.path || "save failed");
-            (err as Error & { code?: string }).code = "save_failed";
-            throw err;
-          }
-        } else {
-          // Browser / non-Tauri fallback.
-          downloadPngBlob(blob, filename);
-        }
-        revokeExportImagePreview();
-        exportImageMsgsSnapRef.current = null;
-        setExportImageTarget(null);
-      } catch (e) {
-        const resolved = resolveExportImageError(e);
-        if (resolved.silent) return;
-        const base = tr(resolved.messageKey as Parameters<typeof tr>[0]);
-        showToast(resolved.detail ? `${base}: ${resolved.detail}` : base);
-      } finally {
-        setExportImageBusy(false);
-      }
-    },
-    [
-      exportImageBusy,
-      exportImageTarget,
-      exportImageSkin,
-      exportImageSmart,
-      buildExportImageBlob,
-      session.sessionId,
-      session.title,
-      sessions,
-      showToast,
-      tr,
-      revokeExportImagePreview,
-    ],
-  );
-
-  /**
-   * Download session as plain text (headless `--output-format plain` style).
-   * Local journal only; no modal. Thoughts + tool summaries on by default.
-   */
-  const exportSessionPlain = useCallback(
-    async (sessionMeta?: {
-      id: string;
-      title: string;
-      projectId?: string | null;
-    }) => {
-      const id = sessionMeta?.id ?? session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportNoTarget"));
-        return;
-      }
-      const title =
-        sessionMeta?.title ||
-        sessions.find((s) => s.id === id)?.title ||
-        session.title ||
-        tr("session.untitled");
-      const projectId =
-        sessionMeta?.projectId ??
-        sessions.find((s) => s.id === id)?.projectId ??
-        null;
-      const proj =
-        projects.find((p) => p.id === projectId) || activeProject || null;
-      try {
-        let msgs = messages;
-        if (id !== session.sessionId) {
-          try {
-            msgs = (await api.sessionMessages(id)) as ChatMessage[];
-          } catch (e) {
-            const err = e instanceof Error ? e : new Error(String(e));
-            (err as Error & { code?: string }).code = "load_failed";
-            toastSessionExportSoftFail(err);
-            return;
-          }
-        }
-        const exportable = msgs.map((m) => ({
-          role: m.role,
-          content: m.content,
-          thought: m.thought,
-          createdAt: m.createdAt,
-          marker: m.marker,
-        }));
-        if (
-          isSessionExportJournalEmpty(exportable, {
-            format: "plain",
-            options: { includeThoughts: true, includeToolSummary: true },
-          })
-        ) {
-          showToast(tr("session.exportEmpty"));
-          return;
-        }
-        const text = sessionToPlain({
-          title,
-          projectName: proj?.name,
-          projectPath: proj?.path,
-          sessionId: id,
-          options: { includeThoughts: true, includeToolSummary: true },
-          messages: exportable,
-        });
-        const blob = new Blob([text], {
-          type: sessionExportMimeType("plain"),
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = sessionExportSafeFilename("plain", title, id);
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        toastSessionExportSoftFail(e);
-      }
-    },
-    [
-      session.sessionId,
-      session.title,
-      sessions,
-      messages,
-      projects,
-      activeProject,
-      showToast,
-      toastSessionExportSoftFail,
-      tr,
-    ],
-  );
-
-  /**
-   * Download session as a standalone HTML page (blob save).
-   * Defaults match Markdown file export: thoughts + tool summaries on.
-   */
-  const exportSessionHtml = useCallback(
-    async (sessionMeta?: {
-      id: string;
-      title: string;
-      projectId?: string | null;
-    }) => {
-      const id = sessionMeta?.id ?? session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportNoTarget"));
-        return;
-      }
-      const title =
-        sessionMeta?.title ||
-        sessions.find((s) => s.id === id)?.title ||
-        session.title ||
-        tr("session.untitled");
-      const projectId =
-        sessionMeta?.projectId ??
-        sessions.find((s) => s.id === id)?.projectId ??
-        null;
-      const proj =
-        projects.find((p) => p.id === projectId) || activeProject || null;
-      try {
-        let msgs = messages;
-        if (id !== session.sessionId) {
-          try {
-            msgs = (await api.sessionMessages(id)) as ChatMessage[];
-          } catch (e) {
-            const err = e instanceof Error ? e : new Error(String(e));
-            (err as Error & { code?: string }).code = "load_failed";
-            toastSessionExportSoftFail(err);
-            return;
-          }
-        }
-        const exportable = msgs.map((m) => ({
-          role: m.role,
-          content: m.content,
-          thought: m.thought,
-          createdAt: m.createdAt,
-          marker: m.marker,
-        }));
-        if (
-          isSessionExportJournalEmpty(exportable, {
-            format: "html",
-            options: { includeThoughts: true, includeToolSummary: true },
-          })
-        ) {
-          showToast(tr("session.exportEmpty"));
-          return;
-        }
-        const html = sessionToHtml({
-          title,
-          projectName: proj?.name,
-          projectPath: proj?.path,
-          sessionId: id,
-          options: { includeThoughts: true, includeToolSummary: true },
-          messages: exportable,
-        });
-        const blob = new Blob([html], {
-          type: sessionExportMimeType("html"),
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = sessionExportSafeFilename("html", title, id);
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        toastSessionExportSoftFail(e);
-      }
-    },
-    [
-      session.sessionId,
-      session.title,
-      sessions,
-      messages,
-      projects,
-      activeProject,
-      showToast,
-      toastSessionExportSoftFail,
-      tr,
-    ],
-  );
-
-  /**
-   * Download session journal as redacted ACP streaming NDJSON
-   * (`streaming-json` or `streaming-messages-json`). Soft-empty toast when
-   * the journal has no exportable rows.
-   */
-  const exportSessionStreamNdjson = useCallback(
-    async (
-      format: StreamSessionExportFormat,
-      sessionMeta?: {
-        id: string;
-        title: string;
-        projectId?: string | null;
-      },
-    ) => {
-      const id = sessionMeta?.id ?? session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportFail"));
-        return;
-      }
-      const title =
-        sessionMeta?.title ||
-        sessions.find((s) => s.id === id)?.title ||
-        session.title ||
-        tr("session.untitled");
-      const projectId =
-        sessionMeta?.projectId ??
-        sessions.find((s) => s.id === id)?.projectId ??
-        null;
-      const proj =
-        projects.find((p) => p.id === projectId) || activeProject || null;
-      try {
-        let msgs = messages;
-        if (id !== session.sessionId) {
-          msgs = (await api.sessionMessages(id)) as ChatMessage[];
-        }
-        const result = buildStreamSessionNdjson(format, {
-          title,
-          projectName: proj?.name,
-          projectPath: proj?.path,
-          sessionId: id,
-          options: { includeThoughts: true, includeToolSummary: true },
-          messages: msgs.map((m) => ({
-            role: m.role,
-            content: m.content,
-            thought: m.thought,
-            createdAt: m.createdAt,
-            marker: m.marker,
-          })),
-        });
-        if (result.empty || !result.body) {
-          showToast(tr("session.exportStreamEmpty"));
-          return;
-        }
-        const blob = new Blob([result.body], {
-          type: streamSessionExportMimeType(format),
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = streamSessionExportFilename(format, title, id);
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        showToast(`${tr("session.exportFail")}: ${String(e)}`);
-      }
-    },
-    [
-      session.sessionId,
-      session.title,
-      sessions,
-      messages,
-      projects,
-      activeProject,
-      showToast,
-      tr,
-    ],
-  );
-
-  /** Full diagnostic zip (messages + agent trail + logs) for bug reports.
-   * Always available — never gated on busy/connecting. Host packs on a
-   * blocking pool; reveal is fire-and-forget so export cannot freeze quit.
-   */
-  const exportSessionDiagnostic = useCallback(
-    async (sessionId?: string | null) => {
-      const id = sessionId || session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportBundleFail"));
-        return;
-      }
-      // Immediate feedback so long zip/save never looks like a freeze.
-      showToast(tr("session.exportBundle"), 2500);
-      try {
-        const res = await api.exportSessionBundle(id);
-        if (res?.ok && res.path) {
-          showToast(tr("session.exportBundleDone"), 4000);
-        } else {
-          showToast(tr("session.exportBundleFail"));
-        }
-      } catch (e) {
-        showToast(`${tr("session.exportBundleFail")}: ${String(e)}`, 5000);
-      }
-    },
-    [session.sessionId, showToast, tr],
-  );
-
-  /**
-   * Export Grok Build CLI session trace.
-   * `localOnly` default true → `grok trace --local`. False omits `--local` (may upload).
-   */
-  const exportSessionTrace = useCallback(
-    async (
-      sessionId?: string | null,
-      opts?: { localOnly?: boolean },
-    ) => {
-      const id = sessionId || session.sessionId;
-      const localOnly = opts?.localOnly !== false;
-      if (!id) {
-        showToast(tr("session.exportTraceFail"));
-        return;
-      }
-      try {
-        const res = await api.sessionTraceExport(id, { localOnly });
-        if (res?.ok && res.path) {
-          const row = sessions.find((s) => s.id === id);
-          const uploaded = res.uploaded === true;
-          recordTraceExport({
-            sessionId: id,
-            path: res.path,
-            title: row?.title ?? null,
-            sizeBytes:
-              typeof res.sizeBytes === "number" ? res.sizeBytes : null,
-            uploaded: uploaded || null,
-          });
-          if (!localOnly && !uploaded) {
-            // Network allowed but CLI only wrote local (upload disabled / fallback).
-            showToast(tr("session.exportTraceDoneLocalFallback"), 5000);
-          }
-        } else {
-          showToast(tr("session.exportTraceFail"));
-        }
-      } catch (e) {
-        const msg = String(e);
-        if (/no agent session/i.test(msg)) {
-          showToast(tr("session.exportTraceNoAgent"), 5000);
-        } else if (/cli not found|grok build cli not found/i.test(msg)) {
-          showToast(`${tr("session.exportTraceFail")}: ${tr("session.exportTraceNoCli")}`, 5500);
-        } else if (/timed out/i.test(msg)) {
-          showToast(
-            `${tr("session.exportTraceFail")}: ${tr("session.exportTraceTimeout")}`,
-            5500,
-          );
-        } else if (!localOnly && /upload|network|telemetry|403|401|forbidden/i.test(msg)) {
-          showToast(
-            `${tr("session.exportTraceUploadFail")}: ${msg}`,
-            6000,
-          );
-        } else {
-          // Actionable: surface host/CLI reason (already redacted server-side).
-          showToast(`${tr("session.exportTraceFail")}: ${msg}`, 5500);
-        }
-      }
-    },
-    [session.sessionId, sessions, showToast, tr],
-  );
-
-  /** Confirm network upload before `grok trace` without `--local`. */
-  const confirmExportSessionTraceUpload = useCallback(
-    (sessionId?: string | null) => {
-      const id = sessionId || session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportTraceFail"));
-        return;
-      }
-      setAppDialog({
-        kind: "confirm",
-        title: tr("session.exportTraceUploadTitle"),
-        message: tr("session.exportTraceUploadMessage"),
-        confirmLabel: tr("session.exportTraceUploadConfirm"),
-        onConfirm: () => {
-          void exportSessionTrace(id, { localOnly: false });
-        },
-      });
-    },
-    [exportSessionTrace, session.sessionId, showToast, tr],
-  );
 
   const beginEditLastUser = useCallback(
     (msg: ChatMessage) => {
@@ -17887,7 +15767,7 @@ export function AppWorkbench() {
     settingsOpen: appView === "settings",
     overlayOpen: Boolean(
       appDialog ||
-        showSearch ||
+        searchPalette.open ||
         showDoctor ||
         showTraces ||
         showPlanHistory ||
@@ -19221,13 +17101,10 @@ export function AppWorkbench() {
               onPointerDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const width = layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH;
-                sidebarResizeStartRef.current = {
-                  x: e.clientX,
-                  width,
-                };
-                liveSidebarWidthRef.current = width;
-                setResizingSidebar(true);
+                beginSidebarResize(
+                  e.clientX,
+                  layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
+                );
               }}
             />
           ) : null}
@@ -19288,10 +17165,7 @@ export function AppWorkbench() {
                 type="button"
                 className="chrome-btn"
                 aria-label={tr("sidebar.search")}
-                onClick={() => {
-                  setShowSearch(true);
-                  setSearchQuery("");
-                }}
+                onClick={() => searchPalette.openBlank()}
               >
                 <IconSearch size={16} />
               </button>
@@ -22286,9 +20160,9 @@ export function AppWorkbench() {
               aria-label="Resize files pane"
               onPointerDown={(e) => {
                 e.preventDefault();
-                liveAsideWidthRef.current =
-                  layout.asideWidth || DEFAULT_LAYOUT.asideWidth;
-                setResizingAside(true);
+                beginAsideResize(
+                  layout.asideWidth || DEFAULT_LAYOUT.asideWidth,
+                );
               }}
             />
           )}
@@ -22515,7 +20389,7 @@ export function AppWorkbench() {
       <Suspense fallback={null}>
       <ReliabilityCenterModal
         open={showReliability}
-        onClose={() => setShowReliability(false)}
+        onClose={closeReliability}
         locale={locale}
         view={reliabilityView}
         goalOrchUiEnabled={goalOrchUiEnabled}
@@ -22524,7 +20398,7 @@ export function AppWorkbench() {
         existingSessionIds={sessions.map((s) => s.id)}
         onOpenDoctor={() => void openDoctor()}
         onSelectSession={(id) => {
-          setShowReliability(false);
+          closeReliability();
           trayHandlersRef.current.openSessionById(id);
         }}
       />
@@ -22673,18 +20547,10 @@ export function AppWorkbench() {
         mode={sandboxWizardMode}
         platform={platform}
         cliSupportsSandbox={cliSupportsSandbox(cliInfo.version)}
-        onClose={() => setSandboxWizardOpen(false)}
-        onSkip={({ dontOfferAgain }) => {
-          if (sandboxWizardMode === "trust" && dontOfferAgain) {
-            markSandboxWizardDismissed();
-          }
-          setSandboxWizardOpen(false);
-        }}
-        onApply={(profile, { dontOfferAgain }) => {
-          if (dontOfferAgain) {
-            markSandboxWizardDismissed();
-          }
-          setSandboxWizardOpen(false);
+        onClose={closeSandboxWizard}
+        onSkip={skipSandboxWizard}
+        onApply={(profile, opts) => {
+          finishSandboxWizardApply(opts);
           applyGlobalSandboxProfile(profile);
         }}
       />
@@ -23300,7 +21166,7 @@ export function AppWorkbench() {
         includeThoughts={exportMdIncludeThoughts}
         includeTools={exportMdIncludeTools}
         honesty={exportMdHonesty}
-        onClose={() => setExportMdTarget(null)}
+        onClose={closeExportSessionMd}
         onCopy={() => {
           void runExportSessionMd("copy");
         }}
@@ -23331,10 +21197,7 @@ export function AppWorkbench() {
         onDownload={() => {
           void runExportSessionImage("download");
         }}
-        onSkinChange={(skinId) => {
-          setExportImageSkin(skinId);
-          saveExportImageSkinPref(skinId);
-        }}
+        onSkinChange={applyExportImageSkin}
         onSmartChange={setExportImageSmart}
       />
 
@@ -23407,44 +21270,36 @@ export function AppWorkbench() {
       )}
 
       {/* Search / command palette (Codex-style) */}
-      {showSearch && (
+      {searchPalette.open && (
         <SearchPalette
           locale={locale}
-          panelRef={searchPanelRef}
-          query={searchQuery}
-          mode={searchMode}
-          rankMode={searchRankMode}
-          includeArchived={searchIncludeArchived}
-          filtersActive={searchFiltersActive}
-          activeIndex={searchActiveIndex}
-          itemCount={searchPaletteItems.length}
-          actions={paletteActionHits}
-          projects={searchHits.matchedProjects}
-          sessionHits={mergedSessionHits}
+          panelRef={searchPalette.panelRef}
+          query={searchPalette.query}
+          mode={searchPalette.mode}
+          rankMode={searchPalette.rankMode}
+          includeArchived={searchPalette.includeArchived}
+          filtersActive={searchPalette.filtersActive}
+          activeIndex={searchPalette.activeIndex}
+          itemCount={searchPalette.items.length}
+          actions={searchPalette.actions}
+          projects={searchPalette.projects}
+          sessionHits={searchPalette.sessionHits}
           sessions={sessions}
           projectsCatalog={projects}
-          contentSearchLoading={contentSearchLoading}
-          emptyState={searchEmptyState}
+          contentSearchLoading={searchPalette.contentLoading}
+          emptyState={searchPalette.emptyState}
           settingsShortcutHint={settingsShortcutHint}
-          onClose={() => setShowSearch(false)}
-          onQueryChange={setSearchQuery}
-          onModeChange={applySearchMode}
-          onRankModeChange={(mode) => {
-            setSearchRankMode(mode);
-            saveSessionSearchRankPref(mode);
-          }}
-          onIncludeArchivedChange={applySearchIncludeArchived}
-          onClearFilters={clearSearchFilters}
-          onActiveIndexChange={setSearchActiveIndex}
-          onRunAction={runPaletteAction}
-          onPickProject={(p) => {
-            setShowSearch(false);
-            projectSpaces.revealProject(p.id);
-            setProjectsOpen(true);
-            setExpandedProjects((e) => ({ ...e, [p.id]: true }));
-          }}
+          onClose={searchPalette.closePalette}
+          onQueryChange={searchPalette.setQuery}
+          onModeChange={searchPalette.applyMode}
+          onRankModeChange={searchPalette.applyRankMode}
+          onIncludeArchivedChange={searchPalette.applyIncludeArchived}
+          onClearFilters={searchPalette.clearFilters}
+          onActiveIndexChange={searchPalette.setActiveIndex}
+          onRunAction={searchPalette.runAction}
+          onPickProject={searchPalette.pickProject}
           onPickSession={(row, proj) => {
-            setShowSearch(false);
+            searchPalette.closePalette();
             void openSession(row, proj);
           }}
         />
