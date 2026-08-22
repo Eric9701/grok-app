@@ -36,6 +36,7 @@ See `docs/llm-wiki/release.md`.
 - **Session catalog lives in `useSessionCatalog`**: sidebar list refresh, `sessions://changed` fanout, and multi-select persist in the hook. AppWorkbench keeps open/new-chat and archived grouping.
 - **Sidebar session tree lives in `WorkbenchSessionTree`**: project/orphan paint and the multi-select bar. Open/new-chat stay on the host.
 - **Left workbench rail lives in `WorkbenchSidebar`**: chrome, primary nav, and user footer. The session tree is a child; open/new-chat stay on the host.
+- **Center workbench chrome lives in `WorkbenchMain`**: title row, toast, drop overlay, and top actions. Chat / kanban / automations stay as children.
 - **Thousand-line file budget is 69**: domain CSS parts, session/contextUsage tests, stall-history module, and Remote IM channel catalog are split so `files_ge_1000` sits under 70.
 - **UI font and terminal font are local-font dropdowns**: Settings → Appearance lists installed families (searchable) instead of a free-text name. UI default is the app sans stack; terminal default is the built-in Nerd Font stack. Reset is unchanged.
 - **Debug dock icon is the white invert**: `pnpm dev` uses `src-tauri/icons/dev` (white plate, dark mark) so the running debug app is distinct from the installed black production icon. Release bundles are unchanged.
@@ -76,6 +77,7 @@ See `docs/llm-wiki/release.md`.
 - **会话目录收进 `useSessionCatalog`**：侧栏列表刷新、`sessions://changed` 同步、多选在 hook 内。AppWorkbench 只留打开/新建会话和归档分组。
 - **侧栏会话树收进 `WorkbenchSessionTree`**：项目/无归属会话绘制和多选条。打开/新建会话仍在宿主。
 - **左栏收进 `WorkbenchSidebar`**：chrome、主导航、用户菜单。会话树是子节点；打开/新建会话仍在宿主。
+- **中栏 chrome 收进 `WorkbenchMain`**：标题、toast、拖放层、顶栏动作。对话 / 看板 / 自动化仍是子节点。
 - **千行文件预算改为 69**：CSS part、session/contextUsage 测试、stall history、Remote IM 渠道目录拆开，`files_ge_1000` 降到 70 以下。
 - **界面字体和终端字体改为本机字体下拉**：设置 → 外观列出本机已安装字体族（可搜索），不再手填名称。界面默认是应用无衬线栈；终端默认是内置 Nerd Font。重置不变。
 - **开发版 Dock 图标改白底反色**：`pnpm dev` 使用 `src-tauri/icons/dev`（白底深色标），和已安装的黑底正式版区分。发布包图标不变。
