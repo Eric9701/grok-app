@@ -237,7 +237,6 @@ import {
   expandMapFromCollapsedIds,
   sameCollapsedIdSet
 } from "@/lib/sidebarExpand";
-import { areAllIdsSelected } from "@/lib/sessionSelect";
 import {
   armStopLatch,
   createStopLatchState,
@@ -392,7 +391,6 @@ import {
   clearNote as clearSessionNote,
   getNote as getSessionNote,
   loadSessionNotes,
-  notePreview,
   setNote as setSessionNote,
   shouldConfirmSessionNoteClear,
   shouldConfirmSessionNoteDiscard,
@@ -567,14 +565,10 @@ import {
 import type { MessageKey } from "@/i18n";
 import { AttachmentCard } from "@/components/AttachmentCard";
 import { ImageViewerProvider } from "@/components/ImageViewer";
-import { OverlayScroll } from "@/components/OverlayScroll";
-import { VirtualList } from "@/components/VirtualList";
 import {
-  SidebarSessionRow,
   type SidebarSessionRowLabels,
   type SidebarSessionWorktreeBadgeProp,
 } from "@/components/SidebarSessionRow";
-import { SidebarTreeReveal } from "@/components/SidebarTreeReveal";
 import { sidebarSessionRowMetrics } from "@/lib/sidebarDensity";
 import { sortSessionsForSidebar } from "@/lib/sidebarDateGroups";
 import { nextSessionTitle } from "@/lib/sidebarSessionRename";
@@ -698,7 +692,6 @@ import { UsageLimitModal } from "@/components/UsageLimitModal";
 import {
   IconChevronDown,
   IconChevronUp,
-  IconChevronRight,
   IconMore,
   IconPlus,
   IconQueue,
@@ -708,14 +701,12 @@ import {
   IconMic,
   IconFolder,
   IconFolderPlus,
-  IconArrowsVerticalCollapse,
   IconArrowsMinimize,
   IconChat,
   IconClock,
   IconClose,
   IconCode,
   IconClipboardList,
-  IconNewChat as IconSquarePen,
   IconNewChat,
   IconImagine,
   IconScheduled,
@@ -993,12 +984,10 @@ import {
 import { useSidebarProjectReorder } from "@/hooks/useSidebarProjectReorder";
 import { useSessionMoveProject } from "@/hooks/useSessionMoveProject";
 import { useSidebarSessionMoveDrag } from "@/hooks/useSidebarSessionMoveDrag";
-import { SESSION_DROP_ORPHAN } from "@/lib/sessionMoveProject";
 import { useSideWorkbenchProjectIsolation } from "@/hooks/useSideWorkbenchProjectIsolation";
 import { useBottomTerminal } from "@/hooks/useBottomTerminal";
 import { BottomTerminalToggle } from "@/components/bottom-terminal/BottomTerminalToggle";
 import { useProjectSpaces } from "@/hooks/useProjectSpaces";
-import { SpaceSwitcher } from "@/components/SpaceSwitcher";
 import {
   findSpace,
   spaceDisplayName,
@@ -1022,6 +1011,7 @@ import { useWorkbenchDisplayPrefs } from "@/hooks/useWorkbenchDisplayPrefs";
 import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
 import { useSearchPalette } from "@/hooks/useSearchPalette";
 import { useSessionCatalog } from "@/hooks/useSessionCatalog";
+import { WorkbenchSessionTree } from "@/app/WorkbenchSessionTree";
 import { useSessionExportText } from "@/hooks/useSessionExportText";
 import { useSessionExportImage } from "@/hooks/useSessionExportImage";
 import {
@@ -4974,20 +4964,6 @@ export function AppWorkbench() {
     // skips when a warm process already exists. Never awaited.
     api.sessionPrewarm();
   };
-
-  const sessionsForProject = (projectId: string) =>
-    sessions.filter((s) => s.projectId === projectId && !s.archived);
-
-  const orphanSessions = sessions.filter(
-    (s) =>
-      (!s.projectId || !projects.some((p) => p.id === s.projectId)) &&
-      !s.archived,
-  );
-  const orphanSessionIds = orphanSessions.map((s) => s.id);
-  const orphanAllSelected = areAllIdsSelected(
-    selectedSessionIds,
-    orphanSessionIds,
-  );
 
   /**
    * Visual order of sessions in the open sidebar (expanded projects + orphans).
@@ -17066,639 +17042,56 @@ export function AppWorkbench() {
             ) : null}
           </div>
 
-          <OverlayScroll
-            className="sidebar__scroll"
-            viewportClassName="sidebar__scroll-inner"
-            syncTreeReveal
-          >
-            {/* L1 — Projects section */}
-            <div className="tree-l1">
-              <button
-                type="button"
-                className="tree-l1__head tree-l1__head--toggle"
-                onClick={() => setProjectsOpen((v) => !v)}
-                aria-expanded={projectsOpen}
-                aria-label={tr("sidebar.projects")}
-              >
-                {projectsOpen ? (
-                  <IconChevronDown size={14} />
-                ) : (
-                  <IconChevronRight size={14} />
-                )}
-              </button>
-              <SpaceSwitcher
-                state={projectSpaces.state}
-                projectIds={projects.map((p) => p.id)}
-                labels={{
-                  projects: tr("sidebar.projects"),
-                  all: tr("sidebar.spaces.all"),
-                  default: tr("sidebar.spaces.default"),
-                  switch: tr("sidebar.spaces.switch"),
-                  new: tr("sidebar.spaces.new"),
-                  rename: tr("sidebar.spaces.rename"),
-                  delete: tr("sidebar.spaces.delete"),
-                }}
-                onSelect={(id) => projectSpaces.switchTo(id)}
-                onNew={() => promptCreateSpace()}
-                onRename={(id) => promptRenameSpace(id)}
-                onDelete={(id) => confirmDeleteSpace(id)}
-              />
-              <div className="tree-l1__actions">
-                {sessionSelectMode ? (
-                  <Tip label={tr("common.cancel")}>
-                    <button
-                      type="button"
-                      className="tree-l1__action"
-                      aria-label={tr("common.cancel")}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        exitSessionSelectMode();
-                      }}
-                    >
-                      <IconClose size={15} />
-                    </button>
-                  </Tip>
-                ) : selectableSessionCount > 0 ? (
-                  <>
-                    <Tip label={tr("sidebar.select")}>
-                      <button
-                        type="button"
-                        className="tree-l1__action"
-                        aria-label={tr("sidebar.select")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          enterSessionSelectMode();
-                        }}
-                      >
-                        <IconListCheck size={15} />
-                      </button>
-                    </Tip>
-                    {unreadSessionIds.size > 0 ? (
-                      <Tip label={tr("session.clearAllUnread")}>
-                        <button
-                          type="button"
-                          className="tree-l1__action"
-                          aria-label={tr("session.clearAllUnread")}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleClearAllSessionUnread();
-                          }}
-                        >
-                          <IconCheck size={15} />
-                        </button>
-                      </Tip>
-                    ) : null}
-                    <Tip label={tr("sidebar.archiveOlder")}>
-                      <button
-                        type="button"
-                        className="tree-l1__action"
-                        aria-label={tr("sidebar.archiveOlder")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCtxMenu({
-                            kind: "archive-older",
-                            x: e.clientX,
-                            y: e.clientY,
-                          });
-                        }}
-                      >
-                        <IconArchive size={15} />
-                      </button>
-                    </Tip>
-                  </>
-                ) : null}
-                {projects.length > 0 && !sessionSelectMode ? (
-                  <Tip label={tr("sidebar.collapseAllProjects")}>
-                    <button
-                      type="button"
-                      className="tree-l1__action"
-                      aria-label={tr("sidebar.collapseAllProjects")}
-                      onClick={(e) => {
-                        // Collapse each project folder only — not the L1 section.
-                        e.stopPropagation();
-                        setExpandedProjects((prev) => {
-                          const next = { ...prev };
-                          for (const p of projects) {
-                            next[p.id] = false;
-                          }
-                          return next;
-                        });
-                      }}
-                    >
-                      <IconArrowsVerticalCollapse size={15} />
-                    </button>
-                  </Tip>
-                ) : null}
-                {!isMirrorClient() && !sessionSelectMode ? (
-                  <Tip label={tr("sidebar.addProject")}>
-                    <button
-                      type="button"
-                      className="tree-l1__action"
-                      aria-label={tr("sidebar.addProject")}
-                      onClick={() => void addProject(false)}
-                    >
-                      <IconPlus size={15} />
-                    </button>
-                  </Tip>
-                ) : null}
-              </div>
-            </div>
-
-            <SidebarTreeReveal open={projectsOpen} className="tree-reveal--projects">
-            {projects.length === 0 && (
-              <div className="sidebar-empty">
-                {tr("sidebar.noProjects")}
-              </div>
-            )}
-
-            {projects.length > 0 &&
-              visibleProjects.length === 0 && (
-              <div className="sidebar-empty sidebar-empty--space">
-                {tr("sidebar.spaces.empty")}
-                <div className="sidebar-empty__hint">
-                  {tr("sidebar.spaces.emptyHint")}
-                </div>
-              </div>
-            )}
-
-            {visibleProjects.map((proj) => {
-                const open = expandedProjects[proj.id] !== false;
-                const projSessions = sessionsForProject(proj.id);
-                const projSessionIds = projSessions.map((s) => s.id);
-                const projAllSelected = areAllIdsSelected(
-                  selectedSessionIds,
-                  projSessionIds,
-                );
-                return (
-                  <div key={proj.id} className="tree-project">
-                    {/* L2 — project folder: expand/collapse; drag row to reorder */}
-                    <div
-                      className={
-                        "tree-l2" +
-                        (isProjectPathMissing(proj.pathOk)
-                          ? " tree-l2--path-missing"
-                          : "") +
-                        (sessionSelectMode ? " tree-l2--select-mode" : "") +
-                        (projectReorder.enabled ? " tree-l2--reorderable" : "")
-                      }
-                      data-project-reorder-id={proj.id}
-                      data-session-drop={proj.id}
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={open}
-                      {...(projectReorder.enabled
-                        ? projectReorder.bindRow(proj.id)
-                        : {})}
-                      onClick={() => {
-                        // After a completed drag, ignore the trailing click.
-                        if (projectReorder.suppressNextClick()) return;
-                        setExpandedProjects((e) => ({
-                          ...e,
-                          [proj.id]: !open,
-                        }));
-                      }}
-                      onContextMenu={(e) => openProjectMenu(e, proj)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setExpandedProjects((ex) => ({
-                            ...ex,
-                            [proj.id]: !open,
-                          }));
-                        }
-                      }}
-                    >
-                      <span className="tree-l2__icon">
-                        <IconFolder size={15} />
-                      </span>
-                      {resolveProjectColorCss(proj.color) ? (
-                        <span
-                          className="tree-l2__color-dot"
-                          style={
-                            {
-                              "--project-color": resolveProjectColorCss(
-                                proj.color,
-                              ),
-                            } as CSSProperties
-                          }
-                          aria-hidden
-                        />
-                      ) : null}
-                      <Tip
-                        label={
-                          isProjectPathMissing(proj.pathOk)
-                            ? tr("project.pathMissing", { name: proj.name })
-                            : proj.path
-                        }
-                      >
-                        <span className="tree-l2__name">
-                          {proj.pinned ? (
-                            <IconPin size={12} className="tree-l2__pin" />
-                          ) : null}
-                          {projectDisplayName(proj, tr)}
-                        </span>
-                      </Tip>
-                      {isProjectPathMissing(proj.pathOk) ? (
-                        <span className="project-row__badge project-row__badge--path-missing">
-                          {tr("sidebar.pathMissing")}
-                        </span>
-                      ) : !proj.trusted ? (
-                        <span className="project-row__badge">
-                          {tr("sidebar.untrusted")}
-                        </span>
-                      ) : null}
-                      <span
-                        className={
-                          "tree-l2__actions" +
-                          (sessionSelectMode
-                            ? " tree-l2__actions--select-mode"
-                            : "")
-                        }
-                      >
-                        {sessionSelectMode ? (
-                          projSessionIds.length > 0 ? (
-                            <button
-                              type="button"
-                              className={
-                                "tree-l2__select-all" +
-                                (projAllSelected
-                                  ? " tree-l2__select-all--on"
-                                  : "")
-                              }
-                              aria-label={
-                                projAllSelected
-                                  ? tr("sidebar.deselectAllInGroup")
-                                  : tr("sidebar.selectAllInGroup")
-                              }
-                              aria-pressed={projAllSelected}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleSessionsSelected(projSessionIds);
-                              }}
-                            >
-                              <span
-                                className={
-                                  "tree-l3__check" +
-                                  (projAllSelected ? " is-on" : "")
-                                }
-                                aria-hidden
-                              >
-                                {projAllSelected ? (
-                                  <IconCheck size={11} stroke={2.4} />
-                                ) : null}
-                              </span>
-                              <span className="tree-l2__select-all-label">
-                                {projAllSelected
-                                  ? tr("sidebar.deselectAllInGroup")
-                                  : tr("sidebar.selectAllInGroup")}
-                              </span>
-                            </button>
-                          ) : null
-                        ) : (
-                          <>
-                            <Tip label={tr("sidebar.newConversation")}>
-                              <button
-                                type="button"
-                                className="tree-icon-btn"
-                                disabled={
-                                  !proj.trusted ||
-                                  isProjectPathMissing(proj.pathOk)
-                                }
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void newChat(proj);
-                                }}
-                              >
-                                <IconSquarePen size={14} />
-                              </button>
-                            </Tip>
-                            <Tip label={tr("sidebar.menu")}>
-                              <button
-                                type="button"
-                                className="tree-icon-btn"
-                                onClick={(e) => openProjectMenu(e, proj)}
-                              >
-                                <IconMore size={14} />
-                              </button>
-                            </Tip>
-                          </>
-                        )}
-                      </span>
-                    </div>
-
-                    <SidebarTreeReveal open={open}>
-                      <div className="tree-l3-list-wrap">
-                        {isProjectPathMissing(proj.pathOk) && (
-                          <button
-                            type="button"
-                            className="tree-l3 tree-l3--hint"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void relocateProject(proj);
-                            }}
-                          >
-                            {tr("sidebar.relocateProject")}
-                          </button>
-                        )}
-                        {!proj.trusted && !isProjectPathMissing(proj.pathOk) && (
-                          <button
-                            type="button"
-                            className="tree-l3 tree-l3--hint"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void trustProject(proj);
-                            }}
-                          >
-                            {tr("sidebar.trustProject")}
-                          </button>
-                        )}
-                        {projSessions.length > 0
-                          ? (() => {
-                              const sortedSessions =
-                                sortSessionsForSidebar(projSessions);
-                              return (
-                                <VirtualList
-                                  className="tree-l3-list"
-                                  items={sortedSessions}
-                                  getKey={(s) => s.id}
-                                  rowHeight={sidebarRowMetrics.rowHeight}
-                                  gap={sidebarRowMetrics.gap}
-                                  scrollToKey={
-                                    session.sessionId &&
-                                    sortedSessions.some(
-                                      (x) => x.id === session.sessionId,
-                                    )
-                                      ? session.sessionId
-                                      : null
-                                  }
-                                  renderItem={(s) => {
-                                    const working = busyIds.has(s.id);
-                                    const checked =
-                                      selectedSessionIds.has(s.id);
-                                    const unread = unreadSessionIds.has(s.id);
-                                    const planPending =
-                                      planPendingSessionIds.has(s.id);
-                                    const noteRaw =
-                                      sessionNotesMap[s.id]?.trim() || "";
-                                    return (
-                                      <SidebarSessionRow
-                                        session={s}
-                                        variant="project"
-                                        active={session.sessionId === s.id}
-                                        working={working}
-                                        unread={unread}
-                                        planPending={planPending}
-                                        checked={checked}
-                                        selectMode={sessionSelectMode}
-                                        muted={mutedSessionIds.has(s.id)}
-                                        noteTitle={
-                                          noteRaw
-                                            ? notePreview(noteRaw) ||
-                                              sidebarSessionLabels.noteAria
-                                            : null
-                                        }
-                                        worktreeBadge={buildSidebarWorktreeBadge(
-                                          s,
-                                        )}
-                                        labels={sidebarSessionLabels}
-                                        locale={locale}
-                                        showRelativeTime={
-                                          sidebarShowRelativeTime
-                                        }
-                                        onOpen={onSidebarSessionOpen}
-                                        onContextMenu={
-                                          onSidebarSessionContextMenu
-                                        }
-                                        onToggleSelect={toggleSessionSelected}
-                                        onPin={onSidebarSessionPin}
-                                        onArchive={onSidebarSessionArchive}
-                                        onMenu={onSidebarSessionMenu}
-                                        onRename={onSidebarSessionRename}
-                                      />
-                                    );
-                                  }}
-                                />
-                              );
-                            })()
-                          : null}
-                        {projSessions.length === 0 && proj.trusted && (
-                          <div className="sidebar-empty" style={{ padding: "4px 10px" }}>
-                            {tr("sidebar.noChats")}
-                          </div>
-                        )}
-                      </div>
-                    </SidebarTreeReveal>
-                  </div>
-                );
-              })}
-            </SidebarTreeReveal>
-
-            {/* Orphans / history — block wrap so the reveal is not a flex item */}
-            <div className="tree-orphan">
-            <div className="tree-l1" style={{ marginTop: 8 }}>
-              <button
-                type="button"
-                className="tree-l1__head"
-                data-session-drop={SESSION_DROP_ORPHAN}
-                aria-expanded={historyOpen}
-                onClick={() => setHistoryOpen((v) => !v)}
-              >
-                <span className="tree-l1__chevron" aria-hidden>
-                  {historyOpen ? (
-                    <IconChevronDown size={14} />
-                  ) : (
-                    <IconChevronRight size={14} />
-                  )}
-                </span>
-                <span className="tree-l1__label">
-                  {tr("sidebar.otherSessions")}
-                </span>
-              </button>
-              {!sessionSelectMode && orphanSessionIds.length > 0 ? (
-                <div className="tree-l1__actions">
-                  <Tip label={tr("sidebar.select")}>
-                    <button
-                      type="button"
-                      className="tree-l1__action"
-                      aria-label={tr("sidebar.select")}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        enterSessionSelectMode();
-                      }}
-                    >
-                      <IconListCheck size={15} />
-                    </button>
-                  </Tip>
-                </div>
-              ) : null}
-              {sessionSelectMode && orphanSessionIds.length > 0 ? (
-                <div className="tree-l1__actions tree-l1__actions--select-mode">
-                  <button
-                    type="button"
-                    className={
-                      "tree-l1__select-all" +
-                      (orphanAllSelected ? " tree-l1__select-all--on" : "")
-                    }
-                    aria-label={
-                      orphanAllSelected
-                        ? tr("sidebar.deselectAllInGroup")
-                        : tr("sidebar.selectAllInGroup")
-                    }
-                    aria-pressed={orphanAllSelected}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleSessionsSelected(orphanSessionIds);
-                    }}
-                  >
-                    <span
-                      className={
-                        "tree-l3__check" +
-                        (orphanAllSelected ? " is-on" : "")
-                      }
-                      aria-hidden
-                    >
-                      {orphanAllSelected ? (
-                        <IconCheck size={11} stroke={2.4} />
-                      ) : null}
-                    </span>
-                    <span className="tree-l1__select-all-label">
-                      {orphanAllSelected
-                        ? tr("sidebar.deselectAllInGroup")
-                        : tr("sidebar.selectAllInGroup")}
-                    </span>
-                  </button>
-                </div>
-              ) : null}
-            </div>
-            {orphanSessions.length > 0
-              ? (() => {
-                  const sortedOrphans = sortSessionsForSidebar(orphanSessions);
-                  return (
-                    <SidebarTreeReveal open={historyOpen}>
-                      <div className="tree-l3-list-wrap">
-                      <VirtualList
-                        className="tree-orphan-list"
-                        items={sortedOrphans}
-                        getKey={(s) => s.id}
-                        rowHeight={sidebarRowMetrics.rowHeight}
-                        gap={sidebarRowMetrics.gap}
-                        scrollToKey={
-                          session.sessionId &&
-                          sortedOrphans.some(
-                            (x) => x.id === session.sessionId,
-                          )
-                            ? session.sessionId
-                            : null
-                        }
-                        renderItem={(s) => {
-                          const working = busyIds.has(s.id);
-                          const checked = selectedSessionIds.has(s.id);
-                          const unread = unreadSessionIds.has(s.id);
-                          const planPending =
-                            planPendingSessionIds.has(s.id);
-                          const noteRaw =
-                            sessionNotesMap[s.id]?.trim() || "";
-                          return (
-                            <SidebarSessionRow
-                              session={s}
-                              variant="orphan"
-                              active={session.sessionId === s.id}
-                              working={working}
-                              unread={unread}
-                              planPending={planPending}
-                              checked={checked}
-                              selectMode={sessionSelectMode}
-                              muted={mutedSessionIds.has(s.id)}
-                              noteTitle={
-                                noteRaw
-                                  ? notePreview(noteRaw) ||
-                                    sidebarSessionLabels.noteAria
-                                  : null
-                              }
-                              worktreeBadge={buildSidebarWorktreeBadge(s)}
-                              labels={sidebarSessionLabels}
-                              locale={locale}
-                              showRelativeTime={sidebarShowRelativeTime}
-                              onOpen={onSidebarSessionOpen}
-                              onContextMenu={onSidebarSessionContextMenu}
-                              onToggleSelect={toggleSessionSelected}
-                              onPin={onSidebarSessionPin}
-                              onArchive={onSidebarSessionArchive}
-                              onMenu={onSidebarSessionMenu}
-                              onRename={onSidebarSessionRename}
-                            />
-                          );
-                        }}
-                      />
-                      </div>
-                    </SidebarTreeReveal>
-                  );
-                })()
-              : null}
-            </div>
-          </OverlayScroll>
-
-          {sessionSelectMode ? (
-            <div className="sidebar-select-bar" role="toolbar">
-              <span className="sidebar-select-bar__count">
-                {tr("sidebar.selectedCount", {
-                  n: selectedSessionIds.size,
-                })}
-              </span>
-              <div className="sidebar-select-bar__actions">
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  onClick={exitSessionSelectMode}
-                >
-                  {tr("common.cancel")}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  disabled={selectedSessionIds.size === 0}
-                  onClick={(e) => {
-                    setCtxMenu({
-                      kind: "session-move",
-                      ids: [...selectedSessionIds],
-                      x: e.clientX,
-                      y: e.clientY,
-                    });
-                  }}
-                >
-                  {tr("sidebar.moveSelected", {
-                    n: selectedSessionIds.size,
-                  })}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  disabled={selectedSessionIds.size === 0}
-                  onClick={() => confirmBulkSetArchived(true)}
-                >
-                  {tr("sidebar.archiveSelected", {
-                    n: selectedSessionIds.size,
-                  })}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm btn--danger"
-                  disabled={selectedSessionIds.size === 0}
-                  onClick={() => {
-                    const rows = sessions.filter((s) =>
-                      selectedSessionIds.has(s.id),
-                    );
-                    deleteSessionsConfirm(rows);
-                  }}
-                >
-                  {tr("sidebar.deleteSelected", {
-                    n: selectedSessionIds.size,
-                  })}
-                </button>
-              </div>
-            </div>
-          ) : null}
-
+          <WorkbenchSessionTree
+            tr={tr}
+            locale={locale}
+            projects={projects}
+            visibleProjects={visibleProjects}
+            sessions={sessions}
+            projectsOpen={projectsOpen}
+            setProjectsOpen={setProjectsOpen}
+            historyOpen={historyOpen}
+            setHistoryOpen={setHistoryOpen}
+            expandedProjects={expandedProjects}
+            setExpandedProjects={setExpandedProjects}
+            projectSpaces={projectSpaces}
+            promptCreateSpace={promptCreateSpace}
+            promptRenameSpace={promptRenameSpace}
+            confirmDeleteSpace={confirmDeleteSpace}
+            sessionSelectMode={sessionSelectMode}
+            selectedSessionIds={selectedSessionIds}
+            selectableSessionCount={selectableSessionCount}
+            enterSessionSelectMode={enterSessionSelectMode}
+            exitSessionSelectMode={exitSessionSelectMode}
+            toggleSessionSelected={toggleSessionSelected}
+            toggleSessionsSelected={toggleSessionsSelected}
+            unreadSessionIds={unreadSessionIds}
+            handleClearAllSessionUnread={handleClearAllSessionUnread}
+            setCtxMenu={setCtxMenu}
+            addProject={addProject}
+            projectReorder={projectReorder}
+            openProjectMenu={openProjectMenu}
+            newChat={newChat}
+            relocateProject={relocateProject}
+            trustProject={trustProject}
+            viewingSessionId={session.sessionId}
+            busyIds={busyIds}
+            planPendingSessionIds={planPendingSessionIds}
+            mutedSessionIds={mutedSessionIds}
+            sessionNotesMap={sessionNotesMap}
+            sidebarSessionLabels={sidebarSessionLabels}
+            sidebarShowRelativeTime={sidebarShowRelativeTime}
+            sidebarRowMetrics={sidebarRowMetrics}
+            buildSidebarWorktreeBadge={buildSidebarWorktreeBadge}
+            onSidebarSessionOpen={onSidebarSessionOpen}
+            onSidebarSessionContextMenu={onSidebarSessionContextMenu}
+            onSidebarSessionPin={onSidebarSessionPin}
+            onSidebarSessionArchive={onSidebarSessionArchive}
+            onSidebarSessionMenu={onSidebarSessionMenu}
+            onSidebarSessionRename={onSidebarSessionRename}
+            confirmBulkSetArchived={confirmBulkSetArchived}
+            deleteSessionsConfirm={deleteSessionsConfirm}
+          />
           <UserMenu
             open={showUserMenu}
             onClose={() => setShowUserMenu(false)}

@@ -154,7 +154,7 @@ describe("tree-reveal CSS", () => {
 
   it("drives the L1 projects chevron, not only per-project chats", () => {
     const src = readFileSync(
-      resolve(__dirname, "../app/AppWorkbench.tsx"),
+      resolve(__dirname, "../app/WorkbenchSessionTree.tsx"),
       "utf8",
     );
     expect(src).toMatch(
@@ -207,7 +207,7 @@ describe("project / orphan flex shrink", () => {
 
 describe("Other sessions tree wrap", () => {
   const src = readFileSync(
-    resolve(__dirname, "../app/AppWorkbench.tsx"),
+    resolve(__dirname, "../app/WorkbenchSessionTree.tsx"),
     "utf8",
   );
 
@@ -251,7 +251,7 @@ describe("sidebar tree text columns", () => {
     "utf8",
   );
   const src = readFileSync(
-    resolve(__dirname, "../app/AppWorkbench.tsx"),
+    resolve(__dirname, "../app/WorkbenchSessionTree.tsx"),
     "utf8",
   );
 
