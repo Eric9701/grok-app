@@ -62,7 +62,7 @@ describe("floating pop CSS", () => {
     "utf8",
   );
   const env = readFileSync(
-    resolve(__dirname, "../styles/side-workbench.css"),
+    resolve(__dirname, "../styles/side-workbench.part2.css"),
     "utf8",
   );
   const settings = readFileSync(

@@ -190,8 +190,8 @@ describe("tree-reveal CSS", () => {
 });
 
 describe("project / orphan flex shrink", () => {
-  const part1 = readFileSync(
-    resolve(__dirname, "../styles/sidebar.part1.css"),
+  const part1b = readFileSync(
+    resolve(__dirname, "../styles/sidebar.part1b.css"),
     "utf8",
   );
   const part2 = readFileSync(
@@ -200,7 +200,7 @@ describe("project / orphan flex shrink", () => {
   );
 
   it("keeps open project folders from shrinking below their session list", () => {
-    expect(part1).toMatch(/\.tree-project\s*\{[^}]*flex-shrink:\s*0/);
+    expect(part1b).toMatch(/\.tree-project\s*\{[^}]*flex-shrink:\s*0/);
     expect(part2).toMatch(/\.tree-orphan\s*\{[^}]*flex-shrink:\s*0/);
   });
 });
@@ -238,6 +238,10 @@ describe("sidebar tree text columns", () => {
     resolve(__dirname, "../styles/sidebar.part1.css"),
     "utf8",
   );
+  const part1b = readFileSync(
+    resolve(__dirname, "../styles/sidebar.part1b.css"),
+    "utf8",
+  );
   const part2 = readFileSync(
     resolve(__dirname, "../styles/sidebar.part2.css"),
     "utf8",
@@ -260,13 +264,13 @@ describe("sidebar tree text columns", () => {
   });
 
   it("consumes tree tokens without px fallbacks", () => {
-    expect(part1).toMatch(
+    expect(part1b).toMatch(
       /\.tree-l1__head--toggle,\s*\.tree-l1__chevron\s*\{[^}]*var\(--tree-l1-gutter\)/,
     );
-    expect(part1).toMatch(/\.tree-l2\s*\{[^}]*var\(--tree-l2-pad\)/);
+    expect(part1b).toMatch(/\.tree-l2\s*\{[^}]*var\(--tree-l2-pad\)/);
     expect(part2).toMatch(/\.tree-l3\s*\{[^}]*var\(--tree-text-inset\)/);
     expect(part4).toMatch(/\.nav-item__icon\s*\{[^}]*var\(--tree-l1-gutter\)/);
-    expect(`${part1}\n${part2}\n${part4}`).not.toMatch(
+    expect(`${part1}\n${part1b}\n${part2}\n${part4}`).not.toMatch(
       /var\(--tree-[a-z0-9-]+,\s*[^)]+\)/,
     );
   });

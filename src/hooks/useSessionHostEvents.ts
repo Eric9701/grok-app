@@ -81,9 +81,9 @@ import { parseProcessLimitEvent } from "@/lib/processBudget";
 import {
   DEFAULT_RELIABILITY_MAX_STALLS,
   prependReliabilityRing,
-  recordStallHistoryFromSignal,
   reliabilityStallFromEvent,
 } from "@/lib/reliabilityCenter";
+import { recordStallHistoryFromSignal } from "@/lib/reliabilityStallHistory";
 import {
   GOAL_ORCH_EVENT_MAX,
   goalEventFromHostPayload,

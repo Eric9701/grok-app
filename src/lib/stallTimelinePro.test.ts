@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StallHistoryEntry } from "./reliabilityCenter";
+import type { StallHistoryEntry } from "./reliabilityStallHistory";
 import {
   canOpenStallSession,
   formatStallDuration,

@@ -12,7 +12,7 @@ import {
   hasActiveStallHistoryFilters,
   type StallHistoryEntry,
   type StallHistoryKindFilter,
-} from "@/lib/reliabilityCenter";
+} from "@/lib/reliabilityStallHistory";
 
 // ── Open session ─────────────────────────────────────────────────────────────
 

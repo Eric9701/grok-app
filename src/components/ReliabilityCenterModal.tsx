@@ -41,6 +41,13 @@ import {
   type GoalOrchPhaseFilter,
 } from "@/lib/goalOrch";
 import {
+  type ReliabilityBusySession,
+  type ReliabilityCenterView,
+  type ReliabilityErrorEntry,
+  type ReliabilityStallKind,
+  type ReliabilityStallSignal,
+} from "@/lib/reliabilityCenter";
+import {
   applyClearStallHistoryPlan,
   buildStallHistoryExport,
   buildStallTimelineSnapshot,
@@ -51,13 +58,8 @@ import {
   serializeStallTimelineSnapshot,
   STALL_HISTORY_CHANGE_EVENT,
   STALL_HISTORY_STORAGE_KEY,
-  type ReliabilityBusySession,
-  type ReliabilityCenterView,
-  type ReliabilityErrorEntry,
-  type ReliabilityStallKind,
-  type ReliabilityStallSignal,
   type StallHistoryEntry,
-} from "@/lib/reliabilityCenter";
+} from "@/lib/reliabilityStallHistory";
 import {
   formatStallDuration,
   planOpenStallSession,
