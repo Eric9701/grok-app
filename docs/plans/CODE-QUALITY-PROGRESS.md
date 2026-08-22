@@ -12,7 +12,7 @@
 | Spec | `docs/plans/2026-08-01-code-quality-remediation-GOAL.md` |
 | Started | `2026-08-01` |
 | Current wave | `workbench-decomp` |
-| Current WP | `WP-W10` |
+| Current WP | `WP-W11` |
 | **FINAL** | **PASS** (honest orchestration metrics; decreasing ceilings) |
 
 ## Wave checklist
@@ -56,6 +56,7 @@
 | WP-W8 | Left rail JSX into WorkbenchSidebar | PASS | b54dca82 | 21638→21326 lines; useState 224; useEffect 88 |
 | WP-W9 | Audit src/lib <80-line modules for pure pass-throughs | PASS | docs | 99 small modules; keep barrels `api.ts` / `session.ts` / `remoteIm/index.ts` |
 | WP-W10 | Center chrome JSX into WorkbenchMain | PASS | 2aa1ad61 | 21326→21020 lines; useState 224; useEffect 88 |
+| WP-W11 | Resources aside + search/export/sandbox/reliability overlays | PASS | 444c55dd | 21020→20903 lines; useState 224; useEffect 88 |
 
 ## Metrics log (append-only)
 
@@ -77,6 +78,7 @@
 | 2026-08-22 W7 | 21638 (shell 18 + wb 21620) | 224 | 88 | 11 | dir | dir | 28 | 9 | 69 |
 | 2026-08-22 W8 | 21326 (shell 18 + wb 21308) | 224 | 88 | 11 | dir | dir | 28 | 9 | 69 |
 | 2026-08-22 W10 | 21020 (shell 18 + wb 21002) | 224 | 88 | 11 | dir | dir | 28 | 9 | 69 |
+| 2026-08-22 W11 | 20903 (shell 18 + wb 20885) | 224 | 88 | 11 | dir | dir | 28 | 9 | 69 |
 
 ## Blockers
 
@@ -102,7 +104,7 @@ Parallel non-overlapping tracks (multi-agent) — **landed**:
 | residual-resource-viewer | ResourceViewer + parts | **PASS** | 4938→modules |
 | residual-i18n | `src/i18n/**` | **PASS** | domain modules + barrels |
 | residual-settings | SettingsPage + settings/* | **PASS** | 8874→1817 |
-| residual-appworkbench | AppWorkbench + hooks | **ACTIVE** | WP-W10: main chrome JSX out; next openSession/newChat + aside/modals JSX |
+| residual-appworkbench | AppWorkbench + hooks | **ACTIVE** | WP-W11: aside + domain overlays out; next openSession/newChat + remaining JSX |
 | residual-settings-catalog | settingsCatalog split | **PASS** | domain entries |
 
-Follow-on: `docs/plans/HANDOFF-appworkbench-decomposition.md` (worktree `D:/code/grok-app-appworkbench-decomp`, branch `refactor/appworkbench-decomposition`). Decreasing ceilings now **21200 / 229 useState / 93 useEffect**; `files_ge_1000` **≤69**. Collaborator skip pi. Five local worktrees are leftover SHAs; product changes already on `main`.
+Follow-on: `docs/plans/HANDOFF-appworkbench-decomposition.md` (worktree `D:/code/grok-app-appworkbench-decomp`, branch `refactor/appworkbench-decomposition`). Decreasing ceilings now **21080 / 229 useState / 93 useEffect**; `files_ge_1000` **≤69**. Collaborator skip pi. Five local worktrees are leftover SHAs; product changes already on `main`.
