@@ -41,16 +41,16 @@ export const CHAT_DEFAULT_ROW_ESTIMATE_PX = 120;
 export const CHAT_MAX_ROW_ESTIMATE_PX = 8000;
 
 /** Baseline extra px above/below the viewport when browsing history. */
-export const CHAT_OVERSCAN_PX = 1200;
+export const CHAT_OVERSCAN_PX = 1800;
 
 /** Baseline when pinned: more history above the tail so pin feels continuous. */
-export const CHAT_PIN_OVERSCAN_PX = 1600;
+export const CHAT_PIN_OVERSCAN_PX = 2400;
 
 /** Floor / ceiling for adaptive overscan (px). */
-export const CHAT_OVERSCAN_MIN_PX = 700;
-export const CHAT_OVERSCAN_MAX_PX = 1800;
-export const CHAT_PIN_OVERSCAN_MIN_PX = 1000;
-export const CHAT_PIN_OVERSCAN_MAX_PX = 2400;
+export const CHAT_OVERSCAN_MIN_PX = 1000;
+export const CHAT_OVERSCAN_MAX_PX = 3000;
+export const CHAT_PIN_OVERSCAN_MIN_PX = 1400;
+export const CHAT_PIN_OVERSCAN_MAX_PX = 3600;
 
 /**
  * Max index gap when expanding the window for `forceIndices` while **escaped**.
@@ -73,9 +73,8 @@ export const CHAT_IMAGE_CARDS_PER_ROW = 3;
  * are not first measured as ~120px (that underestimates scrollHeight and
  * makes mid-document look "near bottom" → stick bounce).
  *
- * Media: chip attachments (~36px), ratio-aware image cards (≤150px), and
- * inline video cards (~240px) are not reflected in `contentLength` — include
- * them so first paint is closer to final height (fewer remeasure snaps).
+ * Estimates are coarse and intentional: they only seed the prefix-sum table
+ * before rows mount. Real heights commit to `heightsRef` via measureRef.
  */
 export function estimateChatRowHeight(input: {
   contentLength?: number;
@@ -125,9 +124,10 @@ export function estimateChatRowHeight(input: {
   }
   // Collapsed CoT is a one-line "Thought" chip, not the raw thought body.
   const thoughtChrome = !input.thoughtExpanded && thoughtRaw > 0 ? 28 : 0;
-  // ~42 chars/line in the bubble, ~20px line height, role chrome.
-  const lines = Math.ceil((content + thought * 0.5) / 42);
-  const chrome = role === "user" ? 72 : role === "tool" ? 28 : 96;
+  // Assistant markdown has paragraph/heading spacing; user bubbles are compact.
+  const contentMultiplier = role === "assistant" ? 1.35 : 1.0;
+  const lines = Math.ceil((content * contentMultiplier + thought * 0.5) / 42);
+  const chrome = role === "user" ? 72 : role === "tool" ? 28 : 110;
   const atts = Math.max(0, input.attachmentCount ?? 0);
   // 36px chips + gap; user strip packs to ~70% width (~6–8 chips/row typical).
   // Collapsed default shows ≤3 + "+N" (≤4 slots) on one row when possible.
@@ -192,21 +192,21 @@ export function resolveChatOverscanPx(input: {
   const vh = Math.max(0, input.viewportHeight);
   let px: number;
   if (input.pinToBottom) {
-    // ~1.5 viewports above the tail + small baseline, clamped.
-    const raw = vh * 1.5 + 200;
+    // ~1.6 viewports above the tail + small baseline, clamped.
+    const raw = vh * 1.6 + 300;
     px = Math.round(
       Math.min(
         CHAT_PIN_OVERSCAN_MAX_PX,
-        Math.max(CHAT_PIN_OVERSCAN_MIN_PX, raw, CHAT_PIN_OVERSCAN_PX * 0.75),
+        Math.max(CHAT_PIN_OVERSCAN_MIN_PX, raw, CHAT_PIN_OVERSCAN_PX),
       ),
     );
   } else {
-    // History browse: ~1 viewport of runway.
-    const raw = vh * 1.1 + 100;
+    // History browse: ~1.8 viewports of runway for high-refresh 120Hz/144Hz smoothness.
+    const raw = vh * 1.8 + 300;
     px = Math.round(
       Math.min(
         CHAT_OVERSCAN_MAX_PX,
-        Math.max(CHAT_OVERSCAN_MIN_PX, raw, CHAT_OVERSCAN_PX * 0.6),
+        Math.max(CHAT_OVERSCAN_MIN_PX, raw, CHAT_OVERSCAN_PX),
       ),
     );
   }

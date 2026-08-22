@@ -108,6 +108,7 @@ import {
   estimateChatRowHeight,
   splitVirtSpacerHeights,
 } from "@/lib/chatVirtualList";
+import { scrollPerfDebug } from "@/lib/scrollPerfDebug";
 import { StructuredJsonPanel } from "./StructuredJsonPanel";
 import {
   MessageActionButton,
@@ -121,6 +122,11 @@ import {
   previewLongAssistant,
   shouldSpillLongAssistant,
 } from "@/lib/longAssistantSpill";
+import {
+  previewUserMessageText,
+  shouldFoldUserMessage,
+  USER_MSG_PREVIEW_CHARS,
+} from "@/lib/userMessageFold";
 import { detectAppPlatform } from "@/lib/appPlatform";
 import { Thinking } from "./Thinking";
 import { LeadFragmentsStrip } from "./LeadFragmentsStrip";
@@ -390,7 +396,7 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
   );
 });
 
-function UserBodyText({
+const UserBodyText = memo(function UserBodyText({
   content,
   findQuery,
   findActiveOccurrence,
@@ -456,10 +462,10 @@ function UserBodyText({
       })}
     </span>
   );
-}
+});
 
 /** Render skill chips / plain text for the user bubble body. */
-function UserPlainOrSkills({
+const UserPlainOrSkills = memo(function UserPlainOrSkills({
   content,
   findQuery,
   findActiveOccurrence,
@@ -474,6 +480,26 @@ function UserPlainOrSkills({
   const body = parsed.text;
   const quotes: ComposerQuote[] = parsed.quotes;
   const tr = createT(locale);
+  const [showFull, setShowFull] = useState(false);
+
+  const targetText = body || (quotes.length ? "" : content);
+  const findActiveHere = !!findQuery?.trim();
+  const canFold = shouldFoldUserMessage(targetText) && !findActiveHere;
+  const displayText =
+    canFold && !showFull ? previewUserMessageText(targetText) : targetText;
+
+  const handleBubbleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!canFold) return;
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim().length > 0) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("button, a, .skill-chip, .chat-ref-chip")) return;
+      setShowFull((v) => !v);
+    },
+    [canFold],
+  );
+
   return (
     <>
       <UserQuoteCards
@@ -481,21 +507,42 @@ function UserPlainOrSkills({
         countLabel={tr("composer.quoteCount", { n: String(quotes.length) })}
       />
       {body.trim() || !quotes.length ? (
-        <UserBodyText
-          content={body || (quotes.length ? "" : content)}
-          findQuery={findQuery}
-          findActiveOccurrence={findActiveOccurrence}
-        />
+        <div
+          className={
+            "lobe-chat-user-body-wrap" +
+            (canFold ? " lobe-chat-user-body-wrap--foldable" : "") +
+            (canFold && !showFull ? " lobe-chat-user-body-wrap--collapsed" : "")
+          }
+          onClick={canFold ? handleBubbleClick : undefined}
+          title={
+            canFold
+              ? showFull
+                ? tr("inspect.collapse")
+                : tr("inspect.expandMore", { n: "" })
+              : undefined
+          }
+        >
+          <UserBodyText
+            content={displayText}
+            findQuery={findQuery}
+            findActiveOccurrence={findActiveOccurrence}
+          />
+          {canFold ? (
+            <div className="lobe-chat-user-fold-cue" aria-hidden>
+              <span>{showFull ? "▲" : "▼"}</span>
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </>
   );
-}
+});
 
 /**
  * User bubble: skill chips + scheduled / Remote IM headers as pill tags
  * (`[Scheduled: title]` / `[Remote IM · feishu]` → label, not raw brackets).
  */
-function UserMessageBody({
+const UserMessageBody = memo(function UserMessageBody({
   content,
   scheduledLabel,
   remoteImLabel,
@@ -594,7 +641,7 @@ function UserMessageBody({
       findActiveOccurrence={findActiveOccurrence}
     />
   );
-}
+});
 
 export interface ConversationThreadProps {
   locale: Locale;
@@ -936,6 +983,18 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   latestContinuableEndId,
 }: TranscriptMessageRowProps) {
   void _timeTick;
+  const renderStart = performance.now();
+  useEffect(() => {
+    const dur = performance.now() - renderStart;
+    scrollPerfDebug.recordRowMount(
+      m.id,
+      msgIndex,
+      m.role,
+      dur,
+      m.content?.length ?? 0,
+    );
+  }, [m.id, msgIndex, m.role]);
+
   const wrap = (node: ReactNode) =>
     virtualized ? (
       <div
@@ -2189,6 +2248,7 @@ export function ConversationThread({
 
   const onScroll = useCallback(
     (e: UIEvent<HTMLDivElement>) => {
+      scrollPerfDebug.recordScrollStart();
       onStickScroll(e);
       // Do NOT setActiveNodeId here — MessageNodeRail owns free-scroll highlight (#280).
     },
@@ -2634,8 +2694,12 @@ export function ConversationThread({
           !isToolStepMessage(m) &&
           !isEndOfTurnMarker(m.marker) &&
           !isContextCompactMessage(m));
+      const effectiveContentLength =
+        m.role === "user" && shouldFoldUserMessage(body)
+          ? USER_MSG_PREVIEW_CHARS
+          : body.length;
       return estimateChatRowHeight({
-        contentLength: body.length,
+        contentLength: effectiveContentLength,
         thoughtLength: m.thought?.length ?? 0,
         role: m.role,
         attachmentCount,
@@ -2666,6 +2730,12 @@ export function ConversationThread({
 
   const visibleMessages = useMemo(() => {
     if (!virtualized) {
+      if (transcriptMessages.length >= 10) {
+        scrollPerfDebug.recordLog(
+          "VirtualizationStatus",
+          `⚠️ Virtualization is OFF for ${transcriptMessages.length} messages (rendered all DOM nodes)`,
+        );
+      }
       return transcriptMessages.map((m, index) => ({ m, index }));
     }
     const slice: { m: ChatMessage; index: number }[] = [];

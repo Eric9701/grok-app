@@ -711,6 +711,37 @@
   vertical-align: baseline;
 }
 
+.lobe-chat-user-body-wrap {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.lobe-chat-user-body-wrap--foldable {
+  cursor: pointer;
+}
+
+.lobe-chat-user-body-wrap--foldable:hover {
+  filter: brightness(1.06);
+}
+
+.lobe-chat-user-fold-cue {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 2px;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-tertiary, #94a3b8);
+  opacity: 0.6;
+  user-select: none;
+  transition: opacity 120ms ease;
+}
+
+.lobe-chat-user-body-wrap--foldable:hover .lobe-chat-user-fold-cue {
+  opacity: 1;
+}
+
 .mcp-modal__footer {
   display: flex;
   align-items: center;

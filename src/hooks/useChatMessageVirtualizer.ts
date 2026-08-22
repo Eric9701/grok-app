@@ -41,6 +41,7 @@ import {
   shouldVirtualizeChat,
   type ChatVirtualWindow,
 } from "@/lib/chatVirtualList";
+import { scrollPerfDebug } from "@/lib/scrollPerfDebug";
 import { resolveStreamOverscanScale } from "@/lib/streamRenderPolicy";
 import {
   cancelFrameSchedule,
@@ -137,8 +138,10 @@ export function useChatMessageVirtualizer(
   const recomputeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Programmatic scrollTop from height correction — ignore once for stick. */
   const ignoreScrollAdjustRef = useRef(false);
-  /** Per-index ResizeObserver so image/video decode updates height after mount. */
-  const rowObserversRef = useRef<Map<number, ResizeObserver>>(new Map());
+  /** Shared ResizeObserver so image/video/layout growth updates height without per-row RO thrash. */
+  const sharedRowObserverRef = useRef<ResizeObserver | null>(null);
+  const observedElementsRef = useRef<Map<HTMLElement, number>>(new Map());
+  const observedIndicesRef = useRef<Map<number, HTMLElement>>(new Map());
   /** Coalesce scroll-driven recomputes to one paint (rAF + mixed-Hz fallback). */
   const scrollFrameRef = useRef<FrameSchedule>(emptyFrameSchedule());
   /**
@@ -175,8 +178,12 @@ export function useChatMessageVirtualizer(
     heightsRef.current.clear();
     heightsVersionRef.current = 0;
     offsetsCacheRef.current = null;
-    for (const ro of rowObserversRef.current.values()) ro.disconnect();
-    rowObserversRef.current.clear();
+    if (sharedRowObserverRef.current) {
+      sharedRowObserverRef.current.disconnect();
+      sharedRowObserverRef.current = null;
+    }
+    observedElementsRef.current.clear();
+    observedIndicesRef.current.clear();
     setWin(full(itemCount));
   }, [conversationKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -229,6 +236,7 @@ export function useChatMessageVirtualizer(
       setWin(full(count));
       return;
     }
+    const t0 = performance.now();
     const pin = !!isPinnedRef.current;
     const offsets = getOffsets();
     const next = computeChatVirtualWindow({
@@ -247,6 +255,16 @@ export function useChatMessageVirtualizer(
       pinToBottom: pin,
       forceIndices: forceRef.current,
       offsets,
+    });
+    const recomputeDuration = performance.now() - t0;
+    scrollPerfDebug.recordRecomputeTime(recomputeDuration, {
+      start: next.start,
+      end: next.end,
+      total: count,
+      scrollTop: el.scrollTop,
+      scrollHeight: el.scrollHeight,
+      paddingTop: next.paddingTop,
+      paddingBottom: next.paddingBottom,
     });
     setWin((prev) => {
       if (
@@ -303,6 +321,7 @@ export function useChatMessageVirtualizer(
     const el = viewportRef.current;
     if (!el) return;
     const onScroll = () => {
+      scrollPerfDebug.recordScrollStart();
       if (ignoreScrollAdjustRef.current) {
         ignoreScrollAdjustRef.current = false;
         return;
@@ -336,31 +355,64 @@ export function useChatMessageVirtualizer(
           pendingHeightRecomputeRef.current = false;
           recomputeNow();
         }
-      }, 140);
+      }, 240);
       // One window update per paint while flinging. Timeout fallback covers
       // mixed 120Hz/75Hz displays where rAF can skip a 75Hz vsync.
       scheduleOnFrame(scrollFrameRef.current, recomputeNow);
     };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    // Viewport chrome resize only — not content (content RO was thrashy).
-    const ro = new ResizeObserver(() => {
-      if (scrollingRef.current || isPaneSplitMotionActive()) {
-        pendingHeightRecomputeRef.current = true;
-        if (isPaneSplitMotionActive()) {
-          runAfterPaneSplitMotion(() => {
-            pendingHeightRecomputeRef.current = false;
-            recomputeNow();
-          });
-        }
-        return;
+
+    const onUserInteraction = () => {
+      scrollingRef.current = true;
+      if (scrollIdleTimerRef.current != null) {
+        clearTimeout(scrollIdleTimerRef.current);
       }
-      recompute();
-    });
-    ro.observe(el);
+      scrollIdleTimerRef.current = setTimeout(() => {
+        scrollIdleTimerRef.current = null;
+        scrollingRef.current = false;
+        const pending = pendingHeightsRef.current;
+        if (pending.size > 0) {
+          for (const [k, h] of pending) {
+            heightsRef.current.set(k, h);
+          }
+          pending.clear();
+          heightsVersionRef.current += 1;
+          offsetsCacheRef.current = null;
+          pendingHeightRecomputeRef.current = true;
+        }
+        if (pendingHeightRecomputeRef.current) {
+          pendingHeightRecomputeRef.current = false;
+          recomputeNow();
+        }
+      }, 240);
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    el.addEventListener("wheel", onUserInteraction, { passive: true });
+    el.addEventListener("touchmove", onUserInteraction, { passive: true });
+    // Viewport chrome resize only — not content (content RO was thrashy).
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            if (scrollingRef.current || isPaneSplitMotionActive()) {
+              pendingHeightRecomputeRef.current = true;
+              if (isPaneSplitMotionActive()) {
+                runAfterPaneSplitMotion(() => {
+                  pendingHeightRecomputeRef.current = false;
+                  recomputeNow();
+                });
+              }
+              return;
+            }
+            recompute();
+          })
+        : null;
+    ro?.observe(el);
     recomputeNow();
     return () => {
       el.removeEventListener("scroll", onScroll);
-      ro.disconnect();
+      el.removeEventListener("wheel", onUserInteraction);
+      el.removeEventListener("touchmove", onUserInteraction);
+      ro?.disconnect();
       cancelFrameSchedule(scrollFrameRef.current);
       if (recomputeTimerRef.current != null) {
         clearTimeout(recomputeTimerRef.current);
@@ -414,16 +466,23 @@ export function useChatMessageVirtualizer(
   // Drop row observers when virtualization turns off.
   useEffect(() => {
     if (virtualized) return;
-    for (const ro of rowObserversRef.current.values()) ro.disconnect();
-    rowObserversRef.current.clear();
+    if (sharedRowObserverRef.current) {
+      sharedRowObserverRef.current.disconnect();
+      sharedRowObserverRef.current = null;
+    }
+    observedElementsRef.current.clear();
+    observedIndicesRef.current.clear();
   }, [virtualized]);
 
   const commitRowHeight = useCallback(
-    (index: number, el: HTMLElement) => {
+    (index: number, el: HTMLElement, measuredHeight?: number) => {
       if (!virtualizedRef.current) return;
-      if (runAfterPaneSplitMotion(() => commitRowHeight(index, el))) return;
+      if (runAfterPaneSplitMotion(() => commitRowHeight(index, el, measuredHeight))) return;
       const key = getKeyRef.current(index);
-      const nextH = Math.round(el.getBoundingClientRect().height);
+      const nextH =
+        measuredHeight != null && Number.isFinite(measuredHeight) && measuredHeight >= 0
+          ? Math.round(measuredHeight)
+          : Math.round(el.getBoundingClientRect().height);
       const prevMeasured = heightsRef.current.get(key);
       const estRaw = estimateRef.current?.(index);
       const estimateH =
@@ -433,6 +492,7 @@ export function useChatMessageVirtualizer(
       // First paint used the estimate in offsets; treat it as the previous
       // height so estimate→actual can keep the viewport anchored.
       const prevH = prevMeasured ?? estimateH;
+      scrollPerfDebug.recordHeightMeasurement(index, key, nextH, estimateH);
 
       if (prevMeasured != null) {
         if (!shouldCommitRowHeight(prevMeasured, nextH)) return;
@@ -504,6 +564,34 @@ export function useChatMessageVirtualizer(
   const commitRowHeightRef = useRef(commitRowHeight);
   commitRowHeightRef.current = commitRowHeight;
 
+  const ensureSharedObserver = useCallback(() => {
+    if (sharedRowObserverRef.current || typeof ResizeObserver === "undefined") {
+      return sharedRowObserverRef.current;
+    }
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const el = entry.target as HTMLElement;
+        const index = observedElementsRef.current.get(el);
+        if (index === undefined) continue;
+        let h = 0;
+        if (entry.borderBoxSize && entry.borderBoxSize.length > 0) {
+          const bs = entry.borderBoxSize[0];
+          if (bs && Number.isFinite(bs.blockSize) && bs.blockSize > 0) {
+            h = bs.blockSize;
+          }
+        } else if (entry.contentRect && Number.isFinite(entry.contentRect.height)) {
+          h = entry.contentRect.height;
+        }
+        if (h <= 0) {
+          h = el.getBoundingClientRect().height;
+        }
+        commitRowHeightRef.current(index, el, h);
+      }
+    });
+    sharedRowObserverRef.current = ro;
+    return ro;
+  }, []);
+
   /**
    * Stable per-index ref callbacks. Returning a fresh function from measureRef(i)
    * on every render makes React detach/reattach the ref → ResizeObserver thrash
@@ -523,31 +611,28 @@ export function useChatMessageVirtualizer(
       const cached = measureCallbackCacheRef.current.get(index);
       if (cached) return cached;
       const cb = (el: HTMLElement | null) => {
-        const prevRo = rowObserversRef.current.get(index);
-        if (prevRo) {
-          prevRo.disconnect();
-          rowObserversRef.current.delete(index);
+        const ro = ensureSharedObserver();
+        const prevEl = observedIndicesRef.current.get(index);
+        if (prevEl && prevEl !== el) {
+          ro?.unobserve(prevEl);
+          observedElementsRef.current.delete(prevEl);
+          observedIndicesRef.current.delete(index);
         }
         if (!el || !virtualizedRef.current) return;
 
-        // Immediate sample (mount) + observe media/layout growth afterward.
-        commitRowHeightRef.current(index, el);
-        // Coalesce RO storms (multi-image decode) — one commit per frame.
-        let roRaf = 0;
-        const ro = new ResizeObserver(() => {
-          if (roRaf) return;
-          roRaf = requestAnimationFrame(() => {
-            roRaf = 0;
-            commitRowHeightRef.current(index, el);
-          });
-        });
-        ro.observe(el);
-        rowObserversRef.current.set(index, ro);
+        observedElementsRef.current.set(el, index);
+        observedIndicesRef.current.set(index, el);
+        if (ro) {
+          ro.observe(el);
+        } else {
+          // Fallback if ResizeObserver is unavailable (e.g. test environment)
+          commitRowHeightRef.current(index, el);
+        }
       };
       measureCallbackCacheRef.current.set(index, cb);
       return cb;
     },
-    [],
+    [ensureSharedObserver],
   );
 
   if (!virtualized) {
