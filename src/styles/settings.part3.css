@@ -713,7 +713,8 @@ textarea.settings-input.settings-agents-json__textarea {
 }
 
 /* Stacked cards after the theme row still need top gap */
-.settings-page__main > .settings-card + .settings-appearance-duo {
+.settings-page__main > .settings-card + .settings-appearance-duo,
+.settings-page__main > .settings-appearance-duo + .settings-card {
   margin-top: 14px;
 }
 
