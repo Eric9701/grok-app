@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Grok App" width="128" height="128" />
+  <img src="assets/logo.png" alt="Grok App Logo" width="128" height="128" />
 </p>
 
 <h1 align="center">Grok App</h1>
 
-<p align="center"><strong>Desktop workbench for local Grok Build</strong></p>
-<p align="center"><em>A real <code>grok</code> CLI host — sessions, files, remote IM, automations, and a desktop companion</em></p>
+<p align="center"><strong>Modern Desktop Workbench for Local Grok Build CLI</strong></p>
+<p align="center"><em>Multi-Project Spaces · Real-time Agent Streaming · Integrated File & Code Loop · Omnichannel Remote IM · Desktop Companion & Personalization</em></p>
 <p align="center"><a href="https://grok-app.com">https://grok-app.com</a></p>
 
 <p align="center">
@@ -37,370 +37,254 @@
 ---
 
 > [!NOTE]
-> ## Note
+> **About Grok App:** Grok App is an open-source desktop client and workbench for the local [Grok Build](https://x.ai) CLI (`grok agent stdio`). It is **not an official xAI product**. The application does not bundle proprietary model backends; all chat reasoning, tool execution, and permissions run directly through your installed `grok` CLI.
 >
-> **Grok App is not an official xAI product.** It is a desktop **host** for the local [Grok Build](https://x.ai) CLI (`grok agent stdio`). The app does not ship a model backend. Chat, tools, and reasoning effort all go through your installed `grok`.
->
-> Real agent power needs **Grok Build CLI** installed and signed in. First-run setup can install the CLI. For UI-only development, use `GROK_APP_ACP=mock`.
+> Full agent capabilities require an installed and signed-in Grok Build CLI. The first-run setup wizard can assist with CLI installation, and UI-only development can be run with `GROK_APP_ACP=mock`.
 
 ---
 
 ## Contents
 
-1. [Overview](#overview)
-2. [Highlights](#highlights)
-3. [Capabilities](#capabilities)
-4. [What this is not](#what-this-is-not)
-5. [Screenshots](#screenshots)
-6. [Install & first run](#install--first-run)
-7. [macOS “damaged” / Gatekeeper](#macos-damaged--gatekeeper)
-8. [Linux blank/black window (WebKit)](#linux-blankblack-window-webkit)
-9. [Linux sandbox / user namespaces (Ubuntu 24.04+)](#linux-sandbox--user-namespaces-ubuntu-2404)
-10. [Config paths](#config-paths)
-11. [Develop & build](#develop--build)
-12. [Docs & contributing](#docs--contributing)
-13. [Contributors](#contributors)
-14. [Follow the author](#follow-the-author)
+- [✨ Key Highlights](#-key-highlights)
+- [🛠️ Features Overview](#️-features-overview)
+- [📸 Screenshots](#-screenshots)
+- [🚀 Quick Start & Installation](#-quick-start--installation)
+- [💡 Platform Notes & Troubleshooting](#-platform-notes--troubleshooting)
+- [📂 Configuration & Data Paths](#-configuration--data-paths)
+- [💻 Building from Source & Development](#-building-from-source--development)
+- [🤝 Community & Contributing](#-community--contributing)
+- [👥 Contributors](#-contributors)
+- [📄 License & Author](#-license--author)
 
 ---
 
-## Overview
+## ✨ Key Highlights
 
-The `grok` CLI is already a strong agent in a terminal. Day-to-day work still needs a workbench: many projects, honest tool timelines, file previews, scheduled jobs, remote channels, and a UI that follows the OS language.
-
-**Grok App** is that workbench — it does not replace the CLI.
-
-1. Install the app and prepare Grok Build CLI
-2. Add a project / new session
-3. Connect the agent; chat under **Ask** (default) or **YOLO**
-4. Preview artifacts, schedule automations, talk from IM, manage account and relays in Settings
-
-**Default model:** Grok **4.6** with Extra High (`xhigh`). Grok 4.5 stays selectable.  
-**Stack:** Tauri 2 + Rust · React + TypeScript + Vite · Tailwind CSS  
-**Release notes:** [CHANGELOG.md](./CHANGELOG.md)
+- ⚡ **Native Build Sessions** — Deep integration with `grok agent stdio` via the ACP protocol. Granular permission tiers (Ask, Allow Once, Allow for Session, and YOLO mode) with Grok 4.6 Extra High (`xhigh`) enabled by default.
+- 🗂️ **Multi-Project Workbench** — Isolated project workspaces, agent status Kanban, one-click Git Worktree switching, session forking from any assistant reply, and cross-session context attachment.
+- 📝 **Files & Creation Loop** — Embedded CodeMirror 6 editor with instant disk synchronization, visual Git Diff review, comprehensive media preview (images, video, audio, PDF, Office documents), and AI image/video generation via Imagine.
+- 📲 **Omnichannel Remote IM** — Unified bridge connecting your local agent to Feishu/Lark, Telegram, Discord, Slack, DingTalk, WeCom, WeChat personal, QQ, Matrix, LINE, and Weibo; token-gated mobile web mirror and loopback REST session API.
+- 🐾 **Desktop Companion & Status Feedback** — Interactive always-on-top desktop pet companion with live agent status awareness, responsive reactions, and notification bubbles.
+- 🔐 **Privacy & Custom Relays** — API keys securely stored in your OS keychain. SuperGrok quota bar and heatmap tracking, custom provider relays (OpenRouter, DeepSeek, AI98PRO, etc.), and 15 built-in UI languages.
 
 ---
 
-## Highlights
+## 🛠️ Features Overview
 
-- **Real Build sessions** — ACP `grok agent stdio`, host-owned session state, Ask / once / session / Deny, per-project YOLO, Grok 4.6 Extra High by default
-- **Multi-project workbench** — project spaces, agent Kanban, git worktrees, fork from a reply, attach another chat as context, chat-column terminal
-- **Files in the loop** — image / video / PDF / Office / code preview and edit, Changes, Imagine image & video from the composer, recommended ChatCut plugin
-- **Away from the desk** — Remote IM (Feishu/Lark, Telegram, Discord, Slack, DingTalk, WeCom, WeChat, QQ, Matrix, LINE, Weibo), phone mirror, local session API for other apps on this machine
-- **Desktop companion** — pet overlay (Look / Bubbles), Live Voice, composer dictation with custom STT, skins and wallpaper
-- **Your keys, your CLI** — official SuperGrok quota + heatmap, custom relays (OpenRouter, DeepSeek, AI98PRO, Grok Build-compatible), OS keychain, **15 UI languages**
+### 1. Modern Workbench & Session Management
+- **Projects & Workspaces**: Folder trust system, workspace isolation, virtualized high-performance sidebar, chat archiving, cross-project migration, and CLI session import.
+- **Parallel Workflows**: Multi-session concurrent execution with continuous background streaming; intelligent process management and idle resource recycling; Kanban board (Needs Input / Working / Done).
+- **Git Worktree Integration**: Automatically discovers linked Git worktrees for seamless working directory switching within sessions.
+- **Session Forking & Attachment**: Branch off from any assistant turn with aligned context history; attach up to 3 reference sessions via `/attach-chat` or drag-and-drop.
 
----
+### 2. Agent Interaction & Live Streaming
+- **Structured Timeline**: Thought reasoning, tool executions, and final responses streamed in real-time order with live activity indicators.
+- **Power Composer**: Queue follow-up prompts while the agent is busy; `Ctrl+Enter` to steer the active turn; type-to-focus; prompt history; selection quotes and inline annotations.
+- **Granular Permissions**: Interactive Ask confirmation by default; allow once, allow for session, per-project defaults, or unattended YOLO mode; workspace sandbox support.
+- **Plan & Goal Tracking**: Sticky multi-step plan progress with full Markdown execution details and structured milestones in the resources panel.
 
-## Capabilities
+### 3. Files, Media & Creation Center
+- **In-App Code & Text Editor**: CodeMirror 6 multi-tab editor with live two-way file synchronization and instant disk reload after agent modifications.
+- **Visual Changes & Diffs**: Inspect session modifications and workspace Git diffs with granular single-file or batch accept/reject/revert controls.
+- **Rich Media Viewer**: Native rendering and preview for images, video, audio, PDF, and Word/Excel/PowerPoint documents; high-quality share-card image export.
+- **AI Asset Generation**: Generate images and videos directly from the composer using the Imagine skill; integrated side-browser with Design Mode for local web development previews.
 
-### Workbench
+### 4. Extensions, Plugins & Automations
+- **Slash Commands & Skills**: Fully aligned with Grok Build slash command palette, inline skill chips, and custom automated workflows (`/workflow`).
+- **Extensions Hub**: Manage Model Context Protocol (MCP) servers, plugins catalog (OpenAI plugin compatible), skills, agents, and hooks with full user control.
+- **ChatCut Integration**: Native integration for the recommended Codex plugin with automated OAuth refresh and external editor workflows.
+- **Scheduled Automations**: Schedule recurring or one-off tasks with natural-language prompt creation and visual execution logs.
 
-| Area | What you get |
-|------|----------------|
-| **Projects & sessions** | Trusted folders, project spaces, virtualized sidebar, archive / orphan, move chats between projects, import / open CLI sessions |
-| **Parallel chats** | Busy turns keep streaming after you switch; process limits and idle recycle; Kanban: Needs you / Working / Done |
-| **Git worktrees** | Project chip lists linked worktrees; one-click cwd switch (hidden for non-git) |
-| **Fork & rewind** | Fork from a completed assistant reply; rewind / bootstrap the child agent to match |
-| **Attach chat** | `/attach-chat`, composer `+`, or drag a sidebar chat onto the composer (max 3; source chat unchanged) |
+### 5. Remote Connectivity & Cross-Device Access
+- **11+ IM Channel Bridges**: Connect to your preferred messaging apps to monitor, resume, and steer your local desktop agent on the go (`/p` project switch, `/r` resume).
+- **Mobile Web Mirror**: Lightweight token-gated web app for mobile browsers; compatible with Cloudflare Quick Tunnel for secure remote access.
+- **Local Session API**: Loopback REST endpoints (`GET /v1/sessions`, `POST /v1/sessions/{id}/turns`) for scripting, CI, or third-party tool integrations.
 
-### Chat & agent
-
-| Area | What you get |
-|------|----------------|
-| **Timeline** | Think → tools → answer in stream order; live “working” rail; no early Ready while tools or permissions are open |
-| **Composer** | Follow-up queue while busy; **Ctrl+Enter** steers the live turn; type-to-focus; prompt history; quote / comment chips |
-| **Permissions** | Default Ask; allow once / session / deny; YOLO; per-project default tier; workspace sandbox (Linux notes below) |
-| **Plan / Goal** | Sticky execution progress; resource-pane Markdown + steps; Goal is a finite objective, not a timer |
-| **Runtime** | Stall cancel; structured error cards; diagnostic zip; Doctor; interrupted turns stay interrupted after a crash |
-
-### Files, media, Imagine
-
-| Area | What you get |
-|------|----------------|
-| **Resources** | Preview and **edit & save** text / code (CodeMirror); multi-tab files; refresh from disk after the agent writes |
-| **Changes** | Session diffs + workspace git; accept / reject / restore with honest empty and error states |
-| **Media** | Image, video, PDF, Office; relative markdown images resolve after `curl -o`; share-card PNG export |
-| **Create** | Composer **Create Image / Create Video** when the Imagine skill is available; side-browser Design Mode for localhost previews |
-
-### Extensions & automations
-
-| Area | What you get |
-|------|----------------|
-| **Slash · Skills** | Slash palette (aligned with Grok Build), inline skill chips, `/workflow` / `/workflows` |
-| **MCP / Plugins** | Settings → Extensions: MCP, plugins catalog (openai/plugins + user sources), Skills, Agents, Hooks — never auto-install |
-| **ChatCut** | Recommended Codex plugin; OAuth refresh on the host; editor opens in the system browser |
-| **Automations** | Scheduled list; natural-language create-from-chat (silent fence, no JSON in the UI) |
-
-### Remote, voice, companion
-
-| Area | What you get |
-|------|----------------|
-| **Remote IM** | Settings → Remote control: GUI bind for Feishu/Lark, Telegram, Discord, Slack, DingTalk, WeCom, WeChat, QQ, Matrix, LINE, Weibo (`/p` project, `/r` resume) |
-| **Phone mirror** | Token-gated local SPA; optional Cloudflare Quick Tunnel (`cloudflared` or Docker image) |
-| **Session API** | Loopback list + continue-by-id (`GET /v1/sessions`, `POST /v1/sessions/{id}/turns`); optional `grok-app` shell command |
-| **Voice** | Live Voice; composer dictation; custom OpenAI-compatible STT with per-provider keys in the OS keychain |
-| **Desktop pet** | Always-on-top bloub overlay; Look / Bubbles settings; celebrates when the last live turn is ready |
-
-### Account, appearance, languages
-
-| Area | What you get |
-|------|----------------|
-| **Account & quota** | Multi-account switcher, official login, SuperGrok bar + heatmap (`/usage`, `/cost`), custom-provider local usage |
-| **Custom relays** | Independent `GROK_HOME` when you need App to write `config.toml`; **shared** (default) keeps `~/.grok` untouched |
-| **Presets** | One-click OpenRouter, DeepSeek, AI98PRO, Amux / Yun, plus generic OpenAI-compatible and Grok Build-compatible modes |
-| **Appearance** | Light / dark / follow system, skins, wallpaper (file / X / Imagine), UI and terminal fonts, share-card logo |
-| **i18n** | 15 locales (de, en, es, fil, fr, id, it, ja, ko, pt-BR, ru, ta, uk, zh, zh-TW). First launch follows the OS language |
-| **Packaging** | macOS ARM / Intel · Windows x64 (setup + portable) · Linux x64 (AppImage / deb / rpm) |
-| **Security** | OS keychain for API keys (`secrets.json` 0600 fallback); store write locks; in-app confirms only — never `window.confirm` |
+### 6. Accounts, Relays & Personalization
+- **Multi-Account & Quota Tracking**: Instant account switcher, official login, SuperGrok quota progress bar, cost heatmaps, and local tracking for custom providers.
+- **Flexible Relay Modes**: Independent configuration mode or non-destructive shared mode (protects existing `~/.grok` configurations); one-click presets for OpenRouter, DeepSeek, AI98PRO, etc.
+- **Visual Customization**: Light, dark, and system-adaptive themes; custom skins, wallpapers, UI fonts, terminal fonts, and share card styling.
+- **Internationalization**: 15 built-in languages (EN, ZH, JA, KO, DE, FR, RU, ES, PT-BR, IT, ID, TA, UK, FIL, ZH-TW) with automatic OS locale detection.
 
 ---
 
-## What this is not
+## 📸 Screenshots
 
-- **Not official xAI.** No bundled SuperGrok quota. Without a working Grok Build CLI / login, it is not a full agent.
-- **Not a model host.** Official Grok, custom relays, and tools all run through the local CLI.
-- **Account is optional.** A signed-in CLI is enough to work. In-app login is for quota, multi-account, and official extras.
-- **Permissions default to Ask.** YOLO / full access is an explicit choice.
-- **Shared mode does not rewrite `~/.grok` `config.toml`.** Use **independent** mode when the App should write providers, privacy, or workflows.
-
----
-
-## Screenshots
-
-> From a recent macOS development build. Layout matches the current workbench.
-
-| Workbench | Account & quota |
+| 🖥️ Workbench & Sessions | 📊 Account & Quota Heatmap |
 |:---:|:---:|
 | ![Workbench](assets/screenshots/workbench.png) | ![Account](assets/screenshots/account.png) |
 
-| Light theme | Session & media |
+| ☀️ Light Theme Mode | 💬 Media Preview & Interaction |
 |:---:|:---:|
 | ![Light](assets/screenshots/light.png) | ![Chat](assets/screenshots/chat.png) |
 
 ---
 
-## Install & first run
+## 🚀 Quick Start & Installation
 
-### 1. Download
+### 1. Download Prebuilt Packages
 
-Get installers from the official site [grok-app.com](https://grok-app.com) or [GitHub Releases](https://github.com/RongleCat/grok-app/releases):
+Download installers directly from the official website [grok-app.com](https://grok-app.com) or [GitHub Releases](https://github.com/RongleCat/grok-app/releases):
 
-| Platform | Artifact |
-|----------|----------|
-| macOS Apple Silicon | `Grok_*_aarch64.dmg` |
-| macOS Intel | `Grok_*_x64.dmg` |
-| Windows x64 | `*-setup.exe` installer + `*-portable.zip` |
-| Linux x64 | AppImage / `.deb` / `.rpm` |
+| Platform | Package Format | Details |
+|:---|:---|:---|
+| **macOS (Apple Silicon)** | `Grok_*_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) Macs |
+| **macOS (Intel)** | `Grok_*_x64.dmg` | Intel-based Macs |
+| **Windows (x64)** | `*-setup.exe` / `*-portable.zip` | Setup installer and portable archive |
+| **Linux (x64)** | `AppImage` / `.deb` / `.rpm` | Universal AppImage, Debian/Ubuntu, Fedora/RHEL |
 
-The bundle product name is **Grok** (matches the window title).
+> 💡 **Note**: The application bundle name is **Grok**. Prebuilt packages do not require Node.js, pnpm, or Rust installed on your system.
 
-**Arch / Manjaro / EndeavourOS:** the **AppImage** is distro-agnostic (`chmod +x` then run). Official CI does not publish a separate AUR package. On **Wayland (e.g. Hyprland) + AMD**, some hosts hit a black window with the stock AppImage — prefer **`.deb` / `.rpm`** (system WebKit) or the [Linux blank/black window](#linux-blankblack-window-webkit) workaround.
-
-> **Prebuilt packages need no build tools.** Node / pnpm / Rust are only required if you [build from source](#develop--build) — do not run `pnpm install && tauri build` just to use the app.
-
-#### Verify your download
-
-Each release ships a `SHA256SUMS` file. After downloading:
-
+#### Checksum Verification
+Each release includes a `SHA256SUMS` file. Verify your download with:
 ```bash
 # macOS / Linux
 shasum -a 256 -c SHA256SUMS --ignore-missing
+
 # Windows (PowerShell)
 Get-FileHash .\Grok_*_x64-setup.exe -Algorithm SHA256
 ```
 
-Compare the PowerShell hash against the matching line in `SHA256SUMS`.
+---
 
-#### Windows SmartScreen
+### 2. First Run & Setup
 
-Community / unsigned Windows builds show SmartScreen “Windows protected your PC / Unknown publisher” on first run — click **More info → Run anyway** and verify the checksum above if in doubt. Release CI can Authenticode-sign installers when `WINDOWS_CERTIFICATE` + `WINDOWS_CERTIFICATE_PASSWORD` secrets are configured (see `docs/BUILD.md`); signed builds use the publisher name on the certificate.
+1. **Launch**: Open Grok App. The setup wizard will automatically verify that the Grok Build CLI is installed (with multi-mirror fast install support).
+2. **Account / Relays (Optional)**: Sign in with your official account, provide an API key, or configure a custom relay. If your local `grok` CLI is already authenticated, simply choose **Use existing CLI sign-in**.
+3. **Add Project**: Select and trust your project working directory.
+4. **Connect Agent**: Choose **Ask** or **YOLO** permission mode, and start building with your desktop agent!
 
-#### In-app auto-update
+#### Requirements
+- Local **Grok Build CLI** (`grok`) **0.2.112 or newer** (run `grok update` in terminal to upgrade).
+- Windows: Requires **WebView2 Runtime** (pre-installed on Windows 11; bootstrapped by the installer if missing).
 
-Silent updates from **Settings → About** only work on **signed production builds** (Tauri updater key embedded + matching signed archives on the rolling release). Unsigned community builds, local `pnpm dev` / debug binaries, and some package types (e.g. non-AppImage on Linux) stay on the **GitHub open-release / download installer** path — they will not receive silent in-app updates. Full matrix and maintainer checklist: [docs/desktop-auto-update.md](./docs/desktop-auto-update.md).
-
-### 2. First run
-
-1. Launch → **Setup wizard** ensures CLI is installed (multi-mirror install supported)
-2. (Optional) Official login / API key / custom relay — skippable. If your local `grok` CLI is already signed in, pick **Use existing CLI sign-in** — no re-authorization needed
-3. **Add project** → trust a folder
-4. **Connect agent** → chat when Ready
-5. Permission bar defaults to **Ask**; use YOLO only when you want unattended runs
-
-### 3. Requirements
-
-- Local **Grok Build CLI** (`grok`) **0.2.112 or newer**, often `~/.grok/bin/grok` or on `PATH` — older CLIs reject flags the app depends on (run `grok update` once after installing, then fully restart the app)
-- Windows: `%USERPROFILE%\.grok\bin\grok.exe` or `PATH`; **WebView2 Runtime** (preinstalled on Windows 11; the installer bootstraps it otherwise)
-
-### 4. Restricted networks (e.g. mainland China)
-
-Grok backends (`auth.x.ai` / `grok.com` / `cli-chat-proxy.grok.com`) may be unreachable by direct connection. If sign-in hangs or every message times out with `NETWORK_PROVIDER`:
-
-1. **Settings → Runtime → Network**: set the proxy (System / Manual, e.g. `http://127.0.0.1:7890`), then use **Test connection** to verify all three endpoints
-2. Prefer **System HTTP** or **Manual** `http://127.0.0.1:7890` (Clash / Surge mixed-port) over TUN. The app resolves loopback PAC and injects `HTTP_PROXY` into agent processes — TUN is only needed when nothing else can route traffic
-3. If your `grok` CLI is already signed in, reuse it via the setup wizard (or switch **Session data mode** to *shared*) instead of Browser OAuth
-4. No launcher scripts or manually exported `HTTP_PROXY` variables are needed — the app injects the configured proxy into all agent processes
+#### Network & Proxy Configuration
+In restricted network environments where Grok services cannot be reached directly:
+- Navigate to **Settings → Runtime → Network** and configure your HTTP/SOCKS proxy (e.g., `http://127.0.0.1:7890`).
+- Click **Test connection** to verify connectivity to endpoints (`auth.x.ai`, `grok.com`, etc.). The proxy is automatically injected into all agent processes.
 
 ---
 
-## macOS “damaged” / Gatekeeper
+## 💡 Platform Notes & Troubleshooting
 
-Official GitHub Releases from **v0.2.19** are Developer ID signed and **Apple-notarized**. Open the `.dmg` and drag Grok to Applications as usual.
-
-If Gatekeeper still blocks (fork / older unsigned builds, or a leftover quarantine flag):
+### macOS Gatekeeper / "App is damaged"
+Official releases starting from **v0.2.19** are signed with an Apple Developer ID and **Apple-notarized**.
+If Gatekeeper blocks launching (e.g., on unsigned custom builds or due to quarantine metadata):
 
 ```bash
 xattr -cr /Applications/Grok.app
 open /Applications/Grok.app
 ```
-
-**Also works:**
-
-- Finder: **right-click** → **Open** → confirm
-- **System Settings → Privacy & Security** → **Open Anyway**
-
-Only download from [grok-app.com](https://grok-app.com) or this repo’s official [Releases](https://github.com/RongleCat/grok-app/releases).
+*Or go to **System Settings → Privacy & Security** and click **Open Anyway**.*
 
 ---
 
-## Linux blank/black window (WebKit)
+### Windows SmartScreen Notice
+For unsigned community packages, Windows SmartScreen may display a warning on initial launch. Click **More info → Run anyway**. You can verify the file hash against `SHA256SUMS` for integrity.
 
-On some **Wayland** desktops (notably **Hyprland + AMD**), the official **AppImage** can open a window that stays **fully black**. The host process still runs (media server, agent ACP, auth), but the bundled WebKitGTK never paints. Logs often include:
+---
 
-```text
-Could not create default EGL display: EGL_BAD_PARAMETER
-```
-
-This is a known **Tauri 2 + AppImage + WebKitGTK** class of issues: the AppImage ships WebKit built in the CI container (Ubuntu 22.04), which can fail against newer host Mesa/DRI stacks. `.deb` / `.rpm` link **system** WebKit and are usually fine on the same machine. See issue [#539](https://github.com/RongleCat/grok-app/issues/539) and [Tauri Linux graphics notes](https://v2.tauri.app/develop/debug/linux-graphics/).
-
-**Try in order:**
-
-1. **Prefer `.deb` or `.rpm`** from the same Release (system WebKit). On Arch, convert with `debtap` or extract the `.deb` and run the binary.
-2. **Run the AppImage against system WebKit** (confirmed on Arch + Hyprland + AMD):
-
-```bash
-# one-time extract
-./Grok_*.AppImage --appimage-extract
-# or: bash scripts/run-linux-appimage-system-webkit.sh ./Grok_*.AppImage
-
-export LD_LIBRARY_PATH=/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-export WEBKIT_EXEC_PATH=/usr/lib/webkit2gtk-4.1
-export WEBKIT_DISABLE_DMABUF_RENDERER=1
-export WEBKIT_DISABLE_COMPOSITING_MODE=1
-export GDK_BACKEND=x11
-unset APPDIR APPIMAGE
-./squashfs-root/usr/bin/grok-app
-```
-
-On Debian/Ubuntu multiarch hosts, use `/usr/lib/x86_64-linux-gnu` and `/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1` if the paths above are missing. Install system WebKit if needed (`webkit2gtk-4.1` on Arch; `libwebkit2gtk-4.1-0` on Debian/Ubuntu).
-
-3. Quick env-only attempt (helps NVIDIA/DMABUF cases; **often not enough** for the EGL abort above):
-
+### Linux Display Notes (WebKitGTK / Wayland)
+On certain Wayland desktop setups (such as Hyprland with AMD GPUs), the universal AppImage may encounter rendering conflicts with the host Mesa/DRI stack:
+- **Recommended**: Use system-integrated **`.deb`** or **`.rpm`** packages which link against your distribution's native WebKitGTK.
+- When running the AppImage, you can try disabling hardware compositing:
 ```bash
 WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Grok_*.AppImage
 ```
 
 ---
 
-## Linux sandbox / user namespaces (Ubuntu 24.04+)
-
-On **Ubuntu 24.04+** (and some other distros), the kernel may set:
-
-```text
-kernel.apparmor_restrict_unprivileged_userns = 1
-```
-
-Grok’s default agent sandbox (`--sandbox workspace`) uses **bubblewrap**, which needs unprivileged user namespaces. When the kernel blocks that, the agent exits immediately and the app may show **Agent process ended** / `SANDBOX_BLOCKED` (stderr often includes `bwrap: setting up uid map: Permission denied`). See issue [#541](https://github.com/RongleCat/grok-app/issues/541).
-
-**Fix (keeps sandbox):**
-
+### Linux Workspace Sandbox (Ubuntu 24.04+)
+Modern distributions such as Ubuntu 24.04+ restrict unprivileged user namespaces by default, which can prevent the bubblewrap agent sandbox from launching:
+- **Option 1 (Recommended, preserves sandbox isolation)**: Enable unprivileged user namespaces
 ```bash
 sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 echo 'kernel.apparmor_restrict_unprivileged_userns=0' | sudo tee /etc/sysctl.d/99-userns.conf
 ```
-
-**Workaround without sudo:** **Settings → Runtime → Sandbox → off** (skips bwrap; loses OS-level isolation).
-
-Doctor also surfaces this when the sysctl is restricted and sandbox is not `off`.
+- **Option 2**: In **Settings → Runtime → Sandbox**, switch the sandbox mode to **off**.
 
 ---
 
-## Config paths
+## 📂 Configuration & Data Paths
 
-Default data root (override with **`GROK_APP_HOME`**):
+Default application data directory (override via the **`GROK_APP_HOME`** environment variable):
 
-| Platform | Typical path |
-|----------|----------------|
-| macOS | `~/Library/Application Support/com.grokapp.grok-app/` |
-| Windows | `%APPDATA%\grokapp\grok-app\` |
-| Fallback | `~/.grok-app/` |
+| Operating System | Default Path |
+|:---|:---|
+| **macOS** | `~/Library/Application Support/com.grokapp.grok-app/` |
+| **Windows** | `%APPDATA%\grokapp\grok-app\` |
+| **Linux** | `~/.grok-app/` |
 
+Data layout:
 ```text
 <app-data>/
-  projects.json
-  sessions_index.json
-  settings.json
-  secrets.json          # metadata (+ API-key fallback); keys prefer OS keychain
-  automations.json
-  projects/
-  sessions/
-  logs/
-  agent-home/           # independent-mode GROK_HOME
+  projects.json          # Project registry
+  sessions_index.json    # Session metadata index
+  settings.json          # Application preferences
+  secrets.json           # Secure key metadata (OS keychain prioritized, 0600 fallback)
+  automations.json       # Scheduled automations
+  projects/              # Project-specific metadata
+  sessions/              # Persistent session history
+  logs/                  # Diagnostic logs
+  agent-home/            # Independent mode GROK_HOME
 ```
-
-API keys prefer the OS secret store (macOS Keychain / Windows Credential Manager /
-Linux Secret Service) with a `secrets.json` (mode `0600`) fallback when the OS store
-is unavailable. Do not commit secrets.
-
-Grok Build’s own config remains under **`~/.grok`** (CLI login, `auth.json`, …).
-**shared** session mode (product default) can use `~/.grok`; **independent** mode uses `agent-home/`.
 
 ---
 
-## Develop & build
+## 💻 Building from Source & Development
 
+To develop or build Grok App from source:
+
+### Prerequisites
+- **Node.js**: `v22.0.0` or newer
+- **pnpm**: `v9.0.0` or newer
+- **Rust**: Stable Toolchain
+- **Platform Build Tools**: macOS Xcode CLT / Windows MSVC / Linux build-essential & webkit2gtk
+
+### Development Workflow
 ```bash
-# Needs: Node 22+, pnpm 9, Rust stable, Xcode CLT (macOS)
+# 1. Install dependencies
 pnpm install
 
-pnpm dev                 # full app (real CLI by default)
-pnpm dev:ui              # frontend only
+# 2. Start desktop development app (Tauri + Vite HMR)
+pnpm dev
+
+# 3. Start web frontend only (UI iteration)
+pnpm dev:ui
+
+# 4. Start with mock ACP backend (no CLI required)
 GROK_APP_ACP=mock pnpm dev
 
+# 5. Type checking and tests
 pnpm typecheck && pnpm test
 cd src-tauri && cargo test
 
+# 6. Build production package
 pnpm build
 ```
 
 Windows (optional): double-click [`install-latest.cmd`](./install-latest.cmd) to fast-forward `origin/main` and silently install an unsigned side-by-side **grok-app-latest** (does not replace official **Grok**). Needs VS Build Tools + Rust MSVC; details in [docs/BUILD.md](./docs/BUILD.md).
 
-Cross-compile and release notes: [docs/BUILD.md](./docs/BUILD.md).
-
-Release (write the matching `CHANGELOG.md` section first):
-
-```bash
-./scripts/release-tag.sh 0.1.1
-./scripts/release-tag.sh 0.1.1 --push
-```
+For cross-compilation and packaging instructions, see [docs/BUILD.md](./docs/BUILD.md).
 
 ---
 
-## Docs & contributing
+## 🤝 Community & Contributing
 
-| Audience | Link |
-|----------|------|
-| AI agents / product rules | [`docs/llm-wiki/`](./docs/llm-wiki/) |
-| Build & release | [docs/BUILD.md](./docs/BUILD.md) |
-| Changelog | [CHANGELOG.md](./CHANGELOG.md) |
-| Contributing | [CONTRIBUTING.md](./CONTRIBUTING.md) |
-| Code of conduct | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) |
-| Security | [SECURITY.md](./SECURITY.md) |
+Contributions, bug reports, and suggestions are warmly welcomed!
 
-Issues and PRs are welcome.
+| Guide | Description |
+|:---|:---|
+| 📖 **Agent & Product Rules** | [`docs/llm-wiki/`](./docs/llm-wiki/) |
+| 🛠️ **Build & Packaging Guide** | [docs/BUILD.md](./docs/BUILD.md) |
+| 📝 **Changelog** | [CHANGELOG.md](./CHANGELOG.md) |
+| 💡 **Contributing Guide** | [CONTRIBUTING.md](./CONTRIBUTING.md) |
+| 🛡️ **Code of Conduct** | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) |
+| 🔒 **Security Policy** | [SECURITY.md](./SECURITY.md) |
 
-## Contributors
+---
+
+## 👥 Contributors
 
 <!-- CONTRIBUTORS:START -->
 Thanks to everyone who has contributed to Grok App. All human GitHub contributors (by commit count, updated 2026-08-21).
@@ -445,21 +329,19 @@ Thanks to everyone who has contributed to Grok App. All human GitHub contributor
 [Full contributors graph →](https://github.com/RongleCat/grok-app/graphs/contributors)
 <!-- CONTRIBUTORS:END -->
 
-
-## License
-
-[MIT](./LICENSE) © RongleCat
-
 ---
 
-## Follow the author
+## 📄 License & Author
+
+This project is licensed under the [MIT License](./LICENSE).
+
+### Connect with the Author & Community
 
 | Channel | Link |
-|---------|------|
-| **X / Twitter** | [铁柱AGI @cgnot996](https://x.com/cgnot996) |
-| **WeChat Official Account** | Search **「铁柱AGI」** (QR at top left) |
-| **WeChat community group** | Scan the QR at top right |
+|:---|:---|
+| 𝕏 **X (Twitter)** | [@cgnot996 (铁柱AGI)](https://x.com/cgnot996) |
+| 📢 **WeChat Official Account** | Search **「铁柱AGI」** or scan top-left QR |
+| 💬 **WeChat Community** | Scan top-right QR code |
+| 🐧 **Linux.do Community** | [linux.do](https://linux.do/) — Learn AI on L-Station |
 
-[linux.do](https://linux.do/) 学AI，上L站
-
-If Grok App helps you, please star the repo ⭐
+⭐ **If Grok App empowers your daily workflow, please consider starring the repository!**
