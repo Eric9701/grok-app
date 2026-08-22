@@ -85,7 +85,6 @@ import { WallpaperMediaLayer } from "@/components/WallpaperMediaLayer";
 import {
   DEFAULT_LAYOUT,
   SIDEBAR_DEFAULT_WIDTH,
-  SIDEBAR_WIDTH_MIN,
 } from "@/lib/layout";
 import { resolveWorkbenchPaneOverlay } from "@/lib/paneOverlay";
 import { isFakeMaximized } from "@/lib/windowChrome";
@@ -573,8 +572,6 @@ import { sidebarSessionRowMetrics } from "@/lib/sidebarDensity";
 import { sortSessionsForSidebar } from "@/lib/sidebarDateGroups";
 import { nextSessionTitle } from "@/lib/sidebarSessionRename";
 import { GrokLogo } from "@/components/GrokLogo";
-import { SidebarBrand } from "@/components/SidebarBrand";
-import { SidebarUpdateButton } from "@/components/SidebarUpdateButton";
 import type { SetupCliInfo } from "@/components/SetupWizard";
 import {
   buildAuthDeferredFlags,
@@ -696,7 +693,6 @@ import {
   IconPlus,
   IconQueue,
   IconSkills,
-  IconSearch,
   IconAttach,
   IconMic,
   IconFolder,
@@ -707,7 +703,6 @@ import {
   IconClose,
   IconCode,
   IconClipboardList,
-  IconNewChat,
   IconImagine,
   IconScheduled,
   IconMenu,
@@ -730,7 +725,6 @@ import {
   IconFork,
   IconRewind,
   IconHistory,
-  IconDeviceMobile,
   IconShield,
   IconCheck,
   IconCircle,
@@ -778,16 +772,11 @@ import {
   resolveProviderBrandId,
 } from "@/lib/providerPresets";
 import {
-  ProviderBrandIcon,
-  providerAvatarLetter
-} from "@/components/ProviderBrandIcon";
-import {
   classifyProviderBalanceError,
   providerBalanceErrorMessageKey,
   supportsProviderBalance,
 } from "@/lib/providerBalanceHonesty";
 import {
-  formatProviderBalanceLine,
   isProviderBalanceCacheFresh,
   type ProviderBalanceCache,
 } from "@/lib/providerBalanceFormat";
@@ -924,7 +913,6 @@ import {
   preferPermissionFocus,
   trapTabKey
 } from "@/lib/a11yFocus";
-import { UserMenu, remainingPercent } from "@/components/UserMenu";
 import {
   quotaFromHostItem,
   type SwitcherQuota,
@@ -942,8 +930,6 @@ import {
   saveSettingsLastRoute
 } from "@/lib/settingsLastRoute";
 import {
-  accountDisplayName,
-  accountInitials,
   isAccountConnected,
   loadCachedSuperGrokBrand,
   resolveWelcomeBrandKind,
@@ -1012,6 +998,7 @@ import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
 import { useSearchPalette } from "@/hooks/useSearchPalette";
 import { useSessionCatalog } from "@/hooks/useSessionCatalog";
 import { WorkbenchSessionTree } from "@/app/WorkbenchSessionTree";
+import { WorkbenchSidebar } from "@/app/WorkbenchSidebar";
 import { useSessionExportText } from "@/hooks/useSessionExportText";
 import { useSessionExportImage } from "@/hooks/useSessionExportImage";
 import {
@@ -16863,185 +16850,64 @@ export function AppWorkbench() {
           />
         ) : null}
         {/* LEFT — fully hideable (not icon-rail); open via top-bar icon when closed */}
-        <aside
-          className={
-            "sidebar" +
-            (layout.sidebarCollapsed ? " sidebar--hidden" : "") +
-            (resizingSidebar ? " is-resizing" : "") +
-            (dragZone === "sidebar" ? " is-drop-target" : "") +
-            (dragZone === "main" ? " is-drop-idle" : "") +
-            (phoneLayout ? " sidebar--phone-drawer" : "") +
-            (sidebarOverlay ? " sidebar--overlay" : "")
-          }
-          aria-label={tr("a11y.sidebar")}
-          aria-hidden={layout.sidebarCollapsed}
-          style={
-            phoneLayout
-              ? undefined
-              : sidebarOverlay
-                ? ({
-                    width: sidebarOpenW,
-                    minWidth: sidebarOpenW,
-                    maxWidth: sidebarOpenW,
-                    ["--sidebar-rail-min"]: `${sidebarOpenW}px`,
-                  } as CSSProperties)
-                : resizingSidebar
-                  ? ({
-                      ["--sidebar-rail-min"]: `${sidebarOpenW}px`,
-                    } as CSSProperties)
-                  : ({
-                      ...paneSplitSizeStyle(sidebarPaint, "x", false),
-                      ["--sidebar-rail-min"]: `${sidebarOpenW}px`,
-                    } as CSSProperties)
-          }
+        <WorkbenchSidebar
+          tr={tr}
+          locale={locale}
+          layout={layout}
+          phoneLayout={phoneLayout}
+          sidebarOverlay={sidebarOverlay}
+          resizingSidebar={resizingSidebar}
+          dragZone={dragZone}
+          sidebarOpenW={sidebarOpenW}
+          sidebarPaint={sidebarPaint}
+          beginSidebarResize={beginSidebarResize}
+          closeSidebarPane={closeSidebarPane}
+          dragRegion={dragRegion}
+          titlebarMax={titlebarMax}
+          replaceProviderBrandLogo={replaceProviderBrandLogo}
+          customRouteActive={customRouteActive}
+          activeCustomProvider={activeCustomProvider}
+          mainPane={mainPane}
+          onOpenSearch={() => searchPalette.openBlank()}
+          onNewChat={() => void newChat(null)}
+          onNavigateAutomations={navigateAutomations}
+          onNavigateKanban={navigateKanban}
+          onNavigateRemoteIm={() => navigateSettings("remote_im", "im")}
+          showUserMenu={showUserMenu}
+          setShowUserMenu={setShowUserMenu}
+          theme={theme}
+          themePreference={themePreference}
+          account={account}
+          accountBusy={accountBusy}
+          providerBalanceCache={providerBalanceCache}
+          providerBalanceBusy={providerBalanceBusy}
+          providerBalanceError={providerBalanceError}
+          loadProviderBalance={loadProviderBalance}
+          applyThemeChoice={applyThemeChoice}
+          onSettings={() => navigateSettings()}
+          onAccountSettings={() => navigateSettings("account")}
+          onTutorial={() => setShowProductTutorial(true)}
+          onLogin={() => void runAccountLogin("oauth")}
+          onLogout={() => void runAccountLogout()}
+          savedAccounts={savedAccounts}
+          activeAccountId={activeAccountId}
+          accountQuotas={accountQuotas}
+          onSwitchAccount={(id) => void runSwitchAccount(id)}
+          onUserMenuOpened={() => {
+            void refreshAccount({ refreshBilling: !customRouteActive });
+            void refreshSavedAccounts();
+            if (!customRouteActive) void refreshAccountQuotas();
+            if (
+              activeCustomProvider &&
+              supportsProviderBalance({
+                providerId: activeCustomProvider.id,
+                baseUrl: activeCustomProvider.baseUrl,
+              })
+            ) {
+              void loadProviderBalance();
+            }
+          }}
         >
-          {dragZone === "sidebar" && (
-            <div className="drop-overlay drop-overlay--project" aria-hidden>
-              <div className="drop-overlay__card">
-                <span className="drop-overlay__icon">
-                  <IconFolderPlus size={22} />
-                </span>
-                <strong>{tr("composer.dropProjectTitle")}</strong>
-                <span>{tr("composer.dropProjectHint")}</span>
-              </div>
-            </div>
-          )}
-          {/* Right-edge drag handle — desktop only (phone is overlay drawer) */}
-          {!layout.sidebarCollapsed && !phoneLayout && !sidebarOverlay ? (
-            <div
-              className="sidebar-resizer"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label={tr("sidebar.resize")}
-              aria-valuenow={layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH}
-              aria-valuemin={SIDEBAR_WIDTH_MIN}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                beginSidebarResize(
-                  e.clientX,
-                  layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-                );
-              }}
-            />
-          ) : null}
-          <div className="sidebar__clip">
-          {/* Row 1: traffic-light height — panel toggle sits just right of traffic lights */}
-          <div
-            className="sidebar-chrome"
-            data-tauri-drag-region={dragRegion}
-            {...titlebarMax}
-          >
-            <Tip label={tr("main.leftPaneHide")}>
-              <button
-                type="button"
-                className="chrome-btn chrome-btn--traffic main__pane-toggle is-on"
-                aria-label={tr("main.leftPaneHide")}
-                onClick={() => closeSidebarPane()}
-              >
-                <IconPanel size={16} />
-              </button>
-            </Tip>
-            <div
-              className="sidebar-chrome__drag"
-              data-tauri-drag-region={dragRegion}
-              {...titlebarMax}
-            />
-          </div>
-
-          {/* Row 2: brand + search (Codex: title left, search right) */}
-          <div className="sidebar-brand-row">
-            <div className="sidebar-brand-row__left">
-              <SidebarBrand
-                replaceLogo={replaceProviderBrandLogo}
-                brandId={
-                  replaceProviderBrandLogo &&
-                  customRouteActive &&
-                  activeCustomProvider
-                    ? resolveProviderBrandId({
-                        providerId: activeCustomProvider.id,
-                        baseUrl: activeCustomProvider.baseUrl,
-                      })
-                    : null
-                }
-                label={
-                  // Only use provider name when actually swapping the brand
-                  // (icon-only marks need a text label). Off → always "Grok".
-                  replaceProviderBrandLogo &&
-                  customRouteActive &&
-                  activeCustomProvider
-                    ? activeCustomProvider.name.trim() ||
-                      activeCustomProvider.id
-                    : "Grok"
-                }
-              />
-              <SidebarUpdateButton t={tr} />
-            </div>
-            <Tip label={tr("sidebar.search")}>
-              <button
-                type="button"
-                className="chrome-btn"
-                aria-label={tr("sidebar.search")}
-                onClick={() => searchPalette.openBlank()}
-              >
-                <IconSearch size={16} />
-              </button>
-            </Tip>
-          </div>
-
-          {/* Primary nav — new orphan session + scheduled tasks (Codex parity) */}
-          <div className="sidebar-nav">
-            <button
-              type="button"
-              className="nav-new"
-              onClick={() => void newChat(null)}
-            >
-              <span className="nav-item__icon">
-                <IconNewChat size={16} />
-              </span>
-              {tr("sidebar.newSession")}
-            </button>
-            <button
-              type="button"
-              className={
-                "nav-item" +
-                (mainPane === "automations" ? " nav-item--active" : "")
-              }
-              onClick={() => navigateAutomations()}
-            >
-              <span className="nav-item__icon">
-                <IconScheduled size={16} />
-              </span>
-              {tr("sidebar.scheduled")}
-            </button>
-            <button
-              type="button"
-              className={
-                "nav-item" +
-                (mainPane === "kanban" ? " nav-item--active" : "")
-              }
-              onClick={() => navigateKanban()}
-            >
-              <span className="nav-item__icon">
-                <IconList size={16} />
-              </span>
-              {tr("sidebar.kanban")}
-            </button>
-            {api.isDesktopHost() ? (
-              <button
-                type="button"
-                className="nav-item"
-                onClick={() => navigateSettings("remote_im", "im")}
-                title={tr("settings.nav.remoteIm")}
-              >
-                <span className="nav-item__icon">
-                  <IconDeviceMobile size={16} />
-                </span>
-                {tr("mirror.connect")}
-              </button>
-            ) : null}
-          </div>
-
           <WorkbenchSessionTree
             tr={tr}
             locale={locale}
@@ -17092,185 +16958,7 @@ export function AppWorkbench() {
             confirmBulkSetArchived={confirmBulkSetArchived}
             deleteSessionsConfirm={deleteSessionsConfirm}
           />
-          <UserMenu
-            open={showUserMenu}
-            onClose={() => setShowUserMenu(false)}
-            theme={theme}
-            themePreference={themePreference}
-            locale={locale}
-            account={account}
-            activeProvider={activeCustomProvider}
-            accountBusy={accountBusy}
-            providerBalance={
-              providerBalanceCache != null &&
-              providerBalanceCache.providerId === activeCustomProvider?.id
-                ? providerBalanceCache.result
-                : null
-            }
-            providerBalanceBusy={providerBalanceBusy}
-            providerBalanceError={
-              activeCustomProvider &&
-              supportsProviderBalance({
-                providerId: activeCustomProvider.id,
-                baseUrl: activeCustomProvider.baseUrl,
-              })
-                ? providerBalanceError
-                : null
-            }
-            onRefreshProviderBalance={
-              activeCustomProvider &&
-              supportsProviderBalance({
-                providerId: activeCustomProvider.id,
-                baseUrl: activeCustomProvider.baseUrl,
-              })
-                ? () => {
-                    void loadProviderBalance({ force: true });
-                  }
-                : undefined
-            }
-            labels={{
-              settings: tr("sidebar.settings"),
-              tutorial: tr("tutorial.menu"),
-              theme: tr("user.theme"),
-              themeSystem: tr("settings.themeSystem"),
-              themeLight: tr("settings.themeLight"),
-              themeDark: tr("settings.themeDark"),
-              local: tr("common.local"),
-              signedIn: tr("account.signedIn"),
-              signedOut: tr("account.signedOut"),
-              login: tr("account.login"),
-              logout: tr("account.logout"),
-              remaining: tr("account.quotaRemaining"),
-              profileActive: tr("account.profileActive"),
-              switchTo: tr("account.switchTo"),
-              customProvider: tr("prov.customProvider"),
-              resetsAt: tr("account.resetsAt"),
-              balanceAvailable: tr("prov.balance.available"),
-              balanceUnavailable: tr("prov.balance.unavailable"),
-              balanceGranted: tr("prov.balance.granted"),
-              balanceToppedUp: tr("prov.balance.toppedUp"),
-              balanceRefresh: tr("prov.balance.refresh"),
-              balanceChecking: tr("prov.balance.checking"),
-            }}
-            onSettings={() => navigateSettings()}
-            onAccountSettings={() => navigateSettings("account")}
-            onTutorial={() => setShowProductTutorial(true)}
-            onTheme={applyThemeChoice}
-            onLogin={() => void runAccountLogin("oauth")}
-            onLogout={() => void runAccountLogout()}
-            savedAccounts={savedAccounts}
-            activeAccountId={activeAccountId}
-            accountQuotas={accountQuotas}
-            onSwitchAccount={(id) => void runSwitchAccount(id)}
-          >
-            <Tip label={tr("user.menu")}>
-            <button
-              type="button"
-              className={
-                "sidebar__footer" + (showUserMenu ? " is-open" : "")
-              }
-              aria-haspopup="menu"
-              aria-expanded={showUserMenu}
-              onClick={() => {
-                setShowUserMenu((v) => !v);
-                if (!showUserMenu) {
-                  void refreshAccount({ refreshBilling: !customRouteActive });
-                  void refreshSavedAccounts();
-                  if (!customRouteActive) void refreshAccountQuotas();
-                  if (
-                    activeCustomProvider &&
-                    supportsProviderBalance({
-                      providerId: activeCustomProvider.id,
-                      baseUrl: activeCustomProvider.baseUrl,
-                    })
-                  ) {
-                    void loadProviderBalance();
-                  }
-                }
-              }}
-            >
-              <div
-                className={
-                  "user-avatar" +
-                  (activeCustomProvider &&
-                  resolveProviderBrandId({
-                    providerId: activeCustomProvider.id,
-                    baseUrl: activeCustomProvider.baseUrl,
-                  })
-                    ? " user-avatar--logo"
-                    : account?.profile?.signedIn
-                      ? " user-avatar--logo"
-                      : "")
-                }
-                aria-hidden
-              >
-                {activeCustomProvider ? (
-                  resolveProviderBrandId({
-                    providerId: activeCustomProvider.id,
-                    baseUrl: activeCustomProvider.baseUrl,
-                  }) ? (
-                    <ProviderBrandIcon
-                      providerId={activeCustomProvider.id}
-                      baseUrl={activeCustomProvider.baseUrl}
-                      size={20}
-                    />
-                  ) : (
-                    providerAvatarLetter(
-                      activeCustomProvider.name.trim() ||
-                        activeCustomProvider.id,
-                    )
-                  )
-                ) : account?.profile?.signedIn ? (
-                  <GrokLogo size={20} />
-                ) : account?.profile ? (
-                  accountInitials(account.profile)
-                ) : (
-                  "G"
-                )}
-              </div>
-              <div className="user-meta">
-                <span className="user-meta__name">
-                  {activeCustomProvider
-                    ? activeCustomProvider.name.trim() || activeCustomProvider.id
-                    : account?.profile
-                      ? accountDisplayName(account.profile, tr("common.local"))
-                      : tr("common.local")}
-                </span>
-                {(() => {
-                  // Custom DeepSeek: show total balance when we have an honest cache.
-                  if (customRouteActive && activeCustomProvider) {
-                    if (
-                      !supportsProviderBalance({
-                        providerId: activeCustomProvider.id,
-                        baseUrl: activeCustomProvider.baseUrl,
-                      })
-                    ) {
-                      return null;
-                    }
-                    const line =
-                      providerBalanceCache?.providerId ===
-                      activeCustomProvider.id
-                        ? formatProviderBalanceLine(
-                            providerBalanceCache.result,
-                          )
-                        : null;
-                    return line ? (
-                      <span className="user-meta__quota">{line}</span>
-                    ) : null;
-                  }
-                  // Official SuperGrok remaining only when signed in.
-                  if (!account?.profile?.signedIn) return null;
-                  const rem = remainingPercent(account);
-                  return rem != null ? (
-                    <span className="user-meta__quota">{rem.toFixed(0)}%</span>
-                  ) : null;
-                })()}
-              </div>
-            </button>
-            </Tip>
-          </UserMenu>
-          </div>
-        </aside>
+        </WorkbenchSidebar>
 
         {/* CENTER — solid pane; top icons fully toggle L/R columns */}
         <main
