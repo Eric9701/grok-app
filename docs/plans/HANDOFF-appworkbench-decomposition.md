@@ -29,11 +29,14 @@
 
 1. **先改闸门度量**：`app_lines()` / `app_hook_counts()` 改为 `src/App.tsx` 与 `src/app/AppWorkbench.tsx` 之和（或 glob `src/app/*.tsx`），移除 `0 <` 下界。
    **陷阱**：一改就会让 `final` 模式立刻 FAIL（24k vs ≤6000）。必须同时把 `APP_LINES_FINAL` 换成**递减天花板**（例如起始 24,000，每个 WP 下调），否则 CI 直接挂红，后续所有 PR 被阻塞。这一步要和 ledger 状态位一起改，不要单独提交。
-   **已落地**：合计两文件；不用 glob（抽出到 `src/app/` 的域模块必须让指标下降）；起始天花板 **25000 / 270 / 110**。
-2. 删除 `src/App.tsx` 的 `shellEpoch` 假 state（必须在第 1 步之后）。**已落地（未提交）。**
-3. 同步 AGENTS.md §7：growth freeze 的对象改为 App shell + AppWorkbench 合计行数，明确"新状态落域模块"。**已落地（未提交）；** `docs/llm-wiki/maintain.md` 同步。
+   **已落地**：合计两文件；不用 glob（抽出到 `src/app/` 的域模块必须让指标下降）。
+2. 删除 `src/App.tsx` 的 `shellEpoch` 假 state（必须在第 1 步之后）。**已落地。**
+3. 同步 AGENTS.md §7：growth freeze 的对象改为 App shell + AppWorkbench 合计行数，明确"新状态落域模块"。**已落地；** `docs/llm-wiki/maintain.md` 同步。
 4. **按信息拆 workbench**，每次一个域，域内自持 state + effect + 持久化，对外只暴露少量动词方法。建议顺序（依赖由弱到强）：layout/panes → search/palette → exports/share → sandbox+reliability → sessions（最后，最重）。不要再切"读-算-写"式的阶段模块。
-   **下一步**：layout/panes → search/palette → exports/share → sandbox+reliability → sessions。
+   **WP-W1 已落地**：`useWorkbenchLayout` 自持开合/适配/拖拽/持久化。
+   **WP-W2 已落地**：`useSearchPalette` 自持开合/查询/筛选/journal 扫描/键盘导航。
+   **WP-W3 已落地**：`useSessionExportText` + `useSessionExportImage` 自持导出弹层/文件格式/分享卡。
+   **WP-W4 已落地**：`useSandboxWizard` + `useReliabilityCenter` 自持向导/可靠性中心开合与 ring。下一步 sessions。天花板 **22550 / 232 / 96**。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。

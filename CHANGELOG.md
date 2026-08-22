@@ -29,6 +29,10 @@ See `docs/llm-wiki/release.md`.
 
 ### Changed
 - **Code-quality gates measure App shell + AppWorkbench**: `APP_*` budgets sum `src/App.tsx` and `src/app/AppWorkbench.tsx` (decreasing ceilings from current combined size). The 26-line shell no longer vacuously passes the old 6000-line bar. Fake `shellEpoch` state in `App.tsx` is gone.
+- **Workbench pane open/close/resize lives in `useWorkbenchLayout`**: sidebar/aside fit, overlay grow, and splitter drag persist inside the layout hook. AppWorkbench keeps verbs (`openAsidePane`, `beginSidebarResize`, …).
+- **Command palette search lives in `useSearchPalette`**: open/query/filters, journal scan, and keyboard nav persist inside the hook. AppWorkbench keeps action dispatch (`runPaletteAction`) and session open.
+- **Session export/share lives in `useSessionExportText` / `useSessionExportImage`**: markdown modal, file formats, traces, and PNG share-card preview/skin persist in those hooks. AppWorkbench keeps menu labels and modal JSX.
+- **Sandbox wizard and reliability center chrome live in `useSandboxReliability`**: offer/dismiss persistence and stall/error rings sit in the hook. Profile apply and the reliability view memo stay on the host.
 - **UI font and terminal font are local-font dropdowns**: Settings → Appearance lists installed families (searchable) instead of a free-text name. UI default is the app sans stack; terminal default is the built-in Nerd Font stack. Reset is unchanged.
 - **Debug dock icon is the white invert**: `pnpm dev` uses `src-tauri/icons/dev` (white plate, dark mark) so the running debug app is distinct from the installed black production icon. Release bundles are unchanged.
 - **Resource markdown preview windows long files**: Side-pane `.md` keeps short files as one tree. Files at 200+ lines split on headings (and length caps) and only mount visible sections, instead of ReactMarkdown for the whole buffer.
@@ -61,6 +65,10 @@ See `docs/llm-wiki/release.md`.
 
 **中文 · 变更**
 - **代码质量闸门改为度量 App shell + AppWorkbench**：`APP_*` 预算合计 `src/App.tsx` 与 `src/app/AppWorkbench.tsx`（从当前合计规模起递减天花板）。26 行 shell 不再让旧的 6000 行门槛空过。`App.tsx` 里的假 `shellEpoch` state 已删。
+- **工作台左右栏开关/拖拽收进 `useWorkbenchLayout`**：开合、窗口适配、分割条拖拽在 layout hook 内持久化。AppWorkbench 只留动词方法。
+- **命令面板搜索收进 `useSearchPalette`**：开合/查询/筛选、journal 扫描、键盘导航在 hook 内持久化。AppWorkbench 只留动作分发（`runPaletteAction`）和打开会话。
+- **会话导出/分享卡收进 `useSessionExportText` / `useSessionExportImage`**：Markdown 弹层、文件格式、trace、PNG 分享卡预览/皮肤在 hook 内持久化。AppWorkbench 只留菜单文案和弹层 JSX。
+- **沙箱向导和可靠性中心收进 `useSandboxReliability`**：向导出现/不再提示、stall/error 环在 hook 内。档位套用和 reliability view 计算仍在宿主。
 - **界面字体和终端字体改为本机字体下拉**：设置 → 外观列出本机已安装字体族（可搜索），不再手填名称。界面默认是应用无衬线栈；终端默认是内置 Nerd Font。重置不变。
 - **开发版 Dock 图标改白底反色**：`pnpm dev` 使用 `src-tauri/icons/dev`（白底深色标），和已安装的黑底正式版区分。发布包图标不变。
 - **资源栏 Markdown 对长文件做窗口化**：侧栏 `.md` 短文件仍整树渲染。200 行以上按标题（及长度上限）切块，只挂可见节，不再对整份 buffer 跑 ReactMarkdown。
