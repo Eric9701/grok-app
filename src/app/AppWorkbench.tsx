@@ -689,11 +689,9 @@ import { UsageLimitModal } from "@/components/UsageLimitModal";
 import {
   IconChevronDown,
   IconChevronUp,
-  IconMore,
   IconPlus,
   IconQueue,
   IconSkills,
-  IconAttach,
   IconMic,
   IconFolder,
   IconFolderPlus,
@@ -704,11 +702,6 @@ import {
   IconCode,
   IconClipboardList,
   IconImagine,
-  IconScheduled,
-  IconMenu,
-  IconPanel,
-  IconPanelRight,
-  IconUser,
   IconArchive,
   IconListCheck,
   IconPin,
@@ -742,7 +735,6 @@ import {
 } from "@/components/icons";
 import { PhoneAccountSheet } from "@/components/PhoneAccountSheet";
 import { PhoneComposerToolsSheet } from "@/components/PhoneComposerToolsSheet";
-import { OpenLocationButton } from "@/components/OpenLocationButton";
 import { ContextMenu, type ContextMenuItem } from "@/components/ContextMenu";
 import {
   aiCreateSeedPrompt,
@@ -781,7 +773,6 @@ import {
   type ProviderBalanceCache,
 } from "@/lib/providerBalanceFormat";
 import type { ResourceOpenTarget } from "@/components/ResourceViewer";
-import { EnvInfoButton } from "@/components/side-workbench/EnvInfoButton";
 import {
   applySideStripClose,
   emptySideWorkbenchState,
@@ -972,7 +963,6 @@ import { useSessionMoveProject } from "@/hooks/useSessionMoveProject";
 import { useSidebarSessionMoveDrag } from "@/hooks/useSidebarSessionMoveDrag";
 import { useSideWorkbenchProjectIsolation } from "@/hooks/useSideWorkbenchProjectIsolation";
 import { useBottomTerminal } from "@/hooks/useBottomTerminal";
-import { BottomTerminalToggle } from "@/components/bottom-terminal/BottomTerminalToggle";
 import { useProjectSpaces } from "@/hooks/useProjectSpaces";
 import {
   findSpace,
@@ -999,6 +989,7 @@ import { useSearchPalette } from "@/hooks/useSearchPalette";
 import { useSessionCatalog } from "@/hooks/useSessionCatalog";
 import { WorkbenchSessionTree } from "@/app/WorkbenchSessionTree";
 import { WorkbenchSidebar } from "@/app/WorkbenchSidebar";
+import { WorkbenchMain } from "@/app/WorkbenchMain";
 import { useSessionExportText } from "@/hooks/useSessionExportText";
 import { useSessionExportImage } from "@/hooks/useSessionExportImage";
 import {
@@ -16960,344 +16951,47 @@ export function AppWorkbench() {
           />
         </WorkbenchSidebar>
 
-        {/* CENTER — solid pane; top icons fully toggle L/R columns */}
-        <main
-          className={
-            "main" +
-            (layout.sidebarCollapsed ? " main--sidebar-hidden" : "") +
-            (dragZone === "main" ? " is-drop-target" : "") +
-            (dragZone === "sidebar" ? " is-drop-idle" : "") +
-            (hideChatForSideExpand ? " main--side-covered" : "")
-          }
-          aria-hidden={hideChatForSideExpand ? true : undefined}
-          // Keep chat DOM mounted under the side overlay; block interaction.
-          inert={hideChatForSideExpand ? true : undefined}
+        <WorkbenchMain
+          tr={tr}
+          locale={locale}
+          layout={layout}
+          phoneLayout={phoneLayout}
+          dragZone={dragZone}
+          hideChatForSideExpand={hideChatForSideExpand}
+          toast={toast}
+          dragRegion={dragRegion}
+          titlebarMax={titlebarMax}
+          mainPane={mainPane}
+          sessions={sessions}
+          session={session}
+          activeProject={activeProject}
+          messages={messages}
+          openPhoneDrawer={openPhoneDrawer}
+          closePhoneDrawer={closePhoneDrawer}
+          openSidebarPane={openSidebarPane}
+          openSessionMenu={openSessionMenu}
+          onOpenPhoneAccount={() => setPhoneAccountOpen(true)}
+          bottomTerminalOpen={bottomTerminal.state.open}
+          onToggleBottomTerminal={bottomTerminal.toggle}
+          mirrorLinkOk={mirrorLinkOk}
+          mirrorHostLabel={mirrorHostLabel}
+          connPill={connPill}
+          connPillCanRetry={connPillCanRetry}
+          onRetryAgentConnect={retryAgentConnect}
+          defaultOpenTarget={defaultOpenTarget}
+          persistOpenTarget={persistOpenTarget}
+          onOpenLocationError={(e) => setLocalError(e)}
+          platform={platform}
+          effectiveProjectPath={effectiveProjectPath}
+          sideIsGitProject={sideIsGitProject}
+          sessionChangesSummary={sessionChangesSummary}
+          gitDirtySummary={gitDirtySummary}
+          sideWorkbench={sideWorkbench}
+          setSideWorkbench={setSideWorkbench}
+          openAsidePane={openAsidePane}
+          closeAsidePane={closeAsidePane}
+          showToast={showToast}
         >
-          {dragZone === "main" && (
-            <div className="drop-overlay drop-overlay--attach" aria-hidden>
-              <div className="drop-overlay__card">
-                <span className="drop-overlay__icon">
-                  <IconAttach size={22} />
-                </span>
-                <strong>{tr("composer.dropAttachTitle")}</strong>
-                <span>{tr("composer.dropAttachHint")}</span>
-              </div>
-            </div>
-          )}
-
-          {toast && (
-            <div className="app-toast" role="status">
-              {toast}
-            </div>
-          )}
-          <div
-            className={
-              "main__top" + (phoneLayout ? " main__top--phone" : "")
-            }
-            data-tauri-drag-region={dragRegion}
-            {...titlebarMax}
-          >
-            <div className="main__title-row" data-tauri-drag-region={dragRegion}>
-              {/* Phone: always-visible hamburger (≥44px). Desktop: reopen when rail hidden. */}
-              {phoneLayout ? (
-                <button
-                  type="button"
-                  className="chrome-btn main__phone-menu"
-                  aria-label={tr("phone.menu")}
-                  aria-expanded={!layout.sidebarCollapsed}
-                  onClick={() => {
-                    if (layout.sidebarCollapsed) openPhoneDrawer();
-                    else closePhoneDrawer();
-                  }}
-                >
-                  <IconMenu size={20} />
-                </button>
-              ) : (
-                layout.sidebarCollapsed && (
-                  <Tip label={tr("main.leftPaneShow")}>
-                    <button
-                      type="button"
-                      className="chrome-btn chrome-btn--traffic main__pane-toggle"
-                      aria-label={tr("main.leftPaneShow")}
-                      onClick={() => openSidebarPane()}
-                    >
-                      <IconPanel size={16} />
-                    </button>
-                  </Tip>
-                )
-              )}
-              {mainPane === "automations" ? (
-                <>
-                  {!phoneLayout ? (
-                    <span className="main__title-icon">
-                      <IconScheduled size={16} />
-                    </span>
-                  ) : null}
-                  <h1 className="main__title" data-tauri-drag-region={dragRegion}>
-                    {tr("automations.title")}
-                  </h1>
-                </>
-              ) : mainPane === "kanban" ? (
-                <>
-                  {!phoneLayout ? (
-                    <span className="main__title-icon">
-                      <IconList size={16} />
-                    </span>
-                  ) : null}
-                  <h1 className="main__title" data-tauri-drag-region={dragRegion}>
-                    {tr("kanban.title")}
-                  </h1>
-                </>
-              ) : (
-                (() => {
-                  const cur = sessions.find((s) => s.id === session.sessionId);
-                  const title =
-                    cur?.title ||
-                    session.title ||
-                    activeProject?.name ||
-                    tr("session.new");
-                  const isScheduledSession =
-                    !!cur?.scheduled ||
-                    messages.some(
-                      (m) =>
-                        m.role === "user" &&
-                        !!parseScheduledUserContent(m.content || ""),
-                    );
-                  return (
-                    <>
-                      {isScheduledSession && !phoneLayout ? (
-                        <span
-                          className="main__title-icon"
-                          title={tr("automations.msgTag")}
-                          aria-label={tr("automations.msgTag")}
-                        >
-                          <IconClock size={16} />
-                        </span>
-                      ) : null}
-                      {phoneLayout ? (
-                        <h1 className="main__title" data-tauri-drag-region={dragRegion}>
-                          {title}
-                        </h1>
-                      ) : (
-                        <Tip label={title}>
-                          <h1 className="main__title" data-tauri-drag-region={dragRegion}>
-                            {title}
-                          </h1>
-                        </Tip>
-                      )}
-                      {cur && !phoneLayout && (
-                        <Tip label={tr("session.menu")}>
-                          <button
-                            type="button"
-                            className="chrome-btn main__title-menu"
-                            onClick={(e) => openSessionMenu(e, cur)}
-                          >
-                            <IconMore size={16} />
-                          </button>
-                        </Tip>
-                      )}
-                    </>
-                  );
-                })()
-              )}
-            </div>
-            <div className="main__top-actions">
-              {phoneLayout ? (
-                <>
-                <button
-                  type="button"
-                  className="chrome-btn main__phone-account"
-                  aria-label={tr("phone.account")}
-                  onClick={() => setPhoneAccountOpen(true)}
-                >
-                  <IconUser size={20} />
-                </button>
-                <BottomTerminalToggle
-                  locale={locale}
-                  open={bottomTerminal.state.open}
-                  onToggle={bottomTerminal.toggle}
-                />
-                </>
-              ) : (
-                <>
-                  {isMirrorClient() && (() => {
-                    const link = deriveMirrorClientLinkStatus({
-                      wsConnected: mirrorLinkOk,
-                      hasToken: !!mirrorToken(),
-                    });
-                    const linkLabel = tr(link.labelKey as MessageKey);
-                    return (
-                    <span
-                      className={
-                        "status-pill status-pill--" + link.tone
-                      }
-                      role="status"
-                      title={
-                        mirrorHostLabel
-                          ? `${mirrorHostLabel} · ${linkLabel}`
-                          : linkLabel
-                      }
-                    >
-                      <span className="status-pill__dot" aria-hidden />
-                      {mirrorLinkOk
-                        ? mirrorHostLabel || linkLabel
-                        : linkLabel}
-                    </span>
-                    );
-                  })()}
-                  {mainPane === "chat" && (
-                    connPillCanRetry ? (
-                      <button
-                        type="button"
-                        className={`status-pill status-pill--${connPill.tone} status-pill--action`}
-                        title={tr("conn.retryHint")}
-                        onClick={() => retryAgentConnect()}
-                      >
-                        <span className="status-pill__dot" aria-hidden />
-                        {tr(connPill.labelKey as MessageKey)}
-                      </button>
-                    ) : (
-                      <span
-                        className={`status-pill status-pill--${connPill.tone}`}
-                        role="status"
-                        title={tr(connPill.labelKey as MessageKey)}
-                      >
-                        <span className="status-pill__dot" aria-hidden />
-                        {tr(connPill.labelKey as MessageKey)}
-                      </span>
-                    )
-                  )}
-                  {/* Retry progress is intentionally NOT shown: mid-connect
-                      network retries (reqwest stream errors, transient 5xx)
-                      are normal and self-healing — surfacing them as a chip
-                      reads as a failure. Final failures surface via
-                      session://turn_error instead. setRetryStatus(null) calls
-                      stay as no-op cleanup. */}
-                  {/* Codex Side Workbench chrome:
-                      collapsed → open-with · env · side
-                      open      → open-with · env · side (also on side bar)
-                      Main keeps a toggle when open so narrow/non-maximized
-                      windows can still close if side chrome is clipped. */}
-                  {mainPane === "chat" &&
-                    activeProject &&
-                    !isMirrorClient() && (
-                      <OpenLocationButton
-                        path={activeProject.path}
-                        target={defaultOpenTarget || "finder"}
-                        onTargetChange={persistOpenTarget}
-                        onOpenError={(e) => setLocalError(e)}
-                        platform={platform}
-                        labels={{
-                          openLocation: tr("main.openLocation"),
-                          openHint: tr("main.openLocationHint"),
-                          openMenu: tr("main.openLocationMenu"),
-                          finder: revealInOsLabel(tr, platform),
-                          systemDefault: tr("main.openSystemDefault"),
-                          copyPath: tr("attach.copyPath"),
-                        }}
-                      />
-                    )}
-                  {mainPane === "chat" ? (
-                    <EnvInfoButton
-                      locale={locale}
-                      projectPath={effectiveProjectPath}
-                      projectName={
-                        activeProject
-                          ? projectDisplayName(activeProject, tr)
-                          : null
-                      }
-                      isGitProject={sideIsGitProject}
-                      changeSummary={
-                        sessionChangesSummary?.mode === "diff"
-                          ? {
-                              add: sessionChangesSummary.addedLines ?? 0,
-                              del: sessionChangesSummary.removedLines ?? 0,
-                              fileCount: sessionChangesSummary.fileCount,
-                            }
-                          : sessionChangesSummary
-                            ? {
-                                add: 0,
-                                del: 0,
-                                fileCount: sessionChangesSummary.fileCount,
-                              }
-                            : gitDirtySummary
-                              ? {
-                                  add: 0,
-                                  del: 0,
-                                  fileCount: gitDirtySummary.count,
-                                }
-                              : null
-                      }
-                      onJump={(jump) => {
-                        if (jump.type === "review") {
-                          const result = applySideContextOpen(
-                            sideWorkbench,
-                            { type: "changes" },
-                            { isGitProject: sideIsGitProject },
-                          );
-                          if (result.noticeKey) {
-                            showToast(tr(result.noticeKey), 2400);
-                          }
-                          if (!result.needAsideOpen) return;
-                          setSideWorkbench(result.state);
-                          openAsidePane();
-                          return;
-                        }
-                        if (jump.type === "local") {
-                          // Open / focus files workbench for the bound project.
-                          const next = openSideTab(sideWorkbench, "file", {
-                            path: effectiveProjectPath || undefined,
-                            name: activeProject
-                              ? projectDisplayName(activeProject, tr)
-                              : undefined,
-                          });
-                          setSideWorkbench({ ...next, treeVisible: true });
-                          openAsidePane();
-                        }
-                        // branch / push / pr: display-only in Phase 3 (no write ops).
-                      }}
-                    />
-                  ) : null}
-                  <BottomTerminalToggle
-                    locale={locale}
-                    open={bottomTerminal.state.open}
-                    onToggle={bottomTerminal.toggle}
-                  />
-                  {/* Always keep a main-chrome toggle: when the window is not
-                      maximized, the side pane can clip its own close control
-                      past the right edge — main column stays reachable. */}
-                  {layout.asideCollapsed ? (
-                    <Tip label={tr("main.rightPaneShow")}>
-                      <button
-                        type="button"
-                        className="chrome-btn main__pane-toggle"
-                        aria-label={tr("main.rightPaneShow")}
-                        aria-pressed={false}
-                        data-testid="main-side-toggle"
-                        onClick={() => openAsidePane()}
-                      >
-                        <IconPanelRight size={16} />
-                      </button>
-                    </Tip>
-                  ) : (
-                    <Tip label={tr("main.rightPaneHide")}>
-                      <button
-                        type="button"
-                        className="chrome-btn main__pane-toggle is-on"
-                        aria-label={tr("main.rightPaneHide")}
-                        aria-pressed
-                        data-testid="main-side-toggle"
-                        onClick={() => closeAsidePane()}
-                      >
-                        <IconPanelRight size={16} />
-                      </button>
-                    </Tip>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
           {mainPane === "kanban" ? (
             <Suspense fallback={null}>
               <KanbanBoardPage
@@ -19041,7 +18735,7 @@ export function AppWorkbench() {
               />
             </Suspense>
           ) : null}
-        </main>
+        </WorkbenchMain>
 
         {/* RIGHT — session-linked project resource viewer (fully hideable + resizable) */}
         <aside
