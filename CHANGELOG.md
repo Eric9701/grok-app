@@ -34,6 +34,7 @@ See `docs/llm-wiki/release.md`.
 - **Resource code preview windows long files**: Side-pane / Changes `CodePreview` keeps short files as a full list. Files at 200+ lines (including 5000-line sources) only mount the visible rows and highlight those lines, instead of highlight.js + one DOM node per line for the whole file.
 - **Permission countdown, git dirty chip, and Tasks liveMap stay off the workbench shell**: Auto-deny seconds tick inside the permission bar. Git chip setState runs only when the count/label change. The Tasks panel subscribes to liveMap itself. ConversationThreadLive is memoized with stable callbacks.
 - **Pet overlay does not parse the workbench**: `#/pet` `import()`s `PetApp`; the main window `import()`s `App`.
+- **Clippy is deny-warnings on all CI legs (#829)**: `cargo clippy --all-targets -- -D warnings` now gates Linux / macOS / Windows. Platform-cfg dead code, mechanical style, and skin-share follow-up lints restore a green gate; no product behavior change.
 - **Clippy is silent on macOS host builds again (#785)**: Windows-only overlay/WSL/shim items use the existing `cfg_attr(not(windows), allow(dead_code))` idiom so cross-platform tests stay; mechanical style lints and Tauri `too_many_arguments` allows restore zero `cargo clippy --all-targets` warnings without behavior change.
 - **Locale catalogs load on demand**: English stays in the main bundle. The other 14 languages `import()` when selected; UI falls back to English until that chunk arrives.
 - **Heavy surfaces leave first paint**: Bottom terminal (xterm) mounts after first open; project-rules TipTap and the image lightbox load on demand.
@@ -60,6 +61,7 @@ See `docs/llm-wiki/release.md`.
 - **资源栏代码预览对长文件做窗口化**：侧栏 / Changes 的 `CodePreview` 短文件仍整表渲染。200 行以上（含 5000 行源文件）只挂可见行并高亮这些行，不再对整文件跑 highlight.js、也不再一行一个 DOM 节点。
 - **权限倒计时、git 脏文件芯片和 Tasks liveMap 不再打穿工作台**：自动拒绝秒数在权限条内部跳动。git 芯片只在条数/文案变化时 setState。Tasks 面板自己订阅 liveMap。ConversationThreadLive 带稳定回调并 memo。
 - **宠物浮层不再解析工作台**：`#/pet` 动态加载 `PetApp`；主窗口动态加载 `App`。
+- **CI 全平台 clippy 改为 deny warnings（#829）**：Linux / macOS / Windows 均以 `cargo clippy --all-targets -- -D warnings` 过门。平台条件死代码、机械风格和皮肤包后续 lint 清干净，无产品行为变化。
 - **macOS 上 clippy 再次零警告（#785）**：Windows 专用 overlay/WSL/shim 用既有 `cfg_attr(not(windows), allow(dead_code))`，跨平台测试仍跑；机械风格与 Tauri `too_many_arguments` allow 恢复 `cargo clippy --all-targets` 零警告，无行为变化。
 - **语言包按需加载**：主包只带英文。另外 14 种语言选中后再 `import()`；chunk 到达前界面先用英文。
 - **重表面离开首屏**：底栏终端（xterm）第一次打开才挂载；项目规则 TipTap 和图片灯箱按需加载。
