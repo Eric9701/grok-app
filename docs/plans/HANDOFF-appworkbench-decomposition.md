@@ -39,6 +39,7 @@
    **WP-W4 已落地**：`useSandboxWizard` + `useReliabilityCenter` 自持向导/可靠性中心开合与 ring。下一步 sessions。天花板 **22550 / 232 / 96**。
    **WP-W5 已落地**：`useSessionCatalog` 自持列表、`sessions://changed` 刷新、侧栏多选。`openSession` / `newChat` 仍在 workbench。天花板 **22400 / 229 / 93**。
    **WP-W6 已落地**：`files_ge_1000` 80→**69**（CSS part、session/contextUsage 测试、stall history、IM channel catalog）。下一步 JSX view shell；sessions 仍欠 open/newChat。
+   **WP-W7 已落地**：侧栏树 JSX → `WorkbenchSessionTree`（projects / orphans / 多选条）。`openSession` / `newChat` 仍在 workbench。天花板 **21800 / 229 / 93**。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。
