@@ -234,7 +234,7 @@ When an agent maintains this repo:
 5. Redact tokens in logs and Issue bodies  
 6. After multi-issue work: leave a short status in the PR / reply (what fixed, what remains)  
 7. **After land:** safely clear merged remote/local branches and finished worktrees (Branch hygiene) — do not leave long-lived `pr-*` / integrate leftovers  
-8. **App.tsx freeze:** never add new `useState` or feature blocks to `src/App.tsx`; put them in domain providers/hooks/components. Remediation baseline ~24842 lines — only shrink.
+8. **App shell + AppWorkbench freeze:** never add new `useState` or feature blocks to `src/App.tsx` or `src/app/AppWorkbench.tsx`; put them in domain providers/hooks/components. Combined lines may only decrease (gate ceilings in `scripts/check-code-quality-gates.py`).
 ---
 
 ## Current community backlog snapshot (launch feedback)

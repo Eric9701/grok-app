@@ -1,0 +1,54 @@
+# Handoff — AppWorkbench 拆解与质量闸门修正
+
+**交接时间**：2026-08-22 · **基线**：`main` @ `fae9b545`（干净，与 `origin/main` 一致） · **来源**：software-design-philosophy review
+
+**执行位置**：worktree `D:/code/grok-app-appworkbench-decomp` · 分支 `refactor/appworkbench-decomposition`
+
+## 现状（已核实的事实）
+
+`docs/plans/CODE-QUALITY-PROGRESS.md` 标记 `FINAL: PASS`，但该结论建立在错误的度量对象上。
+
+- `scripts/check-code-quality-gates.py` 的 `APP_*` 系列闸门只读 `ROOT/"src/App.tsx"`。
+- `src/App.tsx` 现为 26 行 provider shell，域状态全部位于 `src/app/AppWorkbench.tsx`。
+- `src/app/AppWorkbench.tsx`：**23,885 行 / 253 `useState` / 100 `useEffect` / 277 顶层 import**；函数体 `1170–18242` 为 hooks 与逻辑，`18243–23885` 是单个 `return` 的约 5.6k 行 JSX。
+- 对比 baseline（App.tsx 24,843 行 / 318 `useState` / 111 `useEffect`）：规模基本未变，主要发生了搬迁。
+- ledger 残余条目记 AppWorkbench 22,907，现 23,885，**已回涨约 1k**；AGENTS.md §7 的 growth freeze 按文件名写死在 `App.tsx`，对 workbench 无效。
+- 闸门下界 `0 < app_lines()` 迫使 shell 保留一个假 state，注释已自陈：`src/App.tsx:11-13` "Keep a single shell lifecycle tick so gate budgets stay honest"。
+- `files_ge_1000 = 80`，闸门 `≤ 80`，**顶格**，任意新增千行文件即红 CI。
+- `src/lib`：511 个模块（99 个 <80 行，94 个 ≥500 行）。抽出的多为无状态 helper（浅模块），编排知识仍留在 workbench —— 277 个 import 就是这笔接口成本。
+
+### WP-W0 实测更正（2026-08-22）
+
+闸门改度量后（删 `shellEpoch` 之后）：`App.tsx.lines=24549`（shell 18 + AppWorkbench **24531**）、`useState=253`、`useEffect=100`、`files_ge_1000=80`。交接稿里的 23,885 是当时快照；当前文件更大。递减天花板起始 **25000 / 270 useState / 110 useEffect**（wave-b/c 的 APP_* 也必须一起抬，否则 `final` 模式会挂历史门槛）。
+
+## 设计判断
+
+问题不是"文件太大"，是**信息未被隐藏**：wave B/C 的拆分按代码形态与文件体积切，而非按知识归属切，因此每个 helper 的状态接线、生命周期、持久化仍回流到 workbench 顶层。改任何一个域都必须在 253 个 state 里判断耦合（认知负载 + 未知的未知）。Rust 侧（`commands/`、`session_manager/`）与 `src/i18n/`、`SettingsPage` 的拆分是合格的，不在本次范围内。
+
+## 下一步（有序，含陷阱）
+
+1. **先改闸门度量**：`app_lines()` / `app_hook_counts()` 改为 `src/App.tsx` 与 `src/app/AppWorkbench.tsx` 之和（或 glob `src/app/*.tsx`），移除 `0 <` 下界。
+   **陷阱**：一改就会让 `final` 模式立刻 FAIL（24k vs ≤6000）。必须同时把 `APP_LINES_FINAL` 换成**递减天花板**（例如起始 24,000，每个 WP 下调），否则 CI 直接挂红，后续所有 PR 被阻塞。这一步要和 ledger 状态位一起改，不要单独提交。
+   **已落地**：合计两文件；不用 glob（抽出到 `src/app/` 的域模块必须让指标下降）；起始天花板 **25000 / 270 / 110**。
+2. 删除 `src/App.tsx` 的 `shellEpoch` 假 state（必须在第 1 步之后）。**已落地（未提交）。**
+3. 同步 AGENTS.md §7：growth freeze 的对象改为 App shell + AppWorkbench 合计行数，明确"新状态落域模块"。**已落地（未提交）；** `docs/llm-wiki/maintain.md` 同步。
+4. **按信息拆 workbench**，每次一个域，域内自持 state + effect + 持久化，对外只暴露少量动词方法。建议顺序（依赖由弱到强）：layout/panes → search/palette → exports/share → sandbox+reliability → sessions（最后，最重）。不要再切"读-算-写"式的阶段模块。
+   **下一步**：layout/panes → search/palette → exports/share → sandbox+reliability → sessions。
+   **pi**：协作者本机无 pi，按 owner 规则跳过。
+   **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
+5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。
+6. `files_ge_1000` 从 80 降到 <70，留出余量。
+7. 复核 `src/lib` 中 99 个 <80 行模块，合并纯 pass-through。
+
+## 验收标准
+
+- 改动单一域时无需打开 `AppWorkbench.tsx`。
+- 闸门输出的 `App.tsx.*` 指标与真实编排规模一致（不再存在被度量绕过的文件）。
+- `python scripts/check-code-quality-gates.py --mode final` 在**新度量**下 PASS，且 ledger 的 metrics log 追加真实数字。
+- `AppWorkbench` 行数与 `useState` 数单调下降，禁止再次通过重命名/搬迁"达标"。
+
+## 流程约束
+
+- AGENTS.md §8：每完成一项（一次闸门改动、一个域抽取、一个自修 commit）立刻请 **pi** 审核校对，blocker 清掉才进下一项。
+- 本次 review **未经 pi 校对**：本机 `Get-Command pi` 无结果，pi CLI 不可用。接手方需先解决 pi 可用性，或按规则记录失败原因后停在该项。WP-W0 记录：`docs/plans/2026-08-22-wp-w0-pi-review.md`。
+- 分支卫生：另有 5 个 worktree 领先 `main`（`diagnose/long-chat-send-flash` 3、`fix/sidebar-other-session-inset` 5、`fix/settings-shortcut-toggle` 2、`fix/windows-snap-min-width` 1、`fix/narrow-ctrl-b-window-size` 1）。它们都会碰 workbench，**开始第 4 步大拆前先把这些落地或明确放弃**，否则冲突成本极高。

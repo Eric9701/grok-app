@@ -11,9 +11,9 @@
 | Program | `2026-08-01-code-quality-remediation` |
 | Spec | `docs/plans/2026-08-01-code-quality-remediation-GOAL.md` |
 | Started | `2026-08-01` |
-| Current wave | `final` |
-| Current WP | `WP-F2` |
-| **FINAL** | **PASS** |
+| Current wave | `workbench-decomp` |
+| Current WP | `WP-W0` |
+| **FINAL** | **PASS** (honest orchestration metrics; decreasing ceilings) |
 
 ## Wave checklist
 
@@ -45,6 +45,7 @@
 | WP-C4 | Further App.tsx shrink to wave-c numbers | PASS | wave-b | App.tsx shell 23 lines |
 | WP-F1 | Final shrink + timer balance + ≥1k file budget | PASS | wave-f | files_ge_1000=43; CSS parts |
 | WP-F2 | Completion handoff doc + smoke matrix | PASS | wave-f | CODE-QUALITY-COMPLETION.md |
+| WP-W0 | Honest APP_* gates: App.tsx + AppWorkbench; drop shellEpoch | PASS | uncommitted | final PASS; lines=24549 useState=253 useEffect=100 |
 
 ## Metrics log (append-only)
 
@@ -56,6 +57,7 @@
 | 2026-08-01 C1 | — | — | — | — | facade 27 / max ≤2000 | — | — | — | — |
 | 2026-08-01 C2 | — | — | — | — | — | facade 115 | — | — | — |
 | 2026-08-01 final | 23 | 4 | 3 | 8 (shell) | dir | dir | 26 | 9 | 43 |
+| 2026-08-22 W0 | 24549 (shell 18 + wb 24531) | 253 | 100 | 11 | dir | dir | 28 | 9 | 80 |
 
 ## Blockers
 
@@ -81,7 +83,7 @@ Parallel non-overlapping tracks (multi-agent) — **landed**:
 | residual-resource-viewer | ResourceViewer + parts | **PASS** | 4938→modules |
 | residual-i18n | `src/i18n/**` | **PASS** | domain modules + barrels |
 | residual-settings | SettingsPage + settings/* | **PASS** | 8874→1817 |
-| residual-appworkbench | AppWorkbench + hooks | **PASS** | 24572→22907; host events |
+| residual-appworkbench | AppWorkbench + hooks | **ACTIVE** | WP-W0: honest APP_* gates; next layout/panes |
 | residual-settings-catalog | settingsCatalog split | **PASS** | domain entries |
 
-Open: further AppWorkbench shrink (modals / send / view shell). Gate thresholds unchanged; final still **PASS**.
+Follow-on: `docs/plans/HANDOFF-appworkbench-decomposition.md` (worktree `D:/code/grok-app-appworkbench-decomp`, branch `refactor/appworkbench-decomposition`). Decreasing ceilings now **25000 / 270 useState / 110 useEffect**. Collaborator skip pi. Five local worktrees are leftover SHAs; product changes already on `main`.

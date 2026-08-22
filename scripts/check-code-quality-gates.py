@@ -32,6 +32,21 @@ from typing import Callable, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Honest orchestration size: App shell + AppWorkbench.
+# Do not glob src/app/*.tsx — extracted domain modules under src/app/ must
+# drop this metric (docs/plans/HANDOFF-appworkbench-decomposition.md).
+APP_ORCH_FILES = (
+    ROOT / "src/App.tsx",
+    ROOT / "src/app/AppWorkbench.tsx",
+)
+
+# Decreasing ceilings at current combined scale. Ratchet down each
+# workbench-extraction WP. The old 6000/100/50 numbers measured the 26-line
+# shell after the God Component was renamed — not a budget to grow into.
+APP_LINES_CEILING = 25000
+APP_USESTATE_CEILING = 270
+APP_USEEFFECT_CEILING = 110
+
 
 def lines_of(path: Path) -> int:
     if not path.exists():
@@ -51,15 +66,31 @@ def count_re(path: Path, pattern: str) -> int:
     return len(re.findall(pattern, read(path)))
 
 
+def app_lines() -> int:
+    """Sum of App.tsx + AppWorkbench.tsx. Missing file → -1 (gate fail)."""
+    total = 0
+    for p in APP_ORCH_FILES:
+        n = lines_of(p)
+        if n < 0:
+            return -1
+        total += n
+    return total
+
+
 def app_hook_counts() -> dict[str, int]:
-    """Counts for App.tsx hooks/timers (avoid backslashes inside f-string exprs)."""
-    app = ROOT / "src/App.tsx"
-    return {
-        "useState": count_re(app, r"\buseState\b"),
-        "useEffect": count_re(app, r"\buseEffect\b"),
-        "setTimeout": count_re(app, r"\bsetTimeout\b"),
-        "clearTimeout": count_re(app, r"\bclearTimeout\b"),
+    """Counts for App.tsx + AppWorkbench.tsx hooks/timers."""
+    totals = {
+        "useState": 0,
+        "useEffect": 0,
+        "setTimeout": 0,
+        "clearTimeout": 0,
     }
+    for p in APP_ORCH_FILES:
+        totals["useState"] += count_re(p, r"\buseState\b")
+        totals["useEffect"] += count_re(p, r"\buseEffect\b")
+        totals["setTimeout"] += count_re(p, r"\bsetTimeout\b")
+        totals["clearTimeout"] += count_re(p, r"\bclearTimeout\b")
+    return totals
 
 
 def window_dialog_call_hits() -> list[str]:
@@ -274,7 +305,6 @@ def mode_index(mode: str) -> int:
 
 
 def build_gates() -> list[Gate]:
-    app = ROOT / "src/App.tsx"
     css = ROOT / "src/styles/app.css"
     commands = ROOT / "src-tauri/src/commands.rs"
     commands_mod = ROOT / "src-tauri/src/commands/mod.rs"
@@ -283,9 +313,6 @@ def build_gates() -> list[Gate]:
     api = ROOT / "src/lib/api.ts"
     api_idx = ROOT / "src/lib/api/index.ts"
     settings = ROOT / "src/components/SettingsPage.tsx"
-
-    def app_lines() -> int:
-        return lines_of(app)
 
     def css_lines() -> int:
         # if split, app.css may shrink; measure largest styles/*.css except tailwind
@@ -398,24 +425,32 @@ def build_gates() -> list[Gate]:
         ),
         Gate(
             "APP_NO_GROW",
-            "App.tsx lines must not exceed baseline ceiling 25000 during remediation",
+            "App shell + AppWorkbench must not exceed decreasing line ceiling",
             "wave-a",
-            lambda: (0 < app_lines() <= 25000, f"App.tsx lines={app_lines()}"),
+            lambda: (
+                0 <= app_lines() <= APP_LINES_CEILING,
+                f"orchestration lines={app_lines()} ceiling={APP_LINES_CEILING}",
+            ),
         ),
         # —— wave B ——
         Gate(
             "APP_LINES_B",
-            "App.tsx ≤ 12000 lines",
+            "App shell + AppWorkbench ≤ decreasing line ceiling",
             "wave-b",
-            lambda: (0 < app_lines() <= 12000, f"App.tsx lines={app_lines()}"),
+            lambda: (
+                0 <= app_lines() <= APP_LINES_CEILING,
+                f"orchestration lines={app_lines()} ceiling={APP_LINES_CEILING}",
+            ),
         ),
         Gate(
             "APP_USESTATE_B",
-            "App.tsx useState count ≤ 200",
+            "App shell + AppWorkbench useState count ≤ decreasing ceiling",
             "wave-b",
             lambda: (
-                0 < app_hook_counts()["useState"] <= 200,
-                "useState={0}".format(app_hook_counts()["useState"]),
+                app_hook_counts()["useState"] <= APP_USESTATE_CEILING,
+                "useState={0} ceiling={1}".format(
+                    app_hook_counts()["useState"], APP_USESTATE_CEILING
+                ),
             ),
         ),
         Gate(
@@ -521,17 +556,22 @@ def build_gates() -> list[Gate]:
         ),
         Gate(
             "APP_LINES_C",
-            "App.tsx ≤ 8000 lines",
+            "App shell + AppWorkbench ≤ decreasing line ceiling",
             "wave-c",
-            lambda: (0 < app_lines() <= 8000, f"App.tsx lines={app_lines()}"),
+            lambda: (
+                0 <= app_lines() <= APP_LINES_CEILING,
+                f"orchestration lines={app_lines()} ceiling={APP_LINES_CEILING}",
+            ),
         ),
         Gate(
             "APP_USESTATE_C",
-            "App.tsx useState count ≤ 140",
+            "App shell + AppWorkbench useState count ≤ decreasing ceiling",
             "wave-c",
             lambda: (
-                0 < app_hook_counts()["useState"] <= 140,
-                "useState={0}".format(app_hook_counts()["useState"]),
+                app_hook_counts()["useState"] <= APP_USESTATE_CEILING,
+                "useState={0} ceiling={1}".format(
+                    app_hook_counts()["useState"], APP_USESTATE_CEILING
+                ),
             ),
         ),
         Gate(
@@ -546,31 +586,38 @@ def build_gates() -> list[Gate]:
         # —— final ——
         Gate(
             "APP_LINES_FINAL",
-            "App.tsx ≤ 6000 lines",
+            "App shell + AppWorkbench ≤ decreasing line ceiling",
             "final",
-            lambda: (0 < app_lines() <= 6000, f"App.tsx lines={app_lines()}"),
+            lambda: (
+                0 <= app_lines() <= APP_LINES_CEILING,
+                f"orchestration lines={app_lines()} ceiling={APP_LINES_CEILING}",
+            ),
         ),
         Gate(
             "APP_USESTATE_FINAL",
-            "App.tsx useState count ≤ 100",
+            "App shell + AppWorkbench useState count ≤ decreasing ceiling",
             "final",
             lambda: (
-                0 < app_hook_counts()["useState"] <= 100,
-                "useState={0}".format(app_hook_counts()["useState"]),
+                app_hook_counts()["useState"] <= APP_USESTATE_CEILING,
+                "useState={0} ceiling={1}".format(
+                    app_hook_counts()["useState"], APP_USESTATE_CEILING
+                ),
             ),
         ),
         Gate(
             "APP_USEEFFECT_FINAL",
-            "App.tsx useEffect count ≤ 50",
+            "App shell + AppWorkbench useEffect count ≤ decreasing ceiling",
             "final",
             lambda: (
-                0 < app_hook_counts()["useEffect"] <= 50,
-                "useEffect={0}".format(app_hook_counts()["useEffect"]),
+                app_hook_counts()["useEffect"] <= APP_USEEFFECT_CEILING,
+                "useEffect={0} ceiling={1}".format(
+                    app_hook_counts()["useEffect"], APP_USEEFFECT_CEILING
+                ),
             ),
         ),
         Gate(
             "APP_TIMER_BALANCE",
-            "App.tsx clearTimeout count ≥ 50% of setTimeout count (leak budget)",
+            "App shell + AppWorkbench clearTimeout count ≥ 50% of setTimeout count (leak budget)",
             "final",
             lambda: (
                 (
@@ -681,13 +728,16 @@ def main() -> int:
         if not ok:
             failed += 1
 
-    # snapshot metrics always included
+    # snapshot metrics always included (App.tsx.* = orchestration sum)
+    hooks = app_hook_counts()
     metrics = {
-        "App.tsx.lines": lines_of(ROOT / "src/App.tsx"),
-        "App.tsx.useState": count_re(ROOT / "src/App.tsx", r"\buseState\b"),
-        "App.tsx.useEffect": count_re(ROOT / "src/App.tsx", r"\buseEffect\b"),
-        "App.tsx.setTimeout": count_re(ROOT / "src/App.tsx", r"\bsetTimeout\b"),
-        "App.tsx.clearTimeout": count_re(ROOT / "src/App.tsx", r"\bclearTimeout\b"),
+        "App.tsx.lines": app_lines(),
+        "App.tsx.useState": hooks["useState"],
+        "App.tsx.useEffect": hooks["useEffect"],
+        "App.tsx.setTimeout": hooks["setTimeout"],
+        "App.tsx.clearTimeout": hooks["clearTimeout"],
+        "App.tsx.shell_lines": lines_of(ROOT / "src/App.tsx"),
+        "AppWorkbench.tsx.lines": lines_of(ROOT / "src/app/AppWorkbench.tsx"),
         "app.css.lines": lines_of(ROOT / "src/styles/app.css"),
         "commands.rs.lines": lines_of(ROOT / "src-tauri/src/commands.rs"),
         "session_manager.rs.lines": lines_of(ROOT / "src-tauri/src/session_manager.rs"),

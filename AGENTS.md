@@ -45,7 +45,7 @@
 
 6. **Branch hygiene** — after work lands on `main` (merge, squash, or batch integrate), promptly and safely delete finished remote/local branches and idle worktrees. Confirm with `git fetch --prune`, ancestor / `gh pr` / feature-on-main checks; never delete open-PR heads, unique WIP, or worktree-checked-out branches without removing the worktree first. Details: [docs/llm-wiki/maintain.md](docs/llm-wiki/maintain.md#branch-hygiene-merged--finished-work).
 
-7. **App.tsx growth freeze** — do **not** add new `useState` / large feature blocks to `src/App.tsx`. New product state and UI must land in domain modules (`src/providers/`, `src/hooks/`, `src/components/`, `src/lib/`). During code-quality remediation App line count may only decrease relative to the WP start baseline (see `docs/plans/CODE-QUALITY-PROGRESS.md`).
+7. **App shell + AppWorkbench growth freeze** — do **not** add new `useState` / large feature blocks to `src/App.tsx` or `src/app/AppWorkbench.tsx`. Combined line count of App shell + AppWorkbench may only decrease (see `docs/plans/CODE-QUALITY-PROGRESS.md` and `docs/plans/HANDOFF-appworkbench-decomposition.md`). New product state and UI must land in domain modules (`src/providers/`, `src/hooks/`, `src/components/`, `src/lib/`).
 
 8. **pi 审核校对（强制，不可跳过）** — 后续只要是 **修复**、**合并**、**review**，都必须有 **pi** 参与审查纠错。只读 `AGENTS.md` 的 agent 按本条执行即可，不依赖某次 triage 文档。细则与 `maintain.md` 指针：[docs/llm-wiki/maintain.md](docs/llm-wiki/maintain.md#pi-review-loop-mandatory)。
 
