@@ -237,14 +237,7 @@ import {
   expandMapFromCollapsedIds,
   sameCollapsedIdSet
 } from "@/lib/sidebarExpand";
-import {
-  addIdsToSet,
-  areAllIdsSelected,
-  pruneSelectedIds,
-  rangeIdsInclusive,
-  toggleIdInSet,
-  toggleIdsInSet,
-} from "@/lib/sessionSelect";
+import { areAllIdsSelected } from "@/lib/sessionSelect";
 import {
   armStopLatch,
   createStopLatchState,
@@ -1028,6 +1021,7 @@ import { useAccountQuotaAutoRefresh } from "@/hooks/useAccountQuotaAutoRefresh";
 import { useWorkbenchDisplayPrefs } from "@/hooks/useWorkbenchDisplayPrefs";
 import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
 import { useSearchPalette } from "@/hooks/useSearchPalette";
+import { useSessionCatalog } from "@/hooks/useSessionCatalog";
 import { useSessionExportText } from "@/hooks/useSessionExportText";
 import { useSessionExportImage } from "@/hooks/useSessionExportImage";
 import {
@@ -1599,9 +1593,23 @@ export function AppWorkbench() {
   projectsRef.current = projects;
   const projectSpaces = useProjectSpaces();
   const visibleProjects = projectSpaces.visibleProjects(projects);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const sessionsRef = useRef(sessions);
-  sessionsRef.current = sessions;
+  const {
+    sessions,
+    setSessions,
+    sessionsRef,
+    refreshSessions,
+    refreshSessionsRef,
+    sessionSelectMode,
+    selectedSessionIds,
+    selectableSessionCount,
+    enterSessionSelectMode,
+    exitSessionSelectMode,
+    toggleSessionSelected,
+    toggleSessionsSelected,
+  } = useSessionCatalog({
+    projects,
+    isDialogOpen: () => !!appDialogRef.current,
+  });
   usePetCompanion({
     host: windowRoleReady && !isSecondaryWindow,
     sessions,
@@ -1657,15 +1665,6 @@ export function AppWorkbench() {
   const [historyOpen, setHistoryOpen] = useState(true);
   /** Avoid writing other-sessions collapse before settings hydrate on launch. */
   const historyOpenHydratedRef = useRef(false);
-  /** Sidebar multi-select: archive / restore several sessions at once. */
-  const [sessionSelectMode, setSessionSelectMode] = useState(false);
-  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  /** Anchor for Shift+click contiguous range select in the sidebar. */
-  const sessionSelectAnchorIdRef = useRef<string | null>(null);
-  /** Latest sidebar order for range select (avoids stale closures). */
-  const sidebarSelectOrderIdsRef = useRef<string[]>([]);
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(null);
   /** Project rules dialog (from project context menu). */
   const [projectRulesTarget, setProjectRulesTarget] = useState<{
@@ -1746,19 +1745,6 @@ export function AppWorkbench() {
       restoreFocus: true,
     });
   }, [showCompactModal]);
-
-  useEffect(() => {
-    if (!sessionSelectMode) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (appDialogRef.current) return;
-      e.preventDefault();
-      setSessionSelectMode(false);
-      setSelectedSessionIds(new Set());
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [sessionSelectMode]);
 
   // Global shortcuts: search, find-in-chat, help, doctor, copy last reply, toggle sidebar, new chat, settings, voice, Esc-stop.
   // Handlers go through refs so we don't re-bind every render.
@@ -5032,102 +5018,6 @@ export function AppWorkbench() {
   sidebarNavCurrentIdRef.current =
     session.sessionId ?? viewingSessionIdRef.current ?? null;
 
-  /**
-   * Full multi-select order (all projects + orphans), independent of expand/collapse.
-   * Shift+click range uses this so contiguous select matches tree order.
-   */
-  const sidebarSelectOrderIds = useMemo(() => {
-    const ids: string[] = [];
-    const projectIdSet = new Set(projects.map((p) => p.id));
-    for (const proj of projects) {
-      const projSessions = sessions.filter(
-        (s) => s.projectId === proj.id && !s.archived,
-      );
-      for (const s of sortSessionsForSidebar(projSessions)) ids.push(s.id);
-    }
-    const orphans = sessions.filter(
-      (s) =>
-        (!s.projectId || !projectIdSet.has(s.projectId)) && !s.archived,
-    );
-    for (const s of sortSessionsForSidebar(orphans)) ids.push(s.id);
-    return ids;
-  }, [projects, sessions]);
-  sidebarSelectOrderIdsRef.current = sidebarSelectOrderIds;
-
-  /** Active (non-archived) session ids visible in the sidebar tree. */
-  const selectableSessionIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const s of sessions) {
-      if (!s.archived) ids.add(s.id);
-    }
-    return ids;
-  }, [sessions]);
-  const selectableSessionCount = selectableSessionIds.size;
-
-  // Drop selection for sessions that left the active list.
-  useEffect(() => {
-    setSelectedSessionIds((prev) => pruneSelectedIds(prev, selectableSessionIds));
-    const anchor = sessionSelectAnchorIdRef.current;
-    if (anchor && !selectableSessionIds.has(anchor)) {
-      sessionSelectAnchorIdRef.current = null;
-    }
-  }, [selectableSessionIds]);
-
-  const exitSessionSelectMode = useCallback(() => {
-    setSessionSelectMode(false);
-    setSelectedSessionIds(new Set());
-    sessionSelectAnchorIdRef.current = null;
-  }, []);
-
-  /**
-   * Enter multi-select. `preselectId` seeds the selection so right-clicking a
-   * chat → "Select" starts with that chat ticked (and anchors Shift-range).
-   */
-  const enterSessionSelectMode = useCallback((preselectId?: string) => {
-    setSessionSelectMode(true);
-    setSelectedSessionIds(preselectId ? new Set([preselectId]) : new Set());
-    sessionSelectAnchorIdRef.current = preselectId ?? null;
-  }, []);
-
-  const toggleSessionSelected = useCallback(
-    (id: string, opts?: { shiftKey?: boolean }) => {
-      if (opts?.shiftKey) {
-        const anchor = sessionSelectAnchorIdRef.current;
-        if (anchor) {
-          const range = rangeIdsInclusive(
-            sidebarSelectOrderIdsRef.current,
-            anchor,
-            id,
-          );
-          if (range.length > 0) {
-            setSelectedSessionIds((prev) => addIdsToSet(prev, range));
-            return;
-          }
-        }
-        // No usable anchor — fall through to a normal select of the target.
-        setSelectedSessionIds((prev) => addIdsToSet(prev, [id]));
-        sessionSelectAnchorIdRef.current = id;
-        return;
-      }
-      setSelectedSessionIds((prev) => toggleIdInSet(prev, id));
-      sessionSelectAnchorIdRef.current = id;
-    },
-    [],
-  );
-
-  /** Project / “Other sessions” group: select all under the folder, or clear that group. */
-  const toggleSessionsSelected = useCallback((ids: readonly string[]) => {
-    if (ids.length === 0) return;
-    setSelectedSessionIds((prev) => {
-      const next = toggleIdsInSet(prev, ids);
-      // Keep Shift range coherent: after group select, anchor at the last id.
-      if (areAllIdsSelected(next, ids)) {
-        sessionSelectAnchorIdRef.current = ids[ids.length - 1] ?? null;
-      }
-      return next;
-    });
-  }, []);
-
   /** Archived chats grouped by project for Settings → Archived. */
   const archivedGroups = useMemo(() => {
     const archived = sessions
@@ -5169,55 +5059,6 @@ export function AppWorkbench() {
     }
     return groups;
   }, [sessions, projects, tr]);
-
-  const refreshSessions = async () => {
-    try {
-      const list = await api.sessionsList();
-      setSessions(list.map(mapSessionListRow));
-      setSessions(list.map((s) => mapSessionListRow(s)));
-      void api.trayRefresh();
-    } catch {
-      /* ignore */
-    }
-  };
-
-  /**
-   * Cross-device sessions-index sync (DESIGN §7.3 fanout).
-   *
-   * The host emits `sessions://changed` whenever a *mirror* client mutates the
-   * index (session.create / rename / autoTitle). Desktop mutations already
-   * refresh in-process, so this only adds the missing direction: a chat started
-   * on the phone shows up in the desktop window — and in any other phone — with
-   * no manual refresh. Coalesced so a burst reloads the list once.
-   */
-  const refreshSessionsRef = useRef(refreshSessions);
-  refreshSessionsRef.current = refreshSessions;
-  useEffect(() => {
-    if (!api.hasHost()) return;
-    let cancelled = false;
-    let timer: number | null = null;
-    let unlisten: (() => void) | undefined;
-    void (async () => {
-      const un = await api.listen<{ reason?: string; sessionId?: string }>(
-        "sessions://changed",
-        () => {
-          if (cancelled) return;
-          if (timer !== null) window.clearTimeout(timer);
-          timer = window.setTimeout(() => {
-            timer = null;
-            void refreshSessionsRef.current();
-          }, 150);
-        },
-      );
-      if (cancelled) un();
-      else unlisten = un;
-    })();
-    return () => {
-      cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
-      unlisten?.();
-    };
-  }, []);
 
   /**
    * Run a scheduled automation now: open chat under its project (or orphan),
