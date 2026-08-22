@@ -46,6 +46,7 @@
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。
 6. `files_ge_1000` 从 80 降到 <70，留出余量。**WP-W6 已落地（69）。**
 7. 复核 `src/lib` 中 99 个 <80 行模块，合并纯 pass-through。
+   **WP-W9 已落地（无可合并项）**：99 个 <80 行模块里，纯 re-export 只有有意保留的 barrel：`src/lib/api.ts`、`src/lib/session.ts`、`src/lib/remoteIm/index.ts`。其余是真实 helper，不是 pass-through。不合并。
 
 ## 验收标准
 

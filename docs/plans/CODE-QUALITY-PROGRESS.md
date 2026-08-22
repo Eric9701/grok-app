@@ -12,7 +12,7 @@
 | Spec | `docs/plans/2026-08-01-code-quality-remediation-GOAL.md` |
 | Started | `2026-08-01` |
 | Current wave | `workbench-decomp` |
-| Current WP | `WP-W8` |
+| Current WP | `WP-W9` |
 | **FINAL** | **PASS** (honest orchestration metrics; decreasing ceilings) |
 
 ## Wave checklist
@@ -54,6 +54,7 @@
 | WP-W6 | files_ge_1000 80→69 (CSS parts, session tests, stall history, IM schemas) | PASS | ef27ce91 | count 80→69; APP_* unchanged 22245/224/88 |
 | WP-W7 | Sidebar session tree JSX into WorkbenchSessionTree | PASS | b027f45f | 22245→21638 lines; useState 224; useEffect 88 |
 | WP-W8 | Left rail JSX into WorkbenchSidebar | PASS | b54dca82 | 21638→21326 lines; useState 224; useEffect 88 |
+| WP-W9 | Audit src/lib <80-line modules for pure pass-throughs | PASS | docs | 99 small modules; keep barrels `api.ts` / `session.ts` / `remoteIm/index.ts` |
 
 ## Metrics log (append-only)
 
@@ -99,7 +100,7 @@ Parallel non-overlapping tracks (multi-agent) — **landed**:
 | residual-resource-viewer | ResourceViewer + parts | **PASS** | 4938→modules |
 | residual-i18n | `src/i18n/**` | **PASS** | domain modules + barrels |
 | residual-settings | SettingsPage + settings/* | **PASS** | 8874→1817 |
-| residual-appworkbench | AppWorkbench + hooks | **ACTIVE** | WP-W8: sidebar rail JSX out; next openSession/newChat + more JSX + lib pass-throughs |
+| residual-appworkbench | AppWorkbench + hooks | **ACTIVE** | WP-W9: lib barrels kept; next openSession/newChat + remaining JSX |
 | residual-settings-catalog | settingsCatalog split | **PASS** | domain entries |
 
 Follow-on: `docs/plans/HANDOFF-appworkbench-decomposition.md` (worktree `D:/code/grok-app-appworkbench-decomp`, branch `refactor/appworkbench-decomposition`). Decreasing ceilings now **21500 / 229 useState / 93 useEffect**; `files_ge_1000` **≤69**. Collaborator skip pi. Five local worktrees are leftover SHAs; product changes already on `main`.
