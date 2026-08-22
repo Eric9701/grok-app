@@ -243,6 +243,7 @@ pub fn is_grokskin_path(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn ingest_opened_url(app: &AppHandle, url: &url::Url) {
     match url.scheme() {
         "file" => {
@@ -274,12 +275,9 @@ pub fn ingest_uri_string(app: &AppHandle, raw: &str) {
             set_pending_and_emit(app, PendingSkinImport::Url { href });
         }
         ParseResult::Official(id) => {
-            if crate::skin_net::official_configured() {
-                set_pending_and_emit(app, PendingSkinImport::Official { id });
-            }
             // empty official URL: do not invent pending; FE maps via take + official_unconfigured
-            else {
-                set_pending_and_emit(app, PendingSkinImport::Official { id });
+            if let Ok(pending) = resolve_official(&id) {
+                set_pending_and_emit(app, pending);
             }
         }
         ParseResult::Err(_) => {}
