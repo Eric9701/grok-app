@@ -30,13 +30,15 @@ describe("search panel scrollport", () => {
   });
 
   it("wires keyboard selection through useSearchPanelNav", () => {
-    const shell = readFileSync(join(ROOT, "app/AppWorkbench.tsx"), "utf8");
-    expect(shell).toContain("useSearchPanelNav");
-    expect(shell).toContain("flattenSearchPanelItems");
-    expect(shell).toContain("searchActiveIndex");
-    // The shell owns nav state; the palette renders it onto the combobox.
-    expect(shell).toMatch(/activeIndex=\{searchActiveIndex\}/);
-    expect(shell).toMatch(/itemCount=\{searchPaletteItems\.length\}/);
+    const hook = readFileSync(join(ROOT, "hooks/useSearchPalette.ts"), "utf8");
+    expect(hook).toContain("useSearchPanelNav");
+    expect(hook).toContain("flattenSearchPanelItems");
+    const overlays = readFileSync(
+      join(ROOT, "app/WorkbenchDomainOverlays.tsx"),
+      "utf8",
+    );
+    expect(overlays).toMatch(/activeIndex=\{p\.searchPalette\.activeIndex\}/);
+    expect(overlays).toMatch(/itemCount=\{p\.searchPalette\.items\.length\}/);
     const palette = readFileSync(join(ROOT, PALETTE), "utf8");
     expect(palette).toMatch(/role="combobox"/);
     expect(palette).toMatch(/aria-activedescendant=/);

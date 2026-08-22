@@ -88,7 +88,6 @@ import {
 } from "@/lib/layout";
 import { resolveWorkbenchPaneOverlay } from "@/lib/paneOverlay";
 import { isFakeMaximized } from "@/lib/windowChrome";
-import { paneSplitSizeStyle } from "@/lib/paneSplitMotion";
 import { usePaneSplitMotion } from "@/hooks/usePaneSplitMotion";
 import { useOpenPresence, VIEW_PRESENCE_MS } from "@/lib/openPresence";
 import { acquireNativeWebviewCover } from "@/lib/nativeWebviewCover";
@@ -218,7 +217,6 @@ import { queueComposerPreferenceApply } from "@/lib/composerPrefsBarrier";
 import {
   DEFAULT_SANDBOX_PROFILE,
   SANDBOX_PROFILES,
-  cliSupportsSandbox,
   isDangerousSandboxProfile,
   normalizeSandboxProfile,
   sandboxDangerConfirmKey,
@@ -809,11 +807,8 @@ import { SessionNoteModal } from "@/components/workbench-modals/SessionNoteModal
 import { SessionRulesModal } from "@/components/workbench-modals/SessionRulesModal";
 import { SessionMaxTurnsModal } from "@/components/workbench-modals/SessionMaxTurnsModal";
 import { SessionSysPromptModal } from "@/components/workbench-modals/SessionSysPromptModal";
-import { ExportMdModal } from "@/components/workbench-modals/ExportMdModal";
-import { ExportImageModal } from "@/components/workbench-modals/ExportImageModal";
 import { CompactModal } from "@/components/workbench-modals/CompactModal";
 import { AppDialogHost } from "@/components/workbench-modals/AppDialogHost";
-import { SearchPalette } from "@/components/workbench-modals/SearchPalette";
 import {
   mergeSessionChange,
   sessionChangesFromMessages,
@@ -837,10 +832,6 @@ const AutomationsPage = lazy(async () => {
   const m = await import("@/components/AutomationsPage");
   return { default: m.AutomationsPage };
 });
-const SideWorkbench = lazy(async () => {
-  const m = await import("@/components/side-workbench/SideWorkbench");
-  return { default: m.SideWorkbench };
-});
 const AgentDashboardModal = lazy(async () => {
   const m = await import("@/components/AgentDashboardModal");
   return { default: m.AgentDashboardModal };
@@ -861,10 +852,6 @@ const KanbanBoardPage = lazy(async () => {
   const m = await import("@/components/KanbanBoardPage");
   return { default: m.KanbanBoardPage };
 });
-const ReliabilityCenterModal = lazy(async () => {
-  const m = await import("@/components/ReliabilityCenterModal");
-  return { default: m.ReliabilityCenterModal };
-});
 const DoctorModal = lazy(async () => {
   const m = await import("@/components/DoctorModal");
   return { default: m.DoctorModal };
@@ -876,10 +863,6 @@ const VoiceOverlay = lazy(async () => {
 const ProductTutorial = lazy(async () => {
   const m = await import("@/components/ProductTutorial");
   return { default: m.ProductTutorial };
-});
-const SandboxWizard = lazy(async () => {
-  const m = await import("@/components/SandboxWizard");
-  return { default: m.SandboxWizard };
 });
 const McpStatusModal = lazy(async () => {
   const m = await import("@/components/McpStatusModal");
@@ -990,6 +973,8 @@ import { useSessionCatalog } from "@/hooks/useSessionCatalog";
 import { WorkbenchSessionTree } from "@/app/WorkbenchSessionTree";
 import { WorkbenchSidebar } from "@/app/WorkbenchSidebar";
 import { WorkbenchMain } from "@/app/WorkbenchMain";
+import { WorkbenchResourcesAside } from "@/app/WorkbenchResourcesAside";
+import { WorkbenchDomainOverlays } from "@/app/WorkbenchDomainOverlays";
 import { useSessionExportText } from "@/hooks/useSessionExportText";
 import { useSessionExportImage } from "@/hooks/useSessionExportImage";
 import {
@@ -18737,110 +18722,64 @@ export function AppWorkbench() {
           ) : null}
         </WorkbenchMain>
 
-        {/* RIGHT — session-linked project resource viewer (fully hideable + resizable) */}
-        <aside
-          className={
-            (layout.asideCollapsed ? "aside aside--hidden" : "aside") +
-            (resizingAside ? " is-resizing" : "") +
-            (phoneLayout ? " aside--phone-overlay" : "") +
-            (hideChatForSideExpand ? " aside--side-expanded" : "") +
-            (asideOverlay ? " aside--overlay" : "")
+        <WorkbenchResourcesAside
+          tr={tr}
+          locale={locale}
+          layout={layout}
+          phoneLayout={phoneLayout}
+          hideChatForSideExpand={hideChatForSideExpand}
+          asideOverlay={asideOverlay}
+          resizingAside={resizingAside}
+          asideOpenW={asideOpenW}
+          asidePaint={asidePaint}
+          beginAsideResize={beginAsideResize}
+          effectiveProjectPath={effectiveProjectPath}
+          projectName={
+            activeProject
+              ? projectDisplayName(activeProject, tr)
+              : tr("composer.noProject")
           }
-          aria-label={tr("a11y.resourcesPane")}
-          aria-hidden={layout.asideCollapsed}
-          style={
-            phoneLayout || hideChatForSideExpand
-              ? undefined
-              : asideOverlay
-                ? ({
-                    width: asideOpenW,
-                    minWidth: asideOpenW,
-                    maxWidth: asideOpenW,
-                    ["--aside-rail-min"]: `${asideOpenW}px`,
-                  } as CSSProperties)
-                : resizingAside
-                  ? ({
-                      ["--aside-rail-min"]: `${layout.asideWidth || DEFAULT_LAYOUT.asideWidth}px`,
-                    } as CSSProperties)
-                  : ({
-                      ...paneSplitSizeStyle(asidePaint, "x", false),
-                      ["--aside-rail-min"]: `${layout.asideWidth || DEFAULT_LAYOUT.asideWidth}px`,
-                    } as CSSProperties)
+          sideIsGitProject={sideIsGitProject}
+          sideWorkbench={sideWorkbench}
+          setSideWorkbench={setSideWorkbench}
+          sideDockComposer={sideDockComposer}
+          onToggleSideDockComposer={onToggleSideDockComposer}
+          sessionChanges={
+            sessionChangesById[session.sessionId || ""] ?? []
           }
-        >
-          {!layout.asideCollapsed && !hideChatForSideExpand && !asideOverlay && (
-            <div
-              className="aside-resizer"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize files pane"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                beginAsideResize(
-                  layout.asideWidth || DEFAULT_LAYOUT.asideWidth,
-                );
-              }}
-            />
-          )}
-          <div className="aside__inner">
-            <Suspense fallback={null}>
-              <SideWorkbench
-                locale={locale}
-                projectPath={effectiveProjectPath}
-                projectName={
-                  activeProject
-                    ? projectDisplayName(activeProject, tr)
-                    : tr("composer.noProject")
-                }
-                isGitProject={sideIsGitProject}
-                state={sideWorkbench}
-                onStateChange={setSideWorkbench}
-                dockComposer={sideDockComposer}
-                onToggleDockComposer={
-                  phoneLayout ? undefined : onToggleSideDockComposer
-                }
-                paneActive={!layout.asideCollapsed}
-                sessionChanges={
-                  sessionChangesById[session.sessionId || ""] ?? []
-                }
-                plan={plan}
-                planFocusKey={planFocusKey}
-                planChrome={{
-                  composerMode: mode,
-                  planEnabled,
-                  userClosed: plan.userClosed,
-                  hasHistory: planHistoryNonEmpty,
-                }}
-                onApprovePlan={() => void approvePlan()}
-                onRequestPlanChanges={() => openRequestPlanChanges()}
-                onDismissPlan={() => void dismissPlan()}
-                onOpenPlanHistory={() => setShowPlanHistory(true)}
-                openRequest={resourceOpenTarget}
-                onOpenRequestConsumed={() => setResourceOpenTarget(null)}
-                closeActiveRequest={closeActiveSideRequest}
-                onCloseActiveRequestConsumed={() =>
-                  setCloseActiveSideRequest(null)
-                }
-                onCloseSide={closeAsidePane}
-                onExpandedChange={(expanded) => {
-                  if (phoneLayout) return;
-                  if (!expanded) setSideDockComposer(false);
-                }}
-                skillInfos={skillInfos}
-                skillsLoading={skillsLoading}
-                skillsLoadError={skillsLoadError}
-                onSelectSkill={(skill) => {
-                  setDraft((d) => {
-                    const next = planInsertSkill(d, skill.name);
-                    requestComposerStoredCaret("end");
-                    return next;
-                  });
-                  window.setTimeout(() => requestComposerFocus(), 40);
-                }}
-/>
-            </Suspense>
-          </div>
-        </aside>
+          plan={plan}
+          planFocusKey={planFocusKey}
+          composerMode={mode}
+          planEnabled={planEnabled}
+          planUserClosed={plan.userClosed}
+          planHistoryNonEmpty={planHistoryNonEmpty}
+          onApprovePlan={() => void approvePlan()}
+          onRequestPlanChanges={() => openRequestPlanChanges()}
+          onDismissPlan={() => void dismissPlan()}
+          onOpenPlanHistory={() => setShowPlanHistory(true)}
+          resourceOpenTarget={resourceOpenTarget}
+          onOpenRequestConsumed={() => setResourceOpenTarget(null)}
+          closeActiveSideRequest={closeActiveSideRequest}
+          onCloseActiveRequestConsumed={() =>
+            setCloseActiveSideRequest(null)
+          }
+          onCloseSide={closeAsidePane}
+          onExpandedChange={(expanded) => {
+            if (phoneLayout) return;
+            if (!expanded) setSideDockComposer(false);
+          }}
+          skillInfos={skillInfos}
+          skillsLoading={skillsLoading}
+          skillsLoadError={skillsLoadError}
+          onSelectSkill={(skill) => {
+            setDraft((d) => {
+              const next = planInsertSkill(d, skill.name);
+              requestComposerStoredCaret("end");
+              return next;
+            });
+            window.setTimeout(() => requestComposerFocus(), 40);
+          }}
+        />
       </div>
       </>
       )}
@@ -19001,25 +18940,6 @@ export function AppWorkbench() {
       />
       </Suspense>
       ) : null}
-      {(showReliability) ? (
-      <Suspense fallback={null}>
-      <ReliabilityCenterModal
-        open={showReliability}
-        onClose={closeReliability}
-        locale={locale}
-        view={reliabilityView}
-        goalOrchUiEnabled={goalOrchUiEnabled}
-        goalOrchEvents={goalOrchEvents}
-        lastProcessLimit={lastProcessLimit}
-        existingSessionIds={sessions.map((s) => s.id)}
-        onOpenDoctor={() => void openDoctor()}
-        onSelectSession={(id) => {
-          closeReliability();
-          trayHandlersRef.current.openSessionById(id);
-        }}
-      />
-      </Suspense>
-      ) : null}
       {projectRulesTarget ? (
         <Suspense fallback={null}>
           <ProjectRulesModal
@@ -19151,23 +19071,6 @@ export function AppWorkbench() {
         onDone={() => {
           markProductTutorialDone();
           setShowProductTutorial(false);
-        }}
-      />
-      </Suspense>
-      ) : null}
-      {(sandboxWizardOpen) ? (
-      <Suspense fallback={null}>
-      <SandboxWizard
-        open={sandboxWizardOpen}
-        locale={locale}
-        mode={sandboxWizardMode}
-        platform={platform}
-        cliSupportsSandbox={cliSupportsSandbox(cliInfo.version)}
-        onClose={closeSandboxWizard}
-        onSkip={skipSandboxWizard}
-        onApply={(profile, opts) => {
-          finishSandboxWizardApply(opts);
-          applyGlobalSandboxProfile(profile);
         }}
       />
       </Suspense>
@@ -19775,46 +19678,62 @@ export function AppWorkbench() {
         }}
       />
 
-      <ExportMdModal
+      <WorkbenchDomainOverlays
         locale={locale}
-        open={!!exportMdTarget}
-        busy={exportMdBusy}
-        includeThoughts={exportMdIncludeThoughts}
-        includeTools={exportMdIncludeTools}
-        honesty={exportMdHonesty}
-        onClose={closeExportSessionMd}
-        onCopy={() => {
-          void runExportSessionMd("copy");
+        platform={platform}
+        cliVersion={cliInfo.version}
+        showReliability={showReliability}
+        closeReliability={closeReliability}
+        reliabilityView={reliabilityView}
+        goalOrchUiEnabled={goalOrchUiEnabled}
+        goalOrchEvents={goalOrchEvents}
+        lastProcessLimit={lastProcessLimit}
+        sessionIds={sessions.map((s) => s.id)}
+        onOpenDoctor={() => void openDoctor()}
+        onSelectReliabilitySession={(id) => {
+          closeReliability();
+          trayHandlersRef.current.openSessionById(id);
         }}
-        onDownload={() => {
-          void runExportSessionMd("download");
+        sandboxWizardOpen={sandboxWizardOpen}
+        sandboxWizardMode={sandboxWizardMode}
+        closeSandboxWizard={closeSandboxWizard}
+        skipSandboxWizard={skipSandboxWizard}
+        onApplySandbox={(profile, opts) => {
+          finishSandboxWizardApply(opts);
+          applyGlobalSandboxProfile(profile);
         }}
-        onIncludeThoughtsChange={setExportMdIncludeThoughts}
-        onIncludeToolsChange={setExportMdIncludeTools}
-      />
-
-      <ExportImageModal
-        locale={locale}
-        open={!!exportImageTarget}
-        busy={exportImageBusy}
-        canAct={exportImageCanAct}
-        skin={exportImageSkin}
-        smart={exportImageSmart}
-        previewPhase={exportImagePreviewPhase}
-        previewUrl={exportImagePreviewUrl}
-        optionsMatch={exportImageOptionsMatch}
-        previewError={exportImagePreviewError}
-        bytesLabel={exportImageBytesLabel}
-        metaParts={exportImageMetaParts}
-        onClose={closeExportSessionImage}
-        onCopy={() => {
-          void runExportSessionImage("copy");
+        exportMdOpen={!!exportMdTarget}
+        exportMdBusy={exportMdBusy}
+        exportMdIncludeThoughts={exportMdIncludeThoughts}
+        exportMdIncludeTools={exportMdIncludeTools}
+        exportMdHonesty={exportMdHonesty}
+        closeExportSessionMd={closeExportSessionMd}
+        runExportSessionMd={runExportSessionMd}
+        setExportMdIncludeThoughts={setExportMdIncludeThoughts}
+        setExportMdIncludeTools={setExportMdIncludeTools}
+        exportImageOpen={!!exportImageTarget}
+        exportImageBusy={exportImageBusy}
+        exportImageCanAct={exportImageCanAct}
+        exportImageSkin={exportImageSkin}
+        exportImageSmart={exportImageSmart}
+        exportImagePreviewPhase={exportImagePreviewPhase}
+        exportImagePreviewUrl={exportImagePreviewUrl}
+        exportImageOptionsMatch={exportImageOptionsMatch}
+        exportImagePreviewError={exportImagePreviewError}
+        exportImageBytesLabel={exportImageBytesLabel}
+        exportImageMetaParts={exportImageMetaParts}
+        closeExportSessionImage={closeExportSessionImage}
+        runExportSessionImage={runExportSessionImage}
+        applyExportImageSkin={applyExportImageSkin}
+        setExportImageSmart={setExportImageSmart}
+        searchPalette={searchPalette}
+        sessions={sessions}
+        projects={projects}
+        settingsShortcutHint={settingsShortcutHint}
+        onPickSearchSession={(row, proj) => {
+          searchPalette.closePalette();
+          void openSession(row, proj);
         }}
-        onDownload={() => {
-          void runExportSessionImage("download");
-        }}
-        onSkinChange={applyExportImageSkin}
-        onSmartChange={setExportImageSmart}
       />
 
       {showCompactModal && (
@@ -19881,42 +19800,6 @@ export function AppWorkbench() {
                 setLocalError(String(err));
               }
             })();
-          }}
-        />
-      )}
-
-      {/* Search / command palette (Codex-style) */}
-      {searchPalette.open && (
-        <SearchPalette
-          locale={locale}
-          panelRef={searchPalette.panelRef}
-          query={searchPalette.query}
-          mode={searchPalette.mode}
-          rankMode={searchPalette.rankMode}
-          includeArchived={searchPalette.includeArchived}
-          filtersActive={searchPalette.filtersActive}
-          activeIndex={searchPalette.activeIndex}
-          itemCount={searchPalette.items.length}
-          actions={searchPalette.actions}
-          projects={searchPalette.projects}
-          sessionHits={searchPalette.sessionHits}
-          sessions={sessions}
-          projectsCatalog={projects}
-          contentSearchLoading={searchPalette.contentLoading}
-          emptyState={searchPalette.emptyState}
-          settingsShortcutHint={settingsShortcutHint}
-          onClose={searchPalette.closePalette}
-          onQueryChange={searchPalette.setQuery}
-          onModeChange={searchPalette.applyMode}
-          onRankModeChange={searchPalette.applyRankMode}
-          onIncludeArchivedChange={searchPalette.applyIncludeArchived}
-          onClearFilters={searchPalette.clearFilters}
-          onActiveIndexChange={searchPalette.setActiveIndex}
-          onRunAction={searchPalette.runAction}
-          onPickProject={searchPalette.pickProject}
-          onPickSession={(row, proj) => {
-            searchPalette.closePalette();
-            void openSession(row, proj);
           }}
         />
       )}
