@@ -37,6 +37,7 @@
    **WP-W2 已落地**：`useSearchPalette` 自持开合/查询/筛选/journal 扫描/键盘导航。
    **WP-W3 已落地**：`useSessionExportText` + `useSessionExportImage` 自持导出弹层/文件格式/分享卡。
    **WP-W4 已落地**：`useSandboxWizard` + `useReliabilityCenter` 自持向导/可靠性中心开合与 ring。下一步 sessions。天花板 **22550 / 232 / 96**。
+   **WP-W5 已落地**：`useSessionCatalog` 自持列表、`sessions://changed` 刷新、侧栏多选。`openSession` / `newChat` 仍在 workbench。天花板 **22400 / 229 / 93**。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。
