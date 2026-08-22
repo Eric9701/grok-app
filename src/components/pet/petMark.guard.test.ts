@@ -15,4 +15,12 @@ describe("PetMark long-run paint", () => {
     expect(src).toContain("!restOnlyRef.current");
     expect(src).toContain("pet://cursor");
   });
+
+  it("mirrors the face from Host overlay position, not window.screenX", () => {
+    expect(src).toContain("petReadOverlayFrame");
+    expect(src).toContain("petShouldMirrorFromOverlay");
+    expect(src).toContain('scaleX(-1)');
+    expect(src).toContain("onMoved");
+    expect(src).toContain("draggingRef.current");
+  });
 });

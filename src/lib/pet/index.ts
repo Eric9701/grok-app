@@ -144,6 +144,13 @@ export {
 } from "./petMarkPaint";
 
 export {
+  petMarkScreenCenter,
+  petNormXOnWorkArea,
+  petShouldMirrorFace,
+  petShouldMirrorFromOverlay,
+} from "./petFaceMirror";
+
+export {
   PET_HOVER_LISTEN_MS,
   PET_REST_MOODS,
   isPetRestMood,
