@@ -856,10 +856,7 @@ pub fn pet_cursor_quant(dx: f64, dy: f64, local_r: f64) -> (i32, i32, i32) {
     )
 }
 
-pub fn pet_cursor_should_emit(
-    prev: Option<(i32, i32, i32)>,
-    next: (i32, i32, i32),
-) -> bool {
+pub fn pet_cursor_should_emit(prev: Option<(i32, i32, i32)>, next: (i32, i32, i32)) -> bool {
     prev != Some(next)
 }
 
