@@ -60,7 +60,7 @@
 | WP-W12 | Session journal hydrate pipeline (openSession still in workbench) | PASS | 1da3ac14 | 20903→20710 lines; useState 224; useEffect 88 |
 | WP-W13 | openSession into useSessionNavigation; newChat stays | PASS | 5364d0e6 | 20710→20451 lines; useState 224; useEffect 88→87 |
 | WP-W14 | newChat into useSessionNavigation (late-bind sendQueue/focus) | PASS | 933f1361 | 20451→20360 lines; useState 224; useEffect 87→86 |
-| WP-W15 | Chrome overlays (doctor→voice) into WorkbenchChromeOverlays | PASS | pending | 20360→20288 lines; useState 224; useEffect 86 |
+| WP-W15 | Chrome overlays (doctor→voice) into WorkbenchChromeOverlays | PASS | 127a8fa3 | 20360→20288 lines; useState 224; useEffect 86 |
 
 ## Metrics log (append-only)
 
