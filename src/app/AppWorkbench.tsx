@@ -208,7 +208,6 @@ import * as api from "@/lib/api";
 import { queueComposerPreferenceApply } from "@/lib/composerPrefsBarrier";
 import {
   DEFAULT_SANDBOX_PROFILE,
-  SANDBOX_PROFILES,
   isDangerousSandboxProfile,
   normalizeSandboxProfile,
   sandboxDangerConfirmKey,
@@ -217,7 +216,6 @@ import {
 } from "@/lib/sandboxProfile";
 import { shouldRestoreLastSession } from "@/lib/sessionRestore";
 import {
-  listArchiveAgeOptionPreviews,
   planArchiveOlderThan,
   type ArchiveAgePlan,
 } from "@/lib/sessionArchiveAge";
@@ -281,7 +279,6 @@ import {
   DEFAULT_MODEL_ID,
   GROK_BUILD_EFFORTS,
   GROK_BUILD_MODELS,
-  PERMISSION_POLICIES,
   findModel,
   effortCatalogForRoute,
   effortOptionsFromProvider,
@@ -312,13 +309,7 @@ import {
   resolveContinueCwdSoftFail,
   type ContinueCwdSoftFailKind,
 } from "@/lib/continueCwd";
-import {
-  isSessionExportJournalEmpty,
-  joinSessionExportMenuSuffix,
-  resolveSessionExportPath,
-  sessionExportFormatNameKey,
-  sessionExportMenuSuffixKeys,
-} from "@/lib/sessionExportPro";
+
 import {
   clearPlanHistory,
   loadPlanHistory,
@@ -603,9 +594,7 @@ import {
 } from "@/lib/sessionResumeRestore";
 import { isProjectPathMissing } from "@/lib/projectPath";
 import {
-  PROJECT_COLOR_TOKENS,
   normalizeProjectColor,
-  resolveProjectColorCss,
   type ProjectColorToken,
 } from "@/lib/projectColor";
 import { appendPluginDir } from "@/lib/sessionPluginDirs";
@@ -640,48 +629,12 @@ import {
 } from "@/components/ComposerPlusPanel";
 import { planInsertSkill } from "@/lib/skillsTaskPicker";
 import {
-  IconChevronDown,
-  IconChevronUp,
   IconPlus,
-  IconQueue,
-  IconFolder,
-  IconFolderPlus,
-  IconArrowsMinimize,
-  IconChat,
   IconClipboardList,
-  IconArchive,
-  IconListCheck,
-  IconPin,
-  IconPinOff,
-  IconBell,
-  IconBellOff,
-  IconNotes,
-  IconRename,
-  IconCopy,
-  IconExportImage,
-  IconFiles,
-  IconTrash,
-  IconExternalLink,
-  IconFork,
-  IconRewind,
-  IconHistory,
-  IconShield,
-  IconCheck,
-  IconCircle,
-  IconList,
-  IconListNumbers,
-  IconRobot,
-  IconPlan,
-  IconGitBranch,
-  IconUpload,
-  IconFileText,
-  IconSettings,
-  IconAppearance,
-  IconPuzzle,
 } from "@/components/icons";
 import { PhoneAccountSheet } from "@/components/PhoneAccountSheet";
 import { PhoneComposerToolsSheet } from "@/components/PhoneComposerToolsSheet";
-import { ContextMenu, type ContextMenuItem } from "@/components/ContextMenu";
+import { type ContextMenuItem } from "@/components/ContextMenu";
 import {
   aiCreateSeedPrompt,
   computeNextRunAt,
@@ -766,7 +719,7 @@ const BottomTerminal = lazy(async () => {
   const m = await import("@/components/bottom-terminal/BottomTerminal");
   return { default: m.BottomTerminal };
 });
-import { dispatchCollapseAllActivity } from "@/lib/collapseAllActivity";
+
 import {
   installDialogFocus,
   isTypingTarget,
@@ -822,7 +775,6 @@ import {
   type SessionRow,
 } from "@/lib/app/sidebarModels";
 import {
-  canMoveProjectInPinGroup,
   moveProjectInPinGroup,
 } from "@/lib/app/projectOrder";
 import { useSidebarProjectReorder } from "@/hooks/useSidebarProjectReorder";
@@ -834,7 +786,6 @@ import { useProjectSpaces } from "@/hooks/useProjectSpaces";
 import {
   findSpace,
   spaceDisplayName,
-  spaceOfProject,
   type CreateSpaceError,
   type DeleteSpaceError,
   type SpaceNameError,
@@ -866,6 +817,7 @@ import { WorkbenchDomainOverlays } from "@/app/WorkbenchDomainOverlays";
 import { WorkbenchSessionModals } from "@/app/WorkbenchSessionModals";
 import { WorkbenchChromeOverlays } from "@/app/WorkbenchChromeOverlays";
 import { WorkbenchComposerColumn } from "@/app/WorkbenchComposerColumn";
+import { WorkbenchFloatingMenus } from "@/app/WorkbenchFloatingMenus";
 import { useSessionExportText } from "@/hooks/useSessionExportText";
 import { useSessionExportImage } from "@/hooks/useSessionExportImage";
 import {
@@ -17874,1010 +17826,95 @@ export function AppWorkbench() {
           }}
         />
       ) : null}
-
-      {/* Floating context menu (project / session) — unified ContextMenu */}
-      {(() => {
-        let items: ContextMenuItem[] = [];
-        if (ctxMenu?.kind === "archive-older") {
-          const agePreviews = listArchiveAgeOptionPreviews(sessions);
-          items = agePreviews.map(({ days, count }) => ({
-            id: `archive-older-${days}`,
-            label:
-              count > 0
-                ? tr("sidebar.archiveOlderDaysCount", {
-                    days: String(days),
-                    n: String(count),
-                  })
-                : tr("sidebar.archiveOlderDays", { days: String(days) }),
-            icon: <IconArchive size={16} />,
-            // Keep rows clickable when empty so empty-honesty toast can fire.
-            disabled: false,
-            onClick: () => {
-              confirmArchiveOlderThan(days);
-            },
-          }));
-        } else if (ctxMenu?.kind === "project") {
-          const proj = projects.find((p) => p.id === ctxMenu.id);
-          if (proj) {
-            const canUp = canMoveProjectInPinGroup(visibleProjects, proj.id, "up");
-            const canDown = canMoveProjectInPinGroup(
-              visibleProjects,
-              proj.id,
-              "down",
-            );
-            items = [
-              {
-                id: "pin",
-                label: proj.pinned
-                  ? tr("project.unpin")
-                  : tr("project.pin"),
-                icon: proj.pinned ? (
-                  <IconPinOff size={16} />
-                ) : (
-                  <IconPin size={16} />
-                ),
-                onClick: () => {
-                  void api
-                    .projectSetPinned(proj.id, !proj.pinned)
-                    .then(() => refreshProjects());
-                },
-              },
-              ...(projectReorder.enabled
-                ? [
-                    {
-                      id: "move-up",
-                      label: tr("project.moveUp"),
-                      icon: <IconChevronUp size={16} />,
-                      disabled: !canUp,
-                      onClick: () => moveProjectByMenu(proj.id, "up"),
-                    } satisfies ContextMenuItem,
-                    {
-                      id: "move-down",
-                      label: tr("project.moveDown"),
-                      icon: <IconChevronDown size={16} />,
-                      disabled: !canDown,
-                      onClick: () => moveProjectByMenu(proj.id, "down"),
-                    } satisfies ContextMenuItem,
-                  ]
-                : []),
-              {
-                id: "color",
-                label: tr("project.color"),
-                icon: (() => {
-                  const css = resolveProjectColorCss(proj.color);
-                  return css ? (
-                    <span
-                      className="project-color-swatch"
-                      style={{ background: css }}
-                      aria-hidden
-                    />
-                  ) : (
-                    <IconAppearance size={16} />
-                  );
-                })(),
-                onClick: () => {
-                  setCtxMenu({
-                    kind: "project-color",
-                    id: proj.id,
-                    x: ctxMenu.x,
-                    y: ctxMenu.y,
-                  });
-                },
-              },
-              {
-                id: "move-space",
-                label: tr("sidebar.spaces.moveTo"),
-                icon: <IconQueue size={16} />,
-                children: [
-                  ...projectSpaces.state.spaces.map((space) => {
-                    const current =
-                      spaceOfProject(projectSpaces.state, proj.id) ===
-                      space.id;
-                    return {
-                      id: `move-space-${space.id}`,
-                      label: spaceDisplayName(
-                        space,
-                        tr("sidebar.spaces.default"),
-                      ),
-                      icon: current ? <IconCheck size={16} /> : undefined,
-                      onClick: () => {
-                        if (current) return;
-                        projectSpaces.moveProject(proj.id, space.id);
-                        showToast(
-                          tr("sidebar.spaces.moved", {
-                            name: projectDisplayName(proj, tr),
-                            space: spaceDisplayName(
-                              space,
-                              tr("sidebar.spaces.default"),
-                            ),
-                          }),
-                          2400,
-                        );
-                      },
-                    } satisfies ContextMenuItem;
-                  }),
-                  { id: "move-space-sep", separator: true },
-                  {
-                    id: "move-space-new",
-                    label: tr("sidebar.spaces.new"),
-                    icon: <IconPlus size={16} />,
-                    onClick: () => {
-                      setAppDialog({
-                        kind: "prompt",
-                        title: tr("sidebar.spaces.newTitle"),
-                        initial: "",
-                        placeholder: tr("sidebar.spaces.namePlaceholder"),
-                        onSubmit: (value) => {
-                          const result = projectSpaces.createAndMove(
-                            proj.id,
-                            value,
-                          );
-                          if (!result.ok) {
-                            return tr(spaceErrorKey(result.error));
-                          }
-                          showToast(
-                            tr("sidebar.spaces.moved", {
-                              name: projectDisplayName(proj, tr),
-                              space: value.trim(),
-                            }),
-                            2400,
-                          );
-                        },
-                      });
-                    },
-                  },
-                ],
-              },
-              {
-                id: "reveal",
-                label: revealInOsLabel(tr, platform),
-                icon: <IconExternalLink size={16} />,
-                onClick: () => {
-                  void api
-                    .projectReveal(proj.id)
-                    .catch((e) => setLocalError(String(e)));
-                },
-              },
-              ...(isGeneralProject(proj)
-                ? []
-                : [
-                    {
-                      id: "relocate",
-                      label: tr("project.relocate"),
-                      icon: <IconFolderPlus size={16} />,
-                      onClick: () => {
-                        void relocateProject(proj);
-                      },
-                    } satisfies ContextMenuItem,
-                    {
-                      id: "rename",
-                      label: tr("project.rename"),
-                      icon: <IconRename size={16} />,
-                      onClick: () => renameProject(proj),
-                    } satisfies ContextMenuItem,
-                  ]),
-              {
-                id: "rules",
-                label: tr("project.rules"),
-                icon: <IconFileText size={16} />,
-                onClick: () => {
-                  setProjectRulesTarget({
-                    path: proj.path,
-                    name: projectDisplayName(proj, tr),
-                  });
-                },
-              },
-              ...(canOfferContinueCwd(proj.path)
-                ? [
-                    {
-                      id: "continue-cwd",
-                      label: tr("project.continueCwd"),
-                      icon: <IconHistory size={16} />,
-                      onClick: () => {
-                        void continueLastAgentForProject(proj);
-                      },
-                    } satisfies ContextMenuItem,
-                  ]
-                : []),
-              ...(proj.trusted
-                ? [
-                    {
-                      id: "permission",
-                      label: tr("project.permission"),
-                      icon: <IconShield size={16} />,
-                      onClick: () => {
-                        setCtxMenu({
-                          kind: "project-policy",
-                          id: proj.id,
-                          x: ctxMenu.x,
-                          y: ctxMenu.y,
-                        });
-                      },
-                    } satisfies ContextMenuItem,
-                    {
-                      id: "sandbox",
-                      label: tr("project.sandbox"),
-                      icon: <IconShield size={16} />,
-                      onClick: () => {
-                        setCtxMenu({
-                          kind: "project-sandbox",
-                          id: proj.id,
-                          x: ctxMenu.x,
-                          y: ctxMenu.y,
-                        });
-                      },
-                    } satisfies ContextMenuItem,
-                  ]
-                : []),
-              {
-                id: "archive-chats",
-                label: tr("project.archiveChats"),
-                icon: <IconArchive size={16} />,
-                onClick: () => {
-                  void archiveProjectSessions(proj);
-                },
-              },
-              ...(isGeneralProject(proj)
-                ? []
-                : [
-                    {
-                      id: "remove",
-                      label: tr("project.remove"),
-                      icon: <IconTrash size={16} />,
-                      danger: true,
-                      onClick: () => removeProjectFromApp(proj),
-                    } satisfies ContextMenuItem,
-                  ]),
-            ];
-          }
-        } else if (ctxMenu?.kind === "project-policy") {
-          const proj = projects.find((p) => p.id === ctxMenu.id);
-          if (proj && proj.trusted) {
-            const current = proj.permissionPolicy?.trim() || null;
-            const policyLabel = (id: PermissionPolicyId) =>
-              tr(
-                (
-                  {
-                    ask: "policy.ask",
-                    accept_edits: "policy.accept_edits",
-                    allow_for_session: "policy.allow_for_session",
-                    auto: "policy.auto",
-                    dont_ask: "policy.dont_ask",
-                    always_approve: "policy.always_approve",
-                  } as const
-                )[id],
-              );
-            items = [
-              {
-                id: "inherit",
-                label: tr("project.permissionInherit"),
-                icon: !current ? <IconCheck size={16} /> : undefined,
-                onClick: () => applyProjectPermissionPolicy(proj, null),
-              },
-              ...PERMISSION_POLICIES.map(
-                (p) =>
-                  ({
-                    id: `policy-${p.id}`,
-                    label: policyLabel(p.id),
-                    icon:
-                      current === p.id ? <IconCheck size={16} /> : undefined,
-                    danger: !!p.dangerous,
-                    onClick: () => applyProjectPermissionPolicy(proj, p.id),
-                  }) satisfies ContextMenuItem,
-              ),
-            ];
-          }
-        } else if (ctxMenu?.kind === "project-sandbox") {
-          const proj = projects.find((p) => p.id === ctxMenu.id);
-          if (proj && proj.trusted) {
-            const current =
-              normalizeSandboxProfile(proj.sandboxProfile) ?? null;
-            items = [
-              {
-                id: "sandbox-inherit",
-                label: tr("project.sandboxInherit"),
-                icon: !current ? <IconCheck size={16} /> : undefined,
-                onClick: () => applyProjectSandboxProfile(proj, null),
-              },
-              ...SANDBOX_PROFILES.map(
-                (id) =>
-                  ({
-                    id: `sandbox-${id}`,
-                    label: sandboxProfileLabel(id),
-                    icon: current === id ? <IconCheck size={16} /> : undefined,
-                    danger: isDangerousSandboxProfile(id),
-                    onClick: () => applyProjectSandboxProfile(proj, id),
-                  }) satisfies ContextMenuItem,
-              ),
-              {
-                id: "sandbox-open-guide",
-                label: tr("settings.sandbox.openGuide"),
-                onClick: () => openSandboxWizardGuide(),
-              },
-            ];
-          }
-        } else if (ctxMenu?.kind === "project-color") {
-          const proj = projects.find((p) => p.id === ctxMenu.id);
-          if (proj) {
-            const current = normalizeProjectColor(proj.color);
-            items = [
-              {
-                id: "color-none",
-                label: tr("project.colorNone"),
-                icon: !current ? <IconCheck size={16} /> : undefined,
-                onClick: () => applyProjectColor(proj, null),
-              },
-              ...PROJECT_COLOR_TOKENS.map(
-                (tok) =>
-                  ({
-                    id: `color-${tok}`,
-                    label: projectColorLabel(tok),
-                    icon:
-                      current === tok ? (
-                        <IconCheck size={16} />
-                      ) : (
-                        <span
-                          className="project-color-swatch"
-                          style={{
-                            background: resolveProjectColorCss(tok) ?? undefined,
-                          }}
-                          aria-hidden
-                        />
-                      ),
-                    onClick: () => applyProjectColor(proj, tok),
-                  }) satisfies ContextMenuItem,
-              ),
-            ];
-          }
-        } else if (ctxMenu?.kind === "session-move") {
-          items = bulkMoveMenuItems(ctxMenu.ids);
-        } else if (ctxMenu?.kind === "session") {
-          const s = sessions.find((x) => x.id === ctxMenu.id);
-          if (s) {
-            const isOpen =
-              session.sessionId === s.id ||
-              viewingSessionIdRef.current === s.id;
-            const wtBadge = sessionWorktreeBadgeFor(s);
-            const sessionMuted = mutedSessionIds.has(s.id);
-            const sessionUnread = unreadSessionIds.has(s.id);
-            const canPopOut = canOpenSessionInNewWindow({
-              isDesktopHost: api.isDesktopHost(),
-              isSecondaryWindow,
-              sessionId: s.id,
-            });
-
-            const settingsChildren: ContextMenuItem[] = [
-              {
-                id: "session-note",
-                label: tr("session.note"),
-                icon: <IconNotes size={16} />,
-                onClick: () => openSessionNote(s),
-              },
-              {
-                id: "session-rules",
-                label: tr("session.rules"),
-                icon: <IconList size={16} />,
-                onClick: () => openSessionRules(s),
-              },
-              {
-                id: "session-sys-prompt",
-                label: sanitizeSystemPromptOverride(s.systemPromptOverride)
-                  ? tr("session.sysPromptActive")
-                  : tr("session.sysPrompt"),
-                icon: <IconRobot size={16} />,
-                onClick: () => openSessionSysPrompt(s),
-              },
-              {
-                id: "session-max-turns",
-                label:
-                  normalizeMaxAgentTurns(s.maxAgentTurns) != null
-                    ? tr("session.maxTurnsCount", {
-                        n: String(normalizeMaxAgentTurns(s.maxAgentTurns)),
-                      })
-                    : tr("session.maxTurns"),
-                icon: <IconListNumbers size={16} />,
-                onClick: () => openSessionMaxTurns(s),
-              },
-              {
-                id: "session-plugin-add",
-                label:
-                  (s.pluginDirs?.length ?? 0) > 0
-                    ? tr("session.pluginDirsAddCount", {
-                        n: String(s.pluginDirs!.length),
-                      })
-                    : tr("session.pluginDirsAdd"),
-                icon: <IconPuzzle size={16} />,
-                onClick: () => {
-                  void addSessionPluginDir(s);
-                },
-              },
-              ...((s.pluginDirs?.length ?? 0) > 0
-                ? [
-                    {
-                      id: "session-plugin-clear",
-                      label: tr("session.pluginDirsClear"),
-                      icon: <IconPuzzle size={16} />,
-                      onClick: () => {
-                        void clearSessionPluginDirs(s);
-                      },
-                    } satisfies ContextMenuItem,
-                  ]
-                : []),
-            ];
-
-            const conversationChildren: ContextMenuItem[] = [
-              {
-                id: "rewind",
-                label: tr("session.rewind"),
-                icon: <IconRewind size={16} />,
-                disabled: !isOpen || !canRewindSession,
-                onClick: () => {
-                  void openRewindTimeline(s.id);
-                },
-              },
-              {
-                id: "collapse-all-activity",
-                label: tr("session.collapseAllActivity"),
-                icon: <IconArrowsMinimize size={16} />,
-                disabled: !isOpen,
-                onClick: () => {
-                  dispatchCollapseAllActivity();
-                },
-              },
-              {
-                id: "transcript-filter",
-                label:
-                  transcriptFilter === "conversation"
-                    ? tr("session.transcriptFilter.showTools")
-                    : tr("session.transcriptFilter.hideTools"),
-                icon: <IconChat size={16} />,
-                disabled: !isOpen,
-                onClick: () => {
-                  toggleTranscriptFilter();
-                },
-              },
-              {
-                id: "plan-history",
-                label: tr("plan.history"),
-                icon: <IconPlan size={16} />,
-                onClick: () => {
-                  setShowPlanHistory(true);
-                },
-              },
-            ];
-
-            const copyChildren: ContextMenuItem[] = [
-              {
-                id: "copy-md",
-                label: tr("session.copyMd"),
-                icon: <IconCopy size={16} />,
-                onClick: () => {
-                  void copyConversationMarkdown({
-                    id: s.id,
-                    title: s.title,
-                    projectId: s.projectId,
-                  });
-                },
-              },
-              {
-                id: "copy-id",
-                label: tr("session.copyId"),
-                icon: <IconCopy size={16} />,
-                onClick: () => {
-                  void copySessionId(s);
-                },
-              },
-              ...(wtBadge
-                ? [
-                    {
-                      id: "wt-copy-path",
-                      label: tr("session.worktreeCopyPath"),
-                      icon: <IconCopy size={16} />,
-                      onClick: () => {
-                        void (async () => {
-                          try {
-                            await navigator.clipboard.writeText(wtBadge.path);
-                          } catch {
-                            setLocalError(wtBadge.path);
-                          }
-                        })();
-                      },
-                    } satisfies ContextMenuItem,
-                  ]
-                : []),
-            ];
-
-            // Soft-empty honesty for the live session only (other sessions load on demand).
-            const liveExportable =
-              s.id === session.sessionId
-                ? messages.map((m) => ({
-                    role: m.role,
-                    content: m.content,
-                    thought: m.thought,
-                    createdAt: m.createdAt,
-                    marker: m.marker,
-                  }))
-                : null;
-            const liveJournalEmptyMd =
-              liveExportable != null
-                ? isSessionExportJournalEmpty(liveExportable, {
-                    format: "markdown",
-                  })
-                : null;
-            const liveJournalEmptyJson =
-              liveExportable != null
-                ? isSessionExportJournalEmpty(liveExportable, {
-                    format: "json",
-                  })
-                : null;
-            const liveJournalEmptyPlain =
-              liveExportable != null
-                ? isSessionExportJournalEmpty(liveExportable, {
-                    format: "plain",
-                  })
-                : null;
-            const liveJournalEmptyHtml =
-              liveExportable != null
-                ? isSessionExportJournalEmpty(liveExportable, {
-                    format: "html",
-                  })
-                : null;
-            const menuAgentLinked = (() => {
-              if (s.id === session.sessionId) {
-                const live = (session.agentSessionId || "").trim();
-                if (live) return live;
-              }
-              return (s.agentSessionId || "").trim() || null;
-            })();
-            const pathSuffix = (
-              format: "markdown" | "plain" | "json" | "html",
-              empty: boolean | null,
-            ) => {
-              const path = resolveSessionExportPath({
-                format,
-                mode: "download",
-                hasAgentSession: menuAgentLinked,
-                cliHostAvailable: api.isTauri(),
-              });
-              const keys = sessionExportMenuSuffixKeys({
-                journalEmpty: empty,
-                path,
-              });
-              return joinSessionExportMenuSuffix(
-                keys.map((k) => tr(k as Parameters<typeof tr>[0])),
-              );
-            };
-            // Clearer format labels: short name + extension + path badges.
-            const formatMenuLabel = (
-              format: "markdown" | "plain" | "json" | "html",
-              empty: boolean | null,
-            ) => {
-              const name = tr(
-                sessionExportFormatNameKey(format) as Parameters<typeof tr>[0],
-              );
-              const ext =
-                format === "markdown"
-                  ? ".md"
-                  : format === "plain"
-                    ? ".txt"
-                    : format === "json"
-                      ? ".json"
-                      : ".html";
-              return `${name} (${ext})${pathSuffix(format, empty)}`;
-            };
-
-            const exportChildren: ContextMenuItem[] = [
-              {
-                id: "export-image",
-                label: tr("session.exportImage"),
-                icon: <IconExportImage size={16} />,
-                onClick: () => {
-                  openExportSessionImage({
-                    id: s.id,
-                    title: s.title,
-                    projectId: s.projectId,
-                  });
-                },
-              },
-              {
-                id: "export-md",
-                label: formatMenuLabel("markdown", liveJournalEmptyMd),
-                icon: <IconCopy size={16} />,
-                disabled: liveJournalEmptyMd === true,
-                onClick: () => {
-                  if (liveJournalEmptyMd === true) {
-                    showToast(tr("session.exportEmpty"));
-                    return;
-                  }
-                  openExportSessionMd({
-                    id: s.id,
-                    title: s.title,
-                    projectId: s.projectId,
-                  });
-                },
-              },
-              {
-                id: "export-plain",
-                label: formatMenuLabel("plain", liveJournalEmptyPlain),
-                icon: <IconCopy size={16} />,
-                disabled: liveJournalEmptyPlain === true,
-                onClick: () => {
-                  void exportSessionPlain({
-                    id: s.id,
-                    title: s.title,
-                    projectId: s.projectId,
-                  });
-                },
-              },
-              {
-                id: "export-json",
-                label: formatMenuLabel("json", liveJournalEmptyJson),
-                icon: <IconCopy size={16} />,
-                disabled: liveJournalEmptyJson === true,
-                onClick: () => {
-                  void exportSessionJson({
-                    id: s.id,
-                    title: s.title,
-                    projectId: s.projectId,
-                  });
-                },
-              },
-              {
-                id: "export-html",
-                label: formatMenuLabel("html", liveJournalEmptyHtml),
-                icon: <IconCopy size={16} />,
-                disabled: liveJournalEmptyHtml === true,
-                onClick: () => {
-                  void exportSessionHtml({
-                    id: s.id,
-                    title: s.title,
-                    projectId: s.projectId,
-                  });
-                },
-              },
-              {
-                id: "export-stream-json",
-                label: tr("session.exportStreamJson"),
-                icon: <IconCopy size={16} />,
-                onClick: () => {
-                  void exportSessionStreamNdjson("streaming-json", {
-                    id: s.id,
-                    title: s.title,
-                    projectId: s.projectId,
-                  });
-                },
-              },
-              {
-                id: "export-stream-messages-json",
-                label: tr("session.exportStreamMessagesJson"),
-                icon: <IconCopy size={16} />,
-                onClick: () => {
-                  void exportSessionStreamNdjson("streaming-messages-json", {
-                    id: s.id,
-                    title: s.title,
-                    projectId: s.projectId,
-                  });
-                },
-              },
-              {
-                id: "export-trace-local",
-                label: tr("session.exportTraceLocal"),
-                icon: <IconArchive size={16} />,
-                onClick: () => {
-                  void exportSessionTrace(s.id, { localOnly: true });
-                },
-              },
-              {
-                id: "export-trace-upload",
-                label: tr("session.exportTraceUpload"),
-                icon: <IconArchive size={16} />,
-                onClick: () => {
-                  confirmExportSessionTraceUpload(s.id);
-                },
-              },
-              {
-                id: "export-bundle",
-                label: tr("session.exportBundle"),
-                icon: <IconCopy size={16} />,
-                onClick: () => {
-                  void exportSessionDiagnostic(s.id);
-                },
-              },
-              {
-                id: "traces",
-                label: tr("session.traces"),
-                icon: <IconFolder size={16} />,
-                onClick: () => {
-                  setShowTraces(true);
-                },
-              },
-            ];
-
-            const worktreeChildren: ContextMenuItem[] = wtBadge
-              ? [
-                  {
-                    id: "wt-reveal",
-                    label: tr("session.worktreeReveal"),
-                    icon: <IconExternalLink size={16} />,
-                    onClick: () => {
-                      void (async () => {
-                        try {
-                          await api.fsOpenPath(wtBadge.path);
-                        } catch (e) {
-                          showToast(String(e), 4000);
-                        }
-                      })();
-                    },
-                  },
-                  {
-                    id: "wt-copy-path-sub",
-                    label: tr("session.worktreeCopyPath"),
-                    icon: <IconCopy size={16} />,
-                    onClick: () => {
-                      void (async () => {
-                        try {
-                          await navigator.clipboard.writeText(wtBadge.path);
-                        } catch {
-                          setLocalError(wtBadge.path);
-                        }
-                      })();
-                    },
-                  },
-                  {
-                    id: "wt-ship",
-                    label: tr("composer.worktreeShip"),
-                    icon: <IconUpload size={16} />,
-                    onClick: () => {
-                      openShipFlow();
-                    },
-                  },
-                  {
-                    id: "wt-remove",
-                    label: tr("composer.worktreeRemove"),
-                    icon: <IconTrash size={16} />,
-                    danger: true,
-                    onClick: () => {
-                      const fromList =
-                        gitWorktrees.find((w) =>
-                          pathsEqual(w.path, wtBadge.path),
-                        ) ?? null;
-                      const wt: api.GitWorktreeEntry = fromList ?? {
-                        path: wtBadge.path,
-                        branch: wtBadge.branch,
-                        detached: !wtBadge.branch,
-                        isMain: false,
-                        locked: false,
-                        prunable: false,
-                      };
-                      if (!canRemoveWorktree(wt) && fromList?.isMain) {
-                        showToast(tr("composer.worktreeRemoveFailed"), 3500);
-                        return;
-                      }
-                      confirmRemoveWorktree({ ...wt, isMain: false });
-                    },
-                  },
-                ]
-              : [];
-
-            const resumeRestoreItem = (() => {
-              const proj = s.projectId
-                ? projects.find((p) => p.id === s.projectId) ?? null
-                : null;
-              const path = proj?.path?.trim() || "";
-              const gitKnown =
-                activeProject &&
-                path &&
-                pathsEqual(activeProject.path, path)
-                  ? gitWorktreesAvailable
-                  : null;
-              if (
-                !canOfferResumeWithCodeRestore(path, {
-                  gitAvailable: gitKnown,
-                })
-              ) {
-                return null;
-              }
-              return {
-                id: "resume-restore",
-                label: tr("session.resumeRestore"),
-                icon: <IconGitBranch size={16} />,
-                disabled:
-                  resumeRestoreBusy ||
-                  forkBusy ||
-                  busyIds.has(s.id) ||
-                  (isOpen && !canRewindSession),
-                onClick: () => confirmResumeWithCodeRestore(s),
-              } satisfies ContextMenuItem;
-            })();
-
-            items = [
-              {
-                id: "attach-chat",
-                label: tr("chat.selectionAddToInput"),
-                icon: <IconChat size={16} />,
-                disabled: s.id === session.sessionId,
-                onClick: () => {
-                  applyAttachedChat(s.id, s.title, s.updatedAt);
-                },
-              },
-              ...(sessionSelectMode
-                ? []
-                : [
-                    {
-                      // Primary discovery path for bulk archive/delete: the
-                      // group header icon alone was too easy to miss.
-                      id: "select",
-                      label: tr("sidebar.select"),
-                      icon: <IconListCheck size={16} />,
-                      onClick: () => enterSessionSelectMode(s.id),
-                    } satisfies ContextMenuItem,
-                  ]),
-              {
-                id: "pin",
-                label: s.pinned ? tr("session.unpin") : tr("session.pin"),
-                icon: s.pinned ? (
-                  <IconPinOff size={16} />
-                ) : (
-                  <IconPin size={16} />
-                ),
-                onClick: () => {
-                  void pinSession(s, !s.pinned);
-                },
-              },
-              ...moveMenuItemsFor(s),
-              ...(canPopOut
-                ? [
-                    {
-                      id: "open-new-window",
-                      label: tr("session.openInNewWindow"),
-                      icon: <IconExternalLink size={16} />,
-                      onClick: () => openSessionInNewWindow(s),
-                    } satisfies ContextMenuItem,
-                  ]
-                : []),
-              {
-                id: "mute",
-                label: sessionMuted
-                  ? tr("session.unmute")
-                  : tr("session.mute"),
-                icon: sessionMuted ? (
-                  <IconBell size={16} />
-                ) : (
-                  <IconBellOff size={16} />
-                ),
-                onClick: () => handleToggleSessionMute(s.id),
-              },
-              {
-                id: sessionUnread ? "clear-unread" : "mark-unread",
-                label: sessionUnread
-                  ? tr("session.clearUnread")
-                  : tr("session.markUnread"),
-                icon: sessionUnread ? (
-                  <IconCheck size={16} />
-                ) : (
-                  <IconCircle size={16} />
-                ),
-                onClick: () => {
-                  if (sessionUnread) handleClearSessionUnread(s.id);
-                  else handleMarkSessionUnread(s.id);
-                },
-              },
-              ...(unreadSessionIds.size > 0
-                ? [
-                    {
-                      id: "clear-all-unread",
-                      label: tr("session.clearAllUnread"),
-                      icon: <IconCheck size={16} />,
-                      onClick: () => handleClearAllSessionUnread(),
-                    } satisfies ContextMenuItem,
-                  ]
-                : []),
-              {
-                id: "rename",
-                label: tr("session.rename"),
-                icon: <IconRename size={16} />,
-                onClick: () => renameSession(s),
-              },
-              {
-                id: "session-settings",
-                label: tr("session.menuSettings"),
-                icon: <IconSettings size={16} />,
-                children: settingsChildren,
-              },
-              {
-                id: "fork",
-                label: tr("session.fork"),
-                icon: <IconFork size={16} />,
-                onClick: () => confirmForkSession(s),
-              },
-              {
-                id: "duplicate",
-                label: tr("session.duplicate"),
-                icon: <IconFiles size={16} />,
-                disabled:
-                  forkBusy ||
-                  busyIds.has(s.id) ||
-                  (isOpen && !canRewindSession),
-                onClick: () => {
-                  void runDuplicateSession(s);
-                },
-              },
-              ...(resumeRestoreItem ? [resumeRestoreItem] : []),
-              {
-                id: "conversation",
-                label: tr("session.menuConversation"),
-                icon: <IconChat size={16} />,
-                children: conversationChildren,
-              },
-              ...(worktreeChildren.length > 0
-                ? [
-                    {
-                      id: "worktree",
-                      label: tr("session.menuWorktree"),
-                      icon: <IconGitBranch size={16} />,
-                      children: worktreeChildren,
-                    } satisfies ContextMenuItem,
-                  ]
-                : []),
-              {
-                id: "copy",
-                label: tr("session.menuCopy"),
-                icon: <IconCopy size={16} />,
-                children: copyChildren,
-              },
-              {
-                id: "export",
-                label: tr("session.menuExport"),
-                icon: <IconExportImage size={16} />,
-                children: exportChildren,
-              },
-              {
-                id: "archive",
-                label: s.archived
-                  ? tr("sidebar.unarchive")
-                  : tr("sidebar.archive"),
-                icon: <IconArchive size={16} />,
-                onClick: () => {
-                  void archiveSession(s, !s.archived);
-                },
-              },
-              {
-                id: "delete",
-                label: tr("session.delete"),
-                icon: <IconTrash size={16} />,
-                danger: true,
-                onClick: () => deleteSessionConfirm(s),
-              },
-            ];
-          }
-        }
-        return (
-          <>
-          <ContextMenu
-            open={!!ctxMenu && items.length > 0}
-            x={ctxMenu?.x ?? 0}
-            y={ctxMenu?.y ?? 0}
-            onClose={() => setCtxMenu(null)}
-            items={items}
-            estimatedHeight={
-              ctxMenu?.kind === "session"
-                ? 360
-                : ctxMenu?.kind === "project-policy"
-                  ? 280
-                  : 240
-            }
+          <WorkbenchFloatingMenus
+            activeProject={activeProject}
+            addSessionPluginDir={addSessionPluginDir}
+            applyAttachedChat={applyAttachedChat}
+            applyProjectColor={applyProjectColor}
+            applyProjectPermissionPolicy={applyProjectPermissionPolicy}
+            applyProjectSandboxProfile={applyProjectSandboxProfile}
+            archiveProjectSessions={archiveProjectSessions}
+            archiveSession={archiveSession}
+            bulkMoveMenuItems={bulkMoveMenuItems}
+            busyIds={busyIds}
+            canRewindSession={canRewindSession}
+            clearSessionPluginDirs={clearSessionPluginDirs}
+            composerCtxItems={composerCtxItems}
+            composerCtxMenu={composerCtxMenu}
+            confirmArchiveOlderThan={confirmArchiveOlderThan}
+            confirmExportSessionTraceUpload={confirmExportSessionTraceUpload}
+            confirmForkSession={confirmForkSession}
+            confirmRemoveWorktree={confirmRemoveWorktree}
+            confirmResumeWithCodeRestore={confirmResumeWithCodeRestore}
+            continueLastAgentForProject={continueLastAgentForProject}
+            copyConversationMarkdown={copyConversationMarkdown}
+            copySessionId={copySessionId}
+            ctxMenu={ctxMenu}
+            deleteSessionConfirm={deleteSessionConfirm}
+            enterSessionSelectMode={enterSessionSelectMode}
+            exportSessionDiagnostic={exportSessionDiagnostic}
+            exportSessionHtml={exportSessionHtml}
+            exportSessionJson={exportSessionJson}
+            exportSessionPlain={exportSessionPlain}
+            exportSessionStreamNdjson={exportSessionStreamNdjson}
+            exportSessionTrace={exportSessionTrace}
+            forkBusy={forkBusy}
+            gitWorktrees={gitWorktrees}
+            handleClearAllSessionUnread={handleClearAllSessionUnread}
+            handleClearSessionUnread={handleClearSessionUnread}
+            handleMarkSessionUnread={handleMarkSessionUnread}
+            handleToggleSessionMute={handleToggleSessionMute}
+            isSecondaryWindow={isSecondaryWindow}
+            messages={messages}
+            moveProjectByMenu={moveProjectByMenu}
+            mutedSessionIds={mutedSessionIds}
+            navigator={navigator}
+            openExportSessionImage={openExportSessionImage}
+            openExportSessionMd={openExportSessionMd}
+            openRewindTimeline={openRewindTimeline}
+            openSandboxWizardGuide={openSandboxWizardGuide}
+            openSessionInNewWindow={openSessionInNewWindow}
+            openSessionMaxTurns={openSessionMaxTurns}
+            openSessionNote={openSessionNote}
+            openSessionRules={openSessionRules}
+            openSessionSysPrompt={openSessionSysPrompt}
+            openShipFlow={openShipFlow}
+            pinSession={pinSession}
+            platform={platform}
+            projectColorLabel={projectColorLabel}
+            projectReorder={projectReorder}
+            projectSpaces={projectSpaces}
+            projects={projects}
+            refreshProjects={refreshProjects}
+            relocateProject={relocateProject}
+            removeProjectFromApp={removeProjectFromApp}
+            renameProject={renameProject}
+            renameSession={renameSession}
+            resumeRestoreBusy={resumeRestoreBusy}
+            runDuplicateSession={runDuplicateSession}
+            sandboxProfileLabel={sandboxProfileLabel}
+            session={session}
+            sessionSelectMode={sessionSelectMode}
+            sessionWorktreeBadgeFor={sessionWorktreeBadgeFor}
+            sessions={sessions}
+            setAppDialog={setAppDialog}
+            setComposerCtxMenu={setComposerCtxMenu}
+            setCtxMenu={setCtxMenu}
+            setLocalError={setLocalError}
+            setProjectRulesTarget={setProjectRulesTarget}
+            setShowPlanHistory={setShowPlanHistory}
+            setShowTraces={setShowTraces}
+            showToast={showToast}
+            spaceErrorKey={spaceErrorKey}
+            toggleTranscriptFilter={toggleTranscriptFilter}
+            tr={tr}
+            unreadSessionIds={unreadSessionIds}
+            visibleProjects={visibleProjects}
+            transcriptFilter={transcriptFilter}
+            gitWorktreesAvailable={gitWorktreesAvailable}
+            moveMenuItemsFor={moveMenuItemsFor}
+            viewingSessionIdRef={viewingSessionIdRef}
           />
-          <ContextMenu
-            open={!!composerCtxMenu}
-            x={composerCtxMenu?.x ?? 0}
-            y={composerCtxMenu?.y ?? 0}
-            onClose={() => setComposerCtxMenu(null)}
-            items={composerCtxItems}
-            estimatedHeight={88}
-          />
-          </>
-        );
-      })()}
 
       <span hidden data-layout-default={JSON.stringify(DEFAULT_LAYOUT)} />
     </div>
