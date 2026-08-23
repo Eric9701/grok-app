@@ -12,7 +12,7 @@
 | Spec | `docs/plans/2026-08-01-code-quality-remediation-GOAL.md` |
 | Started | `2026-08-01` |
 | Current wave | `workbench-decomp` |
-| Current WP | `WP-W12` |
+| Current WP | `WP-W13` |
 | **FINAL** | **PASS** (honest orchestration metrics; decreasing ceilings) |
 
 ## Wave checklist
@@ -58,6 +58,7 @@
 | WP-W10 | Center chrome JSX into WorkbenchMain | PASS | 2aa1ad61 | 21326→21020 lines; useState 224; useEffect 88 |
 | WP-W11 | Resources aside + search/export/sandbox/reliability overlays | PASS | 444c55dd | 21020→20903 lines; useState 224; useEffect 88 |
 | WP-W12 | Session journal hydrate pipeline (openSession still in workbench) | PASS | 1da3ac14 | 20903→20710 lines; useState 224; useEffect 88 |
+| WP-W13 | openSession into useSessionNavigation; newChat stays | PASS | 5364d0e6 | 20710→20451 lines; useState 224; useEffect 88→87 |
 
 ## Metrics log (append-only)
 
@@ -81,6 +82,7 @@
 | 2026-08-22 W10 | 21020 (shell 18 + wb 21002) | 224 | 88 | 11 | dir | dir | 28 | 9 | 69 |
 | 2026-08-22 W11 | 20903 (shell 18 + wb 20885) | 224 | 88 | 11 | dir | dir | 28 | 9 | 69 |
 | 2026-08-23 W12 | 20710 (shell 18 + wb 20692) | 224 | 88 | 11 | dir | dir | 28 | 9 | 69 |
+| 2026-08-23 W13 | 20451 (shell 18 + wb 20433) | 224 | 87 | 11 | dir | dir | 28 | 9 | 69 |
 
 ## Blockers
 

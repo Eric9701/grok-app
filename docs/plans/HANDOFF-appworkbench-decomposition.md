@@ -44,6 +44,7 @@
    **WP-W10 已落地**：中栏 chrome → `WorkbenchMain`（标题/toast/顶栏动作；chat/kanban/automations 作 children）。天花板 **21200 / 229 / 93**。
    **WP-W11 已落地**：右栏 → `WorkbenchResourcesAside`；search/export/sandbox/reliability 弹层 → `WorkbenchDomainOverlays`。天花板 **21080 / 229 / 93**。
    **WP-W12 已落地**：journal 管道 → `sessionJournalHydrate`（store + 返回值；abort / refine / reconcile 可单测）。`openSession` / `newChat` 仍在 workbench。天花板 **20880 / 229 / 93**。
+   **WP-W13 已落地**：`openSession` → `useSessionNavigation`（gen/timer/viewing bind/hydrate/warm-connect）。`newChat` 仍在 workbench，调用 `invalidateOpenPipelines`。天花板 **20620 / 229 / 92**。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。
