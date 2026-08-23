@@ -586,26 +586,32 @@ html[data-chat-density="comfortable"] .lobe-chat,
 }
 
 /*
- * Chat reading width (Settings → Appearance). Prefer html[data-chat-width] so
- * every .lobe-chat__inner picks it up without prop drilling.
+ * Chat reading width (Settings → Appearance).
+ * Hoist --chat-width-max onto html so the floating composer / perm-bar /
+ * composer-stack share the same cap as .lobe-chat__inner (not a hard 42rem).
+ * Element-level .lobe-chat[data-chat-width] kept for local override.
  * narrow ~640 · medium ~800 · wide ~1000 · full = none
  */
-html[data-chat-width="narrow"] .lobe-chat,
+html {
+  --chat-width-max: 800px;
+}
+
+html[data-chat-width="narrow"],
 .lobe-chat[data-chat-width="narrow"] {
   --chat-width-max: 640px;
 }
 
-html[data-chat-width="medium"] .lobe-chat,
+html[data-chat-width="medium"],
 .lobe-chat[data-chat-width="medium"] {
   --chat-width-max: 800px;
 }
 
-html[data-chat-width="wide"] .lobe-chat,
+html[data-chat-width="wide"],
 .lobe-chat[data-chat-width="wide"] {
   --chat-width-max: 1000px;
 }
 
-html[data-chat-width="full"] .lobe-chat,
+html[data-chat-width="full"],
 .lobe-chat[data-chat-width="full"] {
   --chat-width-max: none;
 }

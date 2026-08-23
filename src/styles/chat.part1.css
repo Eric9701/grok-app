@@ -203,7 +203,7 @@
 .perm-bar {
   pointer-events: auto;
   width: 100%;
-  max-width: 42rem;
+  max-width: var(--chat-width-max, 800px);
   margin: 0 auto;
   padding: 10px 12px;
   border-radius: var(--modal-radius, 16px);
@@ -738,6 +738,16 @@
   width: 100%;
 }
 
+/* Empty session keeps the classic ~42rem input; active threads match transcript. */
+.composer-wrap--welcome .composer-stack {
+  max-width: 42rem;
+}
+
+.composer-wrap--welcome .composer-stack .composer,
+.composer-wrap--welcome > .composer {
+  max-width: 42rem;
+}
+
 .composer-welcome-mark {
   pointer-events: none;
   display: flex;
@@ -864,11 +874,11 @@
   line-height: 1;
 }
 
-/* Context bar + composer share width; tight gap when bar is present */
+/* Context bar + composer share transcript reading width */
 .composer-stack {
   pointer-events: none;
   width: 100%;
-  max-width: 42rem;
+  max-width: var(--chat-width-max, 800px);
   display: flex;
   flex-direction: column;
   align-items: stretch;

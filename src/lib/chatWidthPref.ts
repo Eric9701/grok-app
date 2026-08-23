@@ -84,7 +84,8 @@ export interface ChatWidthPrefRoot {
 
 /**
  * Apply width to document via `data-chat-width`.
- * CSS: `html[data-chat-width="narrow|medium|wide|full"] .lobe-chat__inner { … }`.
+ * CSS: `html[data-chat-width="…"] { --chat-width-max }` drives `.lobe-chat__inner`,
+ * floating `.composer` / `.composer-stack`, and `.perm-bar`.
  * Always sets the attribute so narrow/medium/wide/full are explicit.
  */
 export function applyChatWidth(

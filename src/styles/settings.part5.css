@@ -674,7 +674,7 @@
 
 .messages__col {
   width: 100%;
-  max-width: 42rem;
+  max-width: var(--chat-width-max, 800px);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
