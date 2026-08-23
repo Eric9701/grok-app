@@ -50,6 +50,7 @@
    **WP-W16 已落地**：AskUser / status / dashboard / rewind-fork / plan / schema / note-rules-turns-prompt → `WorkbenchSessionModals`。Compact / Queue / Settings / AppDialog / chat 体仍留 workbench。天花板 **20020 / 229 / 91**。
    **WP-W17 已落地**：composer 列（权限条 + 输入壳）→ `WorkbenchComposerColumn` + `WorkbenchComposerShell`（均 <1000）。`ConversationThreadLive` / Compact / Queue / Settings / AppDialog 仍留 workbench。天花板 **19080 / 229 / 91**。
    **WP-W18 已落地**：侧栏/composer context menu → `WorkbenchFloatingMenus` + project/session item builders（均 <1000）。`ConversationThreadLive` / Compact / Queue / Settings / AppDialog 仍留 workbench。天花板 **18120 / 229 / 91**。
+   **WP-W19 已落地**：Settings 舞台 → `WorkbenchSettingsStage`（<1000）。host 仍持 settings state / 导航 / preload。`ConversationThreadLive` / Compact / Queue / AppDialog 仍留 workbench。天花板 **17600 / 229 / 91**。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。
