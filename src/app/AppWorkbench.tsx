@@ -109,10 +109,8 @@ import {
   isSessionLiveStreaming,
   isSessionNotLiveError,
   isTurnCancelledError,
-  preferSessionMessages,
   presentErrorBanner,
   snapshotOutgoingMessages,
-  ensureBusyTurnStreaming,
   type ErrorBannerView,
   weaveToolsIntoAssistantSegments,
   truncateBeforeLastUser,
@@ -139,7 +137,6 @@ import {
   INITIAL_CONTEXT_USAGE,
   resolveCompactNoteBody,
   resolveContextUsageDisplay,
-  restoreContextUsageForSession,
   type CompactPresetId,
   type ContextUsageState
 } from "@/lib/contextUsage";
@@ -404,10 +401,7 @@ import {
 } from "@/lib/productTutorial";
 import { ChatFindLive } from "@/components/ChatFindLive";
 import {
-  applyResolvedSessionMedia,
   buildAgentPrompt,
-  collectSessionRelativeMediaRefs,
-  isDisplayableAttachmentPath,
   isImagePath,
   mergeAttachments,
   type Attachment
@@ -427,6 +421,7 @@ import { ChatRefChip } from "@/components/ChatRefChip";
 import { AttachedChatLookupContext } from "@/components/AttachedChatLookup";
 import { useAttachChat } from "@/hooks/useAttachChat";
 import { mapStoredMessagesToChat } from "@/lib/mapStoredMessages";
+import { hydrateSessionJournal } from "@/lib/sessionJournalHydrate";
 import {
   detectAtQueryFromEditor,
   rankAtFileHits,
@@ -520,7 +515,6 @@ import { ComposerQuoteCards } from "@/components/ComposerQuoteCards";
 import {
   DEFERRED_RECONCILE_MS,
   WARM_CONNECT_DEBOUNCE_MS,
-  sessionJournalLooksUnchanged,
   shouldApplyOpenSessionResult,
 } from "@/lib/sessionOpenSwitch";
 import { shouldReopenUnhydratedSession } from "@/lib/chatTranscriptEmpty";
@@ -737,8 +731,6 @@ import { ContextMenu, type ContextMenuItem } from "@/components/ContextMenu";
 import {
   aiCreateSeedPrompt,
   computeNextRunAt,
-
-  parseScheduledUserContent,
   type Automation
 } from "@/lib/automations";
 import { automationsBackgroundStatus } from "@/lib/automationsBackgroundStatus";
@@ -811,7 +803,6 @@ import { CompactModal } from "@/components/workbench-modals/CompactModal";
 import { AppDialogHost } from "@/components/workbench-modals/AppDialogHost";
 import {
   mergeSessionChange,
-  sessionChangesFromMessages,
   summarizeSessionChanges,
   type SessionFileChange
 } from "@/lib/sessionChanges";
@@ -3974,51 +3965,25 @@ export function AppWorkbench() {
     );
     setShowJsonSchemaModal(false);
 
-    try {
-      // Fast path: App journal only. Agent reconcile is deferred after settle
-      // so rapid switches do not re-parse chat_history/updates jsonl.
-      const stored = await api.sessionMessages(s.id, { reconcile: false });
-      if (!stillThisOpen()) {
-        // Keep cache warm for a future return, but skip remaining heavy work.
-        try {
-          const mappedEarly = mapStoredMessagesToChat(stored);
-          messagesBySessionRef.current.set(
-            s.id,
-            preferSessionMessages(
-              messagesBySessionRef.current.get(s.id),
-              mappedEarly,
-            ),
-          );
-          sessionTranscriptStore.finishJournalLoad(s.id);
-        } catch {
-          sessionTranscriptStore.abortJournalLoad(s.id);
-        }
-        if (openingSessionIdRef.current === s.id) {
-          openingSessionIdRef.current = null;
-        }
-        return;
+    const hydrated = await hydrateSessionJournal({
+      sessionId: s.id,
+      sessionScheduled: !!s.scheduled,
+      stillThisOpen,
+      liveState: resumeStateForSession(
+        s.id,
+        liveHostRef.current,
+        liveMapRef.current,
+      ).state,
+    });
+    if (hydrated.status === "aborted") {
+      if (openingSessionIdRef.current === s.id) {
+        openingSessionIdRef.current = null;
       }
-      const mapped: ChatMessage[] = mapStoredMessagesToChat(stored);
-      // Prefer in-memory cache (optimistic user msg + partial stream) over disk.
-      // Weave journal tool_step rows into preceding assistant segments so reload
-      // still shows tools on the message timeline (live already interleaves).
-      // Paint this immediately — relative-media resolve + pathsClassify are
-      // extra IPC and used to block the whole transcript behind an empty pane.
-      let chosen = ensureBusyTurnStreaming(
-        weaveToolsIntoAssistantSegments(
-          preferSessionMessages(
-            messagesBySessionRef.current.get(s.id),
-            mapped,
-          ),
-        ),
-        resumeStateForSession(s.id, liveHostRef.current, liveMapRef.current)
-          .state,
-      );
-      // Cache raw journal (may include fences) so apply can read them.
-      messagesBySessionRef.current.set(s.id, chosen);
-      // Rebuild Changes list from tool_step history; preserve live before/after.
+      return;
+    }
+    if (hydrated.status === "applied") {
       {
-        const fromHist = sessionChangesFromMessages(chosen);
+        const fromHist = hydrated.changesFromHistory;
         setSessionChangesById((prev) => {
           const existing = prev[s.id] ?? [];
           let list = fromHist;
@@ -4039,122 +4004,9 @@ export function AppWorkbench() {
           return { ...prev, [s.id]: list };
         });
       }
-      const stripped = chosen.map((m) => {
-        if (m.role !== "assistant" || !m.content) return m;
-        const { cleanText } = extractAutomationPayload(m.content);
-        return cleanText === m.content ? m : { ...m, content: cleanText };
-      });
-      setMessages(stripped);
-      sessionTranscriptStore.finishJournalLoad(s.id);
-      setContextUsage(restoreContextUsageForSession(s.id, stripped));
-      // Refine thumbs after first paint so journal text is not blocked on IPC.
-      // Apply onto the latest cache so a deferred reconcile cannot be overwritten.
-      void (async () => {
-        const source = messagesBySessionRef.current.get(s.id) ?? chosen;
-        const rels = api.isTauri()
-          ? collectSessionRelativeMediaRefs(source)
-          : [];
-        let resolved: Array<{ path: string; name: string; isDir: boolean }> =
-          [];
-        if (rels.length) {
-          try {
-            const list = await api.sessionResolveRelativeMedia(s.id, rels);
-            resolved = list.map((a) => ({
-              path: a.path,
-              name: a.name || a.path.split(/[/\\]/).pop() || a.path,
-              isDir: !!a.isDir,
-            }));
-          } catch {
-            /* ignore */
-          }
-        }
-        const pathSource =
-          resolved.length ? applyResolvedSessionMedia(source, resolved) : source;
-        const allPaths = pathSource.flatMap(
-          (m) => m.attachments?.map((a) => a.path) ?? [],
-        );
-        let classifyByPath: Map<
-          string,
-          { path: string; name: string; isDir: boolean; exists?: boolean }
-        > | null = null;
-        let classifyFailed = false;
-        if (allPaths.length && api.isTauri()) {
-          try {
-            const list = await api.pathsClassify(allPaths);
-            if (list.length) {
-              classifyByPath = new Map(list.map((c) => [c.path, c]));
-            }
-          } catch {
-            classifyFailed = true;
-          }
-        } else if (allPaths.length) {
-          classifyFailed = true;
-        }
-        if (!resolved.length && !classifyByPath && !classifyFailed) return;
-        const applyRefine = (rows: ChatMessage[]): ChatMessage[] => {
-          let next = resolved.length
-            ? applyResolvedSessionMedia(rows, resolved)
-            : rows;
-          if (classifyByPath) {
-            const byPath = classifyByPath;
-            next = next.map((msg) => {
-              if (!msg.attachments?.length) return msg;
-              const nextAtts = msg.attachments
-                .map((a) => {
-                  if (!isDisplayableAttachmentPath(a.path)) return null;
-                  const remote = /^https?:\/\//i.test(a.path);
-                  const c = byPath.get(a.path);
-                  if (remote) {
-                    return c
-                      ? { path: c.path, name: c.name, isDir: c.isDir }
-                      : a;
-                  }
-                  if (c && !c.exists) return null;
-                  return c
-                    ? { path: c.path, name: c.name, isDir: c.isDir }
-                    : a;
-                })
-                .filter((a): a is NonNullable<typeof a> => a != null);
-              return {
-                ...msg,
-                attachments: nextAtts.length ? nextAtts : undefined,
-              };
-            });
-          } else if (classifyFailed) {
-            next = next.map((msg) => {
-              if (!msg.attachments?.length) return msg;
-              const nextAtts = msg.attachments.filter((a) =>
-                isDisplayableAttachmentPath(a.path),
-              );
-              return {
-                ...msg,
-                attachments: nextAtts.length ? nextAtts : undefined,
-              };
-            });
-          }
-          return next;
-        };
-        const latest = messagesBySessionRef.current.get(s.id) ?? source;
-        const next = applyRefine(latest);
-        messagesBySessionRef.current.set(s.id, next);
-        if (!stillThisOpen()) return;
-        const strippedNext = next.map((m) => {
-          if (m.role !== "assistant" || !m.content) return m;
-          const { cleanText } = extractAutomationPayload(m.content);
-          return cleanText === m.content ? m : { ...m, content: cleanText };
-        });
-        setMessages(strippedNext);
-      })();
-      // Backfill create if assistant still has a fence in journal (failed chat-create).
+      setContextUsage(hydrated.usage);
       void tryApplyAutomationFromSession(s.id);
-      // Backfill scheduled flag from journal (older automation sessions).
-      if (
-        !s.scheduled &&
-        chosen.some(
-          (m) =>
-            m.role === "user" && !!parseScheduledUserContent(m.content || ""),
-        )
-      ) {
+      if (hydrated.scheduledFromJournal) {
         setSessions((list) =>
           list.map((row) =>
             row.id === s.id ? { ...row, scheduled: true } : row,
@@ -4164,9 +4016,6 @@ export function AppWorkbench() {
           void api.sessionSetScheduled(s.id, true).catch(() => {});
         }
       }
-
-      // Deferred agent reconcile: recover missing assistant bodies once the
-      // user has settled on this chat (skips work if they already switched).
       if (api.isTauri()) {
         if (deferredReconcileTimerRef.current) {
           clearTimeout(deferredReconcileTimerRef.current);
@@ -4175,67 +4024,25 @@ export function AppWorkbench() {
           deferredReconcileTimerRef.current = null;
           void (async () => {
             if (!stillThisOpen()) return;
-            try {
-              const reconciled = await api.sessionMessages(s.id, {
-                reconcile: true,
-              });
-              if (!stillThisOpen()) return;
-              const mappedR = mapStoredMessagesToChat(reconciled);
-              const chosenR = ensureBusyTurnStreaming(
-                weaveToolsIntoAssistantSegments(
-                  preferSessionMessages(
-                    messagesBySessionRef.current.get(s.id),
-                    mappedR,
-                  ),
-                ),
-                resumeStateForSession(
-                  s.id,
-                  liveHostRef.current,
-                  liveMapRef.current,
-                ).state,
-              );
-              if (
-                sessionJournalLooksUnchanged(
-                  messagesBySessionRef.current.get(s.id),
-                  chosenR,
-                )
-              ) {
-                return;
-              }
-              messagesBySessionRef.current.set(s.id, chosenR);
-              if (!stillThisOpen()) return;
-              const strippedR = chosenR.map((m) => {
-                if (m.role !== "assistant" || !m.content) return m;
-                const { cleanText } = extractAutomationPayload(m.content);
-                return cleanText === m.content
-                  ? m
-                  : { ...m, content: cleanText };
-              });
-              setMessages(strippedR);
-              setContextUsage(
-                restoreContextUsageForSession(s.id, strippedR),
-              );
-              // Reconcile can surface a fence that stream/open missed.
-              void tryApplyAutomationFromSession(s.id);
-            } catch {
-              /* soft-fail reconcile */
-            }
+            const recon = await hydrateSessionJournal({
+              sessionId: s.id,
+              sessionScheduled: !!s.scheduled,
+              stillThisOpen,
+              liveState: resumeStateForSession(
+                s.id,
+                liveHostRef.current,
+                liveMapRef.current,
+              ).state,
+              reconcile: true,
+            });
+            if (recon.status !== "applied" || recon.unchanged) return;
+            setContextUsage(recon.usage);
+            void tryApplyAutomationFromSession(s.id);
           })();
         }, DEFERRED_RECONCILE_MS);
       }
-    } catch {
-      if (!stillThisOpen()) {
-        sessionTranscriptStore.abortJournalLoad(s.id);
-        if (openingSessionIdRef.current === s.id) {
-          openingSessionIdRef.current = null;
-        }
-        return;
-      }
-      const cached = messagesBySessionRef.current.get(s.id);
-      setMessages(cached ?? []);
-      // Mark hydrated so remount recovery does not spin on a hard read failure.
-      sessionTranscriptStore.finishJournalLoad(s.id);
-      setContextUsage(restoreContextUsageForSession(s.id, cached ?? []));
+    } else {
+      setContextUsage(hydrated.usage);
     }
     if (!stillThisOpen()) {
       if (openingSessionIdRef.current === s.id) {
