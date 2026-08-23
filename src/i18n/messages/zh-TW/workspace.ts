@@ -487,6 +487,7 @@ export const zhTWWorkspace = {
   "terminal.toggleHide": "隱藏終端機",
   "terminal.panelAria": "終端機面板",
   "terminal.new": "新增終端機",
+  "terminal.closeAll": "關閉所有終端機",
   "terminal.closePanel": "收合終端機",
   "terminal.resize": "調整終端機高度",
   "side.review.scope": "範圍",

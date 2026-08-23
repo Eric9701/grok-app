@@ -40,6 +40,10 @@ import {
   isPaneSplitMotionActive,
   scheduleAfterPaneSplitMotion,
 } from "@/lib/paneSplitMotion";
+import {
+  killTerminalPtySession,
+  registerTerminalPtySession,
+} from "@/lib/terminalPtySession";
 
 export type TerminalTabProps = {
   locale: Locale | string;
@@ -319,6 +323,7 @@ export function TerminalTab({
         }
         sessionId = spawned.sessionId;
         sessionIdRef.current = sessionId;
+        registerTerminalPtySession(tabId, sessionId);
         const bound = normalizeTerminalCwd(spawned.cwd) || spawned.cwd;
         setBoundCwd(bound);
         setSpawnClassified(
@@ -397,6 +402,7 @@ export function TerminalTab({
       clearListeners();
       const sid = sessionIdRef.current || sessionId;
       sessionIdRef.current = null;
+      void killTerminalPtySession(tabId);
       if (sid) void api.terminalPtyKill(sid).catch(() => undefined);
     };
     // projectPath is read at boot via bootProjectRef; restart picks up latest.

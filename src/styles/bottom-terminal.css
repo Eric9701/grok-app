@@ -48,6 +48,22 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* Close chip on every tab: hidden until hover. Active stays faintly on. */
+.bt .rp-tab .rp-tab__x {
+  opacity: 0;
+}
+
+.bt .rp-tab.is-active .rp-tab__x {
+  opacity: 0.55;
+}
+
+.bt .rp-tab:hover .rp-tab__x,
+.bt .rp-tab.is-active:hover .rp-tab__x,
+.bt .rp-tab .rp-tab__x:hover,
+.bt .rp-tab .rp-tab__x:focus-visible {
+  opacity: 1;
+}
+
 .bt__tabs {
   flex: 1;
   min-width: 0;

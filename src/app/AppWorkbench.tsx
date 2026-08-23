@@ -22359,6 +22359,7 @@ export function AppWorkbench() {
                 state={bottomTerminal.state}
                 onAddTab={bottomTerminal.addTab}
                 onCloseTab={bottomTerminal.closeTab}
+                onCloseAllTabs={bottomTerminal.closeAllTabs}
                 onActivateTab={bottomTerminal.activateTab}
                 onHeightChange={bottomTerminal.setHeight}
                 onClosePanel={bottomTerminal.closePanel}

@@ -487,6 +487,7 @@ export const zhWorkspace = {
   "terminal.toggleHide": "隐藏终端",
   "terminal.panelAria": "终端面板",
   "terminal.new": "新建终端",
+  "terminal.closeAll": "关闭所有终端",
   "terminal.closePanel": "收起终端",
   "terminal.resize": "调整终端高度",
   "side.review.scope": "范围",

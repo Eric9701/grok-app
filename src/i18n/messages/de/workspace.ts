@@ -485,6 +485,7 @@ export const deWorkspace = {
   "terminal.toggleHide": "Terminal ausblenden",
   "terminal.panelAria": "Terminal-Panel",
   "terminal.new": "Neues Terminal",
+  "terminal.closeAll": "Alle Terminals schließen",
   "terminal.closePanel": "Terminal-Panel ausblenden",
   "terminal.resize": "Terminalgröße anpassen",
   "side.review.scope": "Bereich",

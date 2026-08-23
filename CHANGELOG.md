@@ -20,10 +20,15 @@ See `docs/llm-wiki/release.md`.
 - **账户切换**提示可添加第二个 SuperGrok 登录；同一时间只有一个登录生效。
 
 ### Changed
+- **Bottom terminal tab chrome**: hover shows the close chip on every tab; a close-all icon sits next to New terminal.
 
 **中文 · 变更**
+- **底部终端标签栏**：鼠标悬停任意标签显示关闭；加号旁增加关闭所有终端。
 
 ### Fixed
+- **Closing a terminal really kills the shell**: tab × / close-all / overflow / project switch call host `terminal_pty_kill` (process killer + PTY drop), not only hide the chip. Hide-panel still keeps sessions.
+- **Bottom terminal tab numbers follow creation order**: the plus button appends a new chip on the right, so the original Terminal 1 stays Terminal 1 instead of being pushed to Terminal 2.
+- **Terminal prompt inset**: side and bottom PTY text sits 5px inside the pane. The 50% veil still covers the full terminal; padding is on `.xterm`, not the host.
 - **New session side pane opens the picker, not Plan**: the unused `planFocusKey` 0 is no longer treated as a focus bump, so opening the right pane on a fresh chat shows the kind menu instead of an empty Plan tab.
 - **Plan empty state centers in the side pane**: the idle title / hint / history CTA no longer sit in a left-capped 28rem column when Plan is a side-workbench tab.
 - **Context compact cards stay at the moment of compaction (#855)**: mid-turn auto-compact freezes the current assistant bubble, inserts the banner, then continues streaming below it so later tools are not piled on the composer.
@@ -43,6 +48,9 @@ See `docs/llm-wiki/release.md`.
 - **Official-aux X/Imagine on packaged custom mains**: `/Applications/Grok.app` never bundled `scripts/official-aux-mcp.mjs`, so ACP injected `mcpServers count=0` while ChatCut still auto-loaded from independent `agent-home/config.toml`. Host now writes the MCP script into `agent-home-official`, disables user MCP `enabled` flags during solo inject, ships official-aux `--rules` on prewarm, and tells the model to call `official-aux__x_keyword_search` directly instead of `search_tool` (which was resolving to ChatCut).
 
 **中文 · 修复**
+- **关闭终端会真正杀掉 shell**：标签 × / 关闭全部 / 超出上限 / 切换项目都会走宿主 `terminal_pty_kill`（杀进程 + 关掉 PTY），不是只藏标签。收起面板仍保留会话。
+- **底部终端标签序号跟随创建顺序**：加号把新标签加到右边，原来的「终端 1」不会被挤成「终端 2」。
+- **终端提示符内边距**：侧栏和底部 PTY 文字距面板 5px。50% 遮罩仍铺满整个终端，内边距加在 `.xterm` 上，不加在外壳。
 - **新建会话打开侧栏显示可选菜单，而不是计划**：不再把未使用的 `planFocusKey` 0 当成一次聚焦，新对话打开右侧栏会看到种类菜单，而不是空的计划页签。
 - **侧栏计划空状态在面板内居中**：计划作为侧栏页签打开时，标题 / 说明 / 计划历史不再落在左侧 28rem 窄列里。
 - **「上下文已自动压缩」卡片留在压缩发生的时间点（#855）**：回合中压缩会冻结当前助手气泡、插入横幅，再在下方继续流式输出，后续工具不再堆到输入框上方。

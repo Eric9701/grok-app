@@ -837,6 +837,8 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
  */
 .sw-terminal--pty {
   --sw-term-veil: #00000080;
+  /* Inner text inset; FitAddon subtracts .xterm padding. Host stays 0. */
+  --sw-term-pad: 5px;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
@@ -902,7 +904,8 @@ html[data-theme="light"] .sw-terminal--pty {
   margin-left: 0;
 }
 
-/* Zero inset — fills remaining column under status; veil inherited from parent */
+/* Host stays edge-to-edge so the pty veil still paints the full pane.
+ * Text inset lives on `.xterm` (FitAddon subtracts that padding). */
 .sw-terminal__xterm {
   position: relative;
   flex: 1 1 auto;
@@ -926,8 +929,9 @@ html[data-theme="light"] .sw-terminal--pty {
   width: 100% !important;
   height: 100% !important;
   max-height: 100% !important;
-  padding: 0 !important;
+  padding: var(--sw-term-pad, 5px) !important;
   margin: 0 !important;
+  box-sizing: border-box !important;
   background: transparent !important;
   box-shadow: none !important;
   /* Coding ligatures collapse Powerline / `>` runs in JetBrains Mono. */
@@ -949,6 +953,12 @@ html[data-theme="light"] .sw-terminal--pty {
 .sw-terminal__xterm .xterm-screen {
   background: transparent !important;
   box-shadow: none !important;
+}
+
+/* Helpers are absolute to the padding box; offset them onto the screen. */
+.sw-terminal__xterm .xterm-helpers {
+  top: var(--sw-term-pad, 5px) !important;
+  left: var(--sw-term-pad, 5px) !important;
 }
 
 .sw-terminal__xterm .xterm-helpers,

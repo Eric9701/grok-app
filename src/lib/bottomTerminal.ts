@@ -120,8 +120,9 @@ export function addBottomTerminalTab(
 ): BottomTerminalState {
   const tab = createBottomTerminalTab(meta);
   const cap = clampMax(max);
-  let tabs = [tab, ...state.tabs];
-  if (tabs.length > cap) tabs = tabs.slice(0, cap);
+  // Append: chips use index+1 ("终端 1"), so the first created tab must stay at 0.
+  let tabs = [...state.tabs, tab];
+  if (tabs.length > cap) tabs = tabs.slice(-cap);
   return {
     ...state,
     open: true,
@@ -130,17 +131,39 @@ export function addBottomTerminalTab(
   };
 }
 
+/** Tab ids present in `prev` but not in `next` — close/cap must kill these PTYs. */
+export function droppedBottomTerminalTabIds(
+  prev: BottomTerminalState,
+  next: BottomTerminalState,
+): string[] {
+  if (prev.tabs === next.tabs) return [];
+  const keep = new Set(next.tabs.map((t) => t.id));
+  return prev.tabs.filter((t) => !keep.has(t.id)).map((t) => t.id);
+}
+
+export function closeAllBottomTerminalTabs(
+  state: BottomTerminalState,
+): BottomTerminalState {
+  if (state.tabs.length === 0 && state.activeId == null && !state.open) {
+    return state;
+  }
+  return { ...state, tabs: [], activeId: null, open: false };
+}
+
 export function closeBottomTerminalTab(
   state: BottomTerminalState,
   tabId: string,
 ): BottomTerminalState {
+  const idx = state.tabs.findIndex((t) => t.id === tabId);
+  if (idx < 0) return state;
   const tabs = state.tabs.filter((t) => t.id !== tabId);
-  if (tabs.length === state.tabs.length) return state;
   if (tabs.length === 0) {
     return { ...state, tabs, activeId: null, open: false };
   }
   const activeId =
-    state.activeId === tabId ? (tabs[0]?.id ?? null) : state.activeId;
+    state.activeId === tabId
+      ? (tabs[Math.min(idx, tabs.length - 1)]?.id ?? null)
+      : state.activeId;
   return { ...state, tabs, activeId };
 }
 

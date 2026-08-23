@@ -7,8 +7,10 @@ import {
   addBottomTerminalTab,
   applyBottomTerminalProjectSlice,
   bottomTerminalProjectKey,
+  closeAllBottomTerminalTabs,
   closeBottomTerminal,
   closeBottomTerminalTab,
+  droppedBottomTerminalTabIds,
   emptyBottomTerminalState,
   loadBottomTerminalHeight,
   saveBottomTerminalHeight,
@@ -19,12 +21,14 @@ import {
   type BottomTerminalProjectSlice,
   type BottomTerminalState,
 } from "@/lib/bottomTerminal";
+import { killTerminalPtySessions } from "@/lib/terminalPtySession";
 
 export function useBottomTerminal(projectId: string | null | undefined): {
   state: BottomTerminalState;
   toggle: () => void;
   addTab: () => void;
   closeTab: (id: string) => void;
+  closeAllTabs: () => void;
   activateTab: (id: string) => void;
   setHeight: (height: number, maxPx?: number) => void;
   closePanel: () => void;
@@ -50,6 +54,7 @@ export function useBottomTerminal(projectId: string | null | undefined): {
     const toKey = bottomTerminalProjectKey(projectId);
     const fromKey = keyRef.current;
     if (fromKey === toKey) return;
+    void killTerminalPtySessions(stateRef.current.tabs.map((t) => t.id));
     const { state: next, store } = switchBottomTerminalProject(
       stateRef.current,
       storeRef.current,
@@ -66,11 +71,22 @@ export function useBottomTerminal(projectId: string | null | undefined): {
   }, []);
 
   const addTab = useCallback(() => {
-    setState((s) => addBottomTerminalTab(s));
+    setState((s) => {
+      const next = addBottomTerminalTab(s);
+      const dropped = droppedBottomTerminalTabIds(s, next);
+      if (dropped.length > 0) void killTerminalPtySessions(dropped);
+      return next;
+    });
   }, []);
 
   const closeTab = useCallback((id: string) => {
+    void killTerminalPtySessions([id]);
     setState((s) => closeBottomTerminalTab(s, id));
+  }, []);
+
+  const closeAllTabs = useCallback(() => {
+    void killTerminalPtySessions(stateRef.current.tabs.map((t) => t.id));
+    setState((s) => closeAllBottomTerminalTabs(s));
   }, []);
 
   const activateTab = useCallback((id: string) => {
@@ -99,6 +115,7 @@ export function useBottomTerminal(projectId: string | null | undefined): {
     toggle,
     addTab,
     closeTab,
+    closeAllTabs,
     activateTab,
     setHeight,
     closePanel,

@@ -485,6 +485,7 @@ export const esWorkspace = {
   "terminal.toggleHide": "Ocultar terminal",
   "terminal.panelAria": "Panel de terminal",
   "terminal.new": "Nueva terminal",
+  "terminal.closeAll": "Cerrar todas las terminales",
   "terminal.closePanel": "Ocultar panel de terminal",
   "terminal.resize": "Redimensionar terminal",
   "side.review.scope": "Ámbito",

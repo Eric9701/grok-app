@@ -1862,6 +1862,7 @@ dependencies = [
  "hmac",
  "image",
  "keyring",
+ "libc",
  "mac-notification-sys",
  "mac-usernotifications",
  "notify-rust",

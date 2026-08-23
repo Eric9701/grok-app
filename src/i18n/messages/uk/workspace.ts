@@ -485,6 +485,7 @@ export const ukWorkspace = {
   "terminal.toggleHide": "Сховати термінал",
   "terminal.panelAria": "Панель термінала",
   "terminal.new": "Новий термінал",
+  "terminal.closeAll": "Закрити всі термінали",
   "terminal.closePanel": "Сховати панель термінала",
   "terminal.resize": "Змінити розмір термінала",
   "side.review.scope": "Область",

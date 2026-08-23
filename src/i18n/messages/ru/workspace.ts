@@ -485,6 +485,7 @@ export const ruWorkspace = {
   "terminal.toggleHide": "Скрыть терминал",
   "terminal.panelAria": "Панель терминала",
   "terminal.new": "Новый терминал",
+  "terminal.closeAll": "Закрыть все терминалы",
   "terminal.closePanel": "Скрыть панель терминала",
   "terminal.resize": "Изменить размер терминала",
   "side.review.scope": "Область",

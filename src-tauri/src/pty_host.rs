@@ -12,7 +12,7 @@ use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
-use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
@@ -59,6 +59,8 @@ struct PtyExitPayload {
 struct PtySession {
     writer: Box<dyn Write + Send>,
     master: Box<dyn MasterPty + Send>,
+    killer: Box<dyn ChildKiller + Send + Sync>,
+    pid: Option<u32>,
 }
 
 fn sessions() -> &'static Mutex<HashMap<String, PtySession>> {
@@ -191,8 +193,9 @@ pub fn spawn(
         .take_writer()
         .map_err(|e| format!("take writer: {e}"))?;
 
-    // Move child into a waiter; keep nothing in the map that would Drop-kill early.
-    // Killing is done by dropping master/writer (SIGHUP) via kill().
+    // Waiter owns Child; kill() uses clone_killer so we can signal while wait() blocks.
+    let killer = child.clone_killer();
+    let pid = child.process_id();
     let (exit_tx, exit_rx) = std::sync::mpsc::channel::<Option<u32>>();
     thread::Builder::new()
         .name(format!("pty-child-{sid}"))
@@ -211,6 +214,8 @@ pub fn spawn(
             PtySession {
                 writer,
                 master: pair.master,
+                killer,
+                pid,
             },
         );
     }
@@ -365,8 +370,23 @@ pub fn kill(session_id: &str) -> Result<(), String> {
     let mut g = sessions()
         .lock()
         .map_err(|e| format!("sessions lock: {e}"))?;
-    // Dropping master/writer closes the PTY → child gets SIGHUP → reader EOF.
-    g.remove(session_id);
+    let Some(mut sess) = g.remove(session_id) else {
+        return Ok(());
+    };
+    drop(g);
+    let _ = sess.killer.kill();
+    #[cfg(unix)]
+    if let Some(pid) = sess.pid {
+        if pid > 1 {
+            // SIGHUP + closed PTY is not enough for jobs that ignore hangup.
+            unsafe {
+                libc::kill(-(pid as i32), libc::SIGKILL);
+                libc::kill(pid as i32, libc::SIGKILL);
+            }
+        }
+    }
+    // Drop master/writer after signalling so the slave EOF races the kill.
+    drop(sess);
     Ok(())
 }
 
@@ -395,6 +415,12 @@ mod tests {
         assert_eq!(env_str(&cmd, "TERM").as_deref(), Some("xterm-256color"));
         assert_eq!(env_str(&cmd, "COLORTERM").as_deref(), Some("truecolor"));
         assert_eq!(env_str(&cmd, "TERM_PROGRAM").as_deref(), Some("grok-app"));
+    }
+
+    #[test]
+    fn kill_unknown_session_is_ok() {
+        assert!(kill("pty_missing").is_ok());
+        assert!(kill("pty_missing").is_ok());
     }
 
     #[test]

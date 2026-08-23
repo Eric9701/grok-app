@@ -485,6 +485,7 @@ export const filWorkspace = {
   "terminal.toggleHide": "Itago ang terminal",
   "terminal.panelAria": "Panel ng terminal",
   "terminal.new": "Bagong terminal",
+  "terminal.closeAll": "Isara ang lahat ng terminal",
   "terminal.closePanel": "Itago ang panel ng terminal",
   "terminal.resize": "Baguhin ang laki ng terminal",
   "side.review.scope": "Scope",
