@@ -12,7 +12,6 @@ import {
 } from "react";
 import { useThemeShell } from "@/providers/ThemeProvider";
 import { usePetCompanion } from "@/hooks/usePetCompanion";
-import { createPortal } from "react-dom";
 import { useFloatingMenu } from "@/lib/floatingMenu";
 import { DEFAULT_WALLPAPER_FOCUS } from "@/lib/themeSkin";
 import { saveMessageTimestampsPref } from "@/lib/messageTimestampsPref";
@@ -54,7 +53,7 @@ import {
   APP_CLOSE_REQUESTED_EVENT,
   APP_CLOSE_TAB_OR_WINDOW_EVENT,
   loadAlwaysQuitWithoutAskingPref,
-  shouldConfirmQuit
+  shouldConfirmQuit,
 } from "@/lib/confirmQuit";
 import { QUIT_DOUBLE_PRESS_MS } from "@/lib/doublePressQuit";
 import { useDoublePressQuit } from "@/hooks/useDoublePressQuit";
@@ -70,12 +69,12 @@ import {
 } from "@/lib/multiWindow";
 import {
   applyChatWidth,
-  loadChatWidth
+  loadChatWidth,
 } from "@/lib/chatWidthPref";
 import {
   dropGateClocks,
   gateClockKey,
-  resumeGateClock
+  resumeGateClock,
 } from "@/lib/gateClock";
 import { savePermissionTimeoutSec } from "@/lib/permissionTimeout";
 import { saveAskUserTimeoutSec } from "@/lib/askUserTimeout";
@@ -91,12 +90,12 @@ import { useOpenPresence, VIEW_PRESENCE_MS } from "@/lib/openPresence";
 import { acquireNativeWebviewCover } from "@/lib/nativeWebviewCover";
 import {
   PHONE_KEYBOARD_INSET_VAR,
-  keyboardInsetBottom
+  keyboardInsetBottom,
 } from "@/lib/phoneViewport";
 import {
   hitDragZoneFromRects,
   querySidebarEl,
-  toClientDragPoint
+  toClientDragPoint,
 } from "@/lib/dragZone";
 import {
   applyTurnError,
@@ -121,7 +120,7 @@ import {
   type AskUserPayload,
   type ChatMessage,
   type PermissionPayload,
-  type SessionSnapshot
+  type SessionSnapshot,
 } from "@/lib/session";
 import {
   DEFAULT_SESSION_DATA_MODE,
@@ -135,7 +134,7 @@ import {
   resolveCompactNoteBody,
   resolveContextUsageDisplay,
   type CompactPresetId,
-  type ContextUsageState
+  type ContextUsageState,
 } from "@/lib/contextUsage";
 import {
   DEFAULT_COMPACTION_DETAIL,
@@ -143,9 +142,8 @@ import {
   normalizeCompactionDetail,
   normalizeCompactionMode,
   type CompactionDetailId,
-  type CompactionModeId
+  type CompactionModeId,
 } from "@/lib/compactionMode";
-import { ContextUsageChip } from "@/components/ContextUsageChip";
 import { GoalOrchSessionChip } from "@/components/GoalOrchSessionChip";
 import { PlanStatusBar } from "@/components/PlanStatusBar";
 import {
@@ -155,25 +153,25 @@ import {
   invalidatePlanGate,
   planStateToStored,
   restorePlanFromPersistence,
-  type SessionPlanState
+  type SessionPlanState,
 } from "@/lib/planSession";
 import { shouldExitComposerPlanModeAfterDecision } from "@/lib/planModePro";
 import {
   collectActivitySessions,
   countQuitBlockingSessions,
-  stoppableActivitySessions
+  stoppableActivitySessions,
 } from "@/lib/agentActivity";
 import {
   classifyTasksBindCwdError,
   classifyTasksStopError,
-  type TasksBindCwdResult
+  type TasksBindCwdResult,
 } from "@/lib/tasksPanelPro";
 import { saveTrayBusyBadgePref } from "@/lib/trayBusyBadgePref";
 import { saveWinTaskbarOverlayPref } from "@/lib/winTaskbarOverlayPref";
 import { resolveTrayBusyBadgeCount } from "@/lib/trayNotifyPro";
 import {
   collectAgentDashboardRows,
-  countBusyDashboardRows
+  countBusyDashboardRows,
 } from "@/lib/agentDashboard";
 import { buildTaskBoard } from "@/lib/sessionTaskBoard";
 import type { OpsEntryCounts, OpsEntryDestinationId } from "@/lib/opsEntry";
@@ -188,10 +186,10 @@ import {
   type BatchDispatchItemResult,
   type BatchDispatchMode,
   type BatchDispatchSummary,
-  type BatchProjectInput
+  type BatchProjectInput,
 } from "@/lib/batchAgents";
 import {
-  type ProcessLimitEvent
+  type ProcessLimitEvent,
 } from "@/lib/processBudget";
 import {
   buildReliabilityCenter,
@@ -204,7 +202,7 @@ import {
   planClearGoalOrchEvents,
   resolveGoalOrchSessionIndicator,
   saveGoalOrchUiEnabled,
-  shouldConfirmClearGoalOrch
+  shouldConfirmClearGoalOrch,
 } from "@/lib/goalOrch";
 import * as api from "@/lib/api";
 import { queueComposerPreferenceApply } from "@/lib/composerPrefsBarrier";
@@ -215,24 +213,24 @@ import {
   normalizeSandboxProfile,
   sandboxDangerConfirmKey,
   sandboxProfileLabelKey,
-  type SandboxProfileId
+  type SandboxProfileId,
 } from "@/lib/sandboxProfile";
 import { shouldRestoreLastSession } from "@/lib/sessionRestore";
 import {
   listArchiveAgeOptionPreviews,
   planArchiveOlderThan,
-  type ArchiveAgePlan
+  type ArchiveAgePlan,
 } from "@/lib/sessionArchiveAge";
 import {
   collapsedIdsFromExpandMap,
   expandMapFromCollapsedIds,
-  sameCollapsedIdSet
+  sameCollapsedIdSet,
 } from "@/lib/sidebarExpand";
 import {
   armStopLatch,
   createStopLatchState,
   tickStopLatch,
-  STOP_LATCH_MS
+  STOP_LATCH_MS,
 } from "@/lib/stopLatch";
 import {
   isSettingsEscapeOwnedByNestedLayer,
@@ -247,21 +245,21 @@ import {
 } from "@/lib/viewFocus";
 import {
   projectHostIntoLiveMap,
-  settleStoppedSessionInLiveMap
+  settleStoppedSessionInLiveMap,
 } from "@/lib/sessionLiveStore";
 import { endOfTurnMarkerContent } from "@/lib/endOfTurn";
 import {
   stallMessageKey,
   stallTierFromProgress,
   normalizeStallTier,
-  reconcileSessionState
+  reconcileSessionState,
 } from "@/lib/sessionPhase";
 import {
   isMirrorClient,
   mirrorEnsureTransport,
   mirrorHello,
   mirrorToken,
-  mirrorWsConnected
+  mirrorWsConnected,
 } from "@/lib/mirrorTransport";
 import { deriveMirrorClientLinkStatus } from "@/lib/mirrorStatus";
 
@@ -276,7 +274,7 @@ import {
   DEFAULT_LOCALE_PREFERENCE,
   loadLocaleCatalog,
   type Locale,
-  type LocalePreference
+  type LocalePreference,
 } from "@/i18n";
 import {
   DEFAULT_EFFORT,
@@ -298,11 +296,10 @@ import {
   type ComposerPrefsScope,
   type EffortOption,
   type ModelOption,
-  type PermissionPolicyId
+  type PermissionPolicyId,
 } from "@/lib/grokCatalog";
 import {
-  formatPermissionSummary,
-  mapPermissionButtons
+  mapPermissionButtons,
 } from "@/lib/permissionOptions";
 import { dropAskUserClocks } from "@/components/AskUserModal";
 import { type PaletteActionDef } from "@/lib/paletteActions";
@@ -313,21 +310,21 @@ import {
   evaluateContinueCwd,
   resolveContinueCwdEmptyHonesty,
   resolveContinueCwdSoftFail,
-  type ContinueCwdSoftFailKind
+  type ContinueCwdSoftFailKind,
 } from "@/lib/continueCwd";
 import {
   isSessionExportJournalEmpty,
   joinSessionExportMenuSuffix,
   resolveSessionExportPath,
   sessionExportFormatNameKey,
-  sessionExportMenuSuffixKeys
+  sessionExportMenuSuffixKeys,
 } from "@/lib/sessionExportPro";
 import {
   clearPlanHistory,
   loadPlanHistory,
   recordPlanHistory,
   PLAN_HISTORY_CHANGE_EVENT,
-  PLAN_HISTORY_STORAGE_KEY
+  PLAN_HISTORY_STORAGE_KEY,
 } from "@/lib/planHistory";
 import type { PlanHistoryEntry } from "@/lib/planHistory";
 import { planDisplayMarkdown } from "@/lib/planBody";
@@ -348,25 +345,25 @@ import {
   loadShortcutRemaps,
   SHORTCUT_REMAP_CHANGED_EVENT,
   SHORTCUT_REMAP_STORAGE_KEY,
-  type ShortcutRemapMap
+  type ShortcutRemapMap,
 } from "@/lib/shortcutRemap";
 import {
   loadVoiceHotkeyEnabled,
   shouldFireLiveVoiceHotkey,
   VOICE_HOTKEY_CHANGED_EVENT,
-  VOICE_HOTKEY_STORAGE_KEY
+  VOICE_HOTKEY_STORAGE_KEY,
 } from "@/lib/voiceHotkeyPref";
 import {
   ensureNotifyPermission,
   listenForNativeNotifyClicks,
-  setDesktopNotifySessionFocusHandler
+  setDesktopNotifySessionFocusHandler,
 } from "@/lib/desktopNotify";
 import {
   clearAllMutes as clearAllSessionMutes,
   loadMutedSessionIds,
   SESSION_MUTE_CHANGE_EVENT,
   shouldConfirmClearAllMutes,
-  toggle as toggleSessionMute
+  toggle as toggleSessionMute,
 } from "@/lib/sessionMute";
 import {
   clearAllUnread as clearAllSessionUnread,
@@ -384,54 +381,47 @@ import {
   setNote as setSessionNote,
   shouldConfirmSessionNoteClear,
   shouldConfirmSessionNoteDiscard,
-  validateSessionNote
+  validateSessionNote,
 } from "@/lib/sessionNotes";
 import {
   dismissCliUpdateNotice,
-  shouldOfferCliUpdateNotice
+  shouldOfferCliUpdateNotice,
 } from "@/lib/cliUpdateNotice";
 import {
   loadDone as loadProductTutorialDone,
   markDone as markProductTutorialDone,
-  shouldAutoOffer as shouldAutoOfferProductTutorial
+  shouldAutoOffer as shouldAutoOfferProductTutorial,
 } from "@/lib/productTutorial";
 import { ChatFindLive } from "@/components/ChatFindLive";
 import {
   buildAgentPrompt,
-  isImagePath,
   mergeAttachments,
-  type Attachment
+  type Attachment,
 } from "@/lib/attachments";
 import {
   addChatRef,
-  chatHasUpdate,
-  loadRecentAttachIds,
-  lookupChatStatus,
   lookupChatTitle,
   parseChatTokens,
   prependChatTokens,
   stripChatTokens,
 } from "@/lib/chatAttach";
-import { AttachChatPanel } from "@/components/AttachChatPanel";
-import { ChatRefChip } from "@/components/ChatRefChip";
 import { AttachedChatLookupContext } from "@/components/AttachedChatLookup";
 import { useAttachChat } from "@/hooks/useAttachChat";
 import { mapStoredMessagesToChat } from "@/lib/mapStoredMessages";
 import {
   detectAtQueryFromEditor,
   rankAtFileHits,
-  removeAtTokenFromDraft
+  removeAtTokenFromDraft,
 } from "@/lib/atFileQuery";
 import {
-  ComposerAtPanel,
-  type ComposerAtFileEntry
+  type ComposerAtFileEntry,
 } from "@/components/ComposerAtPanel";
 import {
   formatAttachErrorMessage,
   isAttachPayloadTooLarge,
   resolveAttachError,
   resolveHostOnlyAttach,
-  resolveNativeClipboardEmpty
+  resolveNativeClipboardEmpty,
 } from "@/lib/attachmentsPro";
 import { fileKey as clipboardFileKey, readClipboardMediaFiles } from "@/lib/clipboardPaste";
 import {
@@ -440,11 +430,11 @@ import {
   detectSlashQueryFromEditor,
   detectSlashRangeOnStored,
   parseStoredContent,
-  serializeForAgent
+  serializeForAgent,
 } from "@/lib/draftDoc";
 import {
   isActiveJsonSchema,
-  wrapAgentTextWithJsonSchema
+  wrapAgentTextWithJsonSchema,
 } from "@/lib/jsonSchema";
 import { sanitizeExtraRules } from "@/lib/sessionExtraRules";
 import { normalizeMaxAgentTurns } from "@/lib/sessionMaxAgentTurns";
@@ -452,7 +442,7 @@ import { sanitizeSystemPromptOverride } from "@/lib/sessionSystemPrompt";
 import {
   presentSessionPromptSoftFail,
   shouldConfirmSessionTextDiscard,
-  validateSessionTextField
+  validateSessionTextField,
 } from "@/lib/rulesPromptPro";
 import {
   collectUserPromptHistory,
@@ -461,16 +451,15 @@ import {
   shouldHandlePromptHistoryKey,
   stepPromptHistory,
   stepPromptHistoryListIndex,
-  type PromptHistoryEntry
+  type PromptHistoryEntry,
 } from "@/lib/composerPromptHistory";
 import {
   clearRecentPromptHistory,
   filterRecentPromptHistory,
   loadRecentPromptHistory,
   recordRecentPrompt,
-  removeRecentPrompt,
   RECENT_PROMPT_HISTORY_CHANGE_EVENT,
-  RECENT_PROMPT_HISTORY_STORAGE_KEY
+  RECENT_PROMPT_HISTORY_STORAGE_KEY,
 } from "@/lib/recentPromptHistory";
 import {
   composerSteerLive,
@@ -487,7 +476,7 @@ import {
   projectDraftKey,
   resolveComposerProjectDraftToApply,
   saveComposerProjectDraft,
-  type ComposerProjectDraft
+  type ComposerProjectDraft,
 } from "@/lib/composerProjectDraft";
 import {
   clearComposerSessionDraft,
@@ -505,21 +494,18 @@ import {
   serializeQuotesForAgent,
   type ComposerQuote,
 } from "@/lib/composerQuotes";
-import { ComposerQuoteCards } from "@/components/ComposerQuoteCards";
 import { shouldReopenUnhydratedSession } from "@/lib/chatTranscriptEmpty";
 import {
-  PromptHistoryPanel,
-  type PromptHistoryScope
+  type PromptHistoryScope,
 } from "@/components/PromptHistoryPanel";
 import {
   makeQueuedSend,
   migrateDraftSendClaim,
   planClearSendQueue,
   queueSessionKey,
-  queuePreviewText,
   resolveSendQueueStripState,
   shouldEnqueueSend,
-  type QueuedSend
+  type QueuedSend,
 } from "@/lib/sendQueue";
 import {
   migrateDraftTurnClock,
@@ -528,13 +514,13 @@ import {
 } from "@/lib/turnClock";
 import {
   useSendQueue,
-  type ExecuteSendFromQueue
+  type ExecuteSendFromQueue,
 } from "@/hooks/useSendQueue";
 import {
   buildSlashCatalog,
   countSlashByKind,
   flattenFilteredCatalog,
-  type SlashItem
+  type SlashItem,
 } from "@/lib/slashCatalog";
 import {
   classifyWorkflowSlashLine,
@@ -543,7 +529,6 @@ import {
   stripWorkflowSlashFromDraft,
 } from "@/lib/workflowSlash";
 import type { MessageKey } from "@/i18n";
-import { AttachmentCard } from "@/components/AttachmentCard";
 import { ImageViewerProvider } from "@/components/ImageViewer";
 import {
   type SidebarSessionRowLabels,
@@ -558,7 +543,7 @@ import {
   buildAuthDeferredFlags,
   formatCliTooOldDetail,
   isCliVersionUnsupported,
-  resolveSetupGateBoot
+  resolveSetupGateBoot,
 } from "@/lib/setupGatePro";
 import { mapProbeToCliInfo } from "@/lib/cliVersionStatus";
 import {
@@ -567,14 +552,7 @@ import {
   resizeComposerInput,
   serializeDom,
 } from "@/components/ComposerEditor";
-import { ComposerDraftEditor } from "@/components/ComposerDraftEditor";
-import {
-  ComposerClearDraftButton,
-  ComposerDraftStats,
-  ComposerSendCluster,
-} from "@/components/ComposerDraftChrome";
-import { ComposerProjectMenu } from "@/components/ComposerProjectMenu";
-import { ComposerWorktreeMenu } from "@/components/ComposerWorktreeMenu";
+
 import {
   applyGitStatusBranch,
   buildWorktreePath,
@@ -589,7 +567,7 @@ import {
   worktreeEntryForPath,
   worktreeRemoveErrorSuggestsForce,
   type SessionWorktreeBadge,
-  type WorktreeLayout
+  type WorktreeLayout,
 } from "@/lib/gitWorktree";
 import { filterCliWorktreesForProject } from "@/lib/cliWorktrees";
 import {
@@ -599,13 +577,13 @@ import {
   redactShipOutput,
   sanitizePrBody,
   sanitizePrTitle,
-  shipOutcomeSummary
+  shipOutcomeSummary,
 } from "@/lib/wtShipFlow";
 import {
   PR_HUB_ANCHOR_ID,
   buildPrHubDeepLink,
   parseGithubPrNumber,
-  parsePrHubDeepLink
+  parsePrHubDeepLink,
 } from "@/lib/prHubDeepLink";
 import {
   buildForkWorktreeName,
@@ -616,19 +594,19 @@ import {
   resolveForkAgentCheckbox,
   resolveForkAgentSession,
   resolveSessionForkSoftFail,
-  softFailKindFromRestoreGate
+  softFailKindFromRestoreGate,
 } from "@/lib/sessionFork";
 import {
   buildResumeWorktreeName,
   canOfferResumeWithCodeRestore,
-  canRestoreCodeOnResume
+  canRestoreCodeOnResume,
 } from "@/lib/sessionResumeRestore";
 import { isProjectPathMissing } from "@/lib/projectPath";
 import {
   PROJECT_COLOR_TOKENS,
   normalizeProjectColor,
   resolveProjectColorCss,
-  type ProjectColorToken
+  type ProjectColorToken,
 } from "@/lib/projectColor";
 import { appendPluginDir } from "@/lib/sessionPluginDirs";
 import {
@@ -639,29 +617,26 @@ import {
   reduceVoice,
   resolveDictationCommit,
   resolveVoiceErrorClass,
-  resolveVoiceMicChrome,
   voiceAvailabilityFromAuth,
   voiceIsActive,
-  voiceMicLabelMessageKey,
   voiceResultStillCurrent,
   voiceSoftFailResetsIdle,
   voiceStealsEscape,
   VOICE_MAX_RECORD_MS,
   type VoiceErrorClass,
-  type VoiceFsmState
+  type VoiceFsmState,
 } from "@/lib/voiceDictation";
 import {
   blobToBase64,
   extensionForMime,
   startVoiceCapture,
-  type CaptureHandle
+  type CaptureHandle,
 } from "@/lib/voiceCapture";
 import {
-  ComposerPlusPanel,
   buildComposerPlusEntries,
   createVideoMatchesQuery,
   jsonSchemaMatchesQuery,
-  uploadMatchesQuery
+  uploadMatchesQuery,
 } from "@/components/ComposerPlusPanel";
 import { planInsertSkill } from "@/lib/skillsTaskPicker";
 import {
@@ -669,17 +644,11 @@ import {
   IconChevronUp,
   IconPlus,
   IconQueue,
-  IconSkills,
-  IconMic,
   IconFolder,
   IconFolderPlus,
   IconArrowsMinimize,
   IconChat,
-  IconClock,
-  IconClose,
-  IconCode,
   IconClipboardList,
-  IconImagine,
   IconArchive,
   IconListCheck,
   IconPin,
@@ -703,7 +672,6 @@ import {
   IconListNumbers,
   IconRobot,
   IconPlan,
-  IconFileDiff,
   IconGitBranch,
   IconUpload,
   IconFileText,
@@ -717,7 +685,7 @@ import { ContextMenu, type ContextMenuItem } from "@/components/ContextMenu";
 import {
   aiCreateSeedPrompt,
   computeNextRunAt,
-  type Automation
+  type Automation,
 } from "@/lib/automations";
 import { automationsBackgroundStatus } from "@/lib/automationsBackgroundStatus";
 import { recordAutomationRun } from "@/lib/automationRunHistory";
@@ -730,10 +698,7 @@ import {
   shouldAutoApplyAutomationFence,
   wrapAutomationSetupAgentText,
 } from "@/lib/automationSetup";
-import {
-  ComposerAccessMenu,
-  ComposerModelMenu
-} from "@/components/ComposerModelMenu";
+
 import type { ComposerModelPick } from "@/lib/composerModelGroups";
 import {
   alignGrokPresetEfforts,
@@ -771,16 +736,15 @@ import { AppDialogHost } from "@/components/workbench-modals/AppDialogHost";
 import {
   mergeSessionChange,
   summarizeSessionChanges,
-  type SessionFileChange
+  type SessionFileChange,
 } from "@/lib/sessionChanges";
 import {
   gitDirtySummariesEqual,
   summarizeGitDirty,
-  type GitDirtySummary
+  type GitDirtySummary,
 } from "@/lib/workspaceGit";
 import { ConversationThreadLive } from "@/components/lobe-chat";
 import { AgentTasksPanelLive } from "@/components/AgentTasksPanelLive";
-import { PermissionCountdown } from "@/components/PermissionCountdown";
 
 const SettingsPage = lazy(async () => {
   const m = await import("@/components/SettingsPage");
@@ -807,7 +771,7 @@ import {
   installDialogFocus,
   isTypingTarget,
   preferPermissionFocus,
-  trapTabKey
+  trapTabKey,
 } from "@/lib/a11yFocus";
 import {
   quotaFromHostItem,
@@ -818,34 +782,32 @@ import {
   buildSettingsHash,
   isSettingsSectionId,
   parseSettingsHash,
-  type SettingsTabId
+  type SettingsTabId,
 } from "@/lib/settingsCatalog";
 import {
   loadSettingsLastRoute,
   resolveOpenSettingsLocation,
-  saveSettingsLastRoute
+  saveSettingsLastRoute,
 } from "@/lib/settingsLastRoute";
 import {
   isAccountConnected,
   loadCachedSuperGrokBrand,
   resolveWelcomeBrandKind,
   saveCachedSuperGrokBrand,
-  superGrokBrandKind
+  superGrokBrandKind,
 } from "@/lib/accountUi";
 import {
-  SuperGrokMark,
-  type SuperGrokBrandKind
+  type SuperGrokBrandKind,
 } from "@/components/SuperGrokMark";
 import {
   DeepSeekFullMark,
   OpenCodeWordmark,
-  VolcanoArkWelcomeMark
+  VolcanoArkWelcomeMark,
 } from "@/components/ProviderWelcomeMark";
-import { Tip } from "@/components/ui/tooltip";
 import {
   WindowControls,
   tauriDragRegion,
-  titlebarMaximizeHandlers
+  titlebarMaximizeHandlers,
 } from "@/components/WindowControls";
 
 import {
@@ -857,7 +819,7 @@ import {
   normalizeSessionRow,
   projectDisplayName,
   type Project,
-  type SessionRow
+  type SessionRow,
 } from "@/lib/app/sidebarModels";
 import {
   canMoveProjectInPinGroup,
@@ -903,6 +865,7 @@ import { WorkbenchResourcesAside } from "@/app/WorkbenchResourcesAside";
 import { WorkbenchDomainOverlays } from "@/app/WorkbenchDomainOverlays";
 import { WorkbenchSessionModals } from "@/app/WorkbenchSessionModals";
 import { WorkbenchChromeOverlays } from "@/app/WorkbenchChromeOverlays";
+import { WorkbenchComposerColumn } from "@/app/WorkbenchComposerColumn";
 import { useSessionExportText } from "@/hooks/useSessionExportText";
 import { useSessionExportImage } from "@/hooks/useSessionExportImage";
 import {
@@ -934,7 +897,6 @@ function spaceErrorKey(
       return "sidebar.spaces.err.notFound";
   }
 }
-
 
 export function AppWorkbench() {
   const {
@@ -2499,7 +2461,6 @@ export function AppWorkbench() {
     return () => window.removeEventListener("languagechange", onLanguageChange);
   }, [localePreference]);
 
-
   useEffect(() => {
     document.documentElement.classList.remove(
       "platform-mac",
@@ -3490,7 +3451,6 @@ export function AppWorkbench() {
     };
   }, [phoneLayout]);
 
-
   /**
    * Debounced skills_list reload after conversation skill installs.
    * Bump target is wired below (skillsReloadToken lives later in this component).
@@ -3573,8 +3533,6 @@ export function AppWorkbench() {
     maxConcurrentAgents,
     streamStallSeconds,
   });
-
-
 
   const navigateWorkbench = useCallback(() => {
     setAppView("workbench");
@@ -8106,7 +8064,6 @@ export function AppWorkbench() {
     deps: [slashFilterQuery, composerMenuEntries.length],
   });
 
-
   /**
    * Open Find skills in the right Side Workbench (next to Files/Browser/Terminal).
    * Ranks host skills against the live composer draft.
@@ -9784,7 +9741,6 @@ export function AppWorkbench() {
     showToast,
     tr,
   ]);
-
 
   /** Honest fork-agent checkbox presentation (never claims available without id). */
   const forkAgentCheckbox = useMemo(
@@ -17005,1104 +16961,190 @@ export function AppWorkbench() {
           />
           </UiErrorBoundary>
           </AttachedChatLookupContext.Provider>
-
-          {(() => {
-            const composerNode = (
-          <div
-            ref={composerWrapRef}
-            className={
-              "composer-wrap composer-wrap--float" +
-              (welcomeSession && !sideDockActive
-                ? " composer-wrap--welcome"
-                : "") +
-              (sideDockActive ? " composer-wrap--side-dock" : "") +
-              (resizingSidebar ? " is-sidebar-resizing" : "")
-            }
-            style={
-              sideDockActive
-                ? ({
-                    ["--sw-sidebar-occupied"]: `${dockSidebarOccupied}px`,
-                  } as CSSProperties)
-                : undefined
-            }
-            data-side-dock={sideDockActive ? "true" : undefined}
-          >
-            {welcomeSession && welcomeBrandKind && !sideDockActive ? (
-              <div className="composer-welcome-mark">
-                {welcomeProviderBrandNode ?? (
-                  <SuperGrokMark
-                    kind={welcomeBrandKind}
-                    title={
-                      customRouteActive
-                        ? "SuperGrok"
-                        : account?.billing?.subscriptionTier?.trim() ||
-                          (welcomeBrandKind === "heavy"
-                            ? "SuperGrok Heavy"
-                            : "SuperGrok")
-                    }
-                  />
-                )}
-
-              </div>
-            ) : null}
-            {perm ? (
-              <div
-                ref={permBarRef}
-                className="perm-bar"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="perm-bar-title"
-                aria-describedby="perm-bar-summary"
-              >
-                <div className="sr-only" aria-live="assertive">
-                  {tr("a11y.permissionNeeded")}
-                </div>
-                <div className="perm-bar__head">
-                  <span className="perm-bar__badge" id="perm-bar-title">
-                    {tr("perm.title")}
-                  </span>
-                  <span className="perm-bar__tool">
-                    {perm.title || perm.toolName}
-                  </span>
-                  {permissionTimeoutSec > 0 ? (
-                    <PermissionCountdown
-                      startedAtMs={permCountdownStartedAt}
-                      timeoutSec={permissionTimeoutSec}
-                      format={formatPermCountdown}
-                    />
-                  ) : null}
-                </div>
-                <p className="perm-bar__summary" id="perm-bar-summary">
-                  {formatPermissionSummary({
-                    toolName: perm.toolName,
-                    title: perm.title,
-                    command: perm.preview,
-                  })}
-                </p>
-                {perm.preview?.trim() ? (
-                  <pre className="perm-bar__preview">{perm.preview.trim()}</pre>
-                ) : null}
-                <div className="perm-bar__actions" role="group">
-                  {mapPermissionButtons(
-                    perm.options,
-                    {
-                      allowOnce: tr("perm.allowOnce"),
-                      allowSession: tr("perm.allowSession"),
-                      deny: tr("perm.deny"),
-                    },
-                    perm.toolName,
-                  ).map((btn) => (
-                    <button
-                      key={btn.decision + btn.optionId}
-                      type="button"
-                      className={
-                        "perm-bar__btn" +
-                        (btn.decision === "allow_once"
-                          ? " perm-bar__btn--allow"
-                          : btn.decision === "deny"
-                            ? " perm-bar__btn--deny"
-                            : " perm-bar__btn--session")
-                      }
-                      title={
-                        btn.decision === "allow_once"
-                          ? tr("perm.hintOnce")
-                          : btn.decision === "allow_session"
-                            ? tr("perm.hintSession")
-                            : tr("perm.hintDeny")
-                      }
-                      onClick={() =>
-                        resolvePermission(perm, btn.decision, btn.optionId)
-                      }
-                    >
-                      {btn.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {(() => {
-              // Desktop composer always shows the workspace chip (including
-              // unbound / default workspace). Phone uses PhoneComposerToolsSheet.
-              const showComposerProjectRow = !phoneLayout;
-              // Env menu (chat chrome) already shows change stats — hide
-              // the duplicate composer context chips to avoid two "N 变更".
-              const envOwnsChangeSummary =
-                mainPane === "chat" && !phoneLayout;
-              const showChangesChips =
-                !phoneLayout &&
-                !envOwnsChangeSummary &&
-                (!!sessionChangesSummary || !!gitDirtySummary);
-              const showContextBar =
-                showComposerProjectRow || showChangesChips;
-              return (
-            <div
-              className={
-                "composer-stack" +
-                (showContextBar ? " composer-stack--with-context" : "")
-              }
-            >
-            {/* Workspace / branch + session/workspace change chips.
-                Hidden entirely when the bar would be empty. */}
-            {showContextBar ? (
-              <div
-                className="composer__context-bar"
-                aria-label={
-                  showComposerProjectRow
-                    ? tr("composer.pickProject")
-                    : tr("changes.chipAria")
-                }
-              >
-                {showComposerProjectRow ? (
-                  <>
-                <ComposerProjectMenu
-                  variant="context"
-                  activeProject={
-                    activeProject
-                      ? {
-                          ...activeProject,
-                          name: projectDisplayName(activeProject, tr),
-                        }
-                      : null
-                  }
-                  projects={projects.map((p) => ({
-                    ...p,
-                    name: projectDisplayName(p, tr),
-                  }))}
-                  labels={{
-                    noProject: tr("project.general"),
-                    pickProject: tr("composer.pickProject"),
-                    addProject: tr("composer.addProject"),
-                    pathMissing: tr("project.pathMissingShort"),
-                  }}
-                  disabled={
-                    session.state === "streaming" ||
-                    session.state === "awaiting_permission"
-                  }
-                    onSelect={(proj) => {
-                    // Menu default-workspace row still passes null; bind resolves it.
-                    const full = proj
-                      ? projects.find((p) => p.id === proj.id) ?? null
-                      : null;
-                    void bindSessionProject(full);
-                  }}
-                  onAdd={() => {
-                    void addProjectFromPicker({ bindSession: true });
-                  }}
-                />
-                {activeProject && gitWorktreesAvailable === true ? (
-                  <ComposerWorktreeMenu
-                    variant="context"
-                    activePath={activeProject.path}
-                    worktrees={gitWorktrees}
-                    worktreesAvailable={gitWorktreesAvailable}
-                    worktreesLoading={gitWorktreesLoading}
-                    worktreesReason={gitWorktreesReason}
-                    cliWorktrees={cliWorktrees}
-                    cliWorktreesAvailable={cliWorktreesAvailable}
-                    cliWorktreesLoading={cliWorktreesLoading}
-                    cliWorktreesReason={cliWorktreesReason}
-                    disabled={
-                      session.state === "streaming" ||
-                      session.state === "awaiting_permission"
-                    }
-                    labels={{
-                      worktrees: tr("composer.worktrees"),
-                      worktreesEmpty: tr("composer.worktreesEmpty"),
-                      worktreesUnavailable: tr(
-                        "composer.worktreesUnavailable",
-                      ),
-                      worktreesLoading: tr("composer.worktreesLoading"),
-                      worktreeCurrent: tr("composer.worktreeCurrent"),
-                      worktreeMain: tr("composer.worktreeMain"),
-                      worktreeDetached: tr("composer.worktreeDetached"),
-                      worktreeTip: tr("composer.worktreeTip"),
-                      worktreeNew: tr("composer.worktreeNew"),
-                      worktreeNewChat: tr("composer.worktreeNewChat"),
-                      worktreeGc: tr("composer.worktreeGc"),
-                      worktreeShip: tr("composer.worktreeShip"),
-                      worktreeShipTip: tr("composer.worktreeShipTip"),
-                      worktreeRemove: tr("composer.worktreeRemove"),
-                      worktreeRemoveTip: tr("composer.worktreeRemoveTip"),
-                      cliWorktrees: tr("composer.cliWorktrees"),
-                      cliWorktreesEmpty: tr("composer.cliWorktreesEmpty"),
-                      cliWorktreesUnavailable: tr(
-                        "composer.cliWorktreesUnavailable",
-                      ),
-                      cliWorktreesLoading: tr("composer.cliWorktreesLoading"),
-                      cliWorktreeRefresh: tr("composer.cliWorktreeRefresh"),
-                      cliWorktreeReveal: tr("composer.cliWorktreeReveal"),
-                      cliWorktreeOpen: tr("composer.cliWorktreeOpen"),
-                      cliWorktreeOpenUnavailable: tr(
-                        "composer.cliWorktreeOpenUnavailable",
-                      ),
-                      cliWorktreeMissingPath: tr(
-                        "composer.cliWorktreeMissingPath",
-                      ),
-                    }}
-                    onSwitch={(wt) => {
-                      void switchToWorktree(wt);
-                    }}
-                    onCreate={() => openWorktreeCreate()}
-                    onCreateAndChat={() =>
-                      openWorktreeCreate({ startNewChat: true })
-                    }
-                    onGc={openWorktreeGc}
-                    onShip={openShipFlow}
-                    onRemove={confirmRemoveWorktree}
-                    onOpen={() => {
-                      void refreshGitWorktrees();
-                      void refreshCliWorktrees();
-                    }}
-                    onCliRefresh={() => {
-                      void refreshCliWorktrees();
-                    }}
-                    onCliReveal={(wt) => {
-                      const p = wt.path?.trim();
-                      if (!p) return;
-                      void api
-                        .pathReveal(p)
-                        .catch((e) => showToast(String(e), 3500));
-                    }}
-                    onCliOpen={(wt) => {
-                      if (!wt.pathOk || !wt.path?.trim()) {
-                        showToast(
-                          tr("composer.cliWorktreeOpenUnavailable"),
-                          3500,
-                        );
-                        return;
-                      }
-                      void switchToWorktree({
-                        path: wt.path,
-                        branch: wt.branch ?? null,
-                        detached: !wt.branch || wt.branch === "HEAD",
-                        isMain: false,
-                        locked: false,
-                        prunable: false,
-                        head: wt.head ?? null,
-                      });
-                    }}
-                  />
-                ) : null}
-                  </>
-                ) : null}
-                {showChangesChips ? (
-                  <div className="composer__context-changes">
-                    {sessionChangesSummary ? (
-                      <Tip label={tr("changes.chipTip")}>
-                        <button
-                          type="button"
-                          className="composer__context-item composer__context-item--changes"
-                          data-testid="session-changes-chip"
-                          aria-label={
-                            sessionChangesSummary.mode === "diff"
-                              ? `${tr("changes.chipAria")}: ${tr(
-                                  "changes.chipDiff",
-                                  {
-                                    a: String(
-                                      sessionChangesSummary.addedLines ?? 0,
-                                    ),
-                                    d: String(
-                                      sessionChangesSummary.removedLines ?? 0,
-                                    ),
-                                  },
-                                )}`
-                              : `${tr("changes.chipAria")}: ${tr(
-                                  "changes.chipFiles",
-                                  {
-                                    n: String(sessionChangesSummary.fileCount),
-                                  },
-                                )}`
-                          }
-                          onClick={() => {
-                            openAsidePane();
-                            setResourceOpenTarget({ type: "changes" });
-                          }}
-                        >
-                          <IconFileDiff size={14} aria-hidden />
-                          <span className="composer__context-label chip__label--nums">
-                            {sessionChangesSummary.mode === "diff"
-                              ? tr("changes.chipDiff", {
-                                  a: String(
-                                    sessionChangesSummary.addedLines ?? 0,
-                                  ),
-                                  d: String(
-                                    sessionChangesSummary.removedLines ?? 0,
-                                  ),
-                                })
-                              : tr("changes.chipFiles", {
-                                  n: String(sessionChangesSummary.fileCount),
-                                })}
-                          </span>
-                        </button>
-                      </Tip>
-                    ) : null}
-                    {gitDirtySummary ? (
-                      <Tip label={tr("changes.workspace.chipTip")}>
-                        <button
-                          type="button"
-                          className="composer__context-item composer__context-item--git-dirty"
-                          data-testid="git-dirty-chip"
-                          aria-label={`${tr("changes.workspace.chipAria")}: ${tr(
-                            "changes.workspace.chip",
-                            { n: String(gitDirtySummary.count) },
-                          )}`}
-                          onClick={() => {
-                            const path = activeProject?.path?.trim() || "";
-                            if (
-                              api.isTauri() &&
-                              !isMirrorClient() &&
-                              path
-                            ) {
-                              openAsidePane();
-                              setResourceOpenTarget({ type: "changes" });
-                            } else if (path) {
-                              showToast(
-                                tr("changes.workspace.toastPath", {
-                                  path,
-                                }),
-                                4000,
-                              );
-                            }
-                          }}
-                        >
-                          <IconGitBranch size={14} aria-hidden />
-                          <span className="composer__context-label chip__label--nums">
-                            {tr("changes.workspace.chip", {
-                              n: String(gitDirtySummary.count),
-                            })}
-                          </span>
-                        </button>
-                      </Tip>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            <div
-              ref={composerShellRef}
-              className={
-                "composer" +
-                (dragZone === "main" ? " composer--drop-ready" : "")
-              }
-              data-session-attach=""
-            >
-              {sendQueueStrip.visible && (
-                <div
-                  className="composer__queue"
-                  aria-label={tr("composer.queueCount", {
-                    n: String(sendQueueStrip.count),
-                  })}
-                >
-                  <div className="composer__queue-head">
-                    <IconClock size={14} aria-hidden />
-                    <span className="composer__queue-title">
-                      {tr("composer.queueCount", {
-                        n: String(sendQueueStrip.count),
-                      })}
-                    </span>
-                    <button
-                      type="button"
-                      className="composer__queue-clear"
-                      data-testid="queue-clear"
-                      disabled={!sendQueueStrip.canClear}
-                      onClick={requestClearSendQueue}
-                    >
-                      {tr("composer.queueClear")}
-                    </button>
-                  </div>
-                  {sendQueueStrip.showHold ? (
-                    <div className="composer__queue-hold" role="status">
-                      <span className="composer__queue-hold-text">
-                        {tr("composer.queueHold")}
-                      </span>
-                      <button
-                        type="button"
-                        className="composer__queue-hold-retry"
-                        onClick={() => sendQueue.resumeFlush()}
-                      >
-                        {tr("composer.queueHoldRetry")}
-                      </button>
-                    </div>
-                  ) : null}
-                  <ul className="composer__queue-list">
-                    {sendQueue.activeQueue.map((item, idx) => {
-                      const queueLen = sendQueue.activeQueue.length;
-                      const rowBusy =
-                        guidingQueueItemId === item.id ||
-                        queueEditItemId !== null;
-                      return (
-                      <li key={item.id} className="composer__queue-item">
-                        <span className="composer__queue-idx" aria-hidden>
-                          {idx + 1}
-                        </span>
-                        {item.source === "external" ? (
-                          <span className="composer__queue-src">
-                            {tr("composer.queueSourceExternal")}
-                          </span>
-                        ) : null}
-                        <span
-                          className="composer__queue-text"
-                          title={queuePreviewText(
-                            item.storedDisplay,
-                            item.attachments,
-                            200,
-                            queuePreviewLabels,
-                          )}
-                        >
-                          {queuePreviewText(
-                            item.storedDisplay,
-                            item.attachments,
-                            72,
-                            queuePreviewLabels,
-                          )}
-                        </span>
-                        <div className="composer__queue-move">
-                          <button
-                            type="button"
-                            className="composer__queue-move-btn"
-                            data-testid="queue-move-up"
-                            aria-label={tr("composer.queueMoveUp")}
-                            title={tr("composer.queueMoveUp")}
-                            disabled={rowBusy || idx === 0}
-                            onClick={() =>
-                              sendQueue.moveItem(item.id, "up")
-                            }
-                          >
-                            <IconChevronUp size={12} aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            className="composer__queue-move-btn"
-                            data-testid="queue-move-down"
-                            aria-label={tr("composer.queueMoveDown")}
-                            title={tr("composer.queueMoveDown")}
-                            disabled={rowBusy || idx >= queueLen - 1}
-                            onClick={() =>
-                              sendQueue.moveItem(item.id, "down")
-                            }
-                          >
-                            <IconChevronDown size={12} aria-hidden />
-                          </button>
-                        </div>
-                        <button
-                          type="button"
-                          className="composer__queue-edit"
-                          data-testid="queue-edit"
-                          aria-label={tr("composer.queueEdit")}
-                          title={tr("composer.queueEdit")}
-                          disabled={rowBusy}
-                          onClick={() => openQueueEdit(item)}
-                        >
-                          {tr("composer.queueEdit")}
-                        </button>
-                        <button
-                          type="button"
-                          className="composer__queue-guide"
-                          data-testid="queue-guide"
-                          aria-label={
-                            guidingQueueItemId === item.id ||
-                            guidingQueueItemId !== null
-                              ? tr("composer.queueGuiding")
-                              : canGuideQueuedMessage
-                                ? tr("composer.queueGuide")
-                                : tr("composer.queueSendNow")
-                          }
-                          title={
-                            guidingQueueItemId === item.id ||
-                            guidingQueueItemId !== null
-                              ? tr("composer.queueGuiding")
-                              : canGuideQueuedMessage
-                                ? tr("composer.queueGuide")
-                                : tr("composer.queueSendNow")
-                          }
-                          disabled={guidingQueueItemId !== null}
-                          onClick={() => void guideQueuedMessage(item)}
-                        >
-                          {guidingQueueItemId === item.id
-                            ? tr("composer.queueGuiding")
-                            : canGuideQueuedMessage
-                              ? tr("composer.queueGuide")
-                              : tr("composer.queueSendNow")}
-                        </button>
-                        <button
-                          type="button"
-                          className="composer__queue-remove"
-                          aria-label={tr("composer.queueRemove")}
-                          disabled={guidingQueueItemId === item.id}
-                          onClick={() => sendQueue.removeItem(item.id)}
-                        >
-                          <IconClose size={12} />
-                        </button>
-                      </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-              {quotes.length > 0 && (
-                <ComposerQuoteCards
-                  quotes={quotes}
-                  onCommentChange={(id, comment) =>
-                    setQuotes((prev) =>
-                      prev.map((q) => (q.id === id ? { ...q, comment } : q)),
-                    )
-                  }
-                  onRemove={(id) =>
-                    setQuotes((prev) => prev.filter((q) => q.id !== id))
-                  }
-                  labels={{
-                    list: tr("composer.quotes"),
-                    count: tr("composer.quoteCount", {
-                      n: String(quotes.length),
-                    }),
-                    remove: tr("composer.quoteRemove"),
-                    commentPlaceholder: tr("composer.quoteCommentPlaceholder"),
-                  }}
-                />
-              )}
-              {(attachments.length > 0 || chatAttachments.length > 0) && (
-                <div
-                  className="composer__attachments"
-                  aria-label={tr("composer.attachCount", {
-                    n: String(attachments.length + chatAttachments.length),
-                  })}
-                >
-                  {chatAttachments.map((c) => (
-                    <ChatRefChip
-                      key={c.sessionId}
-                      title={
-                        c.title.trim() ||
-                        lookupChatTitle(
-                          c.sessionId,
-                          sessions,
-                          tr("attachChat.missing"),
-                        )
-                      }
-                      status={lookupChatStatus(c.sessionId, sessions)}
-                      meta={attachScopeLabel(c.scope)}
-                      metaTitle={tr("attachChat.scopeHint")}
-                      stale={chatHasUpdate(c, sessions)}
-                      onOpen={() => {
-                        const row = sessions.find((s) => s.id === c.sessionId);
-                        if (!row) {
-                          showToast(tr("attachChat.missing"), 2400);
-                          return;
-                        }
-                        void openSession(row);
-                      }}
-                      onCycleScope={() => cycleAttachedChatScope(c.sessionId)}
-                      onRemove={() => removeAttachedChat(c.sessionId)}
-                      removeLabel={tr("attachChat.chipRemove")}
-                      staleLabel={tr("attachChat.staleAria")}
-                      archivedLabel={tr("attachChat.archived")}
-                    />
-                  ))}
-                  {attachments.map((a) => (
-                    <AttachmentCard
-                      key={a.path}
-                      attachment={a}
-                      variant="chip"
-                      labels={attachLabels}
-                      galleryPaths={attachments
-                        .filter((x) => !x.isDir && isImagePath(x.path))
-                        .map((x) => x.path)}
-                      onRemove={(att) =>
-                        setAttachments((prev) =>
-                          prev.filter((x) => x.path !== att.path),
-                        )
-                      }
-                      onAddToComposer={(att) =>
-                        setAttachments((prev) => mergeAttachments(prev, [att]))
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-              {composerMenuOpen &&
-                composerPlusPos &&
-                typeof document !== "undefined" &&
-                createPortal(
-                  <ComposerPlusPanel
-                    open
-                    panelRef={composerPlusPanelRef}
-                    locale={locale}
-                    entries={composerMenuEntries}
-                    filterQuery={
-                      liveSlash.present ? slashFilterQuery : undefined
-                    }
-                    kindFilter={slashKindFilter}
-                    onKindFilterChange={(k) => {
-                      setSlashKindFilter(k);
-                      setSlashActiveIndex(0);
-                    }}
-                    catalogCount={slashCatalogCount}
-                    kindCounts={slashKindCounts}
-                    skillsLoading={skillsLoading}
-                    skillsError={skillsLoadError}
-                    skillCount={slashCatalog.skills.length}
-                    activeIndex={slashActiveIndex}
-                    onActiveIndexChange={setSlashActiveIndex}
-                    onSelectUpload={() => {
-                      void pickComposerFiles();
-                    }}
-                    onSelectJsonSchema={() => {
-                      closeComposerMenu();
-                      setJsonSchemaDraft(sessionJsonSchema ?? "");
-                      setShowJsonSchemaModal(true);
-                    }}
-                    onSelectCreateVideo={applyCreateVideo}
-                    onSelectSlash={applySlashItem}
-                    onClearFilters={clearSlashFilters}
-                    resolveTitle={resolveSlashTitle}
-                    resolveDescription={resolveSlashDescription}
-                    style={{
-                      ...composerPlusStyle,
-                      zIndex: 10050,
-                    }}
-                  />,
-                  document.body,
-                )}
-              {atMenuOpen &&
-                composerAtPos &&
-                typeof document !== "undefined" &&
-                createPortal(
-                  <ComposerAtPanel
-                    open
-                    panelRef={atPanelRef}
-                    locale={locale}
-                    entries={atEntries}
-                    filterQuery={liveAt.query}
-                    loading={atLoading}
-                    softFail={atSoftFail}
-                    activeIndex={atActiveIndex}
-                    onActiveIndexChange={setAtActiveIndex}
-                    onSelect={applyAtFile}
-                    style={{
-                      ...composerAtStyle,
-                      zIndex: 10050,
-                    }}
-                  />,
-                  document.body,
-                )}
-              {attachChatOpen &&
-                attachChatPos &&
-                typeof document !== "undefined" &&
-                createPortal(
-                  <AttachChatPanel
-                    open
-                    panelRef={attachChatPanelRef}
-                    sessions={attachableSessions}
-                    query={attachChatFilter}
-                    activeIndex={attachChatActive}
-                    focusFilter
-                    labels={{
-                      title: tr("attachChat.title"),
-                      placeholder: tr("attachChat.placeholder"),
-                      empty: tr("attachChat.empty"),
-                      emptyFilter: tr("attachChat.emptyFilter"),
-                      aria: tr("attachChat.aria"),
-                      recentBadge: tr("attachChat.pickerRecent"),
-                      projectBadge: tr("attachChat.pickerProject"),
-                    }}
-                    recentIds={loadRecentAttachIds()}
-                    currentProjectId={activeProject?.id ?? null}
-                    onQueryChange={setAttachChatFilter}
-                    onActiveIndexChange={setAttachChatActive}
-                    onSelect={(s) => {
-                      applyAttachedChat(s.id, s.title, s.updatedAt);
-                    }}
-                    onClose={closeAttachChat}
-                    style={{
-                      ...attachChatStyle,
-                      zIndex: 10050,
-                    }}
-                  />,
-                  document.body,
-                )}
-              {promptHistoryOpen &&
-                promptHistoryPos &&
-                typeof document !== "undefined" &&
-                createPortal(
-                  <PromptHistoryPanel
-                    open
-                    panelRef={promptHistoryPanelRef}
-                    scope={promptHistoryScope}
-                    onScopeChange={(next) => {
-                      setPromptHistoryScope(next);
-                      setPromptHistoryActive(0);
-                      // Leaving session browse when switching to recent.
-                      if (next === "recent") {
-                        promptHistoryIndexRef.current = null;
-                        setPromptHistoryIndex(null);
-                      }
-                    }}
-                    entries={promptHistoryEntries}
-                    unfilteredCount={promptHistoryUnfilteredCount}
-                    query={promptHistoryFilter}
-                    activeIndex={promptHistoryActive}
-                    focusFilter={promptHistoryFocusFilter}
-                    entryMeta={promptHistoryEntryMeta}
-                    labels={{
-                      tabSession: tr("promptHistory.tabSession"),
-                      tabRecent: tr("promptHistory.tabRecent"),
-                      placeholder: tr("promptHistory.placeholder"),
-                      empty: tr("promptHistory.empty"),
-                      emptyFilter: tr("promptHistory.emptyFilter"),
-                      emptyRecent: tr("promptHistory.emptyRecent"),
-                      emptyRecentFilter: tr("promptHistory.emptyRecentFilter"),
-                      aria: tr("promptHistory.aria"),
-                      clearFilter: tr("promptHistory.clearFilter"),
-                      clearRecent: tr("promptHistory.clearRecent"),
-                      removeRecent: tr("promptHistory.removeRecent"),
-                    }}
-                    onQueryChange={setPromptHistoryFilter}
-                    onActiveIndexChange={(i) => {
-                      setPromptHistoryActive(i);
-                      const entry = promptHistoryEntries[i];
-                      if (
-                        entry &&
-                        !promptHistoryFocusFilter &&
-                        promptHistoryScope === "session"
-                      ) {
-                        // Empty-↑ browse: mirror Build — each step lands in the input.
-                        applyPromptHistoryEntry(entry, {
-                          close: false,
-                          listIndex: i,
-                          scope: "session",
-                        });
-                      }
-                    }}
-                    onSelect={(entry) =>
-                      applyPromptHistoryEntry(entry, {
-                        scope: promptHistoryScope,
-                      })
-                    }
-                    onRequestClearRecent={() => setPromptHistoryClearOpen(true)}
-                    onRemoveRecent={(historyIndex) => {
-                      setRecentPromptHistory(removeRecentPrompt(historyIndex));
-                      setPromptHistoryActive((i) => Math.max(0, i));
-                    }}
-                    onClose={closePromptHistory}
-                    style={{
-                      ...promptHistoryStyle,
-                      zIndex: 10050,
-                    }}
-                  />,
-                  document.body,
-                )}
-              <ComposerDraftEditor
-                editorRef={composerInputRef}
-                className="composer__input"
-                disabled={!canType(session.state)}
-                spellCheck={composerSpellcheck}
-                aria-label={tr("a11y.composerInput")}
-                placeholder={
-                  goalMode
-                    ? tr("composer.goalPlaceholder")
-                    : tr("composer.placeholder")
-                }
-                onDraftChange={onComposerDraftChange}
-                onPasteFiles={onComposerPasteFiles}
-                onPasteMediaFallback={onComposerPasteMediaFallback}
-                onSlashQueryChange={onSlashQueryChange}
-                onKeyDown={onComposerKeyDown}
-                onContextMenu={onComposerContextMenu}
-              />
-              <div
-                className={
-                  "composer__row" + (phoneLayout ? " composer__row--phone" : "")
-                }
-              >
-                <Tip label={tr("composer.add")} disabled={phoneLayout}>
-                  <button
-                    ref={composerPlusTriggerRef}
-                    type="button"
-                    className={
-                      "icon-btn icon-btn--plus" +
-                      (composerMenuOpen || phoneToolsOpen ? " is-open" : "")
-                    }
-                    aria-label={tr("composer.add")}
-                    onClick={() => {
-                      if (phoneLayout) {
-                        setPhoneToolsOpen((v) => !v);
-                        closeComposerMenu();
-                        return;
-                      }
-                      if (composerMenuOpen) {
-                        closeComposerMenu();
-                      } else {
-                        setShowComposerPlus(true);
-                      }
-                    }}
-                  >
-                    <IconPlus size={18} />
-                  </button>
-                </Tip>
-                {!phoneLayout ? (
-                  <Tip label={tr("composer.skillsPicker")}>
-                    <button
-                      type="button"
-                      className={
-                        "icon-btn" +
-                        (sideWorkbench.tabs.some((t) => t.kind === "skills") &&
-                        !layout.asideCollapsed
-                          ? " is-open"
-                          : "")
-                      }
-                      aria-label={tr("composer.skillsPicker")}
-                      aria-pressed={
-                        sideWorkbench.tabs.some((t) => t.kind === "skills") &&
-                        !layout.asideCollapsed
-                      }
-                      onClick={() => openSideSkillsPanel()}
-                    >
-                      <IconSkills size={18} />
-                    </button>
-                  </Tip>
-                ) : null}
-                {!phoneLayout ? (
-                  <>
-                    {goalMode ? (
-                      <Tip label={tr("composer.goalHint")}>
-                        <button
-                          type="button"
-                          className="chip chip--goal"
-                          onClick={() => setGoalMode(false)}
-                          aria-label={tr("composer.goalClear")}
-                        >
-                          <IconImagine size={14} />
-                          <span className="chip__label">
-                            {tr("composer.goal")}
-                          </span>
-                          <IconClose size={12} />
-                        </button>
-                      </Tip>
-                    ) : null}
-                    {sessionJsonSchema ? (
-                      <Tip
-                        label={sessionJsonSchema}
-                        className="ui-tip--wrap ui-tip--mono"
-                      >
-                        <button
-                          type="button"
-                          className="icon-btn chip--json-schema is-active"
-                          onClick={() => {
-                            setJsonSchemaDraft(sessionJsonSchema);
-                            setShowJsonSchemaModal(true);
-                          }}
-                          aria-label={tr("composer.jsonSchemaActive")}
-                        >
-                          <IconCode size={16} />
-                        </button>
-                      </Tip>
-                    ) : null}
-                    <ComposerModelMenu
-                      locale={locale}
-                      modelId={modelId}
-                      effort={effort}
-                      models={availableModels}
-                      providers={composerProviderInputs}
-                      activeSource={providerActiveSource}
-                      activeProviderId={providerActiveId}
-                      channelEfforts={channelEffortOptions}
-                      contextWindow={currentModelWindow}
-                      contextWindowEditable={customRouteActive}
-                      onContextWindow={handleContextWindow}
-                      labels={{
-                        model: tr("composer.model"),
-                        modelGroupOfficial: tr("composer.modelGroupOfficial"),
-                        modelViaProvider: tr("composer.modelViaProvider"),
-                        effort: tr("composer.effort"),
-                        effortHigh: tr("effort.high"),
-                        effortMedium: tr("effort.medium"),
-                        effortLow: tr("effort.low"),
-                        effortXhigh: tr("effort.xhigh"),
-                        effortMax: tr("effort.max"),
-                        modelSearchPlaceholder: tr(
-                          "composer.modelSearchPlaceholder",
-                        ),
-                        modelSearchEmpty: tr("composer.modelSearchEmpty"),
-                        contextWindow: tr("composer.contextWindow"),
-                        contextWindowOfficial: tr(
-                          "composer.contextWindowOfficial",
-                        ),
-                        contextWindowCustom: tr("composer.contextWindowCustom"),
-                        contextWindowPlaceholder: tr(
-                          "composer.contextWindowPlaceholder",
-                        ),
-                        contextWindowSave: tr("composer.contextWindowSave"),
-                        contextWindowOfficialHint: tr(
-                          "composer.contextWindowOfficialHint",
-                        ),
-                      }}
-                      onModelPick={(pick) => {
-                        void handleModelPick(pick);
-                      }}
-                      onEffort={handleEffortPick}
-                    />
-                    <ComposerAccessMenu
-                      mode={mode}
-                      policy={policy}
-                      labels={{
-                        access: tr("composer.access"),
-                        accessHint: tr("composer.accessHint"),
-                        mode: tr("composer.mode"),
-                        modeAgent: tr("mode.agent"),
-                        modePlan: tr("mode.plan"),
-                        modeAsk: tr("mode.ask"),
-                        modeAgentDesc: tr("mode.agentDesc"),
-                        modePlanDesc: tr("mode.planDesc"),
-                        modeAskDesc: tr("mode.askDesc"),
-                        permission: tr("composer.permission"),
-                        policyAsk: tr("policy.ask"),
-                        policyAcceptEdits: tr("policy.accept_edits"),
-                        policySession: tr("policy.allow_for_session"),
-                        policyAuto: tr("policy.auto"),
-                        policyDontAsk: tr("policy.dont_ask"),
-                        policyYolo: tr("policy.always_approve"),
-                        policyAskDesc: tr("policy.askDesc"),
-                        policyAcceptEditsDesc: tr("policy.accept_editsDesc"),
-                        policySessionDesc: tr(
-                          "policy.allow_for_sessionDesc",
-                        ),
-                        policyAutoDesc: tr("policy.autoDesc"),
-                        policyDontAskDesc: tr("policy.dont_askDesc"),
-                        policyYoloDesc: tr("policy.always_approveDesc"),
-                        policyShortAsk: tr("policy.short.ask"),
-                        policyShortAccept: tr("policy.short.accept_edits"),
-                        policyShortSession: tr(
-                          "policy.short.allow_for_session",
-                        ),
-                        policyShortAuto: tr("policy.short.auto"),
-                        policyShortDontAsk: tr("policy.short.dont_ask"),
-                        policyShortYolo: tr("policy.short.always_approve"),
-                      }}
-                      onMode={(v) => {
-                        setMode(v);
-                        if (v === "plan") setGoalMode(false);
-                        void api
-                          .composerPrefsSet({
-                            projectId: activeProject?.id ?? null,
-                            sessionId: session.sessionId ?? null,
-                            mode: v,
-                          })
-                          .catch((e) => showToast(String(e), 4000));
-                      }}
-                      onPolicy={(v: PermissionPolicyId) => {
-                        applyPermissionPolicy(v);
-                      }}
-                    />
-                    <ContextUsageChip
-                      display={contextUsageDisplay}
-                      locale={locale}
-                      labels={{
-                        aria: tr("context.chipAria"),
-                        tipUnknown: tr("context.chipTipUnknown"),
-                        tipEstimated: tr("context.chipTipEstimated"),
-                        tipKnown: tr("context.chipTipKnown"),
-                        menuTitle: tr("context.menuTitle"),
-                        current: tr("context.current"),
-                        sourceKnown: tr("context.sourceKnown"),
-                        sourceEstimated: tr("context.sourceEstimated"),
-                        sourceUnknown: tr("context.sourceUnknown"),
-                        lastCompact: tr("context.lastCompact"),
-                        lastCompactNone: tr("context.lastCompactNone"),
-                        tokensRange: tr("compact.tokensRange"),
-                        compactAction: tr("context.compactAction"),
-                        heuristicNote: tr("context.heuristicNote"),
-                        auto: tr("context.triggerAuto"),
-                        manual: tr("context.triggerManual"),
-                        breakdownUser: tr("context.breakdownUser"),
-                        breakdownAssistant: tr("context.breakdownAssistant"),
-                        breakdownThought: tr("context.breakdownThought"),
-                        breakdownEstimatedNote: tr(
-                          "context.breakdownEstimatedNote",
-                        ),
-                        window: tr("context.window"),
-                        percentUsed: tr("context.percentLabel"),
-                        cacheHit: tr("context.cacheHit"),
-                      }}
-                      onCompact={() => {
-                        setCompactNote("");
-                        setShowCompactModal(true);
-                      }}
-                      onUsage={() => setShowUsageLimitModal(true)}
-                      usageAction={tr("usageModal.openFromChip")}
-                    />
-                  </>
-                ) : null}
-                <ComposerDraftStats show={showComposerDraftStats} tr={tr} />
-                <ComposerClearDraftButton
-                  attachmentsLength={attachments.length + quotes.length}
-                  onClear={() => requestClearComposerDraft()}
-                  label={tr("composer.clearDraft")}
-                />
-                <span className="composer__spacer" />
-                {/* Dictation (mic): always visible for auth soft-fail; Live Voice entry separate. */}
-                {(() => {
-                  const micChrome = resolveVoiceMicChrome({
-                    phase: voice.phase,
-                    gateAvailable: voiceGate.available,
-                    autoSend: voiceDictationAutoSend,
-                    liveVoiceOpen,
-                    canType: canType(session.state),
-                  });
-                  const micLabel = tr(
-                    voiceMicLabelMessageKey(micChrome.labelKind),
-                  );
-                  return (
-                    <Tip label={micLabel}>
-                      <button
-                        type="button"
-                        className={
-                          "icon-btn composer__voice" +
-                          (micChrome.liveClass
-                            ? " composer__voice--live"
-                            : "") +
-                          (micChrome.busyClass
-                            ? " composer__voice--busy"
-                            : "") +
-                          (micChrome.unavailableClass
-                            ? " composer__voice--unavailable"
-                            : "")
-                        }
-                        disabled={!micChrome.interactive}
-                        aria-pressed={micChrome.ariaPressed}
-                        aria-label={micLabel}
-                        onClick={() => toggleVoice()}
-                      >
-                        <IconMic size={16} />
-                      </button>
-                    </Tip>
-                  );
-                })()}
-                <ComposerSendCluster
-                  attachmentsLength={attachments.length + quotes.length}
-                  effectiveCanStop={effectiveCanStop}
-                  connecting={connecting}
-                  sessionState={session.state}
-                  effectiveCanSend={effectiveCanSend}
-                  shouldEnqueue={shouldEnqueueSend(session.state, connecting)}
-                  canShowQueueButton={(state, conn, hasBody) =>
-                    sendQueue.canShowQueueButton(state, conn, hasBody)
-                  }
-                  onSend={() => void send()}
-                  onStop={() => void stop()}
-                  tr={tr}
-                />
-              </div>
-            </div>
-            </div>
-              );
-            })()}
-          </div>
-            );
-            // Portal out of .main so main[inert] cannot block focus/clicks.
-            // Fixed bottom strip; aside bottom = --sw-dock-composer-h.
-            return sideDockActive && typeof document !== "undefined"
-              ? createPortal(composerNode, document.body)
-              : composerNode;
-          })()}
+          <WorkbenchComposerColumn
+            account={account}
+            activeProject={activeProject}
+            addProjectFromPicker={addProjectFromPicker}
+            applyAtFile={applyAtFile}
+            applyAttachedChat={applyAttachedChat}
+            applyCreateVideo={applyCreateVideo}
+            applyPermissionPolicy={applyPermissionPolicy}
+            applyPromptHistoryEntry={applyPromptHistoryEntry}
+            applySlashItem={applySlashItem}
+            atActiveIndex={atActiveIndex}
+            atEntries={atEntries}
+            atLoading={atLoading}
+            atMenuOpen={atMenuOpen}
+            atPanelRef={atPanelRef}
+            atSoftFail={atSoftFail}
+            attachChatActive={attachChatActive}
+            attachChatFilter={attachChatFilter}
+            attachChatOpen={attachChatOpen}
+            attachChatPanelRef={attachChatPanelRef}
+            attachChatPos={attachChatPos}
+            attachLabels={attachLabels}
+            attachScopeLabel={attachScopeLabel}
+            attachableSessions={attachableSessions}
+            attachments={attachments}
+            availableModels={availableModels}
+            bindSessionProject={bindSessionProject}
+            canGuideQueuedMessage={canGuideQueuedMessage}
+            channelEffortOptions={channelEffortOptions}
+            chatAttachments={chatAttachments}
+            clearSlashFilters={clearSlashFilters}
+            cliWorktrees={cliWorktrees}
+            cliWorktreesAvailable={cliWorktreesAvailable}
+            cliWorktreesLoading={cliWorktreesLoading}
+            cliWorktreesReason={cliWorktreesReason}
+            closeAttachChat={closeAttachChat}
+            closeComposerMenu={closeComposerMenu}
+            closePromptHistory={closePromptHistory}
+            composerAtPos={composerAtPos}
+            composerInputRef={composerInputRef}
+            composerMenuEntries={composerMenuEntries}
+            composerMenuOpen={composerMenuOpen}
+            composerPlusPanelRef={composerPlusPanelRef}
+            composerPlusPos={composerPlusPos}
+            composerPlusTriggerRef={composerPlusTriggerRef}
+            composerProviderInputs={composerProviderInputs}
+            composerShellRef={composerShellRef}
+            composerSpellcheck={composerSpellcheck}
+            composerWrapRef={composerWrapRef}
+            confirmRemoveWorktree={confirmRemoveWorktree}
+            connecting={connecting}
+            contextUsageDisplay={contextUsageDisplay}
+            currentModelWindow={currentModelWindow}
+            customRouteActive={customRouteActive}
+            cycleAttachedChatScope={cycleAttachedChatScope}
+            effectiveCanSend={effectiveCanSend}
+            effectiveCanStop={effectiveCanStop}
+            effort={effort}
+            formatPermCountdown={formatPermCountdown}
+            gitDirtySummary={gitDirtySummary}
+            gitWorktrees={gitWorktrees}
+            gitWorktreesAvailable={gitWorktreesAvailable}
+            gitWorktreesLoading={gitWorktreesLoading}
+            gitWorktreesReason={gitWorktreesReason}
+            goalMode={goalMode}
+            guideQueuedMessage={guideQueuedMessage}
+            guidingQueueItemId={guidingQueueItemId}
+            handleContextWindow={handleContextWindow}
+            handleEffortPick={handleEffortPick}
+            handleModelPick={handleModelPick}
+            layout={layout}
+            liveAt={liveAt}
+            liveSlash={liveSlash}
+            liveVoiceOpen={liveVoiceOpen}
+            locale={locale}
+            mode={mode}
+            modelId={modelId}
+            onComposerContextMenu={onComposerContextMenu}
+            onComposerDraftChange={onComposerDraftChange}
+            onComposerKeyDown={onComposerKeyDown}
+            onComposerPasteFiles={onComposerPasteFiles}
+            onComposerPasteMediaFallback={onComposerPasteMediaFallback}
+            onSlashQueryChange={onSlashQueryChange}
+            openAsidePane={openAsidePane}
+            openQueueEdit={openQueueEdit}
+            openSession={openSession}
+            openShipFlow={openShipFlow}
+            openSideSkillsPanel={openSideSkillsPanel}
+            openWorktreeCreate={openWorktreeCreate}
+            openWorktreeGc={openWorktreeGc}
+            perm={perm}
+            permBarRef={permBarRef}
+            permCountdownStartedAt={permCountdownStartedAt}
+            permissionTimeoutSec={permissionTimeoutSec}
+            phoneLayout={phoneLayout}
+            phoneToolsOpen={phoneToolsOpen}
+            pickComposerFiles={pickComposerFiles}
+            policy={policy}
+            projects={projects}
+            promptHistoryActive={promptHistoryActive}
+            promptHistoryEntries={promptHistoryEntries}
+            promptHistoryEntryMeta={promptHistoryEntryMeta}
+            promptHistoryFilter={promptHistoryFilter}
+            promptHistoryFocusFilter={promptHistoryFocusFilter}
+            promptHistoryOpen={promptHistoryOpen}
+            promptHistoryPanelRef={promptHistoryPanelRef}
+            promptHistoryPos={promptHistoryPos}
+            promptHistoryScope={promptHistoryScope}
+            promptHistoryUnfilteredCount={promptHistoryUnfilteredCount}
+            providerActiveId={providerActiveId}
+            providerActiveSource={providerActiveSource}
+            queueEditItemId={queueEditItemId}
+            queuePreviewLabels={queuePreviewLabels}
+            quotes={quotes}
+            refreshCliWorktrees={refreshCliWorktrees}
+            refreshGitWorktrees={refreshGitWorktrees}
+            removeAttachedChat={removeAttachedChat}
+            requestClearComposerDraft={requestClearComposerDraft}
+            requestClearSendQueue={requestClearSendQueue}
+            resizingSidebar={resizingSidebar}
+            resolvePermission={resolvePermission}
+            resolveSlashDescription={resolveSlashDescription}
+            resolveSlashTitle={resolveSlashTitle}
+            send={send}
+            sendQueue={sendQueue}
+            sendQueueStrip={sendQueueStrip}
+            session={session}
+            sessionChangesSummary={sessionChangesSummary}
+            sessionJsonSchema={sessionJsonSchema}
+            sessions={sessions}
+            setAtActiveIndex={setAtActiveIndex}
+            setAttachChatActive={setAttachChatActive}
+            setAttachChatFilter={setAttachChatFilter}
+            setAttachments={setAttachments}
+            setCompactNote={setCompactNote}
+            setGoalMode={setGoalMode}
+            setJsonSchemaDraft={setJsonSchemaDraft}
+            setMode={setMode}
+            setPhoneToolsOpen={setPhoneToolsOpen}
+            setPromptHistoryActive={setPromptHistoryActive}
+            setPromptHistoryClearOpen={setPromptHistoryClearOpen}
+            setPromptHistoryFilter={setPromptHistoryFilter}
+            setPromptHistoryIndex={setPromptHistoryIndex}
+            setPromptHistoryScope={setPromptHistoryScope}
+            setQuotes={setQuotes}
+            setRecentPromptHistory={setRecentPromptHistory}
+            setResourceOpenTarget={setResourceOpenTarget}
+            setShowCompactModal={setShowCompactModal}
+            setShowComposerPlus={setShowComposerPlus}
+            setShowJsonSchemaModal={setShowJsonSchemaModal}
+            setShowUsageLimitModal={setShowUsageLimitModal}
+            setSlashActiveIndex={setSlashActiveIndex}
+            setSlashKindFilter={setSlashKindFilter}
+            showComposerDraftStats={showComposerDraftStats}
+            showToast={showToast}
+            sideDockActive={sideDockActive}
+            sideWorkbench={sideWorkbench}
+            skillsLoadError={skillsLoadError}
+            skillsLoading={skillsLoading}
+            slashActiveIndex={slashActiveIndex}
+            slashCatalog={slashCatalog}
+            slashCatalogCount={slashCatalogCount}
+            slashKindCounts={slashKindCounts}
+            slashKindFilter={slashKindFilter}
+            stop={stop}
+            switchToWorktree={switchToWorktree}
+            toggleVoice={toggleVoice}
+            voice={voice}
+            voiceDictationAutoSend={voiceDictationAutoSend}
+            voiceGate={voiceGate}
+            welcomeBrandKind={welcomeBrandKind}
+            welcomeProviderBrandNode={welcomeProviderBrandNode}
+            welcomeSession={welcomeSession}
+            dockSidebarOccupied={dockSidebarOccupied}
+            dragZone={dragZone}
+            mainPane={mainPane}
+            tr={tr}
+            slashFilterQuery={slashFilterQuery}
+            composerPlusStyle={composerPlusStyle}
+            composerAtStyle={composerAtStyle}
+            attachChatStyle={attachChatStyle}
+            promptHistoryStyle={promptHistoryStyle}
+            promptHistoryIndexRef={promptHistoryIndexRef}
+          />
           </div>
           </>
           )}
