@@ -91,7 +91,7 @@ export const TimelineToolRow = memo(function TimelineToolRow({
     toolExpandBody(tool, failed);
 
   const [autoCollapse, setAutoCollapse] = useState(
-    () => autoCollapseProp ?? loadToolStepsAutoCollapsePref(),
+    () => (autoCollapseProp !== undefined ? autoCollapseProp : loadToolStepsAutoCollapsePref()),
   );
   const userToggled = useRef(false);
   const runningRef = useRef(running);
@@ -212,7 +212,7 @@ export function TimelineToolGroup({
 }) {
   const tr = useMemo(() => createT(locale), [locale]);
   const [autoCollapse, setAutoCollapse] = useState(
-    () => autoCollapseProp ?? loadToolStepsAutoCollapsePref(),
+    () => (autoCollapseProp !== undefined ? autoCollapseProp : loadToolStepsAutoCollapsePref()),
   );
   const running = tools.some(toolSegmentIsRunning);
   const hasErr = tools.some(toolSegmentFailed);

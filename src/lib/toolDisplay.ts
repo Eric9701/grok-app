@@ -515,6 +515,41 @@ export function toolOutputBody(
 }
 
 /**
+ * Cheap "would {@link toolOutputBody} be non-empty" check that avoids
+ * ANSI-stripping and line-splitting the whole output. Samples the head;
+ * printable content virtually always appears early, and the full strip only
+ * runs for pathological ANSI/whitespace-only heads.
+ */
+function hasToolOutputContent(output: string | null | undefined): boolean {
+  const raw = output || "";
+  if (!raw) return false;
+  const head = raw.length > 2048 ? raw.slice(0, 2048) : raw;
+  if (/\S/.test(stripAnsi(head))) return true;
+  if (raw.length <= 2048) return false;
+  return /\S/.test(stripAnsi(raw));
+}
+
+/**
+ * Cheap predicate: would {@link toolExpandBody} return `hasBody: true`?
+ *
+ * Collapsed activity rows (the common case while a big "Worked for …" phase
+ * scrolls into view) only need this boolean to decide whether to show the
+ * expand caret. Building the real body eagerly stripped + split every tool's
+ * full output on mount — tens of ms for a 30-tool phase mid-scroll.
+ */
+export function toolExpandHasBody(
+  seg: ToolLabelSource & { isError?: boolean; status?: string },
+  failed: boolean,
+): boolean {
+  // Mirrors toolExpandBody: a failed row always has at least the fail hint
+  // (or an empty one, in which case the other branches decide).
+  if (failed && (seg.path || seg.detail || "").trim()) return true;
+  if (hasToolOutputContent(seg.output)) return true;
+  const hostSide = /^(host-vision|host-x)/i.test(seg.toolCallId || "");
+  return !!toolDetailTail(seg.detail, hostSide ? 24 : 8);
+}
+
+/**
  * Expand body for a tool step.
  *
  * Precedence: real tool output (ACP `content[]`) wins; `detail` is only a

@@ -7,6 +7,7 @@ import {
   summarizeToolDisplay,
   toolDetailTail,
   toolExpandBody,
+  toolExpandHasBody,
   toolInputDisplay,
   toolOutputBody,
 } from "./toolDisplay";
@@ -240,4 +241,65 @@ describe("resolveToolPrimaryLabel fallback", () => {
     const label = resolveToolPrimaryLabel({ toolCallId: "call_x" }, enTr);
     expect(label).toBe("Tool");
   });
+});
+
+describe("toolExpandHasBody", () => {
+  // The cheap predicate must agree with the full builder — collapsed rows
+  // decide the expand caret from it without building body strings.
+  const cases: Array<{
+    name: string;
+    seg: Parameters<typeof toolExpandBody>[0];
+    failed: boolean;
+  }> = [
+    { name: "empty tool", seg: { toolKind: "read_file" }, failed: false },
+    {
+      name: "plain output",
+      seg: { toolKind: "run_terminal_command", output: "hello\nworld" },
+      failed: false,
+    },
+    {
+      name: "whitespace-only output, no detail",
+      seg: { toolKind: "read_file", output: "   \n \n" },
+      failed: false,
+    },
+    {
+      name: "whitespace output but detail fallback",
+      seg: { toolKind: "read_file", output: "", detail: "src/app.ts" },
+      failed: false,
+    },
+    {
+      name: "failed with path hint",
+      seg: { toolKind: "edit_file", path: "src/x.ts" },
+      failed: true,
+    },
+    {
+      name: "failed with nothing at all",
+      seg: { toolKind: "edit_file" },
+      failed: true,
+    },
+    {
+      name: "host side-channel detail",
+      seg: {
+        toolCallId: "host-vision-1",
+        toolKind: "",
+        detail: "line1\nline2",
+      },
+      failed: false,
+    },
+    {
+      name: "long output (head sample path)",
+      seg: {
+        toolKind: "run_terminal_command",
+        output: `${" ".repeat(3000)}\ntail content`,
+      },
+      failed: false,
+    },
+  ];
+  for (const c of cases) {
+    it(`matches toolExpandBody().hasBody: ${c.name}`, () => {
+      expect(toolExpandHasBody(c.seg, c.failed)).toBe(
+        toolExpandBody(c.seg, c.failed).hasBody,
+      );
+    });
+  }
 });

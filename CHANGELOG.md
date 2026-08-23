@@ -20,8 +20,11 @@ See `docs/llm-wiki/release.md`.
 **中文 · 变更**
 
 ### Fixed
+- **Long chat transcript scroll no longer hitches on Worked-for blocks or lift-off (#853)**: Follow-up to #842. Virtual-window growth that still covers the viewport commits in the background (`startTransition`) and at most 3 rows per frame; collapsed tool steps skip `toolExpandBody` until opened; scroll settle uses velocity + a 160ms stillness floor so touchpad lift-off is not treated as a stop; hover is disabled while moving; pin snap restores the pre-commit distance from the bottom so expanding overscan does not bounce.
 
 **中文 · 修复**
+- **长对话滑过「Worked for …」和抬手时不再卡顿（#853）**：#842 的后续。视口已被覆盖时的窗口扩张走后台提交，每帧最多挂 3 行；折叠的 tool 步骤在展开前不算 `toolExpandBody`；settle 用速度 + 160ms 静止下限，触控板抬手不再被当成停下；滑动中关掉 hover；贴底 snap 恢复 commit 前的离底距离，扩张 overscan 时不再弹跳。
+
 
 ## [0.2.25] - 2026-08-23
 

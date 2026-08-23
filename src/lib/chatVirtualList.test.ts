@@ -446,8 +446,9 @@ describe("long transcript window scale", () => {
       forceIndices: [count - 2, count - 1],
     });
     const mounted = w.end - w.start;
-    // Viewport 800 + adaptive overscan (~1.1*800) ≈ a few thousand px / 120 ≈ ~30–50.
-    expect(mounted).toBeLessThan(80);
+    // Viewport 800 + doubled adaptive overscan (4800px each side) ≈ 10400px
+    // / 120 ≈ ~88 rows. Still bounded — nowhere near the 500-row list.
+    expect(mounted).toBeLessThan(120);
     expect(w.end).toBeLessThan(count - 10);
     expect(w.start).toBeGreaterThan(50);
   });

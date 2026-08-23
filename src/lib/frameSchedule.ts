@@ -56,13 +56,12 @@ export function scheduleOnFrame(
   state: FrameSchedule,
   run: () => void,
   host: FrameScheduleHost = defaultHost,
-  fallbackMs: number = MIXED_DISPLAY_FRAME_FALLBACK_MS,
 ): void {
-  if (isFrameSchedulePending(state)) return;
+  if (state.raf != null || state.timeout != null) return;
   const fire = () => {
     cancelFrameSchedule(state, host);
     run();
   };
   state.raf = host.raf(fire);
-  state.timeout = host.timeout(fire, fallbackMs);
+  state.timeout = host.timeout(fire, MIXED_DISPLAY_FRAME_FALLBACK_MS);
 }

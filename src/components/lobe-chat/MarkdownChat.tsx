@@ -241,22 +241,13 @@ export function getMarkdownFileLabels(locale: Locale): FilePathCardLabels {
   return cached;
 }
 
-const StaticMarkdownBody = memo(function StaticMarkdownBody({
-  source,
-  components,
-}: {
-  source: string;
-  components: Components;
-}) {
-  return (
-    <ReactMarkdown
-      remarkPlugins={MARKDOWN_CHAT_REMARK_PLUGINS}
-      components={components}
-    >
-      {source}
-    </ReactMarkdown>
-  );
-});
+function isSimplePlainText(text: string): boolean {
+  if (!text || text.length > 500) return false;
+  if (/[\n#*_`\[\]|~<>]|^\s*[-*+]\s|^\s*\d+\.\s/m.test(text)) {
+    return false;
+  }
+  return true;
+}
 
 export const MarkdownChat = memo(function MarkdownChat({
   children,
@@ -692,6 +683,8 @@ export const MarkdownChat = memo(function MarkdownChat({
     tr,
   ]);
 
+  const isPlain = !streaming && !qFind && isSimplePlainText(painted);
+
   return (
     <div
       className={cn(
@@ -701,15 +694,15 @@ export const MarkdownChat = memo(function MarkdownChat({
         className,
       )}
     >
-      {streaming ? (
+      {isPlain ? (
+        <p>{painted}</p>
+      ) : (
         <ReactMarkdown
           remarkPlugins={MARKDOWN_CHAT_REMARK_PLUGINS}
           components={components}
         >
           {painted}
         </ReactMarkdown>
-      ) : (
-        <StaticMarkdownBody source={painted} components={components} />
       )}
     </div>
   );

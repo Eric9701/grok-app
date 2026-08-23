@@ -846,3 +846,7 @@
 .ext-badge--muted {
   opacity: 0.92;
 }
+
+div[data-virt-index] {
+  contain: layout style;
+}

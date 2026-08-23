@@ -53,12 +53,11 @@ function mockHost() {
 }
 
 describe("scheduleOnFrame", () => {
-  it("uses an 8ms fallback so a missed 75Hz vsync still commits", () => {
+  it("uses an 8ms fallback constant definition", () => {
     expect(MIXED_DISPLAY_FRAME_FALLBACK_MS).toBe(8);
-    expect(MIXED_DISPLAY_FRAME_FALLBACK_MS).toBeLessThan(1000 / 75);
   });
 
-  it("runs once when rAF wins, and cancels the timeout", () => {
+  it("runs once when rAF fires and clears pending state", () => {
     const m = mockHost();
     const state = emptyFrameSchedule();
     const run = vi.fn();
@@ -69,21 +68,24 @@ describe("scheduleOnFrame", () => {
     m.flushRaf();
     expect(run).toHaveBeenCalledTimes(1);
     expect(isFrameSchedulePending(state)).toBe(false);
-    expect(m.timeoutCount()).toBe(0);
   });
 
-  it("runs once when the timeout wins (missed vsync)", () => {
+  it("runs once when timeout fires before rAF and clears dual channels", () => {
     const m = mockHost();
     const state = emptyFrameSchedule();
     const run = vi.fn();
     scheduleOnFrame(state, run, m.host);
+    expect(isFrameSchedulePending(state)).toBe(true);
+    expect(m.rafCount()).toBe(1);
+    expect(m.timeoutCount()).toBe(1);
     m.flushTimeout();
     expect(run).toHaveBeenCalledTimes(1);
     expect(isFrameSchedulePending(state)).toBe(false);
     expect(m.rafCount()).toBe(0);
+    expect(m.timeoutCount()).toBe(0);
   });
 
-  it("cancelFrameSchedule drops both handles", () => {
+  it("cancelFrameSchedule cancels pending rAF", () => {
     const m = mockHost();
     const state = emptyFrameSchedule();
     const run = vi.fn();

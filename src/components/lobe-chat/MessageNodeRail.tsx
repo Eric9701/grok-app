@@ -21,7 +21,6 @@ import type { SessionMessageNode } from "@/lib/sessionMessageNodes";
 import {
   estimateMessageIndexAtY,
   nearestNodeIdFromPaintList,
-  pickActiveNodeIdFromRects,
 } from "@/lib/sessionMessageNodes";
 import type { ChatMessage } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -105,9 +104,9 @@ export function MessageNodeRail({
 
   const nodeIdSet = useMemo(() => new Set(nodes.map((n) => n.id)), [nodes]);
 
-  // Keep the active tick roughly in view inside a long rail.
+  // Keep the active tick roughly in view inside a long rail (programmatic jumps only, skip on free-scroll to avoid layout thrashing).
   useEffect(() => {
-    if (activeIndex < 0 || !listRef.current) return;
+    if (activeIndex < 0 || !listRef.current || scrollActiveId != null) return;
     const list = listRef.current;
     const tick = list.querySelector(
       `[data-node-id="${CSS.escape(nodes[activeIndex]!.id)}"]`,
@@ -121,9 +120,9 @@ export function MessageNodeRail({
     if (tickTop < viewTop || tickBottom > viewBottom) {
       tick.scrollIntoView({ block: "nearest", behavior: "auto" });
     }
-  }, [activeIndex, nodes]);
+  }, [activeIndex, nodes, scrollActiveId]);
 
-  // Free-scroll highlight: rAF throttle + one querySelectorAll per frame.
+  // Free-scroll highlight: rAF throttle + pure numerical index calculation on hot scroll path.
   useEffect(() => {
     const viewport = scrollParentRef?.current;
     if (!viewport || nodes.length < 2) return;
@@ -138,30 +137,19 @@ export function MessageNodeRail({
       }
       const t0 = performance.now();
 
-      const viewportRect = viewport.getBoundingClientRect();
-      const focusY = viewportRect.top + viewport.clientHeight * 0.28;
+      let bestId: string | null = null;
 
-      // Single pass over mounted message rows (virtual window only).
-      const mounted = viewport.querySelectorAll<HTMLElement>("[data-message-id]");
-      const rects: { id: string; top: number; bottom: number }[] = [];
-      for (const row of mounted) {
-        const id = row.getAttribute("data-message-id");
-        if (!id || !nodeIdSet.has(id)) continue;
-        const r = row.getBoundingClientRect();
-        rects.push({ id, top: r.top, bottom: r.bottom });
-      }
-
-      let bestId = pickActiveNodeIdFromRects(rects, focusY);
-
-      if (!bestId && messages && messages.length > 0) {
+      // Fast path: pure mathematical index lookup from scrollTop (0 forced reflows)
+      if (messages && messages.length > 0) {
         const y = viewport.scrollTop + viewport.clientHeight * 0.28;
         const msgIdx = estimateMessageIndexAtY(messages, y);
-        // Id walk on the paint list — not journal messageIndex (filtered lists).
         bestId = nearestNodeIdFromPaintList(messages, nodes, msgIdx);
       }
 
-      const syncDuration = performance.now() - t0;
-      scrollPerfDebug.recordNodeRailSyncTime(syncDuration, mounted.length);
+      if (import.meta.env.DEV) {
+        const syncDuration = performance.now() - t0;
+        scrollPerfDebug.recordNodeRailSyncTime(syncDuration, 0);
+      }
 
       if (bestId) {
         setScrollActiveId((prev) => {
