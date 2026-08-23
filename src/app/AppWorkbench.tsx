@@ -642,7 +642,7 @@ import {
 import { applySideContextOpen } from "@/lib/sideContextOpen";
 import { resolveSidePathDeepLink } from "@/lib/sidePathDeepLink";
 
-import { AppDialogHost } from "@/components/workbench-modals/AppDialogHost";
+import { WorkbenchAppDialogStage } from "@/app/WorkbenchAppDialogStage";
 import { WorkbenchComposerModals } from "@/app/WorkbenchComposerModals";
 import {
   mergeSessionChange,
@@ -16681,45 +16681,20 @@ export function AppWorkbench() {
         usage={contextUsageDisplay}
       />
 
-      {/* In-app confirm / prompt (Tauri WebView has no reliable window.prompt/confirm) */}
-      {appDialog ? (
-        <AppDialogHost
-          locale={locale}
-          dialog={appDialog}
-          dialogRef={appDialogRef}
-          panelRef={appDialogPanelRef}
-          confirmBtnRef={confirmBtnRef}
-          inputRef={dialogInputRef}
-          inputValue={dialogInput}
-          error={dialogError}
-          onDismiss={dismissDialog}
-          onInputChange={setDialogInput}
-          onClearError={() => setDialogError("")}
-          onConfirm={(d) => {
-            const run = d.onConfirm;
-            setAppDialog(null);
-            void run();
-          }}
-          onPromptSubmit={(value) => {
-            if (appDialog.kind !== "prompt") return;
-            const submit = appDialog.onSubmit;
-            void (async () => {
-              const ok = await submit(value);
-              if (typeof ok === "string") {
-                setDialogError(ok);
-                return;
-              }
-              if (ok === false) return;
-              setDialogError("");
-              setAppDialog((cur) =>
-                cur && cur.kind === "prompt" && cur.onSubmit === submit
-                  ? null
-                  : cur,
-              );
-            })();
-          }}
-        />
-      ) : null}
+      <WorkbenchAppDialogStage
+        locale={locale}
+        dialog={appDialog}
+        dialogRef={appDialogRef}
+        panelRef={appDialogPanelRef}
+        confirmBtnRef={confirmBtnRef}
+        inputRef={dialogInputRef}
+        inputValue={dialogInput}
+        error={dialogError}
+        onDismiss={dismissDialog}
+        onInputChange={setDialogInput}
+        setDialog={setAppDialog}
+        setError={setDialogError}
+      />
           <WorkbenchFloatingMenus
             activeProject={activeProject}
             addSessionPluginDir={addSessionPluginDir}
