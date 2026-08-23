@@ -46,6 +46,7 @@
    **WP-W12 已落地**：journal 管道 → `sessionJournalHydrate`（store + 返回值；abort / refine / reconcile 可单测）。`openSession` / `newChat` 仍在 workbench。天花板 **20880 / 229 / 93**。
    **WP-W13 已落地**：`openSession` → `useSessionNavigation`（gen/timer/viewing bind/hydrate/warm-connect）。
    **WP-W14 已落地**：`newChat` → `useSessionNavigation`。sendQueue / composer focus 在 `useSendQueue` 之后原地晚绑。天花板 **20520 / 229 / 91**。
+   **WP-W15 已落地**：Doctor / 规则 / 历史归档确认 / worktree×3 / 快捷键 / 教程 / Voice → `WorkbenchChromeOverlays`。Compact / Queue / AskUser / rewind 仍留 workbench。实测 **20288 / 224 / 86**；天花板待下调。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。

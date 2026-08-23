@@ -768,12 +768,6 @@ import {
 import { applySideContextOpen } from "@/lib/sideContextOpen";
 import { resolveSidePathDeepLink } from "@/lib/sidePathDeepLink";
 
-import { PromptHistoryClearModal } from "@/components/workbench-modals/PromptHistoryClearModal";
-import { ArchiveAgeConfirmModal } from "@/components/workbench-modals/ArchiveAgeConfirmModal";
-import { WorktreeCreateModal } from "@/components/workbench-modals/WorktreeCreateModal";
-import { WorktreeGcModal } from "@/components/workbench-modals/WorktreeGcModal";
-import { WorktreeShipModal } from "@/components/workbench-modals/WorktreeShipModal";
-import { ShortcutsHelpModal } from "@/components/workbench-modals/ShortcutsHelpModal";
 import { RewindConfirmModal } from "@/components/workbench-modals/RewindConfirmModal";
 import { ForkConfirmModal } from "@/components/workbench-modals/ForkConfirmModal";
 import { ResumeRestoreConfirmModal } from "@/components/workbench-modals/ResumeRestoreConfirmModal";
@@ -833,18 +827,6 @@ const KanbanBoardPage = lazy(async () => {
   const m = await import("@/components/KanbanBoardPage");
   return { default: m.KanbanBoardPage };
 });
-const DoctorModal = lazy(async () => {
-  const m = await import("@/components/DoctorModal");
-  return { default: m.DoctorModal };
-});
-const VoiceOverlay = lazy(async () => {
-  const m = await import("@/components/VoiceOverlay");
-  return { default: m.VoiceOverlay };
-});
-const ProductTutorial = lazy(async () => {
-  const m = await import("@/components/ProductTutorial");
-  return { default: m.ProductTutorial };
-});
 const McpStatusModal = lazy(async () => {
   const m = await import("@/components/McpStatusModal");
   return { default: m.McpStatusModal };
@@ -856,10 +838,6 @@ const SetupWizard = lazy(async () => {
 const BottomTerminal = lazy(async () => {
   const m = await import("@/components/bottom-terminal/BottomTerminal");
   return { default: m.BottomTerminal };
-});
-const ProjectRulesModal = lazy(async () => {
-  const m = await import("@/components/ProjectRulesModal");
-  return { default: m.ProjectRulesModal };
 });
 import { dispatchCollapseAllActivity } from "@/lib/collapseAllActivity";
 import {
@@ -960,6 +938,7 @@ import { WorkbenchSidebar } from "@/app/WorkbenchSidebar";
 import { WorkbenchMain } from "@/app/WorkbenchMain";
 import { WorkbenchResourcesAside } from "@/app/WorkbenchResourcesAside";
 import { WorkbenchDomainOverlays } from "@/app/WorkbenchDomainOverlays";
+import { WorkbenchChromeOverlays } from "@/app/WorkbenchChromeOverlays";
 import { useSessionExportText } from "@/hooks/useSessionExportText";
 import { useSessionExportImage } from "@/hooks/useSessionExportImage";
 import {
@@ -18374,13 +18353,12 @@ export function AppWorkbench() {
         </>
       ) : null}
 
-      {(showDoctor) ? (
-      <Suspense fallback={null}>
-      <DoctorModal
-        open={showDoctor}
-        onClose={() => setShowDoctor(false)}
+      <WorkbenchChromeOverlays
         locale={locale}
-        onConfirm={({ title, message, confirmLabel, danger, onConfirm }) => {
+        platform={platform}
+        showDoctor={showDoctor}
+        closeDoctor={() => setShowDoctor(false)}
+        onDoctorConfirm={({ title, message, confirmLabel, danger, onConfirm }) => {
           setAppDialog({
             kind: "confirm",
             title,
@@ -18390,172 +18368,123 @@ export function AppWorkbench() {
             onConfirm,
           });
         }}
-        onResetDone={() => {
+        onDoctorResetDone={() => {
           void refreshLists();
         }}
         onOpenReliability={() => openReliability()}
-      />
-      </Suspense>
-      ) : null}
-      {projectRulesTarget ? (
-        <Suspense fallback={null}>
-          <ProjectRulesModal
-            open
-            onClose={() => setProjectRulesTarget(null)}
-            projectPath={projectRulesTarget.path}
-            projectName={projectRulesTarget.name}
-            locale={locale}
-          />
-        </Suspense>
-      ) : null}
-      <PromptHistoryClearModal
-        locale={locale}
-        open={promptHistoryClearOpen}
-        onClose={() => setPromptHistoryClearOpen(false)}
-        onConfirm={() => {
+        projectRulesTarget={projectRulesTarget}
+        closeProjectRules={() => setProjectRulesTarget(null)}
+        promptHistoryClearOpen={promptHistoryClearOpen}
+        closePromptHistoryClear={() => setPromptHistoryClearOpen(false)}
+        onConfirmPromptHistoryClear={() => {
           setRecentPromptHistory(clearRecentPromptHistory());
           setPromptHistoryActive(0);
           setPromptHistoryClearOpen(false);
         }}
-      />
-      <ArchiveAgeConfirmModal
-        locale={locale}
-        plan={archiveAgeConfirm}
-        busy={archiveAgeBusy}
-        onClose={() => setArchiveAgeConfirm(null)}
-        onConfirm={() => {
+        archiveAgePlan={archiveAgeConfirm}
+        archiveAgeBusy={archiveAgeBusy}
+        closeArchiveAge={() => setArchiveAgeConfirm(null)}
+        onConfirmArchiveAge={() => {
           if (!archiveAgeConfirm) return;
           void runArchiveAgePlan(archiveAgeConfirm);
         }}
-      />
-      <WorktreeCreateModal
-        locale={locale}
-        open={worktreeCreateOpen}
-        busy={worktreeCreateBusy}
-        startChat={worktreeCreateStartChat}
-        name={worktreeCreateName}
-        layout={worktreeCreateLayout}
-        startRef={worktreeCreateRef}
-        previewPath={worktreeCreatePreviewPath}
-        error={worktreeCreateError}
-        onClose={() => setWorktreeCreateOpen(false)}
-        onSubmit={() => {
+        worktreeCreateOpen={worktreeCreateOpen}
+        worktreeCreateBusy={worktreeCreateBusy}
+        worktreeCreateStartChat={worktreeCreateStartChat}
+        worktreeCreateName={worktreeCreateName}
+        worktreeCreateLayout={worktreeCreateLayout}
+        worktreeCreateRef={worktreeCreateRef}
+        worktreeCreatePreviewPath={worktreeCreatePreviewPath}
+        worktreeCreateError={worktreeCreateError}
+        closeWorktreeCreate={() => setWorktreeCreateOpen(false)}
+        submitWorktreeCreate={() => {
           void submitWorktreeCreate();
         }}
-        onNameChange={(value) => {
+        onWorktreeCreateNameChange={(value) => {
           setWorktreeCreateName(value);
           setWorktreeCreateError(null);
         }}
-        onLayoutChange={(value) => {
+        onWorktreeCreateLayoutChange={(value) => {
           setWorktreeCreateLayout(value);
           setWorktreeCreateError(null);
         }}
-        onRefChange={(value) => {
+        onWorktreeCreateRefChange={(value) => {
           setWorktreeCreateRef(value);
           setWorktreeCreateError(null);
         }}
-      />
-      <WorktreeGcModal
-        locale={locale}
-        open={worktreeGcOpen}
-        busy={worktreeGcBusy}
-        previewBusy={worktreeGcPreviewBusy}
-        force={worktreeGcForce}
-        preview={worktreeGcPreview}
-        error={worktreeGcError}
-        onClose={() => {
+        worktreeGcOpen={worktreeGcOpen}
+        worktreeGcBusy={worktreeGcBusy}
+        worktreeGcPreviewBusy={worktreeGcPreviewBusy}
+        worktreeGcForce={worktreeGcForce}
+        worktreeGcPreview={worktreeGcPreview}
+        worktreeGcError={worktreeGcError}
+        closeWorktreeGc={() => {
           setWorktreeGcOpen(false);
           setWorktreeGcError(null);
           setWorktreeGcPreview(null);
           setWorktreeGcForce(false);
         }}
-        onSubmit={() => {
+        submitWorktreeGc={() => {
           void submitWorktreeGc();
         }}
-        onForceChange={setWorktreeGcForce}
-      />
-      <WorktreeShipModal
-        locale={locale}
-        open={shipOpen}
-        busy={shipBusy}
-        success={shipSuccess}
-        title={shipTitle}
-        body={shipBody}
-        createPr={shipCreatePr}
-        draft={shipDraft}
-        branch={shipBranch}
-        status={shipStatus}
-        error={shipError}
-        onClose={closeShipFlow}
-        onSubmit={() => {
+        setWorktreeGcForce={setWorktreeGcForce}
+        shipOpen={shipOpen}
+        shipBusy={shipBusy}
+        shipSuccess={shipSuccess}
+        shipTitle={shipTitle}
+        shipBody={shipBody}
+        shipCreatePr={shipCreatePr}
+        shipDraft={shipDraft}
+        shipBranch={shipBranch}
+        shipStatus={shipStatus}
+        shipError={shipError}
+        closeShip={closeShipFlow}
+        submitShip={() => {
           void submitShipFlow();
         }}
-        onTitleChange={(value) => {
+        onShipTitleChange={(value) => {
           setShipTitle(value);
           setShipError(null);
         }}
-        onBodyChange={(value) => {
+        onShipBodyChange={(value) => {
           setShipBody(value);
           setShipError(null);
         }}
-        onCreatePrChange={setShipCreatePr}
-        onDraftChange={setShipDraft}
-        onOpenPrHub={openPrHubFromShip}
-        onToast={showToast}
-      />
-      <ShortcutsHelpModal
-        locale={locale}
-        open={showShortcuts}
-        platform={platform}
+        setShipCreatePr={setShipCreatePr}
+        setShipDraft={setShipDraft}
+        onOpenPrHubFromShip={openPrHubFromShip}
+        showToast={showToast}
+        showShortcuts={showShortcuts}
         composerSendKeyPref={composerSendKeyPref}
         shortcutRemaps={shortcutRemaps}
         voiceHotkeyEnabled={voiceHotkeyEnabled}
-        onClose={() => setShowShortcuts(false)}
-      />
-      {(showProductTutorial) ? (
-      <Suspense fallback={null}>
-      <ProductTutorial
-        open={showProductTutorial}
-        locale={locale}
-        onClose={() => {
+        closeShortcuts={() => setShowShortcuts(false)}
+        showProductTutorial={showProductTutorial}
+        closeProductTutorial={() => {
           markProductTutorialDone();
           setShowProductTutorial(false);
         }}
-        onSkip={() => {
-          markProductTutorialDone();
-          setShowProductTutorial(false);
-        }}
-        onDone={() => {
-          markProductTutorialDone();
-          setShowProductTutorial(false);
-        }}
-      />
-      </Suspense>
-      ) : null}
-      {(liveVoiceOpen) ? (
-      <Suspense fallback={null}>
-      <VoiceOverlay
-        locale={resolveLocale(locale)}
-        open={liveVoiceOpen}
-        projectPath={effectiveProjectPath}
-        projectId={activeProject?.id ?? null}
-        projectName={
+        liveVoiceOpen={liveVoiceOpen}
+        voiceLocale={resolveLocale(locale)}
+        voiceProjectPath={effectiveProjectPath}
+        voiceProjectId={activeProject?.id ?? null}
+        voiceProjectName={
           activeProject
             ? projectDisplayName(activeProject, tr)
             : tr("composer.noProject")
         }
         voiceId={voiceId}
-        keepAgentsOnEnd={voiceKeepAgentsOnEnd}
-        hasActiveSession={Boolean(session.sessionId)}
-        hasVoiceAuth={voiceGate.available}
-        sessions={sessions.map((s) => ({
+        voiceKeepAgentsOnEnd={voiceKeepAgentsOnEnd}
+        voiceHasActiveSession={Boolean(session.sessionId)}
+        voiceHasAuth={voiceGate.available}
+        voiceSessions={sessions.map((s) => ({
           id: s.id,
           title: s.title || tr("session.untitled"),
           status: liveMap[s.id]?.state ?? "idle",
         }))}
-        onClose={() => setLiveVoiceOpen(false)}
-        onClassifiedNotice={onLiveVoiceClassifiedNotice}
-        onSendTranscriptAsPrompt={
+        closeLiveVoice={() => setLiveVoiceOpen(false)}
+        onLiveVoiceClassifiedNotice={onLiveVoiceClassifiedNotice}
+        onSendVoiceTranscriptAsPrompt={
           session.sessionId
             ? async (prompt) => {
                 await executeSend({
@@ -18566,7 +18495,7 @@ export function AppWorkbench() {
               }
             : undefined
         }
-        onFocusSession={(id) => {
+        onVoiceFocusSession={(id) => {
           setLiveVoiceOpen(false);
           void (async () => {
             await refreshSessions();
@@ -18595,8 +18524,7 @@ export function AppWorkbench() {
           })();
         }}
       />
-      </Suspense>
-      ) : null}
+
       <AskUserModal
         payload={askUser}
         timeoutSec={askUserTimeoutSec}
