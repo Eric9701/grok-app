@@ -53,6 +53,7 @@
    **WP-W19 已落地**：Settings 舞台 → `WorkbenchSettingsStage`（<1000）。host 仍持 settings state / 导航 / preload。`ConversationThreadLive` / Compact / Queue / AppDialog 仍留 workbench。天花板 **17600 / 229 / 91**。
    **WP-W20 已落地**：chat 舞台（thread + stall/plan/find/tasks/error）→ `WorkbenchChatStage`（<1000）。composer 作 children 留在 `main__stage`。Compact / Queue / AppDialog 仍留 workbench。天花板 **17240 / 229 / 91**。
    **WP-W21 已落地**：Compact/Queue 弹层 state+JSX → `useCompactDialog` + `useQueueEditDialog` + `WorkbenchComposerModals`（均 <1000）。host 仍绑 send/connect。AppDialog 仍留 workbench。天花板 **17020 / 221 / 90**。
+   **WP-W22 已落地**：AppDialog 挂载 → `WorkbenchAppDialogStage`。host 仍 `setAppDialog` 打开。天花板 **16990 / 221 / 90**。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。
