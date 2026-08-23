@@ -117,7 +117,6 @@ import {
   DEFAULT_SESSION_DATA_MODE,
   normalizeSessionDataMode,
 } from "@/lib/sessionDataMode";
-import { UiErrorBoundary } from "@/components/UiErrorBoundary";
 import {
   buildCompactSlashCommand,
   DEFAULT_COMPACT_PRESET,
@@ -135,8 +134,6 @@ import {
   type CompactionDetailId,
   type CompactionModeId,
 } from "@/lib/compactionMode";
-import { GoalOrchSessionChip } from "@/components/GoalOrchSessionChip";
-import { PlanStatusBar } from "@/components/PlanStatusBar";
 import {
   applyPlanPendingMembership,
   closedSessionPlan,
@@ -152,11 +149,6 @@ import {
   countQuitBlockingSessions,
   stoppableActivitySessions,
 } from "@/lib/agentActivity";
-import {
-  classifyTasksBindCwdError,
-  classifyTasksStopError,
-  type TasksBindCwdResult,
-} from "@/lib/tasksPanelPro";
 import { resolveTrayBusyBadgeCount } from "@/lib/trayNotifyPro";
 import {
   collectAgentDashboardRows,
@@ -187,7 +179,6 @@ import {
 import {
   buildGoalControlSummary,
   filterGoalOrchEvents,
-  goalOrchPhaseLabelKey,
   planClearGoalOrchEvents,
   resolveGoalOrchSessionIndicator,
   shouldConfirmClearGoalOrch,
@@ -231,13 +222,9 @@ import {
 } from "@/lib/viewFocus";
 import {
   projectHostIntoLiveMap,
-  settleStoppedSessionInLiveMap,
 } from "@/lib/sessionLiveStore";
 import { endOfTurnMarkerContent } from "@/lib/endOfTurn";
 import {
-  stallMessageKey,
-  stallTierFromProgress,
-  normalizeStallTier,
   reconcileSessionState,
 } from "@/lib/sessionPhase";
 import {
@@ -371,7 +358,6 @@ import {
   markDone as markProductTutorialDone,
   shouldAutoOffer as shouldAutoOfferProductTutorial,
 } from "@/lib/productTutorial";
-import { ChatFindLive } from "@/components/ChatFindLive";
 import {
   buildAgentPrompt,
   mergeAttachments,
@@ -384,7 +370,6 @@ import {
   prependChatTokens,
   stripChatTokens,
 } from "@/lib/chatAttach";
-import { AttachedChatLookupContext } from "@/components/AttachedChatLookup";
 import { useAttachChat } from "@/hooks/useAttachChat";
 import { mapStoredMessagesToChat } from "@/lib/mapStoredMessages";
 import {
@@ -684,8 +669,6 @@ import {
   summarizeGitDirty,
   type GitDirtySummary,
 } from "@/lib/workspaceGit";
-import { ConversationThreadLive } from "@/components/lobe-chat";
-import { AgentTasksPanelLive } from "@/components/AgentTasksPanelLive";
 
 const AutomationsPage = lazy(async () => {
   const m = await import("@/components/AutomationsPage");
@@ -803,6 +786,7 @@ import { WorkbenchChromeOverlays } from "@/app/WorkbenchChromeOverlays";
 import { WorkbenchComposerColumn } from "@/app/WorkbenchComposerColumn";
 import { WorkbenchFloatingMenus } from "@/app/WorkbenchFloatingMenus";
 import { WorkbenchSettingsStage } from "@/app/WorkbenchSettingsStage";
+import { WorkbenchChatStage } from "@/app/WorkbenchChatStage";
 import { useSessionExportText } from "@/hooks/useSessionExportText";
 import { useSessionExportImage } from "@/hooks/useSessionExportImage";
 import {
@@ -15946,447 +15930,98 @@ export function AppWorkbench() {
             </div>
           )}
 
-          {/* Secondary multi-window: concurrent live tip + focus main. */}
-          {isSecondaryWindow && mainPane === "chat" && (
-            <div
-              className="view-only-banner"
-              role="status"
-              aria-label={tr("session.secondaryLiveTitle")}
-            >
-              <div className="view-only-banner__row">
-                <div className="view-only-banner__copy">
-                  <div className="view-only-banner__title">
-                    {tr("session.secondaryLiveTitle")}
-                  </div>
-                  <div className="view-only-banner__body">
-                    {tr("session.secondaryLiveBanner")}
-                  </div>
-                </div>
-                {api.isDesktopHost() ? (
-                  <button
-                    type="button"
-                    className="btn btn--ghost view-only-banner__action"
-                    onClick={() => {
-                      void api.focusMainWindow().catch((e) => {
-                        showToast(
-                          tr("session.focusMainWindowFailed") +
-                            ": " +
-                            String(e),
-                          3200,
-                        );
-                      });
-                    }}
-                  >
-                    {tr("session.focusMainWindow")}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          )}
-
-          {/* I06: soft stall — heal-first Host; soft banner is secondary. Primary = keep waiting. */}
-          {streamStall && mainPane === "chat" && (
-            <div
-              className={`stall-banner error-banner${
-                (() => {
-                  const sid = streamStall.sessionId || session.sessionId || "";
-                  const live = liveMap[sid];
-                  const saw =
-                    !!streamStall.sawModelOutput ||
-                    !!live?.sawModelOutput ||
-                    false;
-                  const tools =
-                    !!streamStall.sawToolActivity ||
-                    !!live?.sawToolActivity ||
-                    false;
-                  const hostTier = normalizeStallTier(streamStall.tier);
-                  const tier =
-                    hostTier ??
-                    stallTierFromProgress({
-                      sawModelOutput: saw,
-                      sawToolActivity: tools,
-                      terminalCandidate: saw && !live?.liveToolId,
-                    });
-                  return tier === "maybe_done" || tier === "post_output"
-                    ? " stall-banner--soft"
-                    : "";
-                })()
-              }`}
-              role="status"
-            >
-              <div className="error-banner__code">STREAM_STALL</div>
-              <div className="error-banner__summary">
-                {(() => {
-                  const sid = streamStall.sessionId || session.sessionId || "";
-                  const live = liveMap[sid];
-                  const saw =
-                    !!streamStall.sawModelOutput || !!live?.sawModelOutput;
-                  const tools =
-                    !!streamStall.sawToolActivity || !!live?.sawToolActivity;
-                  const hostTier = normalizeStallTier(streamStall.tier);
-                  const tier =
-                    hostTier ??
-                    stallTierFromProgress({
-                      sawModelOutput: saw,
-                      sawToolActivity: tools,
-                      terminalCandidate: saw && !live?.liveToolId,
-                    });
-                  const key = stallMessageKey(tier);
-                  if (key === "endOfTurn.stallPreToken") {
-                    return tr("endOfTurn.stallPreToken");
-                  }
-                  if (key === "endOfTurn.stallWorkingTools") {
-                    return tr("endOfTurn.stallWorkingTools");
-                  }
-                  if (key === "endOfTurn.stallMaybeDone") {
-                    return tr("endOfTurn.stallMaybeDone");
-                  }
-                  return tr("error.deck.stall.problem");
-                })()}
-              </div>
-              <div className="error-banner__cause">
-                {tr("error.deck.stall.cause", {
-                  seconds: String(streamStall.stallSeconds),
-                })}
-              </div>
-              <div className="stall-banner__actions error-banner__actions">
-                <button
-                  type="button"
-                  className="btn btn--primary stall-banner__btn"
-                  onClick={() => setStreamStall(null)}
-                >
-                  {tr("agent.streamStallKeepWaiting")}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost stall-banner__btn"
-                  onClick={() => {
-                    setStreamStall(null);
-                    void stop();
-                  }}
-                >
-                  {tr("agent.streamStallEndTurn")}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {mainPane === "chat" && (!plan.barDismissed || goalMode) && (
-            <PlanStatusBar
-              goalMode={goalMode}
-              mode={mode}
-              planVisible={plan.visible}
-              planWaiting={plan.waiting}
-              planRpcId={plan.rpcId}
-              planNeedsResume={
-                plan.visible &&
-                plan.rpcId == null &&
-                (plan.gateStale || plan.awaitingAgentApproval)
-              }
-              entries={plan.entries}
-              labels={{
-                goal: tr("planBar.goal"),
-                planMode: tr("planBar.planMode"),
-                progress: tr("planBar.progress"),
-                review: tr("planBar.review"),
-                done: tr("planBar.done"),
-                resume: tr("planBar.resume"),
-                fraction: tr("planBar.fraction"),
-                current: tr("planBar.current"),
-                approve: tr("plan.approve"),
-                changes: tr("plan.changes"),
-                dismiss: tr("plan.dismiss"),
-                exitPlanMode: tr("plan.exitPlanMode"),
-                expand: tr("planBar.expand"),
-                clearGoal: tr("planBar.clearGoal"),
-                aria: tr("planBar.aria"),
-              }}
-              onApprove={() => void approvePlan()}
-              onRequestChanges={() => openRequestPlanChanges()}
-              onDismiss={() => void dismissPlan()}
-              onExitPlanMode={exitPlanMode}
-              onClearGoal={() => setGoalMode(false)}
-              onOpenDetails={() => openPlanInResource()}
-            />
-          )}
-
-          {mainPane === "chat" && goalOrchSessionChip ? (
-            <GoalOrchSessionChip
-              indicator={goalOrchSessionChip}
-              phaseLabel={tr(
-                goalOrchPhaseLabelKey(goalOrchSessionChip.phase),
-              )}
-              canClear={goalOrchSessionEvents.length > 0}
-              labels={{
-                chipLabel:
-                  goalOrchSessionChip.kind === "waiting"
-                    ? tr("reliability.goal.sessionChipWaiting")
-                    : tr("reliability.goal.sessionChip", {
-                        phase: tr(
-                          goalOrchPhaseLabelKey(goalOrchSessionChip.phase),
-                        ),
-                      }),
-                aria:
-                  goalOrchSessionChip.kind === "waiting"
-                    ? tr("reliability.goal.sessionChipWaitingAria")
-                    : tr("reliability.goal.sessionChipAria", {
-                        phase: tr(
-                          goalOrchPhaseLabelKey(goalOrchSessionChip.phase),
-                        ),
-                      }),
-                title:
-                  goalOrchSessionChip.kind === "waiting"
-                    ? tr("reliability.goal.sessionChipWaitingTitle")
-                    : tr(goalOrchPhaseLabelKey(goalOrchSessionChip.phase)),
-                menuAria: tr("reliability.goal.sessionMenuAria"),
-                openReliability: tr("reliability.goal.openReliability"),
-                copySummary: tr("reliability.goal.copySummary"),
-                clearTimeline: tr("reliability.goal.clearTimeline"),
-              }}
-              onOpenReliability={() => openReliability()}
-              onCopySummary={() => void copyGoalOrchControlSummary()}
-              onClearTimeline={requestClearLocalGoalOrchTimeline}
-            />
-          ) : null}
-
-          {mainPane === "chat" && showChatFind && (
-            <ChatFindLive
-              focusNonce={chatFindFocusKey}
-              labels={{
-                placeholder: tr("chatFind.placeholder"),
-                prev: tr("chatFind.prev"),
-                next: tr("chatFind.next"),
-                close: tr("chatFind.close"),
-                count: tr("chatFind.count"),
-                noMatches: tr("chatFind.noMatches"),
-                aria: tr("chatFind.aria"),
-              }}
-              onClose={() => setShowChatFind(false)}
-            />
-          )}
-          {mainPane === "chat" && tasksPanelOpen && session.sessionId ? (
-            <AgentTasksPanelLive
-              t={(k, vars) => tr(k, vars)}
-              onClose={() => setTasksPanelOpen(false)}
-              subagentWorktreeSnapshotEnabled={
-                subagentWorktreeSnapshotEnabled
-              }
-              activityLookupSessions={sessions}
-              currentSessionId={session.sessionId}
-              untitledLabel={tr("session.untitled")}
-              onSelectSession={(id) => {
-                const row = sessions.find((s) => s.id === id);
-                if (!row) return;
-                const proj =
-                  projects.find((p) => p.id === row.projectId) || null;
-                void openSession(row, proj);
-              }}
-              onStopSession={async (id) => {
-                try {
-                  await api.sessionStop(id);
-                  setLiveMap((lm) => settleStoppedSessionInLiveMap(lm, id));
-                } catch (e) {
-                  const view = classifyTasksStopError(e);
-                  showToast(tr(view.titleKey as MessageKey), 4000);
-                  // Re-throw so the panel can also show an inline soft-fail hint.
-                  throw e;
-                }
-              }}
-              onStopAllSessions={() => stopAllBusySessions("tasks")}
-              onOpenDashboard={() => setAgentDashboardOpen(true)}
-              activeCwd={activeProject?.path ?? null}
-              onOpenCwd={async (cwd): Promise<TasksBindCwdResult> => {
-                const path = (cwd || "").trim();
-                if (!path) {
-                  return { ok: false, kind: "empty_path" };
-                }
-                if (!api.isTauri()) {
-                  return { ok: false, kind: "host_only" };
-                }
-                if (
-                  activeProject?.path &&
-                  pathsEqual(path, activeProject.path)
-                ) {
-                  return { ok: false, kind: "already_active" };
-                }
-                const wt = worktreeEntryForPath(path, gitWorktrees);
-                if (!wt) {
-                  return { ok: false, kind: "not_worktree" };
-                }
-                try {
-                  await switchToWorktree(wt);
-                  const liveId =
-                    viewingSessionIdRef.current || session.sessionId || null;
-                  if (liveId) {
-                    await markSessionWorktree(liveId, wt.path, wt.branch);
-                  }
-                  return { ok: true };
-                } catch (e) {
-                  const view = classifyTasksBindCwdError(e);
-                  showToast(tr(view.titleKey as MessageKey), 4000);
-                  return {
-                    ok: false,
-                    kind: view.kind,
-                    detail: view.detail || undefined,
-                  };
-                }
-              }}
-            />
-          ) : null}
-
-          {/* Pre-turn / host errors: T04 deck (problem · cause · primary · secondary) */}
-          {errorBanner && !hasChatTurnError && (
-            <div className="error-banner" role="alert">
-              {errorBanner.code ? (
-                <div className="error-banner__code">{errorBanner.code}</div>
-              ) : null}
-              <div className="error-banner__summary">{errorBanner.summary}</div>
-              {errorBanner.cause ? (
-                <div className="error-banner__cause">{errorBanner.cause}</div>
-              ) : null}
-              <div className="error-banner__actions">
-                {errorBanner.primary ? (
-                  <button
-                    type="button"
-                    className="btn btn--primary error-banner__primary"
-                    disabled={
-                      shouldDisableReconnectBecauseConnecting(connecting) &&
-                      errorBanner.primary.id === "reconnect"
-                    }
-                    onClick={() => {
-                      if (errorBanner.primary) {
-                        runErrorBannerAction(errorBanner.primary);
-                      }
-                    }}
-                  >
-                    {errorBanner.primary.label}
-                  </button>
-                ) : null}
-                {errorBanner.secondary ? (
-                  <button
-                    type="button"
-                    className="btn btn--ghost error-banner__secondary"
-                    disabled={
-                      shouldDisableReconnectBecauseConnecting(connecting) &&
-                      errorBanner.secondary.id === "reconnect"
-                    }
-                    onClick={() => {
-                      if (errorBanner.secondary) {
-                        runErrorBannerAction(errorBanner.secondary);
-                      }
-                    }}
-                  >
-                    {errorBanner.secondary.label}
-                  </button>
-                ) : null}
-                {!errorBanner.primary &&
-                  (errorBanner.reconnectHint ||
-                    session.state === "disconnected") && (
-                    <button
-                      type="button"
-                      className="btn btn--ghost error-banner__reconnect"
-                      disabled={shouldDisableReconnectBecauseConnecting(
-                        connecting,
-                      )}
-                      onClick={() => {
-                        setErrorDetailOpen(false);
-                        retryAgentConnect();
-                      }}
-                    >
-                      {tr("main.reconnect")}
-                    </button>
-                  )}
-                {errorBanner.detail ? (
-                  <button
-                    type="button"
-                    className="error-banner__details-btn"
-                    aria-expanded={errorDetailOpen}
-                    onClick={() => setErrorDetailOpen((v) => !v)}
-                  >
-                    {errorDetailOpen
-                      ? tr("error.hideDetails")
-                      : tr("error.details")}
-                  </button>
-                ) : null}
-              </div>
-              {errorBanner.detail && errorDetailOpen && (
-                <pre className="error-banner__detail">{errorBanner.detail}</pre>
-              )}
-            </div>
-          )}
-
-          <div
-            className="main__stage"
-            style={
-              {
-                ["--composer-float-pad"]: `${composerFloatPad}px`,
-              } as CSSProperties
-            }
-          >
-          <div className="sr-only" aria-live="polite" aria-atomic="true">
-            {streamA11yNote}
-          </div>
-          <AttachedChatLookupContext.Provider value={attachedChatLookup}>
-          <UiErrorBoundary
-            resetKey={session.sessionId ?? `draft-${session.title ?? "new"}`}
-            labels={{
-              title: tr("ui.errorBoundary.title"),
-              body: tr("ui.errorBoundary.body"),
-              retry: tr("ui.errorBoundary.retry"),
-            }}
-          >
-          <ConversationThreadLive
-            onContinueInterrupted={onThreadContinueInterrupted}
-            onAddQuote={onThreadAddQuote}
-            locale={locale}
-            sessionState={
-              stopLatch.phase === "force_idle" || stopGate.forceIdle
-                ? "ready"
-                : session.state
-            }
-            sessionKey={session.sessionId ?? `draft-${session.title ?? "new"}`}
-            projectPath={effectiveProjectPath}
-            suppressEmptyCopy={welcomeSession}
-            journalLoading={journalPending}
-            hasExistingSession={!!session.sessionId}
-            journalHydrated={
-              !!session.sessionId &&
-              sessionTranscriptStore.isJournalHydrated(session.sessionId)
-            }
-            canEditLastUser={canEditLastUser}
-            lastUserMessageId={lastUserMessageId}
-            editingUserMessageId={editingUserMessageId}
-            editSubmitting={editSubmitting}
-            editAttachments={editAttachments}
-            onEditUserMessage={beginEditLastUser}
-            onCancelEditUserMessage={cancelEditUser}
-            onSubmitEditUserMessage={submitEditLastUser}
-            onRemoveEditAttachment={onThreadRemoveEditAttachment}
-            canRegenerate={canEditLastUser && !editSubmitting}
-            onRegenerateAssistant={regenerateLastAssistant}
-            regenerateModels={availableModels}
-            regenerateModelId={modelId}
-            canRewindSession={canRewindSession && !!session.sessionId}
-            onRewindToUserMessage={onRewindToUserMessage}
-            onForkFromAssistantMessage={onForkFromAssistantMessage}
-            turnStartedAt={turnStartedAt}
-            onOpenSessionChanges={onThreadOpenSessionChanges}
-            onOpenModifiedPath={onThreadOpenModifiedPath}
-            onOpenResource={onThreadOpenResource}
-            onOpenError={onThreadOpenError}
-            onOpenExternalLink={openExternalLinkFromChat}
-            onAddAttachmentToComposer={onThreadAddAttachmentToComposer}
+          <WorkbenchChatStage
+            activeProject={activeProject}
+            approvePlan={approvePlan}
             attachLabels={attachLabels}
-            showTimestamps={showMessageTimestamps}
+            attachedChatLookup={attachedChatLookup}
+            availableModels={availableModels}
+            beginEditLastUser={beginEditLastUser}
+            canEditLastUser={canEditLastUser}
+            canRewindSession={canRewindSession}
+            cancelEditUser={cancelEditUser}
+            chatFindFocusKey={chatFindFocusKey}
+            composerFloatPad={composerFloatPad}
+            connecting={connecting}
+            copyGoalOrchControlSummary={copyGoalOrchControlSummary}
+            dismissPlan={dismissPlan}
+            editAttachments={editAttachments}
+            editSubmitting={editSubmitting}
+            editingUserMessageId={editingUserMessageId}
+            effectiveProjectPath={effectiveProjectPath}
+            errorBanner={errorBanner}
+            errorDetailOpen={errorDetailOpen}
+            exitPlanMode={exitPlanMode}
+            gitWorktrees={gitWorktrees}
+            goalMode={goalMode}
+            goalOrchSessionChip={goalOrchSessionChip}
+            goalOrchSessionEvents={goalOrchSessionEvents}
+            hasChatTurnError={hasChatTurnError}
+            isSecondaryWindow={isSecondaryWindow}
+            journalPending={journalPending}
+            lastUserMessageId={lastUserMessageId}
+            liveMap={liveMap}
+            locale={locale}
+            mainPane={mainPane}
+            markSessionWorktree={markSessionWorktree}
             messageTimeFormat={messageTimeFormat}
+            mode={mode}
+            modelId={modelId}
+            onForkFromAssistantMessage={onForkFromAssistantMessage}
+            onRewindToUserMessage={onRewindToUserMessage}
+            onThreadAddAttachmentToComposer={onThreadAddAttachmentToComposer}
+            onThreadAddQuote={onThreadAddQuote}
+            onThreadContinueInterrupted={onThreadContinueInterrupted}
+            onThreadOpenError={onThreadOpenError}
+            onThreadOpenModifiedPath={onThreadOpenModifiedPath}
+            onThreadOpenResource={onThreadOpenResource}
+            onThreadOpenSessionChanges={onThreadOpenSessionChanges}
+            onThreadRemoveEditAttachment={onThreadRemoveEditAttachment}
+            openExternalLinkFromChat={openExternalLinkFromChat}
+            openPlanInResource={openPlanInResource}
+            openReliability={openReliability}
+            openRequestPlanChanges={openRequestPlanChanges}
+            openSession={openSession}
+            plan={plan}
+            projects={projects}
+            regenerateLastAssistant={regenerateLastAssistant}
+            requestClearLocalGoalOrchTimeline={requestClearLocalGoalOrchTimeline}
+            retryAgentConnect={retryAgentConnect}
+            runErrorBannerAction={runErrorBannerAction}
+            session={session}
+            sessionJsonSchema={sessionJsonSchema}
+            sessionTranscriptStore={sessionTranscriptStore}
+            sessions={sessions}
+            setAgentDashboardOpen={setAgentDashboardOpen}
+            setErrorDetailOpen={setErrorDetailOpen}
+            setGoalMode={setGoalMode}
+            setLiveMap={setLiveMap}
+            setShowChatFind={setShowChatFind}
+            setStreamStall={setStreamStall}
+            setTasksPanelOpen={setTasksPanelOpen}
+            shouldDisableReconnectBecauseConnecting={shouldDisableReconnectBecauseConnecting}
+            showChatFind={showChatFind}
+            showMessageTimestamps={showMessageTimestamps}
             showReplyLength={showReplyLength}
-            structuredOutputActive={!!sessionJsonSchema}
-            structuredOutputSchema={sessionJsonSchema}
-            structuredOutputUsage={structuredOutputUsage}
+            showToast={showToast}
+            stop={stop}
+            stopAllBusySessions={stopAllBusySessions}
+            stopGate={stopGate}
+            stopLatch={stopLatch}
+            streamA11yNote={streamA11yNote}
+            streamStall={streamStall}
             structuredOutputLabels={structuredOutputLabels}
-          />
-          </UiErrorBoundary>
-          </AttachedChatLookupContext.Provider>
+            structuredOutputUsage={structuredOutputUsage}
+            subagentWorktreeSnapshotEnabled={subagentWorktreeSnapshotEnabled}
+            submitEditLastUser={submitEditLastUser}
+            switchToWorktree={switchToWorktree}
+            tasksPanelOpen={tasksPanelOpen}
+            tr={tr}
+            turnStartedAt={turnStartedAt}
+            viewingSessionIdRef={viewingSessionIdRef}
+            welcomeSession={welcomeSession}
+            worktreeEntryForPath={worktreeEntryForPath}
+          >
           <WorkbenchComposerColumn
             account={account}
             activeProject={activeProject}
@@ -16571,7 +16206,7 @@ export function AppWorkbench() {
             promptHistoryStyle={promptHistoryStyle}
             promptHistoryIndexRef={promptHistoryIndexRef}
           />
-          </div>
+          </WorkbenchChatStage>
           </>
           )}
           {bottomTerminalMounted ? (
