@@ -540,7 +540,7 @@ export function FilePathCard({
 
   return (
     <>
-      <div
+      <span
         className={
           "file-path-card" +
           (isUrl ? " file-path-card--url" : "") +
@@ -572,7 +572,7 @@ export function FilePathCard({
             <span className="file-path-card__name">{name}</span>
           </span>
         </button>
-      </div>
+      </span>
 
       <ContextMenu
         open={!!menu}

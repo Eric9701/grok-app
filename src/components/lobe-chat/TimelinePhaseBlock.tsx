@@ -50,6 +50,7 @@ import {
 import {
   resolveToolPrimaryLabel,
   toolExpandBody,
+  toolExpandHasBody,
   type ToolDisplayKind,
 } from "@/lib/toolDisplay";
 import {
@@ -313,16 +314,6 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
     step.type === "web-search" ? step.resultDomains : undefined;
 
   const expandTool = step.type === "tool" ? step.tool : null;
-  const expand = expandTool
-    ? toolExpandBody(expandTool, failed)
-    : {
-        failHint: "",
-        failHintShort: "",
-        detailTail: "",
-        outputBody: "",
-        command: "",
-        hasBody: false,
-      };
   // An explore-group is always expandable: its body is the child step list.
   // A thought step is expandable when it has body text beyond the one-line
   // summary — otherwise the reasoning is unreadable inside the phase (only the
@@ -332,7 +323,7 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
     step.type === "bash-group" ||
     step.type === "edit-group";
   const hasBody =
-    expand.hasBody ||
+    (expandTool ? toolExpandHasBody(expandTool, failed) : false) ||
     (grouped && step.children.length > 0) ||
     (step.type === "thought" && step.text.trim().length > 0);
 
@@ -369,6 +360,13 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
 
   const open = hasBody && expanded && !lockCollapsed;
   const showBody = open;
+  // Body strings (ANSI-stripped, line-elided output) are built only for open
+  // rows — collapsed rows in a big phase used to pay this on every mid-scroll
+  // mount (see toolExpandHasBody).
+  const expand = useMemo(
+    () => (expandTool && open ? toolExpandBody(expandTool, failed) : null),
+    [expandTool, open, failed],
+  );
 
   if (step.type === "speech") {
     const speechFindBase = findMatchesBeforeVisible({
@@ -480,12 +478,12 @@ const GrokActivityStepRow = memo(function GrokActivityStepRow({
                 {step.text}
               </MarkdownChat>
             </div>
-          ) : (
+          ) : expand ? (
             <ToolExpandBody
               body={expand}
               className="lobe-timeline-tool__body grok-act__expand-body"
             />
-          )
+          ) : null
         ) : null}
       </div>
     </div>
@@ -794,6 +792,7 @@ export const TimelinePhaseBlock = memo(function TimelinePhaseBlock({
   }, [phaseRunning, phase.id, stampPool]);
 
   const stepsResolved = useMemo(() => {
+    if (!expanded) return [];
     const items =
       phase.items?.length
         ? phase.items
@@ -807,7 +806,7 @@ export const TimelinePhaseBlock = memo(function TimelinePhaseBlock({
       live: phase.live,
       messageStreaming: !!messageStreaming,
     });
-  }, [phase.items, phase.thoughts, phase.tools, phase.live, messageStreaming]);
+  }, [expanded, phase.items, phase.thoughts, phase.tools, phase.live, messageStreaming]);
 
   // Prefer the larger of wall-clock and timestamp span (see resolveWorkDurationSec).
   const durationSec = resolveWorkDurationSec({ liveSec, historySec });

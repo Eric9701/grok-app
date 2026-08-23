@@ -19,9 +19,14 @@
  * - Cache cumulative offsets until a height commit or itemCount change.
  * - Adaptive overscan via {@link resolveChatOverscanPx}.
  * - Force-index expand capped while escaped (see chatVirtualList).
+ * - Overscan-only window commits render via startTransition ("background
+ *   mounting"): when the committed window still covers the viewport, new rows
+ *   are pure pre-mounting, so React may time-slice them and scroll/input can
+ *   interrupt. Only a viewport hole forces the urgent lane.
  */
 
 import {
+  startTransition,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -35,9 +40,7 @@ import {
   computeChatVirtualWindow,
   cumulativeOffsets,
   resolveChatOverscanPx,
-  scrollTopAfterHeightChange,
   shouldCommitRowHeight,
-  shouldWriteScrollOnRowCommit,
   shouldVirtualizeChat,
   type ChatVirtualWindow,
 } from "@/lib/chatVirtualList";
@@ -53,7 +56,11 @@ import {
   isPaneSplitMotionActive,
   runAfterPaneSplitMotion,
 } from "@/lib/paneSplitMotion";
-import { shouldSnapPinnedLayoutToBottom } from "@/lib/stickToBottom";
+import {
+  distanceFromBottom,
+  STICK_ESCAPE_MIN_DELTA_PX,
+} from "@/lib/stickToBottom";
+import { createScrollVelocityTracker } from "@/lib/scrollVelocity";
 
 export type UseChatMessageVirtualizerArgs = {
   itemCount: number;
@@ -144,22 +151,14 @@ export function useChatMessageVirtualizer(
   const observedIndicesRef = useRef<Map<number, HTMLElement>>(new Map());
   /** Coalesce scroll-driven recomputes to one paint (rAF + mixed-Hz fallback). */
   const scrollFrameRef = useRef<FrameSchedule>(emptyFrameSchedule());
+  /** High-precision physics velocity tracker (derivative of scrollTop / dt). */
+  const velocityTrackerRef = useRef(createScrollVelocityTracker());
   /**
-   * True while the user is actively scrolling. Height remeasures that rebuild
-   * the virtual window mid-fling were the main "everything jitters on scroll"
-   * source (estimate→actual + paddingTop churn). Defer those until idle.
+   * True while the user is actively scrolling or flinging with non-zero momentum.
    */
   const scrollingRef = useRef(false);
-  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  /** Height commits landed during scroll — recompute once when idle. */
-  const pendingHeightRecomputeRef = useRef(false);
-  /**
-   * Measures taken mid-scroll. Applied to heightsRef only after scroll idle
-   * so window offsets stay stable during the gesture (no padding flash).
-   */
-  const pendingHeightsRef = useRef<Map<string, number>>(new Map());
+  /** Height delta above viewport absorbed by spacer during active scroll. */
+  const pendingAnchorOffsetRef = useRef(0);
   /**
    * Bump when any committed height changes so the offset cache invalidates.
    * Avoids O(n) cumulative rebuild on every scroll when heights are stable.
@@ -172,12 +171,68 @@ export function useChatMessageVirtualizer(
   } | null>(null);
 
   const [win, setWin] = useState<ChatVirtualWindow>(() => full(itemCount));
+  const winRef = useRef(win);
+  winRef.current = win;
+  /**
+   * Window as last committed to the DOM. Transition commits lag winRef, and
+   * the urgent-vs-background decision must be made against what the user can
+   * actually see mounted, not against the latest scheduled window.
+   */
+  const committedWinRef = useRef(win);
+  useLayoutEffect(() => {
+    committedWinRef.current = win;
+  }, [win]);
+  /**
+   * Distance from the bottom captured right before a pinned window commit.
+   * The post-commit snap restores this distance instead of trusting
+   * post-commit reads, which cannot distinguish user movement from
+   * scrollHeight drift caused by the freshly mounted rows.
+   */
+  const pinnedPreCommitBottomDistRef = useRef(0);
+
+  /**
+   * Mirror scrollingRef onto the viewport as data-scrolling so CSS can turn
+   * off pointer events (kills per-frame :hover style recalc mid-gesture).
+   *
+   * Disable is immediate; restore is debounced. Each attribute flip costs a
+   * full-list style recalc, and slow drags "settle" for a few frames between
+   * wheel ticks — without the debounce one gesture toggled hover 31 times.
+   */
+  const hoverRestoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const setScrollingUi = useCallback(
+    (active: boolean) => {
+      const el = viewportRef.current;
+      if (!el) return;
+      if (hoverRestoreTimerRef.current != null) {
+        clearTimeout(hoverRestoreTimerRef.current);
+        hoverRestoreTimerRef.current = null;
+      }
+      if (active) {
+        if (el.dataset.scrolling !== "1") {
+          el.dataset.scrolling = "1";
+        }
+        return;
+      }
+      if (el.dataset.scrolling !== "1") return;
+      hoverRestoreTimerRef.current = setTimeout(() => {
+        hoverRestoreTimerRef.current = null;
+        const v = viewportRef.current;
+        if (v && v.dataset.scrolling === "1") {
+          delete v.dataset.scrolling;
+        }
+      }, 220);
+    },
+    [viewportRef],
+  );
 
   // Drop height cache on conversation change.
   useEffect(() => {
     heightsRef.current.clear();
     heightsVersionRef.current = 0;
     offsetsCacheRef.current = null;
+    pendingAnchorOffsetRef.current = 0;
     if (sharedRowObserverRef.current) {
       sharedRowObserverRef.current.disconnect();
       sharedRowObserverRef.current = null;
@@ -217,29 +272,69 @@ export function useChatMessageVirtualizer(
     return offsets;
   }, [getHeight]);
 
-  const recomputeNow = useCallback(() => {
+  const recomputeNow = useCallback((options?: { sampleVelocity?: boolean }) => {
     const count = itemCountRef.current;
     if (!virtualizedRef.current) {
-      setWin((prev) => {
-        const next = full(count);
-        return prev.start === next.start &&
-          prev.end === next.end &&
-          prev.paddingTop === 0 &&
-          prev.paddingBottom === 0
-          ? prev
-          : next;
-      });
+      const next = full(count);
+      const prev = winRef.current;
+      if (
+        prev.start === next.start &&
+        prev.end === next.end &&
+        prev.paddingTop === 0 &&
+        prev.paddingBottom === 0
+      ) {
+        return;
+      }
+      winRef.current = next;
+      setWin(next);
       return;
     }
     const el = viewportRef.current;
     if (!el) {
-      setWin(full(count));
+      const next = full(count);
+      winRef.current = next;
+      setWin(next);
       return;
     }
     const t0 = performance.now();
     const pin = !!isPinnedRef.current;
+
+    if (pin && scrollingRef.current) {
+      scrollingRef.current = false;
+      pendingAnchorOffsetRef.current = 0;
+      setScrollingUi(false);
+    }
+
+    // A synchronous scrollTop write below must land with its compensating
+    // paddingTop in the same commit — a deferred (transition) commit would
+    // paint one frame of visible jump. Forces the urgent lane.
+    let scrollTopWasWritten = false;
+
+    // Velocity-driven motion tracking: only sample when requested by scroll/rAF loop
+    if (options?.sampleVelocity && !pin) {
+      const velState = velocityTrackerRef.current.sample(el.scrollTop, t0);
+      if (velState.isMoving) {
+        scrollingRef.current = true;
+        // Schedule next rAF to continue tracking velocity decay until motion settles
+        scheduleOnFrame(scrollFrameRef.current, () =>
+          recomputeNow({ sampleVelocity: true }),
+        );
+      } else if (scrollingRef.current) {
+        scrollingRef.current = false;
+        setScrollingUi(false);
+        // Motion settled (velocity == 0): safely flush absorbed anchor offset to scrollTop!
+        const flushOffset = pendingAnchorOffsetRef.current;
+        pendingAnchorOffsetRef.current = 0;
+        if (Math.abs(flushOffset) > 0.5) {
+          ignoreScrollAdjustRef.current = true;
+          el.scrollTop += flushOffset;
+          scrollTopWasWritten = true;
+        }
+      }
+    }
+
     const offsets = getOffsets();
-    const next = computeChatVirtualWindow({
+    let next = computeChatVirtualWindow({
       count,
       getHeight,
       scrollTop: el.scrollTop,
@@ -256,46 +351,127 @@ export function useChatMessageVirtualizer(
       forceIndices: forceRef.current,
       offsets,
     });
-    const recomputeDuration = performance.now() - t0;
-    scrollPerfDebug.recordRecomputeTime(recomputeDuration, {
-      start: next.start,
-      end: next.end,
-      total: count,
-      scrollTop: el.scrollTop,
-      scrollHeight: el.scrollHeight,
-      paddingTop: next.paddingTop,
-      paddingBottom: next.paddingBottom,
-    });
-    setWin((prev) => {
+
+    // Urgent-vs-background lane decision, made against the DOM-committed
+    // window (winRef can run ahead of pending transition commits): if the
+    // committed window still covers the viewport plus a margin, this update
+    // only grows/trims overscan — pure pre-mounting. That holds for pinned
+    // windows too (tail covered ⇒ expansion upward is background work).
+    const committed = committedWinRef.current;
+    const cTopPx = offsets[Math.min(committed.start, count)] ?? 0;
+    const cBottomPx = offsets[Math.min(committed.end, count)] ?? 0;
+    const viewTop = el.scrollTop;
+    const viewBottom = viewTop + el.clientHeight;
+    const coverMarginPx = 240;
+    const committedCoversViewport =
+      cTopPx <= Math.max(0, viewTop - coverMarginPx) &&
+      cBottomPx >= Math.min(next.totalHeight, viewBottom + coverMarginPx);
+    const deferrable = !scrollTopWasWritten && committedCoversViewport;
+
+    // Chunked pre-mounting: a deferred expansion mounts at most a few rows
+    // per commit, and an rAF loop walks the window to the full target.
+    // Without the cap, a pin↔browse window swing after re-pinning committed
+    // ten rows (five "Worked for …" phase blocks) at once — a ~100ms commit
+    // even on the transition lane, because the DOM commit is atomic.
+    if (deferrable) {
+      const MAX_MOUNT_ROWS_PER_COMMIT = 3;
+      let s = next.start;
+      let e = next.end;
+      const sFloor = committed.start - MAX_MOUNT_ROWS_PER_COMMIT;
       if (
-        prev.start === next.start &&
-        prev.end === next.end &&
-        prev.paddingTop === next.paddingTop &&
-        prev.paddingBottom === next.paddingBottom &&
-        prev.totalHeight === next.totalHeight
+        s < sFloor &&
+        !forceRef.current.some((i) => i >= s && i < sFloor)
       ) {
-        return prev;
+        s = sFloor;
       }
-      // Ignore sub-pixel spacer thrash when the visible range is unchanged
-      // (pin or browse) — main source of bottom / mid-scroll flash.
+      const eCeil = committed.end + MAX_MOUNT_ROWS_PER_COMMIT;
       if (
-        prev.start === next.start &&
-        prev.end === next.end &&
-        Math.abs(prev.paddingTop - next.paddingTop) < 4 &&
-        Math.abs(prev.paddingBottom - next.paddingBottom) < 4 &&
-        Math.abs(prev.totalHeight - next.totalHeight) < 8
+        !pin &&
+        e > eCeil &&
+        !forceRef.current.some((i) => i >= eCeil && i < e)
       ) {
-        return prev;
+        e = eCeil;
       }
-      return next;
-    });
-  }, [viewportRef, isPinnedRef, getHeight, getOffsets]);
+      if (s !== next.start || e !== next.end) {
+        next = {
+          ...next,
+          start: s,
+          end: e,
+          paddingTop: offsets[s] ?? 0,
+          paddingBottom: Math.max(
+            0,
+            next.totalHeight - (offsets[Math.min(e, count)] ?? next.totalHeight),
+          ),
+        };
+        scheduleOnFrame(scrollFrameRef.current, () => recomputeNow());
+      }
+    }
+
+    const effectivePaddingTop = Math.max(
+      0,
+      next.paddingTop - pendingAnchorOffsetRef.current,
+    );
+    const adjustedNext =
+      effectivePaddingTop !== next.paddingTop
+        ? { ...next, paddingTop: effectivePaddingTop }
+        : next;
+
+    if (import.meta.env.DEV) {
+      const recomputeDuration = performance.now() - t0;
+      scrollPerfDebug.recordRecomputeTime(recomputeDuration, {
+        start: adjustedNext.start,
+        end: adjustedNext.end,
+        total: count,
+        scrollTop: el.scrollTop,
+        scrollHeight: el.scrollHeight,
+        paddingTop: adjustedNext.paddingTop,
+        paddingBottom: adjustedNext.paddingBottom,
+      });
+    }
+
+    const prev = winRef.current;
+    if (
+      prev.start === adjustedNext.start &&
+      prev.end === adjustedNext.end &&
+      (scrollingRef.current || (
+        prev.paddingTop === adjustedNext.paddingTop &&
+        prev.paddingBottom === adjustedNext.paddingBottom &&
+        prev.totalHeight === adjustedNext.totalHeight
+      ))
+    ) {
+      return;
+    }
+
+    // Capture the distance-from-bottom *before* this commit lands. The pinned
+    // snap effect restores it: post-commit reads cannot tell "user scrolled
+    // up" from "mounted rows shifted scrollHeight", and judging on post-commit
+    // numbers made >10px measurement drift refuse the snap (bottom bounce).
+    if (pin) {
+      pinnedPreCommitBottomDistRef.current = distanceFromBottom(
+        el.scrollTop,
+        el.scrollHeight,
+        el.clientHeight,
+      );
+    }
+
+    winRef.current = adjustedNext;
+
+    // Background-mount lane: render pure-overscan updates as a transition so
+    // React can time-slice the row mounts and scroll frames stay clean. A
+    // viewport hole must commit urgently or the user scrolls into blank space.
+    if (deferrable) {
+      startTransition(() => {
+        setWin(adjustedNext);
+      });
+      return;
+    }
+    setWin(adjustedNext);
+  }, [viewportRef, isPinnedRef, getHeight, getOffsets, setScrollingUi]);
 
   const recompute = useCallback(() => {
     // Never rebuild the virtual window from height churn mid-scroll — that
     // paddingTop flash is the universal scroll jitter.
     if (scrollingRef.current) {
-      pendingHeightRecomputeRef.current = true;
       return;
     }
     // Coalesce measure storms (tall markdown + table reflow) into one window update.
@@ -321,69 +497,30 @@ export function useChatMessageVirtualizer(
     const el = viewportRef.current;
     if (!el) return;
     const onScroll = () => {
-      scrollPerfDebug.recordScrollStart();
+      if (import.meta.env.DEV) {
+        scrollPerfDebug.recordScrollStart();
+      }
       if (ignoreScrollAdjustRef.current) {
         ignoreScrollAdjustRef.current = false;
         return;
       }
-      // Pin-lock follow / clamp writes look like scroll events. Treating
-      // them as a user fling buffers height commits for 140ms, then flushes
-      // a spacer jump that stick snaps back — bounce at the locked bottom.
-      if (isPinnedRef.current) {
-        scheduleOnFrame(scrollFrameRef.current, recomputeNow);
-        return;
-      }
       scrollingRef.current = true;
-      if (scrollIdleTimerRef.current != null) {
-        clearTimeout(scrollIdleTimerRef.current);
-      }
-      scrollIdleTimerRef.current = setTimeout(() => {
-        scrollIdleTimerRef.current = null;
-        scrollingRef.current = false;
-        // Flush measures deferred during the fling.
-        const pending = pendingHeightsRef.current;
-        if (pending.size > 0) {
-          for (const [k, h] of pending) {
-            heightsRef.current.set(k, h);
-          }
-          pending.clear();
-          heightsVersionRef.current += 1;
-          offsetsCacheRef.current = null;
-          pendingHeightRecomputeRef.current = true;
-        }
-        if (pendingHeightRecomputeRef.current) {
-          pendingHeightRecomputeRef.current = false;
-          recomputeNow();
-        }
-      }, 240);
-      // One window update per paint while flinging. Timeout fallback covers
-      // mixed 120Hz/75Hz displays where rAF can skip a 75Hz vsync.
-      scheduleOnFrame(scrollFrameRef.current, recomputeNow);
+      setScrollingUi(true);
+      scheduleOnFrame(scrollFrameRef.current, () =>
+        recomputeNow({ sampleVelocity: true }),
+      );
     };
 
     const onUserInteraction = () => {
-      scrollingRef.current = true;
-      if (scrollIdleTimerRef.current != null) {
-        clearTimeout(scrollIdleTimerRef.current);
+      const v = viewportRef.current;
+      if (v) {
+        velocityTrackerRef.current.reset(v.scrollTop, performance.now());
       }
-      scrollIdleTimerRef.current = setTimeout(() => {
-        scrollIdleTimerRef.current = null;
-        scrollingRef.current = false;
-        const pending = pendingHeightsRef.current;
-        if (pending.size > 0) {
-          for (const [k, h] of pending) {
-            heightsRef.current.set(k, h);
-          }
-          pending.clear();
-          heightsVersionRef.current += 1;
-          offsetsCacheRef.current = null;
-          pendingHeightRecomputeRef.current = true;
-        }
-        if (pendingHeightRecomputeRef.current) {
-          pendingHeightRecomputeRef.current = false;
-          recomputeNow();
-        }
-      }, 240);
+      scrollingRef.current = true;
+      setScrollingUi(true);
+      scheduleOnFrame(scrollFrameRef.current, () =>
+        recomputeNow({ sampleVelocity: true }),
+      );
     };
 
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -394,10 +531,8 @@ export function useChatMessageVirtualizer(
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(() => {
             if (scrollingRef.current || isPaneSplitMotionActive()) {
-              pendingHeightRecomputeRef.current = true;
               if (isPaneSplitMotionActive()) {
                 runAfterPaneSplitMotion(() => {
-                  pendingHeightRecomputeRef.current = false;
                   recomputeNow();
                 });
               }
@@ -412,18 +547,19 @@ export function useChatMessageVirtualizer(
       el.removeEventListener("scroll", onScroll);
       el.removeEventListener("wheel", onUserInteraction);
       el.removeEventListener("touchmove", onUserInteraction);
+      if (hoverRestoreTimerRef.current != null) {
+        clearTimeout(hoverRestoreTimerRef.current);
+        hoverRestoreTimerRef.current = null;
+      }
+      delete el.dataset.scrolling;
       ro?.disconnect();
       cancelFrameSchedule(scrollFrameRef.current);
       if (recomputeTimerRef.current != null) {
         clearTimeout(recomputeTimerRef.current);
         recomputeTimerRef.current = null;
       }
-      if (scrollIdleTimerRef.current != null) {
-        clearTimeout(scrollIdleTimerRef.current);
-        scrollIdleTimerRef.current = null;
-      }
     };
-  }, [virtualized, viewportRef, recompute, recomputeNow, conversationKey]);
+  }, [virtualized, viewportRef, recompute, recomputeNow, conversationKey, setScrollingUi]);
 
   // Streaming growth / force index changes while mounted.
   useLayoutEffect(() => {
@@ -431,27 +567,24 @@ export function useChatMessageVirtualizer(
     recomputeNow();
   }, [virtualized, itemCount, forceIndices, recomputeNow]);
 
-  // After a pin-window spacer commit, snap before paint so the user never
-  // sees one frame of "scrolled up" then stick yanking back.
+  // After a pin-window spacer commit, restore the pre-commit distance from
+  // the bottom before paint, so a commit whose mounted heights differ from
+  // the cached estimates is displacement-neutral (no bottom bounce).
   useLayoutEffect(() => {
     if (!virtualized || !isPinnedRef.current) return;
     const v = viewportRef.current;
     if (!v) return;
-    const top = Math.max(0, v.scrollHeight - v.clientHeight);
-    if (Math.abs(v.scrollTop - top) <= 0.5) return;
     // User already left the bottom (trackpad ticks). Snapping here is the
-    // "wheel turns, screen does not move" freeze until a hard flick.
-    if (
-      !shouldSnapPinnedLayoutToBottom({
-        scrollTop: v.scrollTop,
-        scrollHeight: v.scrollHeight,
-        clientHeight: v.clientHeight,
-      })
-    ) {
-      return;
-    }
+    // "wheel turns, screen does not move" freeze until a hard flick. Judged
+    // on the distance captured before the commit: post-commit numbers
+    // conflate user motion with scrollHeight drift from fresh row mounts.
+    const dist = pinnedPreCommitBottomDistRef.current;
+    if (dist >= STICK_ESCAPE_MIN_DELTA_PX) return;
+    const top = Math.max(0, v.scrollHeight - v.clientHeight);
+    const desired = Math.max(0, top - dist);
+    if (Math.abs(v.scrollTop - desired) <= 0.5) return;
     ignoreScrollAdjustRef.current = true;
-    v.scrollTop = top;
+    v.scrollTop = desired;
   }, [
     virtualized,
     win.start,
@@ -477,10 +610,17 @@ export function useChatMessageVirtualizer(
   const commitRowHeight = useCallback(
     (index: number, el: HTMLElement, measuredHeight?: number) => {
       if (!virtualizedRef.current) return;
-      if (runAfterPaneSplitMotion(() => commitRowHeight(index, el, measuredHeight))) return;
+      if (
+        runAfterPaneSplitMotion(() =>
+          commitRowHeight(index, el, measuredHeight),
+        )
+      )
+        return;
       const key = getKeyRef.current(index);
       const nextH =
-        measuredHeight != null && Number.isFinite(measuredHeight) && measuredHeight >= 0
+        measuredHeight != null &&
+        Number.isFinite(measuredHeight) &&
+        measuredHeight >= 0
           ? Math.round(measuredHeight)
           : Math.round(el.getBoundingClientRect().height);
       const prevMeasured = heightsRef.current.get(key);
@@ -489,76 +629,47 @@ export function useChatMessageVirtualizer(
         estRaw != null && Number.isFinite(estRaw) && estRaw >= 0
           ? Math.round(estRaw)
           : CHAT_DEFAULT_ROW_ESTIMATE_PX;
-      // First paint used the estimate in offsets; treat it as the previous
-      // height so estimate→actual can keep the viewport anchored.
       const prevH = prevMeasured ?? estimateH;
-      scrollPerfDebug.recordHeightMeasurement(index, key, nextH, estimateH);
+
+      if (import.meta.env.DEV) {
+        scrollPerfDebug.recordHeightMeasurement(index, key, nextH, estimateH);
+      }
 
       if (prevMeasured != null) {
         if (!shouldCommitRowHeight(prevMeasured, nextH)) return;
       } else if (Math.abs(nextH - estimateH) < 4) {
-        // Close enough to estimate — record without rebuilding the window.
-        if (scrollingRef.current) {
-          pendingHeightsRef.current.set(key, nextH);
-        } else {
-          heightsRef.current.set(key, nextH);
-        }
+        heightsRef.current.set(key, nextH);
         return;
       }
 
-      // Mid-scroll: buffer only — do not mutate live offsets until idle.
-      if (scrollingRef.current) {
-        pendingHeightsRef.current.set(key, nextH);
-        pendingHeightRecomputeRef.current = true;
-        return;
-      }
+      // Pre-commit offsets before cache invalidation to determine if row is above viewport
+      const offsetsBefore = getOffsets();
+      const rowOffset = offsetsBefore[index] ?? 0;
+      const viewport = viewportRef.current;
+      const isFullyAboveViewport =
+        viewport && rowOffset + prevH <= viewport.scrollTop + 0.5;
 
+      // Measurement instant commit
+      const delta = nextH - prevH;
       heightsRef.current.set(key, nextH);
       heightsVersionRef.current += 1;
       offsetsCacheRef.current = null;
 
-      const pin = !!isPinnedRef.current;
-      const viewport = viewportRef.current;
-      if (viewport && !pin && Math.abs(nextH - prevH) >= 4) {
-        // Offsets for scroll anchor must use prevH for this row.
-        heightsRef.current.set(key, prevH);
-        const offsetsBefore = cumulativeOffsets(itemCountRef.current, (i) => {
-          const k = getKeyRef.current(i);
-          const m = heightsRef.current.get(k);
-          if (m != null) return m;
-          const e = estimateRef.current?.(i);
-          if (e != null && Number.isFinite(e) && e >= 0) return e;
-          return CHAT_DEFAULT_ROW_ESTIMATE_PX;
-        });
-        heightsRef.current.set(key, nextH);
-        const rowOffset = offsetsBefore[index] ?? 0;
-        const delta = nextH - prevH;
-        const adjusted = scrollTopAfterHeightChange({
-          scrollTop: viewport.scrollTop,
-          rowOffset,
-          prevHeight: prevH,
-          delta,
-          pinToBottom: false,
-        });
-        if (Math.abs(adjusted - viewport.scrollTop) > 0.5) {
+      // Compensate height changes for rows above the viewport
+      if (!isPinnedRef.current && isFullyAboveViewport && Math.abs(delta) > 0.5) {
+        if (scrollingRef.current) {
+          // Mid-scroll: absorb into top spacer without writing scrollTop (preserves smooth gesture)
+          pendingAnchorOffsetRef.current += delta;
+        } else if (viewport) {
+          // Idle reading: synchronously adjust scrollTop to keep on-screen content locked in place
           ignoreScrollAdjustRef.current = true;
-          viewport.scrollTop = adjusted;
+          viewport.scrollTop += delta;
         }
       }
 
       recompute();
-      // Pinned: do not snap here. Each image/PDF decode used to write
-      // scrollTop, then the debounced window layout wrote it again — bounce.
-      // One snap lives in the window-metrics layout effect after coalesce.
-      if (pin && viewport && shouldWriteScrollOnRowCommit(true)) {
-        const top = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
-        if (Math.abs(viewport.scrollTop - top) > 0.5) {
-          ignoreScrollAdjustRef.current = true;
-          viewport.scrollTop = top;
-        }
-      }
     },
-    [isPinnedRef, viewportRef, recompute],
+    [getOffsets, recompute, viewportRef, isPinnedRef],
   );
 
   const commitRowHeightRef = useRef(commitRowHeight);
@@ -582,9 +693,7 @@ export function useChatMessageVirtualizer(
         } else if (entry.contentRect && Number.isFinite(entry.contentRect.height)) {
           h = entry.contentRect.height;
         }
-        if (h <= 0) {
-          h = el.getBoundingClientRect().height;
-        }
+        if (h <= 0) continue;
         commitRowHeightRef.current(index, el, h);
       }
     });

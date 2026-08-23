@@ -131,6 +131,24 @@
   scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
 }
 
+/* Scroll-perf: while a gesture/fling is in motion the virtualizer flags the
+ * scroller; killing pointer events on content stops per-frame :hover style
+ * recalc (content moves under a stationary cursor → hover re-resolution can
+ * burn 10ms+ of style/layout per frame that JS profiling cannot see).
+ * Wheel still targets the scroller itself, so scrolling is unaffected.
+ *
+ * Direct-child selector on purpose (NOT `[data-scrolling="1"] *`): the
+ * universal-descendant form made every attribute flip re-run selector
+ * matching over the whole transcript DOM (a 100ms+ style recalc on long
+ * chats). pointer-events is an inherited property that Blink propagates via
+ * the independent-property fast path, so flipping it on the children is
+ * near-free and still disables hover for the entire subtree. Descendants
+ * with explicit `pointer-events: auto` (rail steps, pinned action bars)
+ * stay interactive, which is acceptable. */
+.lobe-chat__scroll[data-scrolling="1"] > * {
+  pointer-events: none;
+}
+
 .lobe-chat__inner {
   box-sizing: border-box;
   width: 100%;
@@ -141,6 +159,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--chat-list-gap, 4px);
+  contain: layout style;
 }
 
 /* ── Message rows ── */

@@ -14,7 +14,6 @@ import {
   useRef,
   useState,
   type ReactNode,
-  type UIEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import type { Locale } from "@/i18n";
@@ -25,7 +24,6 @@ import {
   lastRegenerableAssistantId,
   messageSegments,
   isTurnPromptMessage,
-  userPromptIndexContaining,
   weaveToolsIntoAssistantSegments,
   type ChatMessage,
   type MessageToolSegment,
@@ -166,7 +164,6 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   BACK_BOTTOM_ALWAYS_CHANGE_EVENT,
   loadBackBottomAlwaysPref,
-  shouldShowBackBottom,
 } from "@/lib/backBottomAlwaysPref";
 import {
   TOOL_STEPS_AUTO_COLLAPSE_CHANGE_EVENT,
@@ -189,7 +186,6 @@ type AttachLabels = {
   addToComposer: string;
   remove: string;
 };
-
 
 /** Keep path-map object identity when tool paths did not change (stream text growth). */
 function useStableSessionPathMap(
@@ -643,6 +639,7 @@ const UserMessageBody = memo(function UserMessageBody({
   );
 });
 
+
 export interface ConversationThreadProps {
   locale: Locale;
   messages: ChatMessage[];
@@ -983,16 +980,23 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   latestContinuableEndId,
 }: TranscriptMessageRowProps) {
   void _timeTick;
-  const renderStart = performance.now();
+  const renderStartRef = useRef<number | null>(null);
+  if (import.meta.env.DEV && renderStartRef.current === null) {
+    renderStartRef.current = performance.now();
+  }
   useEffect(() => {
-    const dur = performance.now() - renderStart;
-    scrollPerfDebug.recordRowMount(
-      m.id,
-      msgIndex,
-      m.role,
-      dur,
-      m.content?.length ?? 0,
-    );
+    if (import.meta.env.DEV && renderStartRef.current !== null) {
+      const dur = performance.now() - renderStartRef.current;
+      // StrictMode re-runs mount effects; null the ref so we log once.
+      renderStartRef.current = null;
+      scrollPerfDebug.recordRowMount(
+        m.id,
+        msgIndex,
+        m.role,
+        dur,
+        m.content?.length ?? 0,
+      );
+    }
   }, [m.id, msgIndex, m.role]);
 
   const wrap = (node: ReactNode) =>
@@ -1435,9 +1439,13 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   const isNodeFocus = focusMessageId === m.id;
   // Phase projection: thought+tools collapse when phase ends (content
   // / next thought), not only when the full answer is done.
-  const timelineUnits = buildAssistantTimeline(segs, {
-    streaming: !!m.streaming,
-  });
+  const timelineUnits = useMemo(
+    () =>
+      buildAssistantTimeline(segs, {
+        streaming: !!m.streaming,
+      }),
+    [segs, m.streaming],
+  );
   // Live chrome follows the *current* episode (trailing thought / phase),
   // not “this message already has some body text”. Grok 4.x think→tool
   // loops keep reasoning after the first status sentence.
@@ -1542,7 +1550,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                     ? unit.texts
                     : [unit.text];
                 const joined = texts
-                  .map((t) => t.trim())
+                  .map((t: string) => t.trim())
                   .filter(Boolean)
                   .join("\n\n");
                 const streaming = unit.streaming;
@@ -1945,10 +1953,9 @@ export function ConversationThread({
   const {
     viewportRef: scrollRef,
     contentRef,
-    onScroll: onStickScroll,
     scrollToBottom,
     isPinnedRef,
-    showBack,
+    subscribeShowBack,
   } = useStickToBottom({
     conversationKey: sessionKey ?? "chat",
     forceStickKey,
@@ -1967,7 +1974,6 @@ export function ConversationThread({
     return () =>
       window.removeEventListener(BACK_BOTTOM_ALWAYS_CHANGE_EVENT, onPref);
   }, []);
-  const backBottomVisible = shouldShowBackBottom(backBottomAlways, showBack);
 
   /** Finished tool steps start collapsed when true (default). */
   const [toolStepsAutoCollapse, setToolStepsAutoCollapse] = useState(() =>
@@ -2245,15 +2251,6 @@ export function ConversationThread({
     if (performance.now() < navLockUntilRef.current) return;
     railCursorRef.current = id;
   }, []);
-
-  const onScroll = useCallback(
-    (e: UIEvent<HTMLDivElement>) => {
-      scrollPerfDebug.recordScrollStart();
-      onStickScroll(e);
-      // Do NOT setActiveNodeId here — MessageNodeRail owns free-scroll highlight (#280).
-    },
-    [onStickScroll],
-  );
 
   const applyScrollToNodeDom = useCallback(
     (node: SessionMessageNode, attempt = 0) => {
@@ -2637,6 +2634,15 @@ export function ConversationThread({
     turnBusy,
   ]);
 
+  const estimateCacheRef = useRef<
+    Map<string, { len: number; atts: number; h: number }>
+  >(new Map());
+
+  // Invalidate estimate cache on session key change
+  useEffect(() => {
+    estimateCacheRef.current.clear();
+  }, [sessionKey]);
+
   const getEstimateHeight = useCallback(
     (i: number) => {
       const m = transcriptMessages[i];
@@ -2650,8 +2656,19 @@ export function ConversationThread({
           role: "tool",
         });
       }
+
       const body = m.content || "";
       const atts = m.attachments ?? [];
+      const cached = estimateCacheRef.current.get(m.id);
+      if (
+        cached &&
+        cached.len === body.length &&
+        cached.atts === atts.length &&
+        !m.streaming
+      ) {
+        return cached.h;
+      }
+
       const imageFromAtts = atts.filter(
         (a) => !a.isDir && isImagePath(a.path),
       ).length;
@@ -2698,8 +2715,15 @@ export function ConversationThread({
         m.role === "user" && shouldFoldUserMessage(body)
           ? USER_MSG_PREVIEW_CHARS
           : body.length;
-      return estimateChatRowHeight({
+      const toolCount = m.segments
+        ? m.segments.filter((s) => s.kind === "tool").length
+        : m.toolCallId
+          ? 1
+          : 0;
+      const est = estimateChatRowHeight({
         contentLength: effectiveContentLength,
+        rawContent: body,
+        toolCount,
         thoughtLength: m.thought?.length ?? 0,
         role: m.role,
         attachmentCount,
@@ -2707,8 +2731,21 @@ export function ConversationThread({
         hasVideoCard,
         collapsed: collapsedTool,
       });
+
+      if (!m.streaming) {
+        if (estimateCacheRef.current.size > 500) {
+          const firstKey = estimateCacheRef.current.keys().next().value;
+          if (firstKey) estimateCacheRef.current.delete(firstKey);
+        }
+        estimateCacheRef.current.set(m.id, {
+          len: body.length,
+          atts: atts.length,
+          h: est,
+        });
+      }
+      return est;
     },
-    [transcriptMessages, standaloneToolGroups],
+    [transcriptMessages, standaloneToolGroups, wovenMessages],
   );
 
   const {
@@ -2727,6 +2764,20 @@ export function ConversationThread({
     conversationKey: sessionKey ?? "chat",
     forceIndices: forceVirtualIndices,
   });
+
+  const parentPromptIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let lastPrompt = -1;
+    let idx = -1;
+    for (const m of messages) {
+      if (isTurnPromptMessage(m)) {
+        idx += 1;
+        lastPrompt = idx;
+      }
+      map.set(m.id, lastPrompt);
+    }
+    return map;
+  }, [messages]);
 
   const visibleMessages = useMemo(() => {
     if (!virtualized) {
@@ -2751,7 +2802,6 @@ export function ConversationThread({
       <div
         ref={scrollRef}
         className="lobe-chat__scroll"
-        onScroll={onScroll}
         onContextMenu={onTranscriptContextMenu}
       >
         <div ref={contentRef} className="lobe-chat__inner">
@@ -2816,7 +2866,7 @@ export function ConversationThread({
                   sessionState === "streaming" ||
                   sessionState === "awaiting_permission",
                 canRewindSession,
-                parentPromptIndex: userPromptIndexContaining(messages, m.id),
+                parentPromptIndex: parentPromptIndexMap.get(m.id) ?? -1,
               })}
               regenerableAssistantId={regenerableAssistantId}
               regenerateModels={regenerateModels}
@@ -2920,7 +2970,8 @@ export function ConversationThread({
       />
 
       <BackBottom
-        visible={backBottomVisible}
+        subscribeVisible={subscribeShowBack}
+        alwaysVisible={backBottomAlways}
         label={tr("chat.scrollBottom")}
         onClick={() => scrollToBottom("smooth")}
       />

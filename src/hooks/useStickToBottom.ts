@@ -16,7 +16,6 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
-  useState,
   type RefObject,
   type UIEvent,
 } from "react";
@@ -27,13 +26,11 @@ import {
   bottomScrollTop,
   isHardBottom,
   isHeightDeltaNoise,
-  isMeaningfulScrollUp,
   isNearBottom,
   nextStickPinState,
   pinnedFollowDelayMs,
   shouldClampPinnedOverscroll,
   shouldClampPinnedStreamDrift,
-  shouldReleaseStickOnDistanceFromBottom,
   shouldReleaseStickOnScrollUp,
 } from "@/lib/stickToBottom";
 import { runAfterPaneSplitMotion } from "@/lib/paneSplitMotion";
@@ -58,6 +55,8 @@ export type UseStickToBottomResult = {
   isPinnedRef: RefObject<boolean>;
   /** Reactive: show "back to bottom" control when user has scrolled up. */
   showBack: boolean;
+  /** Fine-grained subscription for BackBottom button to avoid parent component re-renders. */
+  subscribeShowBack: (cb: (val: boolean) => void) => () => void;
 };
 
 export function useStickToBottom(
@@ -94,17 +93,31 @@ export function useStickToBottom(
   thresholdRef.current = thresholdPx;
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  const showBackRef = useRef(false);
+  const showBackListenersRef = useRef<Set<(val: boolean) => void>>(new Set());
+  const scrollDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [showBack, setShowBack] = useState(false);
+  const subscribeShowBack = useCallback((cb: (val: boolean) => void) => {
+    showBackListenersRef.current.add(cb);
+    cb(showBackRef.current);
+    return () => {
+      showBackListenersRef.current.delete(cb);
+    };
+  }, []);
 
   const syncShowBack = useCallback(() => {
     const el = viewportRef.current;
-    if (!el) {
-      setShowBack(false);
-      return;
+    let next = false;
+    if (el) {
+      const overflow = el.scrollHeight > el.clientHeight + 40;
+      next = !isPinnedRef.current && overflow;
     }
-    const overflow = el.scrollHeight > el.clientHeight + 40;
-    setShowBack(!isPinnedRef.current && overflow);
+    if (next !== showBackRef.current) {
+      showBackRef.current = next;
+      for (const listener of showBackListenersRef.current) {
+        listener(next);
+      }
+    }
   }, []);
 
   const applyScrollTop = useCallback((top: number) => {
@@ -202,50 +215,21 @@ export function useStickToBottom(
       }
 
       const maxTop = bottomScrollTop(el.scrollHeight, el.clientHeight);
-      const meaningfulUp = isMeaningfulScrollUp(scrollTop, lastScrollTop);
+      const shouldEscapeStick = shouldReleaseStickOnScrollUp({
+        pinned: isPinnedRef.current,
+        scrollTop,
+        previousScrollTop: lastScrollTop,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+        minDeltaPx: 0.5,
+      });
+      const isMovingUp = scrollTop < lastScrollTop - 0.5;
       const meaningfulDown =
         scrollTop - lastScrollTop >= STICK_ESCAPE_MIN_DELTA_PX;
 
-      // While locked at bottom: only snap rubber-band past max. Do not
-      // write an upward leave back to the bottom — that fights the
-      // trackpad and is the #703 jitter.
-      // Pixel-mode wheels never hit meaningfulUp (each tick is 2–8px).
-      // If they have already left the bottom by ≥10px, release anyway.
-      if (isPinnedRef.current && !escapedRef.current && !meaningfulUp) {
-        if (shouldClampPinnedOverscroll(scrollTop, maxTop)) {
-          applyScrollTop(maxTop);
-          return;
-        }
-        if (
-          shouldReleaseStickOnDistanceFromBottom({
-            pinned: true,
-            scrollTop,
-            scrollHeight: el.scrollHeight,
-            clientHeight: el.clientHeight,
-          })
-        ) {
-          userIntentDownRef.current = false;
-          isPinnedRef.current = false;
-          escapedRef.current = true;
-          syncShowBack();
-        }
-        return;
-      }
-
-      // Clear intentional leave — escape immediately so stream growth cannot
-      // yank the reader back during the same gesture. A scroll-up that ends
-      // parked on the absolute bottom is a browser clamp (content shrank
-      // above / viewport grew → scrollTop forced to the new max), not an
-      // intentional leave — escaping there stops mid-stream following.
-      if (
-        shouldReleaseStickOnScrollUp({
-          pinned: isPinnedRef.current,
-          scrollTop,
-          previousScrollTop: lastScrollTop,
-          scrollHeight: el.scrollHeight,
-          clientHeight: el.clientHeight,
-        })
-      ) {
+      // Instant escape on intentional user upward gesture (not browser-clamp).
+      // Never write back to scrollTop on upward leave.
+      if (shouldEscapeStick) {
         userIntentDownRef.current = false;
         isPinnedRef.current = false;
         escapedRef.current = true;
@@ -253,14 +237,27 @@ export function useStickToBottom(
         return;
       }
 
-      if (meaningfulUp) userIntentDownRef.current = false;
+      // While locked at bottom: only clamp positive overscroll past max.
+      if (isPinnedRef.current && !escapedRef.current) {
+        if (shouldClampPinnedOverscroll(scrollTop, maxTop)) {
+          applyScrollTop(maxTop);
+          return;
+        }
+        return;
+      }
+
+      if (isMovingUp) userIntentDownRef.current = false;
       if (meaningfulDown) userIntentDownRef.current = true;
 
       // ResizeObserver scroll races: suppress ambiguous resize-only events.
       // Never drop a clear scroll-down / intent-down hard-bottom landing —
       // those are how the user re-engages stick after reading history.
       // @see https://github.com/WICG/resize-observer/issues/25
-      window.setTimeout(() => {
+      if (scrollDebounceTimerRef.current != null) {
+        clearTimeout(scrollDebounceTimerRef.current);
+      }
+      scrollDebounceTimerRef.current = setTimeout(() => {
+        scrollDebounceTimerRef.current = null;
         if (ignore != null && scrollTop === ignore) return;
 
         // Still locked (e.g. no escape this frame)? Snap rubber-band only.
@@ -285,7 +282,7 @@ export function useStickToBottom(
           el.clientHeight,
         );
         const intentDown = userIntentDownRef.current;
-        const scrollingUp = meaningfulUp;
+        const scrollingUp = isMovingUp;
         const scrollingDown = meaningfulDown;
 
         if (
@@ -318,7 +315,7 @@ export function useStickToBottom(
           );
         }
         syncShowBack();
-      }, 1);
+      }, 16);
     };
 
     const handleWheel = (e: WheelEvent) => {
@@ -427,6 +424,10 @@ export function useStickToBottom(
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
+      if (scrollDebounceTimerRef.current != null) {
+        clearTimeout(scrollDebounceTimerRef.current);
+        scrollDebounceTimerRef.current = null;
+      }
     };
   }, [enabled, conversationKey, syncShowBack, applyScrollTop]);
 
@@ -592,6 +593,7 @@ export function useStickToBottom(
     onScroll,
     scrollToBottom,
     isPinnedRef,
-    showBack,
+    showBack: showBackRef.current,
+    subscribeShowBack,
   };
 }

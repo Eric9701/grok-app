@@ -190,9 +190,13 @@
   inset-inline-end: auto;
   transform: translateX(-50%) translateY(10px);
   opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity;
+  contain: layout style paint;
   transition:
     opacity 180ms ease,
-    transform 180ms ease;
+    transform 180ms ease,
+    visibility 180ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -200,14 +204,14 @@
   height: 36px;
   border-radius: 999px;
   border: 1px solid var(--chat-code-border);
-  background: color-mix(in srgb, var(--chat-code-bg) 92%, transparent);
-  backdrop-filter: blur(10px);
+  background: var(--chat-code-bg);
   color: var(--chat-text-2);
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 .lobe-chat-back-bottom.is-visible {
   pointer-events: all;
+  visibility: visible;
   transform: translateX(-50%) translateY(0);
   opacity: 1;
 }
@@ -217,7 +221,7 @@
 
 /* Welcome: composer is vertically centered, not bottom-docked — park
  * the control near the viewport bottom with a modest inset. */
-.main__stage:has(.composer-wrap--welcome) .lobe-chat-back-bottom {
+.main__stage--welcome .lobe-chat-back-bottom {
   inset-block-end: 24px;
 }
 

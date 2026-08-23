@@ -24,6 +24,14 @@ See `docs/llm-wiki/release.md`.
 **中文 · 变更**
 
 ### Fixed
+- **Long chat transcript scroll no longer hitches on Worked-for blocks or lift-off (#853)**: Follow-up to #842. Virtual-window growth that still covers the viewport commits in the background (`startTransition`) and at most 3 rows per frame; collapsed tool steps skip `toolExpandBody` until opened; scroll settle uses velocity + a 160ms stillness floor so touchpad lift-off is not treated as a stop; hover is disabled while moving; pin snap restores the pre-commit distance from the bottom so expanding overscan does not bounce.
+- **WeCom webhook auth + ACL fail-closed (#851)**: webhook mode requires `callback_token` and verifies signatures; empty `allowFrom` denies all (use `*` to opt in); loopback bind by default.
+- **Settings segmented controls no longer flash (#856)**: shared `SegmentedControl` for tabs and theme capsules; first mount settles without a vertical expand.
+- **Welcome intro motion + Appearance toggle (#857)**: restored “what to do today” cadence; optional welcome animation (on by default).
+- **Sidebar open/close motion stable (#858)**: wide-window rail eases with the main pane; titlebar safe padding no longer snaps toward traffic lights.
+- **Settings frosts wallpaper behind the stage (#859)**: `app-settings-stage` uses glass blur/saturate under wallpaper.
+- **Theme light/dark transition keeps sidebar blur (#860)**: View Transition elsewhere; WebKit color WAAPI so backdrop-filter stays live.
+- **Pet body edge no longer shows a white fringe (#861)**: same-ink stroke covers AA seams.
 
 - **Composer matches chat reading width after the first turn**: once a session has transcript, the floating input (and permission bar) follow Appearance → chat width via `--chat-width-max`. Empty/new-session welcome still uses the classic `42rem` input.
 - **Sidebar “Other sessions” no longer sits under empty project space**: collapsing every project (or shrinking a folder after a long session list) now retargets the locked L1 projects height to the remaining rows instead of keeping the last expanded px.
@@ -31,6 +39,14 @@ See `docs/llm-wiki/release.md`.
 - **Official-aux X/Imagine on packaged custom mains**: `/Applications/Grok.app` never bundled `scripts/official-aux-mcp.mjs`, so ACP injected `mcpServers count=0` while ChatCut still auto-loaded from independent `agent-home/config.toml`. Host now writes the MCP script into `agent-home-official`, disables user MCP `enabled` flags during solo inject, ships official-aux `--rules` on prewarm, and tells the model to call `official-aux__x_keyword_search` directly instead of `search_tool` (which was resolving to ChatCut).
 
 **中文 · 修复**
+- **长对话滑过「Worked for …」和抬手时不再卡顿（#853）**：#842 的后续。视口已被覆盖时的窗口扩张走后台提交，每帧最多挂 3 行；折叠的 tool 步骤在展开前不算 `toolExpandBody`；settle 用速度 + 160ms 静止下限，触控板抬手不再被当成停下；滑动中关掉 hover；贴底 snap 恢复 commit 前的离底距离，扩张 overscan 时不再弹跳。
+- **企微 webhook 鉴权 + ACL 默认拒绝（#851）**：webhook 必须填 `callback_token` 并验签；空 `allowFrom` 拒绝全部（显式 `*` 才开放）；默认只绑 loopback。
+- **设置页签/胶囊切换不再闪（#856）**：公共 `SegmentedControl`；首次挂载不纵向展开。
+- **新对话欢迎动画 + 外观开关（#857）**：恢复入场节奏；欢迎动画默认开、可关。
+- **侧栏开合动效稳定（#858）**：宽窗侧栏与主区连续移动；标题栏安全边距不再回弹红绿灯。
+- **壁纸下设置舞台毛玻璃（#859）**：`app-settings-stage` 使用 glass blur。
+- **深浅主题切换保持侧栏模糊（#860）**：非 WebKit 用 View Transition；WebKit 用颜色 WAAPI。
+- **宠物身体外缘白边消除（#861）**：同色描边盖住抗锯齿缝。
 - **有聊天记录后输入框与阅读宽度一致**：会话产生内容后，浮动输入框（及权限条）跟随设置 → 外观的聊天宽度（`--chat-width-max`）。新建/空会话欢迎态仍用原来的 `42rem` 输入框宽度。
 - **侧栏「其他会话」不再被空项目区顶到最下面**：收起全部项目（或长会话列表变短）后，L1 项目区会按剩余行高回缩，而不再锁在上次展开的像素高度。
 - **侧栏项目区顶部图标**：箭头+空间名展开/收起整个项目区；切换空间是独立按钮，和折叠/更多一样只在该行 hover 时出现；折叠全部仍留在外面；多选、按时间归档、添加项目收进 ⋯ 菜单。
