@@ -108,7 +108,6 @@ import {
   isSessionNotLiveError,
   isTurnCancelledError,
   presentErrorBanner,
-  snapshotOutgoingMessages,
   type ErrorBannerView,
   weaveToolsIntoAssistantSegments,
   truncateBeforeLastUser,
@@ -1656,6 +1655,7 @@ export function AppWorkbench() {
   const sessionNavHostRef = useRef(createSessionNavHost());
   const {
     openSession,
+    newChat,
     openSessionRef,
     openingSessionIdRef,
     invalidateOpenPipelines,
@@ -3803,6 +3803,25 @@ export function AppWorkbench() {
     host.catalog.clearUnread = (sessionId) => {
       applyClearSessionUnread(sessionId);
     };
+    host.catalog.getActiveProject = () => activeProject;
+    host.catalog.rejectUnusable = (project) => {
+      if (project && !project.trusted) {
+        setLocalError(tr("project.trustFirst", { name: project.name }));
+        return true;
+      }
+      if (project && isProjectPathMissing(project.pathOk)) {
+        setLocalError(tr("project.pathMissing", { name: project.name }));
+        return true;
+      }
+      return false;
+    };
+    host.catalog.revealInSidebar = (project) => {
+      if (project) {
+        setExpandedProjects((e) => ({ ...e, [project.id]: true }));
+      } else {
+        setHistoryOpen(true);
+      }
+    };
     host.composer.stashLeaving = (leavingSessionId) => {
       const snap = {
         text: getDraft(),
@@ -3937,6 +3956,26 @@ export function AppWorkbench() {
       setShowJsonSchemaModal(false);
     };
     host.gates.setLocalError = setLocalError;
+    host.draft.setAutomationSetup = (on) => {
+      automationSetupDraftRef.current = on;
+    };
+    host.draft.resetUsageAndClock = () => {
+      setContextUsage(INITIAL_CONTEXT_USAGE);
+      clearTurnClock();
+      if (!isSendInFlightForSession(null)) {
+        turnStartedAtBySessionRef.current.delete(resolveTurnClockKey(null));
+      }
+    };
+    host.draft.resetPlanAndGates = () => {
+      setPlan(emptySessionPlan(tr("plan.ready")));
+      setPerm(null);
+      setAskUser(null);
+      setRetryStatus(null);
+      setSessionJsonSchema(null);
+      setShowJsonSchemaModal(false);
+      setLocalError(null);
+    };
+    host.draft.newChatTitle = () => tr("session.new");
     host.connect.isSecondaryWindow = () => isSecondaryWindowRef.current;
     host.connect.isSendInFlight = (sessionId) =>
       isSendInFlightForSession(sessionId);
@@ -4314,166 +4353,13 @@ export function AppWorkbench() {
     };
     // macOS: button click keeps focus on the button until the next tick.
     if (composerFocusTimerRef.current) {
-      window.clearTimeout(composerFocusTimerRef.current);
+      clearTimeout(composerFocusTimerRef.current);
     }
-    composerFocusTimerRef.current = window.setTimeout(() => {
+    composerFocusTimerRef.current = setTimeout(() => {
       composerFocusTimerRef.current = null;
       tryFocus(12);
     }, 0);
   }, []);
-
-  /**
-   * Draft new chat (Codex-style): clear UI only.
-   * No store row / CLI until first successful send via ensureConnected.
-   * Pass `null` for a project-less session (listed under “其他会话”).
-   * Omit / pass undefined to use the active project (requires one).
-   *
-   * Composer text/attachments: leaving a real thread stashes per-session
-   * follow-ups; the new-chat page restores the per-project buffer so a
-   * half-typed new task survives switching away and back.
-   */
-  const newChat = async (
-    project?: Project | null,
-    opts?: {
-      seedDraft?: string;
-      switchToChat?: boolean;
-      /** Enter conversation-driven scheduled-task setup mode. */
-      automationSetup?: boolean;
-    },
-  ) => {
-    // Explicit null → orphan; undefined → keep active project when set,
-    // otherwise orphan draft (no forced "pick a project first").
-    const proj = project === undefined ? activeProject : project;
-    if (proj && !proj.trusted) {
-      setLocalError(tr("project.trustFirst", { name: proj.name }));
-      return;
-    }
-    if (proj && isProjectPathMissing(proj.pathOk)) {
-      setLocalError(tr("project.pathMissing", { name: proj.name }));
-      return;
-    }
-
-    // Snapshot outgoing composer: new-chat → per-project; real thread → per-session.
-    const prevKey = projectDraftKey(activeProject?.id ?? null);
-    const wasDraftPage = viewingSessionIdRef.current == null;
-    const leavingId = viewingSessionIdRef.current;
-    if (wasDraftPage) {
-      saveComposerProjectDraft(prevKey, {
-        text: getDraft(),
-        attachments,
-        chatAttachments,
-        quotes,
-        goalMode,
-      });
-    } else if (leavingId) {
-      saveComposerSessionDraft(leavingId, {
-        text: getDraft(),
-        attachments,
-        chatAttachments,
-        quotes,
-        goalMode,
-      });
-    }
-
-    automationSetupDraftRef.current = !!opts?.automationSetup;
-    if (opts?.switchToChat !== false) {
-      setMainPane("chat");
-      setAppView("workbench");
-      if (typeof window !== "undefined" && window.location.hash) {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      }
-    }
-    if (phoneLayout) closePhoneDrawer();
-    setActiveProject(proj);
-    if (proj) {
-      setExpandedProjects((e) => ({ ...e, [proj.id]: true }));
-    } else {
-      setHistoryOpen(true);
-    }
-    // User navigation: a connect/send still in flight for the previous chat must
-    // not drag the workbench back here once it resolves.
-    bumpViewEpoch();
-    // Invalidate openSession pipelines + pending warm connect / reconcile.
-    invalidateOpenPipelines();
-    // Preserve outgoing thread in cache before clearing the draft UI.
-    // Always snapshot current messages (not only if already cached) so a mid-send
-    // switch does not drop the optimistic user/assistant bubbles.
-    if (leavingId) {
-      messagesBySessionRef.current.set(
-        leavingId,
-        snapshotOutgoingMessages(
-          messagesBySessionRef.current.get(leavingId),
-          messagesRef.current,
-        ),
-      );
-      planBySessionRef.current.set(leavingId, planRef.current);
-    }
-    viewingSessionIdRef.current = null;
-    sessionTranscriptStore.setViewingSessionId(null);
-    sessionTranscriptStore.clearJournalLoad();
-    setMessages([]);
-    setContextUsage(INITIAL_CONTEXT_USAGE);
-
-    const nextKey = projectDraftKey(proj?.id ?? null);
-    if (opts?.seedDraft != null) {
-      applyComposerProjectDraft(null, opts.seedDraft);
-      // Explicit seed replaces the saved buffer for this project.
-      saveComposerProjectDraft(nextKey, {
-        text: opts.seedDraft,
-        attachments: [],
-        goalMode,
-      });
-    } else {
-      restoreComposerProjectDraft(nextKey);
-    }
-
-    sendQueue.clearDraftQueue();
-    setPlan(emptySessionPlan(tr("plan.ready")));
-    setPerm(null);
-    setAskUser(null);
-    setRetryStatus(null);
-    setSessionJsonSchema(null);
-    setShowJsonSchemaModal(false);
-    setSession({
-      ...IDLE_SNAPSHOT,
-      sessionId: null,
-      title: tr("session.new"),
-      state: "idle",
-      backend: "grok_agent_stdio",
-    });
-    // Drop the previous chat's elapsed timer. Ghost-heal grace uses this
-    // value; leaving it in place made a new-chat first send look 45s+ old.
-    clearTurnClock();
-    if (!isSendInFlightForSession(null)) {
-      turnStartedAtBySessionRef.current.delete(resolveTurnClockKey(null));
-    }
-    setLocalError(null);
-    // Multi-session: NEVER sessionDisconnect here.
-    // Disconnect kills the live ACP process — that aborted in-flight turns when
-    // users hit "new chat" right after send (sessions with agentSessionId but
-    // empty journals). Leave liveHost as-is so Host keeps executing; the next
-    // send on this draft will demote+spawn via ensureConnected.
-    const prevLive = liveHostRef.current;
-    if (
-      prevLive.sessionId &&
-      isSessionLiveStreaming(prevLive.state)
-    ) {
-      setLiveMap((prev) =>
-        projectHostIntoLiveMap(prev, {
-          sessionId: prevLive.sessionId,
-          state: prevLive.state,
-          streamingMessageId: prevLive.streamingMessageId,
-        }),
-      );
-    }
-    // Focus explicitly — do not rely only on useEffect: after await, effects may
-    // already have run, and identical draft/sessionId can skip a re-render.
-    requestComposerFocus();
-    // Entering new-chat view: prewarm a CLI process (spawn+init+auth, no
-    // session, no project binding) so the first send is near-instant. The host
-    // skips when a warm process already exists. Never awaited.
-    api.sessionPrewarm();
-  };
 
   /**
    * Visual order of sessions in the open sidebar (expanded projects + orphans).
@@ -9580,6 +9466,29 @@ export function AppWorkbench() {
     acceptExternal: !isSecondaryWindow,
     labels: sendQueueLabels,
   });
+
+  // sendQueue / composer focus exist only after this point. Mutate in place;
+  // do not replace the host object (useSessionNavigation closes over hostRef).
+  {
+    const host = sessionNavHostRef.current;
+    host.composer.restoreForNewChat = (proj, seedDraft) => {
+      const nextKey = projectDraftKey(proj?.id ?? null);
+      if (seedDraft != null) {
+        applyComposerProjectDraft(null, seedDraft);
+        saveComposerProjectDraft(nextKey, {
+          text: seedDraft,
+          attachments: [],
+          goalMode,
+        });
+      } else {
+        restoreComposerProjectDraft(nextKey);
+      }
+    };
+    host.composer.clearDraftQueue = () => {
+      sendQueue.clearDraftQueue();
+    };
+    host.composer.requestFocus = requestComposerFocus;
+  }
 
   /**
    * Optimistic "Thinking…" with no Host turn (liveMap never streaming) — after

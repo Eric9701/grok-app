@@ -4,7 +4,7 @@
  *
  * Composer / plan / gates / catalog stay with the workbench composition root
  * via {@link SessionNavHost} (in-place field updates, never a null ref).
- * `newChat` stays on the host and calls {@link UseSessionNavigationResult.invalidateOpenPipelines}.
+ * `sendQueue` / composer focus bind after `useSendQueue` in AppWorkbench.
  */
 import {
   useCallback,
@@ -29,7 +29,10 @@ import {
   snapshotOutgoingMessages,
 } from "@/lib/session";
 import { sessionLiveMapStore } from "@/lib/sessionLiveMapStore";
-import { resumeStateForSession } from "@/lib/sessionLiveStore";
+import {
+  projectHostIntoLiveMap,
+  resumeStateForSession,
+} from "@/lib/sessionLiveStore";
 import {
   shouldDeferWarmConnectForForeignBusy,
   shouldSkipWarmConnect,
@@ -55,10 +58,25 @@ export type SessionNavHost = {
       projectId: string | null,
     ) => void;
     clearUnread: (sessionId: string) => void;
+    getActiveProject: () => Project | null;
+    rejectUnusable: (project: Project | null) => boolean;
+    revealInSidebar: (project: Project | null) => void;
   };
   composer: {
     stashLeaving: (leavingSessionId: string | null) => void;
     restoreForSession: (sessionId: string) => void;
+    restoreForNewChat: (
+      project: Project | null,
+      seedDraft?: string,
+    ) => void;
+    clearDraftQueue: () => void;
+    requestFocus: () => void;
+  };
+  draft: {
+    setAutomationSetup: (on: boolean) => void;
+    resetUsageAndClock: () => void;
+    resetPlanAndGates: () => void;
+    newChatTitle: () => string;
   };
   plan: {
     stashLeaving: (sessionId: string) => void;
@@ -115,10 +133,26 @@ export function createSessionNavHost(): SessionNavHost {
       markScheduled: stub("catalog.markScheduled"),
       rememberLastSession: stub("catalog.rememberLastSession"),
       clearUnread: stub("catalog.clearUnread"),
+      getActiveProject: stub(
+        "catalog.getActiveProject",
+      ) as SessionNavHost["catalog"]["getActiveProject"],
+      rejectUnusable: stub(
+        "catalog.rejectUnusable",
+      ) as SessionNavHost["catalog"]["rejectUnusable"],
+      revealInSidebar: stub("catalog.revealInSidebar"),
     },
     composer: {
       stashLeaving: stub("composer.stashLeaving"),
       restoreForSession: stub("composer.restoreForSession"),
+      restoreForNewChat: stub("composer.restoreForNewChat"),
+      clearDraftQueue: stub("composer.clearDraftQueue"),
+      requestFocus: stub("composer.requestFocus"),
+    },
+    draft: {
+      setAutomationSetup: stub("draft.setAutomationSetup"),
+      resetUsageAndClock: stub("draft.resetUsageAndClock"),
+      resetPlanAndGates: stub("draft.resetPlanAndGates"),
+      newChatTitle: stub("draft.newChatTitle") as SessionNavHost["draft"]["newChatTitle"],
     },
     plan: {
       stashLeaving: stub("plan.stashLeaving"),
@@ -147,8 +181,18 @@ export function createSessionNavHost(): SessionNavHost {
   };
 }
 
+export type NewChatOpts = {
+  seedDraft?: string;
+  switchToChat?: boolean;
+  automationSetup?: boolean;
+};
+
 export type UseSessionNavigationResult = {
   openSession: (s: SessionRow, project?: Project | null) => Promise<void>;
+  newChat: (
+    project?: Project | null,
+    opts?: NewChatOpts,
+  ) => Promise<void>;
   openSessionRef: MutableRefObject<
     (s: SessionRow, project?: Project | null) => Promise<void>
   >;
@@ -422,11 +466,93 @@ export function useSessionNavigation(opts: {
     [bumpViewEpoch, hostRef, setLiveHost, setSession, viewingSessionIdRef],
   );
 
+  /**
+   * Draft new chat: clear UI only. No store row / CLI until first send.
+   * `project === undefined` keeps the active project; explicit `null` is orphan.
+   */
+  const newChat = useCallback(
+    async (project?: Project | null, opts?: NewChatOpts) => {
+      const host = hostRef.current;
+      // Explicit null → orphan; undefined → keep active project when set.
+      const proj =
+        project === undefined ? host.catalog.getActiveProject() : project;
+      if (host.catalog.rejectUnusable(proj)) return;
+
+      const leavingId = viewingSessionIdRef.current;
+      host.composer.stashLeaving(leavingId);
+
+      host.draft.setAutomationSetup(!!opts?.automationSetup);
+      if (opts?.switchToChat !== false) {
+        host.chrome.goToChat();
+      }
+      host.chrome.closePhoneDrawerIfNeeded();
+      host.catalog.setActiveProject(proj);
+      host.catalog.revealInSidebar(proj);
+
+      bumpViewEpoch();
+      invalidateOpenPipelines();
+
+      if (leavingId) {
+        sessionTranscriptStore.cacheSession(
+          leavingId,
+          snapshotOutgoingMessages(
+            sessionTranscriptStore.getCached(leavingId),
+            sessionTranscriptStore.getMessages(),
+          ),
+        );
+        host.plan.stashLeaving(leavingId);
+      }
+      viewingSessionIdRef.current = null;
+      sessionTranscriptStore.setViewingSessionId(null);
+      sessionTranscriptStore.clearJournalLoad();
+      sessionTranscriptStore.setMessages([]);
+      host.draft.resetUsageAndClock();
+
+      host.composer.restoreForNewChat(proj, opts?.seedDraft);
+      host.composer.clearDraftQueue();
+      host.draft.resetPlanAndGates();
+      setSession({
+        ...IDLE_SNAPSHOT,
+        sessionId: null,
+        title: host.draft.newChatTitle(),
+        state: "idle",
+        backend: "grok_agent_stdio",
+      });
+
+      // Never sessionDisconnect: an in-flight turn on the previous live host
+      // must keep running. Park it in liveMap so the next draft send can
+      // demote+spawn via ensureConnected.
+      const prevLive = sessionShellStore.getLiveHost();
+      if (
+        prevLive.sessionId &&
+        isSessionLiveStreaming(prevLive.state)
+      ) {
+        sessionLiveMapStore.setLiveMap((prev) =>
+          projectHostIntoLiveMap(prev, {
+            sessionId: prevLive.sessionId,
+            state: prevLive.state,
+            streamingMessageId: prevLive.streamingMessageId,
+          }),
+        );
+      }
+      host.composer.requestFocus();
+      api.sessionPrewarm();
+    },
+    [
+      bumpViewEpoch,
+      hostRef,
+      invalidateOpenPipelines,
+      setSession,
+      viewingSessionIdRef,
+    ],
+  );
+
   const openSessionRef = useRef(openSession);
   openSessionRef.current = openSession;
 
   return {
     openSession,
+    newChat,
     openSessionRef,
     openingSessionIdRef,
     invalidateOpenPipelines,

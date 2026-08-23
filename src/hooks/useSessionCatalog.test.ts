@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Catalog list + multi-select live here. AppWorkbench keeps open/new-chat.
+ * Catalog list + multi-select live here. Open/new-chat live in useSessionNavigation.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
