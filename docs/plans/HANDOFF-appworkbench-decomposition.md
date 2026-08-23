@@ -48,6 +48,7 @@
    **WP-W14 已落地**：`newChat` → `useSessionNavigation`。sendQueue / composer focus 在 `useSendQueue` 之后原地晚绑。天花板 **20520 / 229 / 91**。
    **WP-W15 已落地**：Doctor / 规则 / 历史归档确认 / worktree×3 / 快捷键 / 教程 / Voice → `WorkbenchChromeOverlays`。天花板 **20450 / 229 / 91**。
    **WP-W16 已落地**：AskUser / status / dashboard / rewind-fork / plan / schema / note-rules-turns-prompt → `WorkbenchSessionModals`。Compact / Queue / Settings / AppDialog / chat 体仍留 workbench。天花板 **20020 / 229 / 91**。
+   **WP-W17 已落地**：composer 列（权限条 + 输入壳）→ `WorkbenchComposerColumn` + `WorkbenchComposerShell`（均 <1000）。`ConversationThreadLive` / Compact / Queue / Settings / AppDialog 仍留 workbench。天花板 **19080 / 229 / 91**。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。
