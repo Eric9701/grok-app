@@ -67,8 +67,6 @@ import {
   parseSessionDeepLinkHash,
   resolveSecondarySessionId,
   resolveStopTargets,
-  shouldDeferWarmConnectForForeignBusy,
-  shouldSkipWarmConnect
 } from "@/lib/multiWindow";
 import {
   applyChatWidth,
@@ -250,7 +248,6 @@ import {
 } from "@/lib/viewFocus";
 import {
   projectHostIntoLiveMap,
-  resumeStateForSession,
   settleStoppedSessionInLiveMap
 } from "@/lib/sessionLiveStore";
 import { endOfTurnMarkerContent } from "@/lib/endOfTurn";
@@ -421,7 +418,6 @@ import { ChatRefChip } from "@/components/ChatRefChip";
 import { AttachedChatLookupContext } from "@/components/AttachedChatLookup";
 import { useAttachChat } from "@/hooks/useAttachChat";
 import { mapStoredMessagesToChat } from "@/lib/mapStoredMessages";
-import { hydrateSessionJournal } from "@/lib/sessionJournalHydrate";
 import {
   detectAtQueryFromEditor,
   rankAtFileHits,
@@ -512,11 +508,6 @@ import {
   type ComposerQuote,
 } from "@/lib/composerQuotes";
 import { ComposerQuoteCards } from "@/components/ComposerQuoteCards";
-import {
-  DEFERRED_RECONCILE_MS,
-  WARM_CONNECT_DEBOUNCE_MS,
-  shouldApplyOpenSessionResult,
-} from "@/lib/sessionOpenSwitch";
 import { shouldReopenUnhydratedSession } from "@/lib/chatTranscriptEmpty";
 import {
   PromptHistoryPanel,
@@ -961,6 +952,10 @@ import { useWorkbenchDisplayPrefs } from "@/hooks/useWorkbenchDisplayPrefs";
 import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
 import { useSearchPalette } from "@/hooks/useSearchPalette";
 import { useSessionCatalog } from "@/hooks/useSessionCatalog";
+import {
+  createSessionNavHost,
+  useSessionNavigation,
+} from "@/hooks/useSessionNavigation";
 import { WorkbenchSessionTree } from "@/app/WorkbenchSessionTree";
 import { WorkbenchSidebar } from "@/app/WorkbenchSidebar";
 import { WorkbenchMain } from "@/app/WorkbenchMain";
@@ -1299,7 +1294,6 @@ export function AppWorkbench() {
     liveHostRef,
     setLiveMap,
     liveMapRef,
-    getLiveMap,
     stopLatch,
     setStopLatch,
     stopLatchRef,
@@ -1627,6 +1621,9 @@ export function AppWorkbench() {
   const composerWrapRef = useRef<HTMLDivElement>(null);
   /** Set by newChat; applied after chat pane + textarea mount. */
   const pendingComposerFocus = useRef(false);
+  const composerFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [sessionDataMode, setSessionDataMode] = useState(DEFAULT_SESSION_DATA_MODE);
   const [defaultOpenTarget, setDefaultOpenTarget] = useState("finder");
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -1654,24 +1651,20 @@ export function AppWorkbench() {
   const automationRunLock = useRef(false);
   /** Conversation is guiding the user to create a scheduled task. */
   const automationSetupDraftRef = useRef(false);
-  const automationSetupSessionsRef = useRef<Set<string>>(new Set());
-  const automationAppliedRef = useRef<Set<string>>(new Set());
-  /** While openSession loads, do not let session.sessionId effect clobber viewing id. */
-  const openingSessionIdRef = useRef<string | null>(null);
-  /**
-   * Monotonic openSession generation: rapid sidebar switches bump this so
-   * in-flight journal load / media classify / warm connect abort after await
-   * (Windows freeze under concurrent open pipelines).
-   */
-  const openSessionGenRef = useRef(0);
-  /** Debounced warm sessionConnect timer (cleared on next navigation). */
-  const warmConnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  /** Deferred agent-journal reconcile after a fast open (no reconcile). */
-  const deferredReconcileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const automationSetupSessionsRef = useRef(new Set<string>());
+  const automationAppliedRef = useRef(new Set<string>());
+  const sessionNavHostRef = useRef(createSessionNavHost());
+  const {
+    openSession,
+    openSessionRef,
+    openingSessionIdRef,
+    invalidateOpenPipelines,
+  } = useSessionNavigation({
+    hostRef: sessionNavHostRef,
+    focusedSessionId: session.sessionId,
+    viewingSessionIdRef,
+    bumpViewEpoch,
+  });
 
   // ContextMenu handles outside click + Escape for sidebar menus.
 
@@ -3315,13 +3308,6 @@ export function AppWorkbench() {
     availableModels,
   ]);
 
-  // Keep refs aligned for event handlers — but not while openSession is loading
-  // (otherwise an intermediate null sessionId wipes viewing id and skips UI update).
-  useEffect(() => {
-    if (openingSessionIdRef.current) return;
-    viewingSessionIdRef.current = session.sessionId;
-  }, [session.sessionId]);
-
   // Prompt history browse is per viewed session — leave browse mode on switch / new chat.
   // Cross-session recent ring is not cleared (lives in localStorage).
   useEffect(() => {
@@ -3778,121 +3764,64 @@ export function AppWorkbench() {
   }, []);
 
   /**
-   * Open a stored session. Loads journal immediately; warms the ACP agent in
-   * the background so the first send skips cold process spawn when possible.
-   *
-   * Rapid switches: bump openSessionGen, skip agent reconcile on the first
-   * journal load, debounce warm connect, and abort after each await when the
-   * user has already moved on (Windows Not Responding under open storms).
+   * Composition root for session open: other domains' verbs, mutated in place
+   * so `useSessionNavigation` never captures a stale host object.
    */
-  const openSession = async (s: SessionRow, project?: Project | null) => {
-    const proj =
-      project ||
-      projects.find((p) => p.id === s.projectId) ||
-      null;
-    setMainPane("chat");
-    setAppView("workbench");
-    if (typeof window !== "undefined" && window.location.hash) {
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    }
-    // Phone drawer: selecting a session closes the overlay (does not push layout).
-    if (phoneLayout) closePhoneDrawer();
-
-    // Leaving a new-chat page: stash composer under the project so newChat can restore.
-    // Leaving a real thread: stash per-session so switching back restores the follow-up.
-    const leavingBeforeOpen = viewingSessionIdRef.current;
-    if (leavingBeforeOpen == null) {
-      saveComposerProjectDraft(projectDraftKey(activeProject?.id ?? null), {
-        text: getDraft(),
-        attachments,
-        chatAttachments,
-        quotes,
-        goalMode,
-      });
-    } else {
-      saveComposerSessionDraft(leavingBeforeOpen, {
-        text: getDraft(),
-        attachments,
-        chatAttachments,
-        quotes,
-        goalMode,
-      });
-    }
-
-    // User navigation: invalidate any in-flight work that wants the workbench.
-    bumpViewEpoch();
-    // Cancel pending warm-connect / deferred reconcile from a previous click.
-    if (warmConnectTimerRef.current) {
-      clearTimeout(warmConnectTimerRef.current);
-      warmConnectTimerRef.current = null;
-    }
-    if (deferredReconcileTimerRef.current) {
-      clearTimeout(deferredReconcileTimerRef.current);
-      deferredReconcileTimerRef.current = null;
-    }
-    const openGen = ++openSessionGenRef.current;
-    const stillThisOpen = () =>
-      shouldApplyOpenSessionResult({
-        currentGen: openSessionGenRef.current,
-        startedGen: openGen,
-        viewingSessionId: viewingSessionIdRef.current,
-        targetSessionId: s.id,
-      });
-
-    // Snapshot the outgoing thread so a mid-turn switch does not lose the user bubble.
-    const leavingId = leavingBeforeOpen;
-    if (leavingId) {
-      messagesBySessionRef.current.set(
-        leavingId,
-        snapshotOutgoingMessages(
-          messagesBySessionRef.current.get(leavingId),
-          messagesRef.current,
+  {
+    const host = sessionNavHostRef.current;
+    host.chrome.goToChat = () => {
+      setMainPane("chat");
+      setAppView("workbench");
+      if (typeof window !== "undefined" && window.location.hash) {
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
+      }
+    };
+    host.chrome.closePhoneDrawerIfNeeded = () => {
+      if (phoneLayout) closePhoneDrawer();
+    };
+    host.catalog.resolveProject = (s, hint) =>
+      hint || projects.find((p) => p.id === s.projectId) || null;
+    host.catalog.setActiveProject = setActiveProject;
+    host.catalog.markScheduled = (sessionId) => {
+      setSessions((list) =>
+        list.map((row) =>
+          row.id === sessionId ? { ...row, scheduled: true } : row,
         ),
       );
-      // Plan progress is per-session — stash bar state before switching.
-      planBySessionRef.current.set(leavingId, planRef.current);
-    }
-
-    // Point viewing id immediately so late stream chunks land in the right cache.
-    openingSessionIdRef.current = s.id;
-    viewingSessionIdRef.current = s.id;
-    sessionTranscriptStore.setViewingSessionId(s.id);
-    if (!sessionTranscriptStore.isJournalHydrated(s.id)) {
-      sessionTranscriptStore.beginJournalLoad(s.id);
-    } else {
-      sessionTranscriptStore.clearJournalLoad();
-    }
-    // Bind shell sessionId immediately too — otherwise send/stop still use the
-    // previous chat id while the user is already composing on this thread
-    // (sticky-thinking chat A + switch to B → send landed on A).
-    {
-      const liveEarly = liveHostRef.current;
-      const resumeEarly = resumeStateForSession(
-        s.id,
-        liveEarly,
-        liveMapRef.current,
-      );
-      if (liveEarly.sessionId === s.id) {
-        setSession({
-          ...liveEarly,
-          title: s.title || liveEarly.title || "Untitled",
-        });
-      } else {
-        setSession({
-          ...IDLE_SNAPSHOT,
-          sessionId: s.id,
-          title: s.title || "Untitled",
-          state: resumeEarly.state,
-          streamingMessageId: resumeEarly.streamingMessageId,
-          backend: "grok_agent_stdio",
-        });
+      if (api.isTauri()) {
+        void api.sessionSetScheduled(sessionId, true).catch(() => {});
       }
-    }
-    // Restore this thread's follow-up draft immediately (sync localStorage) so
-    // the composer matches the session before journal load, and mid-load typing
-    // is attributed to the right thread on the next switch.
-    {
-      const saved = loadComposerSessionDraft(s.id);
+    };
+    host.catalog.rememberLastSession = (sessionId, projectId) => {
+      setLastSessionId(sessionId);
+      void api.settingsRememberLastSession(sessionId, projectId).catch(() => {});
+    };
+    host.catalog.clearUnread = (sessionId) => {
+      applyClearSessionUnread(sessionId);
+    };
+    host.composer.stashLeaving = (leavingSessionId) => {
+      const snap = {
+        text: getDraft(),
+        attachments,
+        chatAttachments,
+        quotes,
+        goalMode,
+      };
+      if (leavingSessionId == null) {
+        saveComposerProjectDraft(
+          projectDraftKey(activeProject?.id ?? null),
+          snap,
+        );
+      } else {
+        saveComposerSessionDraft(leavingSessionId, snap);
+      }
+    };
+    host.composer.restoreForSession = (sessionId) => {
+      const saved = loadComposerSessionDraft(sessionId);
       suppressProjectDraftPersistRef.current = true;
       if (saved) {
         setDraft(saved.text || "");
@@ -3911,82 +3840,45 @@ export function AppWorkbench() {
       requestAnimationFrame(() => {
         suppressProjectDraftPersistRef.current = false;
       });
-    }
-    // P0 (#529): immediately paint this session's cache (or empty) so stream /
-    // rehydrate / clear-streaming never reduce against the previous chat while
-    // viewing id has already moved. Disk load below may replace with prefer().
-    {
-      const early = messagesBySessionRef.current.get(s.id) ?? [];
-      messagesBySessionRef.current.set(s.id, early);
-      setMessages(early);
-    }
-    // Opening/viewing clears sidebar unread + dock/tray badge for this chat.
-    applyClearSessionUnread(s.id);
-    // Swap plan chrome to this session (memory cache first; Host restore below).
-    setPlan(
-      planBySessionRef.current.get(s.id) ??
-        emptySessionPlan(trRef.current("plan.ready")),
-    );
-    // P1: restore plan chrome from disk + agent plan_mode.json / plan.md.
-    void (async () => {
-      const openId = s.id;
-      try {
-        const [chrome, agentSnap] = await Promise.all([
-          api.sessionPlanChromeGet(openId),
-          api.sessionAgentPlanSnapshot(openId),
-        ]);
-        if (!stillThisOpen()) return;
-        // Live map with a live rpcId wins over stale disk (session still warm).
-        const mem = planBySessionRef.current.get(openId);
-        if (mem && mem.rpcId != null) return;
-        const restored = restorePlanFromPersistence(
-          chrome,
-          agentSnap,
-          trRef.current("plan.ready"),
-        );
-        if (!restored.visible && !restored.userClosed && !restored.body) {
-          return;
+    };
+    host.plan.stashLeaving = (sessionId) => {
+      planBySessionRef.current.set(sessionId, planRef.current);
+    };
+    host.plan.restoreChrome = (sessionId, stillThisOpen) => {
+      setPlan(
+        planBySessionRef.current.get(sessionId) ??
+          emptySessionPlan(trRef.current("plan.ready")),
+      );
+      void (async () => {
+        try {
+          const [chrome, agentSnap] = await Promise.all([
+            api.sessionPlanChromeGet(sessionId),
+            api.sessionAgentPlanSnapshot(sessionId),
+          ]);
+          if (!stillThisOpen()) return;
+          const mem = planBySessionRef.current.get(sessionId);
+          if (mem && mem.rpcId != null) return;
+          const restored = restorePlanFromPersistence(
+            chrome,
+            agentSnap,
+            trRef.current("plan.ready"),
+          );
+          if (!restored.visible && !restored.userClosed && !restored.body) {
+            return;
+          }
+          planBySessionRef.current.set(sessionId, restored);
+          markPlanPendingBadge(sessionId, restored);
+          if (stillThisOpen()) setPlan(restored);
+        } catch {
+          /* soft-fail restore */
         }
-        planBySessionRef.current.set(openId, restored);
-        markPlanPendingBadge(openId, restored);
-        if (stillThisOpen()) {
-          setPlan(restored);
-        }
-      } catch {
-        /* soft-fail restore */
-      }
-    })();
-    setEditingUserMessageId(null);
-    setEditAttachments([]);
-    setSessionJsonSchema(
-      typeof s.jsonSchema === "string" && s.jsonSchema.trim()
-        ? s.jsonSchema
-        : null,
-    );
-    setShowJsonSchemaModal(false);
-
-    const hydrated = await hydrateSessionJournal({
-      sessionId: s.id,
-      sessionScheduled: !!s.scheduled,
-      stillThisOpen,
-      liveState: resumeStateForSession(
-        s.id,
-        liveHostRef.current,
-        liveMapRef.current,
-      ).state,
-    });
-    if (hydrated.status === "aborted") {
-      if (openingSessionIdRef.current === s.id) {
-        openingSessionIdRef.current = null;
-      }
-      return;
-    }
-    if (hydrated.status === "applied") {
-      {
-        const fromHist = hydrated.changesFromHistory;
+      })();
+    };
+    host.hydrate.applyOpenResult = (sessionId, result) => {
+      if (result.status === "applied") {
         setSessionChangesById((prev) => {
-          const existing = prev[s.id] ?? [];
-          let list = fromHist;
+          const existing = prev[sessionId] ?? [];
+          let list = result.changesFromHistory;
           for (const e of existing) {
             if (e.before != null || e.after != null) {
               list = mergeSessionChange(list, {
@@ -4001,212 +3893,62 @@ export function AppWorkbench() {
               });
             }
           }
-          return { ...prev, [s.id]: list };
+          return { ...prev, [sessionId]: list };
         });
-      }
-      setContextUsage(hydrated.usage);
-      void tryApplyAutomationFromSession(s.id);
-      if (hydrated.scheduledFromJournal) {
-        setSessions((list) =>
-          list.map((row) =>
-            row.id === s.id ? { ...row, scheduled: true } : row,
-          ),
-        );
-        if (api.isTauri()) {
-          void api.sessionSetScheduled(s.id, true).catch(() => {});
+        setContextUsage(result.usage);
+        void tryApplyAutomationFromSession(sessionId);
+        if (result.scheduledFromJournal) {
+          sessionNavHostRef.current.catalog.markScheduled(sessionId);
         }
+      } else {
+        setContextUsage(result.usage);
       }
-      if (api.isTauri()) {
-        if (deferredReconcileTimerRef.current) {
-          clearTimeout(deferredReconcileTimerRef.current);
-        }
-        deferredReconcileTimerRef.current = setTimeout(() => {
-          deferredReconcileTimerRef.current = null;
-          void (async () => {
-            if (!stillThisOpen()) return;
-            const recon = await hydrateSessionJournal({
-              sessionId: s.id,
-              sessionScheduled: !!s.scheduled,
-              stillThisOpen,
-              liveState: resumeStateForSession(
-                s.id,
-                liveHostRef.current,
-                liveMapRef.current,
-              ).state,
-              reconcile: true,
-            });
-            if (recon.status !== "applied" || recon.unchanged) return;
-            setContextUsage(recon.usage);
-            void tryApplyAutomationFromSession(s.id);
-          })();
-        }, DEFERRED_RECONCILE_MS);
+    };
+    host.hydrate.applyReconcileResult = (sessionId, result) => {
+      setContextUsage(result.usage);
+      void tryApplyAutomationFromSession(sessionId);
+    };
+    host.gates.restoreForSession = (sessionId, { stillThisOpen, liveSessionId }) => {
+      const parkedPerm = pendingPermBySessionRef.current.get(sessionId) ?? null;
+      setPerm(parkedPerm);
+      if (!parkedPerm && api.isTauri()) {
+        void api
+          .sessionPendingPermission(sessionId)
+          .then((p) => {
+            if (!p || !stillThisOpen()) return;
+            if (pendingPermBySessionRef.current.has(sessionId)) return;
+            pendingPermBySessionRef.current.set(sessionId, p);
+            setPerm(p);
+          })
+          .catch(() => {});
       }
-    } else {
-      setContextUsage(hydrated.usage);
-    }
-    if (!stillThisOpen()) {
-      if (openingSessionIdRef.current === s.id) {
-        openingSessionIdRef.current = null;
-      }
-      return;
-    }
-    // Orphan sessions clear project context; project sessions select their folder.
-    setActiveProject(proj);
-    // Composer follow-up draft was restored at switch time (per-session buffer).
-    // Reattach live host snapshot when reopening the session that is still running.
-    const live = liveHostRef.current;
-    if (live.sessionId === s.id) {
-      setSession({
-        ...live,
-        title: s.title || live.title || "Untitled",
-      });
-    } else {
-      // A chat demoted to background is still running: re-attach its state so
-      // the thread shows the spinner / streaming bubble instead of looking done.
-      const resume = resumeStateForSession(s.id, live, liveMapRef.current);
-      setSession({
-        ...IDLE_SNAPSHOT,
-        sessionId: s.id,
-        title: s.title || "Untitled",
-        state: resume.state,
-        streamingMessageId: resume.streamingMessageId,
-        backend: "grok_agent_stdio",
-      });
-    }
-    if (openingSessionIdRef.current === s.id) {
-      openingSessionIdRef.current = null;
-    }
-    setLocalError(null);
-    // Gates are session-scoped: restore any unanswered request for this chat
-    // (it may have been raised while demoted to background), else clear chrome.
-    const parkedPerm = pendingPermBySessionRef.current.get(s.id) ?? null;
-    setPerm(parkedPerm);
-    if (!parkedPerm && api.isTauri()) {
-      // `session://permission` is a one-shot emit — a WebView reload or window
-      // remount while a turn waits on approval misses it, leaving the chat
-      // stuck "thinking" with no approval bar (diag f1daa64c). Pull the
-      // still-pending gate from Host so the user can answer.
-      void api
-        .sessionPendingPermission(s.id)
-        .then((p) => {
-          if (!p || !stillThisOpen()) return;
-          // Event listener may have raced us with a fresh request — keep it.
-          if (pendingPermBySessionRef.current.has(s.id)) return;
-          pendingPermBySessionRef.current.set(s.id, p);
-          setPerm(p);
-        })
-        .catch(() => {});
-    }
-    setAskUser(pendingAskUserBySessionRef.current.get(s.id) ?? null);
-    // The turn clock is session-scoped too: a chat still mid-turn keeps counting
-    // from when *its* turn started, instead of restarting at zero on every open.
-    setTurnStartedAt(turnStartedAtBySessionRef.current.get(s.id) ?? null);
-    if (live.sessionId !== s.id) {
-      setRetryStatus(null);
-    }
-
-    // Secondary windows must not rewrite "last session" for the main workbench.
-    if (api.isTauri() && !isSecondaryWindowRef.current && stillThisOpen()) {
-      setLastSessionId(s.id);
-      void api
-        .settingsRememberLastSession(s.id, proj?.id ?? null)
-        .catch(() => {});
-    }
-
-    // Warm ACP: connect while the user reads history (trusted project or orphan).
-    // Host serializes connect; first send no-ops if already ready.
-    //
-    // Multi-session (main): if *another* session is mid-turn, defer warm-connect
-    // so browsing does not thrash demote/spawn. Secondary windows exist for
-    // concurrent work — Host session-keyed pool keeps foreign busy turns in
-    // background (never kills), so secondary may warm-connect immediately.
-    // The next send still runs ensureConnected if warm was deferred.
-    // Skip when project folder is missing (D05) — user must relocate first.
-    //
-    // Debounce: rapid switches used to queue many sessionConnect under
-    // connect_lock (park/unpark/load) even after the user had left the chat.
-    if (shouldSkipWarmConnect(isSecondaryWindowRef.current)) {
-      return;
-    }
-    const foreignBusy =
-      Object.entries(getLiveMap()).some(
-        ([id, snap]) =>
-          id !== s.id &&
-          (snap.state === "streaming" || snap.state === "awaiting_permission"),
-      ) ||
-      (!!live.sessionId &&
-        live.sessionId !== s.id &&
-        isSessionLiveStreaming(live.state));
-    const deferForeign = shouldDeferWarmConnectForForeignBusy({
-      isSecondaryWindow: isSecondaryWindowRef.current,
-      foreignBusy,
-    });
-    // Also defer while a send / connect is in flight: warm-connecting mid-send
-    // used to steal the live slot from the turn being dispatched.
-    if (
-      api.isTauri() &&
-      !deferForeign &&
-      !isSendInFlightForSession(s.id) &&
-      !connectingBySessionRef.current.has(queueSessionKey(s.id)) &&
-      (!proj || (proj.trusted && !isProjectPathMissing(proj.pathOk))) &&
-      !(live.sessionId === s.id && live.state === "ready")
-    ) {
-      const warmId = s.id;
-      const warmProjPath = proj?.path || generalWorkspacePath || undefined;
-      const warmTitle = s.title;
-      if (warmConnectTimerRef.current) {
-        clearTimeout(warmConnectTimerRef.current);
-      }
-      warmConnectTimerRef.current = setTimeout(() => {
-        warmConnectTimerRef.current = null;
-        if (!stillThisOpen()) return;
-        if (
-          isSendInFlightForSession(warmId) ||
-          connectingBySessionRef.current.has(queueSessionKey(warmId))
-        ) {
-          return;
-        }
-        if (shouldSkipWarmConnect(isSecondaryWindowRef.current)) return;
-        if (!claimSessionConnection(warmId)) return;
-        void (async () => {
-          if (!stillThisOpen()) {
-            releaseSessionConnection([queueSessionKey(warmId)]);
-            return;
-          }
-          try {
-            const snap = await api.sessionConnect({
-              projectPath: warmProjPath,
-              sessionId: warmId,
-            });
-            if (!stillThisOpen()) return;
-            setLiveHost(snap);
-            liveHostRef.current = snap;
-            if (snap.sessionId === warmId) {
-              setSession((prev) => ({
-                ...snap,
-                title: prev.title || warmTitle || snap.title || "Untitled",
-              }));
-            }
-            if (snap.lastError && snap.state !== "ready") {
-              // Soft: keep chat readable; send will retry via ensureConnected.
-              console.warn(
-                "warm connect:",
-                snap.lastError.code,
-                snap.lastError.message,
-              );
-            }
-          } catch (e) {
-            console.warn("warm connect failed", e);
-          } finally {
-            releaseSessionConnection([queueSessionKey(warmId)]);
-          }
-        })();
-      }, WARM_CONNECT_DEBOUNCE_MS);
-    }
-  };
-
-  const openSessionRef = useRef(openSession);
-  openSessionRef.current = openSession;
+      setAskUser(pendingAskUserBySessionRef.current.get(sessionId) ?? null);
+      setTurnStartedAt(turnStartedAtBySessionRef.current.get(sessionId) ?? null);
+      if (liveSessionId !== sessionId) setRetryStatus(null);
+    };
+    host.gates.clearEditingAndSchema = (jsonSchema) => {
+      setEditingUserMessageId(null);
+      setEditAttachments([]);
+      setSessionJsonSchema(
+        typeof jsonSchema === "string" && jsonSchema.trim()
+          ? jsonSchema
+          : null,
+      );
+      setShowJsonSchemaModal(false);
+    };
+    host.gates.setLocalError = setLocalError;
+    host.connect.isSecondaryWindow = () => isSecondaryWindowRef.current;
+    host.connect.isSendInFlight = (sessionId) =>
+      isSendInFlightForSession(sessionId);
+    host.connect.isConnecting = (sessionId) =>
+      connectingBySessionRef.current.has(queueSessionKey(sessionId));
+    host.connect.claim = (sessionId) => claimSessionConnection(sessionId);
+    host.connect.release = (sessionId) =>
+      releaseSessionConnection([queueSessionKey(sessionId)]);
+    host.connect.workspacePath = () => generalWorkspacePath || undefined;
+    host.connect.isProjectWarmable = (project) =>
+      !project || (project.trusted && !isProjectPathMissing(project.pathOk));
+  }
 
   const searchPaletteHostRef = useRef({
     runAction: (_action: PaletteActionDef) => {},
@@ -4571,7 +4313,13 @@ export function AppWorkbench() {
       requestAnimationFrame(() => tryFocus(attemptsLeft - 1));
     };
     // macOS: button click keeps focus on the button until the next tick.
-    window.setTimeout(() => tryFocus(12), 0);
+    if (composerFocusTimerRef.current) {
+      window.clearTimeout(composerFocusTimerRef.current);
+    }
+    composerFocusTimerRef.current = window.setTimeout(() => {
+      composerFocusTimerRef.current = null;
+      tryFocus(12);
+    }, 0);
   }, []);
 
   /**
@@ -4646,15 +4394,7 @@ export function AppWorkbench() {
     // not drag the workbench back here once it resolves.
     bumpViewEpoch();
     // Invalidate openSession pipelines + pending warm connect / reconcile.
-    openSessionGenRef.current += 1;
-    if (warmConnectTimerRef.current) {
-      clearTimeout(warmConnectTimerRef.current);
-      warmConnectTimerRef.current = null;
-    }
-    if (deferredReconcileTimerRef.current) {
-      clearTimeout(deferredReconcileTimerRef.current);
-      deferredReconcileTimerRef.current = null;
-    }
+    invalidateOpenPipelines();
     // Preserve outgoing thread in cache before clearing the draft UI.
     // Always snapshot current messages (not only if already cached) so a mid-send
     // switch does not drop the optimistic user/assistant bubbles.
@@ -4876,6 +4616,7 @@ export function AppWorkbench() {
           setHistoryOpen(true);
         }
         openingSessionIdRef.current = null;
+        invalidateOpenPipelines();
         bumpViewEpoch();
         viewingSessionIdRef.current = null;
         sessionTranscriptStore.setViewingSessionId(null);
