@@ -498,7 +498,6 @@ import {
 } from "@/lib/setupGatePro";
 import { mapProbeToCliInfo } from "@/lib/cliVersionStatus";
 import {
-  getComposerCaretOffset,
   requestComposerStoredCaret,
   resizeComposerInput,
   serializeDom,
@@ -558,29 +557,7 @@ import {
   type ProjectColorToken,
 } from "@/lib/projectColor";
 import { appendPluginDir } from "@/lib/sessionPluginDirs";
-import {
-  classifyVoiceError,
-  initialVoiceState,
-  isVoiceToggleKey,
-  planTranscriptInsert,
-  reduceVoice,
-  resolveDictationCommit,
-  resolveVoiceErrorClass,
-  voiceAvailabilityFromAuth,
-  voiceIsActive,
-  voiceResultStillCurrent,
-  voiceSoftFailResetsIdle,
-  voiceStealsEscape,
-  VOICE_MAX_RECORD_MS,
-  type VoiceErrorClass,
-  type VoiceFsmState,
-} from "@/lib/voiceDictation";
-import {
-  blobToBase64,
-  extensionForMime,
-  startVoiceCapture,
-  type CaptureHandle,
-} from "@/lib/voiceCapture";
+import { isVoiceToggleKey } from "@/lib/voiceDictation";
 import {
   buildComposerPlusEntries,
   createVideoMatchesQuery,
@@ -757,6 +734,7 @@ import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
 import { useSearchPalette } from "@/hooks/useSearchPalette";
 import { useCompactDialog } from "@/hooks/useCompactDialog";
 import { useQueueEditDialog } from "@/hooks/useQueueEditDialog";
+import { useVoiceDictation } from "@/hooks/useVoiceDictation";
 import { useSessionCatalog } from "@/hooks/useSessionCatalog";
 import {
   createSessionNavHost,
@@ -1233,22 +1211,10 @@ export function AppWorkbench() {
   const [archiveAgeConfirm, setArchiveAgeConfirm] =
     useState<ArchiveAgePlan<SessionRow> | null>(null);
   const [archiveAgeBusy, setArchiveAgeBusy] = useState(false);
-  /** Composer voice dictation FSM (record → STT → insert draft). */
-  const [voice, setVoice] = useState<VoiceFsmState>(() => initialVoiceState());
-  /** Full-duplex live voice overlay (separate from composer dictation). */
-  const [liveVoiceOpen, setLiveVoiceOpen] = useState(false);
-  const [voiceGate, setVoiceGate] = useState<{
-    available: boolean;
-    reason: VoiceErrorClass | null;
-  }>({ available: false, reason: "not_available" });
-  const voiceCaptureRef = useRef<CaptureHandle | null>(null);
-  const voiceTimersRef = useRef<{ max?: number; noSpeech?: number }>({});
-  const voiceRef = useRef(voice);
-  voiceRef.current = voice;
-  /** Bumped on cancel/start so in-flight STT never mutates draft after cancel. */
-  const voiceGenRef = useRef(0);
-  /** Caret in draft string captured when stop is requested. */
-  const voiceCaretRef = useRef<number | null>(null);
+  /** Filled after useVoiceDictation; shortcuts read this at keydown time. */
+  const voiceStealsEscapeRef = useRef(false);
+  const voiceNotifyRef = useRef<(msg: string, ms?: number) => void>(() => {});
+  const voiceSignedInRef = useRef(false);
   const [goalMode, setGoalMode] = useState(false);
   /** Per-session (or draft) JSON Schema for structured output. */
   const [sessionJsonSchema, setSessionJsonSchema] = useState<string | null>(
@@ -1538,7 +1504,7 @@ export function AppWorkbench() {
       // Settings is capturing a new binding — do not run global actions.
       if (isShortcutRecordingActive()) return;
       // Esc cancels in-progress dictation (steal before other Esc handlers).
-      if (e.key === "Escape" && voiceStealsEscape(voiceRef.current.phase)) {
+      if (e.key === "Escape" && voiceStealsEscapeRef.current) {
         e.preventDefault();
         e.stopPropagation();
         shortcutHandlersRef.current.cancelVoice();
@@ -1547,7 +1513,7 @@ export function AppWorkbench() {
       // Esc: leave Settings, else stop the active turn (catalog: shortcuts.stop).
       if (e.key === "Escape") {
         const gate = escapeStopLiveRef.current;
-        const voiceSteals = voiceStealsEscape(voiceRef.current.phase);
+        const voiceSteals = voiceStealsEscapeRef.current;
         const nestedLayerOpen =
           gate.settingsOpen &&
           isSettingsEscapeOwnedByNestedLayer(
@@ -2015,6 +1981,31 @@ export function AppWorkbench() {
   >(null);
   const voiceDictationAutoSendRef = useRef(false);
   const sendRef = useRef<(() => Promise<void>) | null>(null);
+  const {
+    voice,
+    liveVoiceOpen,
+    setLiveVoiceOpen,
+    voiceGate,
+    cancelVoice,
+    toggleVoice,
+    startLiveVoice,
+    voiceStealsEscape: voiceStealsEscapeNow,
+    refreshVoiceGate,
+  } = useVoiceDictation({
+    tr,
+    localeRef,
+    composerInputRef,
+    sendRef,
+    voiceDictationAutoSendRef,
+    setDraft,
+    sessionState: session.state,
+    refreshSessions,
+    sttEngine,
+    sttCustomBaseUrl,
+    signedInRef: voiceSignedInRef,
+    notifyRef: voiceNotifyRef,
+  });
+  voiceStealsEscapeRef.current = voiceStealsEscapeNow;
   const [subagentsEnabled, setSubagentsEnabled] = useState(true);
   const [subagentWorktreeSnapshotEnabled, setSubagentWorktreeSnapshotEnabled] =
     useState(false);
@@ -2256,6 +2247,10 @@ export function AppWorkbench() {
     asideOverlay,
   });
   const [account, setAccount] = useState<api.AccountStatus | null>(null);
+  voiceSignedInRef.current = !!account?.profile?.signedIn;
+  useEffect(() => {
+    void refreshVoiceGate();
+  }, [account?.profile?.signedIn, refreshVoiceGate]);
   const [accountLoading, setAccountLoading] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
   /** Soft-fail heatmap / account_status error (never invents activity or quota). */
@@ -8255,6 +8250,8 @@ export function AppWorkbench() {
     }, ms);
   }, []);
 
+  voiceNotifyRef.current = showToast;
+
   const promptCreateSpace = useCallback(
     (afterCreate?: (id: string) => void) => {
       setAppDialog({
@@ -8575,328 +8572,6 @@ export function AppWorkbench() {
     },
     [showToast, tr],
   );
-
-  const voiceErrorMessage = useCallback(
-    (cls: VoiceErrorClass | null | undefined) => {
-      const key = (`composer.voiceErr.${cls ?? "unknown"}`) as MessageKey;
-      try {
-        return tr(key);
-      } catch {
-        return tr("composer.voiceErr.unknown");
-      }
-    },
-    [tr],
-  );
-
-  const clearVoiceTimers = useCallback(() => {
-    const t = voiceTimersRef.current;
-    if (t.max != null) window.clearTimeout(t.max);
-    if (t.noSpeech != null) window.clearTimeout(t.noSpeech);
-    voiceTimersRef.current = {};
-  }, []);
-
-  const refreshVoiceGate = useCallback(async () => {
-    // Resolve whether the active inference route is a custom/third-party provider.
-    let customActive = false;
-    if (api.isTauri()) {
-      try {
-        const list = await api.providersList();
-        customActive = list.activeSource === "custom";
-      } catch {
-        /* ignore */
-      }
-    }
-    try {
-      // Desktop Tauri and phone mirror both resolve availability from the host
-      // voice.status (mirror routes it over the WS allowlist). The host refuses
-      // speech when the active provider is custom AND no custom STT endpoint is
-      // configured; with a custom STT endpoint the host reports available.
-      if (api.isTauri() || isMirrorClient()) {
-        if (customActive && sttEngine !== "custom") {
-          setVoiceGate({ available: false, reason: "not_available" });
-          return;
-        }
-        const st = await api.voiceStatus();
-        setVoiceGate({
-          available: !!st.available,
-          reason: (st.reason as VoiceErrorClass | null) ?? "not_available",
-        });
-        return;
-      }
-    } catch {
-      /* fall through to local estimate */
-    }
-    const signedIn = !!account?.profile?.signedIn;
-    let hasOfficial = false;
-    let hasRelay = false;
-    try {
-      const masked = await api.secretsGetMasked();
-      hasOfficial = !!masked.hasOfficialKey;
-      hasRelay = !!masked.hasRelayKey;
-    } catch {
-      /* ignore */
-    }
-    const gate = voiceAvailabilityFromAuth({
-      signedInOfficial: signedIn,
-      hasOfficialApiKey: hasOfficial,
-      hasRelayOnly: hasRelay && !hasOfficial && !signedIn,
-      sttCustomConfigured:
-        sttEngine === "custom" && sttCustomBaseUrl.trim().length > 0,
-      activeProviderIsCustom: customActive,
-    });
-    setVoiceGate({
-      available: gate.available,
-      reason: gate.reason,
-    });
-  }, [account?.profile?.signedIn, sttEngine, sttCustomBaseUrl]);
-
-  useEffect(() => {
-    void refreshVoiceGate();
-  }, [refreshVoiceGate]);
-
-  const cancelVoice = useCallback(() => {
-    voiceGenRef.current += 1;
-    clearVoiceTimers();
-    try {
-      voiceCaptureRef.current?.cancel();
-    } catch {
-      /* ignore */
-    }
-    voiceCaptureRef.current = null;
-    voiceCaretRef.current = null;
-    setVoice(reduceVoice(voiceRef.current, { type: "cancel" }));
-  }, [clearVoiceTimers]);
-
-  // Drop in-progress dictation / live session when speech becomes unavailable
-  // (e.g. switched to a third-party provider).
-  useEffect(() => {
-    if (voiceGate.available) return;
-    if (voiceIsActive(voiceRef.current.phase)) {
-      cancelVoice();
-    }
-    if (liveVoiceOpen) {
-      setLiveVoiceOpen(false);
-    }
-  }, [voiceGate.available, cancelVoice, liveVoiceOpen]);
-
-  // Live Voice host created/updated a coding session — refresh sidebar list.
-  useEffect(() => {
-    const onVoiceSession = () => {
-      void refreshSessions();
-    };
-    window.addEventListener("grok-app:voice-session-changed", onVoiceSession);
-    return () =>
-      window.removeEventListener(
-        "grok-app:voice-session-changed",
-        onVoiceSession,
-      );
-    // refreshSessions is stable enough for mount-scoped listen
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /** Soft-fail toast + idle for empty speech / auth; sticky error for network/timeout. */
-  const applyVoiceFail = useCallback(
-    (cls: VoiceErrorClass, toastMs = 4800) => {
-      showToast(voiceErrorMessage(cls), toastMs);
-      if (voiceSoftFailResetsIdle(cls)) {
-        setVoice(initialVoiceState());
-      } else {
-        setVoice((s) =>
-          reduceVoice(s, { type: "transcribe_fail", error: cls }),
-        );
-      }
-    },
-    [showToast, voiceErrorMessage],
-  );
-
-  const finishVoiceTranscribe = useCallback(
-    async (blob: Blob, gen: number) => {
-      if (!voiceResultStillCurrent(gen, voiceGenRef.current)) return;
-      setVoice((s) => reduceVoice(s, { type: "stop" }));
-      try {
-        if (blob.size < 256) {
-          if (!voiceResultStillCurrent(gen, voiceGenRef.current)) return;
-          applyVoiceFail("no_speech", 4200);
-          return;
-        }
-        const b64 = await blobToBase64(blob);
-        if (!voiceResultStillCurrent(gen, voiceGenRef.current)) return;
-        const mime = blob.type || "audio/webm";
-        const ext = extensionForMime(mime);
-        const res = await api.voiceTranscribe({
-          audioBase64: b64,
-          filename: `dictation.${ext}`,
-          mime,
-          // Resolved locale via the live ref (never the raw "system"
-          // preference) so the host can steer the Chinese language hint for
-          // 跟随系统 — avoids a stale closure when the UI language changes.
-          locale: localeRef.current,
-        });
-        if (!voiceResultStillCurrent(gen, voiceGenRef.current)) return;
-        if (!res.ok || !res.text?.trim()) {
-          const cls = resolveVoiceErrorClass(res.errorClass, res.error);
-          applyVoiceFail(cls, 4800);
-          return;
-        }
-        if (!voiceResultStillCurrent(gen, voiceGenRef.current)) return;
-        const caret = voiceCaretRef.current;
-        const commit = resolveDictationCommit({
-          transcript: res.text!,
-          autoSend: voiceDictationAutoSendRef.current,
-          // Permission gate blocks auto-send; busy sessions still enqueue via send().
-          canAutoSend: session.state !== "awaiting_permission",
-        });
-        if (commit.kind === "empty") {
-          applyVoiceFail("no_speech", 4200);
-          return;
-        }
-        setDraft((d) => {
-          const at =
-            caret == null ? d.length : Math.max(0, Math.min(caret, d.length));
-          const plan = planTranscriptInsert(d, commit.text, at);
-          if (!plan) return d;
-          return plan.text;
-        });
-        setVoice((s) => reduceVoice(s, { type: "transcribe_ok" }));
-        if (commit.kind === "send") {
-          window.setTimeout(() => {
-            void sendRef.current?.();
-          }, 0);
-        } else if (commit.kind === "send_blocked") {
-          showToast(tr("composer.voiceErr.sendBlocked"), 4800);
-        }
-      } catch (e) {
-        if (!voiceResultStillCurrent(gen, voiceGenRef.current)) return;
-        const cls = classifyVoiceError(String(e));
-        applyVoiceFail(cls, 4800);
-      } finally {
-        if (voiceResultStillCurrent(gen, voiceGenRef.current)) {
-          voiceCaptureRef.current = null;
-          voiceCaretRef.current = null;
-          clearVoiceTimers();
-        }
-      }
-    },
-    [
-      applyVoiceFail,
-      clearVoiceTimers,
-      session.state,
-      showToast,
-      tr,
-    ],
-  );
-
-  const startVoice = useCallback(async () => {
-    if (!voiceGate.available) {
-      showToast(
-        voiceErrorMessage(voiceGate.reason ?? "not_available"),
-        4800,
-      );
-      return;
-    }
-    if (voiceIsActive(voiceRef.current.phase)) return;
-    voiceGenRef.current += 1;
-    const gen = voiceGenRef.current;
-    setVoice((s) => reduceVoice(s, { type: "start" }));
-    try {
-      const handle = await startVoiceCapture();
-      if (gen !== voiceGenRef.current) {
-        handle.cancel();
-        return;
-      }
-      voiceCaptureRef.current = handle;
-      setVoice((s) => reduceVoice(s, { type: "mic_granted" }, Date.now()));
-      clearVoiceTimers();
-      // Auto-stop cap: stop() + STT (never cancel/discard live speech).
-      // "no_speech" only after STT empty / tiny blob — phase-1 has no VAD.
-      const autoStopAndTranscribe = () => {
-        void (async () => {
-          if (!voiceResultStillCurrent(gen, voiceGenRef.current)) return;
-          if (voiceRef.current.phase !== "recording") return;
-          const cap = voiceCaptureRef.current;
-          if (!cap) return;
-          clearVoiceTimers();
-          try {
-            voiceCaretRef.current = getComposerCaretOffset(
-              composerInputRef.current,
-            );
-            const blob = await cap.stop();
-            await finishVoiceTranscribe(blob, gen);
-          } catch (e) {
-            if (!voiceResultStillCurrent(gen, voiceGenRef.current)) return;
-            applyVoiceFail(classifyVoiceError(String(e)), 4200);
-          }
-        })();
-      };
-      voiceTimersRef.current.max = window.setTimeout(
-        autoStopAndTranscribe,
-        VOICE_MAX_RECORD_MS,
-      );
-    } catch (e) {
-      if (gen !== voiceGenRef.current) return;
-      const code =
-        e && typeof e === "object" && "code" in e
-          ? String((e as { code?: string }).code)
-          : "";
-      if (code === "mic_denied") {
-        applyVoiceFail("mic_denied", 5200);
-      } else if (code === "mic_missing") {
-        applyVoiceFail("mic_missing", 4200);
-      } else {
-        applyVoiceFail(classifyVoiceError(String(e)), 4200);
-      }
-      voiceCaptureRef.current = null;
-    }
-  }, [
-    applyVoiceFail,
-    clearVoiceTimers,
-    finishVoiceTranscribe,
-    showToast,
-    voiceErrorMessage,
-    voiceGate.available,
-    voiceGate.reason,
-  ]);
-
-  const stopVoice = useCallback(async () => {
-    if (voiceRef.current.phase !== "recording") return;
-    const gen = voiceGenRef.current;
-    // Capture caret before focus/selection changes during stop.
-    voiceCaretRef.current = getComposerCaretOffset(composerInputRef.current);
-    clearVoiceTimers();
-    const cap = voiceCaptureRef.current;
-    if (!cap) {
-      setVoice(initialVoiceState());
-      return;
-    }
-    try {
-      const blob = await cap.stop();
-      await finishVoiceTranscribe(blob, gen);
-    } catch (e) {
-      if (gen !== voiceGenRef.current) return;
-      applyVoiceFail(classifyVoiceError(String(e)), 4200);
-      voiceCaptureRef.current = null;
-    }
-  }, [
-    applyVoiceFail,
-    clearVoiceTimers,
-    finishVoiceTranscribe,
-  ]);
-
-  const toggleVoice = useCallback(() => {
-    const phase = voiceRef.current.phase;
-    if (phase === "recording") {
-      void stopVoice();
-      return;
-    }
-    if (phase === "requesting_mic" || phase === "transcribing") {
-      cancelVoice();
-      return;
-    }
-    if (phase === "error") {
-      setVoice(initialVoiceState());
-    }
-    void startVoice();
-  }, [cancelVoice, startVoice, stopVoice]);
 
   const writePlanForViewing = useCallback((next: PlanState) => {
     const sid = viewingSessionIdRef.current;
@@ -10577,14 +10252,7 @@ export function AppWorkbench() {
             return;
           case "live-voice":
           case "liveVoice":
-            if (!voiceGate.available) {
-              showToast(
-                voiceErrorMessage(voiceGate.reason ?? "not_available"),
-                4200,
-              );
-              return;
-            }
-            setLiveVoiceOpen(true);
+            startLiveVoice();
             return;
           case "settings":
             navigateSettings();
@@ -13007,17 +12675,7 @@ export function AppWorkbench() {
       cancelVoice();
     },
     startLiveVoice: () => {
-      if (!voiceGate.available) {
-        showToast(
-          voiceErrorMessage(voiceGate.reason ?? "not_available"),
-          4200,
-        );
-        return;
-      }
-      if (voiceIsActive(voiceRef.current.phase)) {
-        cancelVoice();
-      }
-      setLiveVoiceOpen(true);
+      startLiveVoice();
     },
     stopGeneration: () => {
       void stop();
