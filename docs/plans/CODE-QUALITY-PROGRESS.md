@@ -12,7 +12,7 @@
 | Spec | `docs/plans/2026-08-01-code-quality-remediation-GOAL.md` |
 | Started | `2026-08-01` |
 | Current wave | `workbench-decomp` |
-| Current WP | `WP-W15` |
+| Current WP | `WP-W16` |
 | **FINAL** | **PASS** (honest orchestration metrics; decreasing ceilings) |
 
 ## Wave checklist
@@ -61,6 +61,7 @@
 | WP-W13 | openSession into useSessionNavigation; newChat stays | PASS | 5364d0e6 | 20710→20451 lines; useState 224; useEffect 88→87 |
 | WP-W14 | newChat into useSessionNavigation (late-bind sendQueue/focus) | PASS | 933f1361 | 20451→20360 lines; useState 224; useEffect 87→86 |
 | WP-W15 | Chrome overlays (doctor→voice) into WorkbenchChromeOverlays | PASS | 127a8fa3 | 20360→20288 lines; useState 224; useEffect 86 |
+| WP-W16 | Session/agent action modals into WorkbenchSessionModals | PASS | pending | 20288→19862 lines; useState 224; useEffect 86 |
 
 ## Metrics log (append-only)
 
@@ -87,6 +88,7 @@
 | 2026-08-23 W13 | 20451 (shell 18 + wb 20433) | 224 | 87 | 11 | dir | dir | 28 | 9 | 69 |
 | 2026-08-23 W14 | 20360 (shell 18 + wb 20342) | 224 | 86 | 11 | dir | dir | 28 | 9 | 69 |
 | 2026-08-23 W15 | 20288 (shell 18 + wb 20270) | 224 | 86 | 11 | dir | dir | 28 | 9 | 69 |
+| 2026-08-23 W16 | 19862 (shell 18 + wb 19844) | 224 | 86 | 11 | dir | dir | 28 | 9 | 69 |
 
 ## Blockers
 
