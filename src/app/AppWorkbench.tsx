@@ -89,6 +89,8 @@ import {
   shouldClearAskUserGate,
 } from "@/lib/askUserSettle";
 import { WallpaperMediaLayer } from "@/components/WallpaperMediaLayer";
+import { SidebarCliImportCta } from "@/components/SidebarCliImportCta";
+import { useCliCallLogImport } from "@/hooks/useCliCallLogImport";
 import {
   ASIDE_WIDTH_MIN,
   DEFAULT_LAYOUT,
@@ -15761,6 +15763,60 @@ export function AppWorkbench() {
     }
   }, [activeProject?.id, projects, showToast, tr]);
 
+  const unarchivedAppSessionCount = sessions.filter((s) => !s.archived).length;
+  const linkedAgentIds = sessions
+    .map((s) => s.agentSessionId)
+    .filter((id): id is string => !!id);
+  const cliCallLogImport = useCliCallLogImport({
+    callLogs: account?.callLogs,
+    unarchivedAppSessionCount,
+    linkedAgentIds,
+    onImported: () => {
+      void refreshSessions();
+      void refreshProjects();
+    },
+  });
+  const importCliCallLogsFromSidebar = useCallback(async () => {
+    try {
+      const result = await cliCallLogImport.importListed();
+      if (result.imported.length > 0) {
+        showToast(
+          tr("settings.cliSessionsImportedN", {
+            n: String(result.imported.length),
+          }),
+        );
+      }
+      if (result.failed > 0) {
+        showToast(
+          tr("account.callLogsImportPartial", {
+            n: String(result.failed),
+          }),
+          5000,
+        );
+      }
+    } catch (e) {
+      showToast(String(e), 5000);
+    }
+  }, [cliCallLogImport, showToast, tr]);
+  const browseCliSessionsSettings = useCallback(() => {
+    navigateSettings("account");
+    setSettingsFocusAnchor("settings-anchor-account-callLogs");
+  }, [navigateSettings]);
+  const sidebarCliImportCta = cliCallLogImport.showCta ? (
+    <SidebarCliImportCta
+      hint={tr("sidebar.importCliSessionsHint")}
+      importLabel={
+        cliCallLogImport.importing
+          ? tr("settings.cliSessionsImporting")
+          : tr("sidebar.importCliSessions")
+      }
+      browseLabel={tr("account.callLogs")}
+      importing={cliCallLogImport.importing}
+      onImport={() => void importCliCallLogsFromSidebar()}
+      onBrowse={browseCliSessionsSettings}
+    />
+  ) : null;
+
   type ExportMdTarget = {
     id: string;
     title: string;
@@ -18513,6 +18569,7 @@ export function AppWorkbench() {
           sessionDataMode={sessionDataMode}
           onCliSessionsImported={() => {
           void refreshSessions();
+          void refreshProjects();
           }}
           onOpenCliSession={(appSessionId) => {
           void (async () => {
@@ -19532,6 +19589,7 @@ export function AppWorkbench() {
             {projects.length === 0 && (
               <div className="sidebar-empty">
                 {tr("sidebar.noProjects")}
+                {sidebarCliImportCta}
               </div>
             )}
 
@@ -19959,6 +20017,7 @@ export function AppWorkbench() {
                   );
                 })()
               : null}
+            {historyOpen && projects.length > 0 ? sidebarCliImportCta : null}
             </div>
           </OverlayScroll>
 

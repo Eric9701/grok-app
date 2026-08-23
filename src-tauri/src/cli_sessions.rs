@@ -187,6 +187,49 @@ pub fn cwd_paths_match(a: &str, b: &str) -> bool {
     !na.is_empty() && na == nb
 }
 
+/// Whether a CLI cwd should become an untrusted App project on import (pure).
+///
+/// Skips filesystem roots, the user home, ancestors of home, and shallow
+/// paths such as `/Users/name` or `/Users/name/Developer`. Real project
+/// folders (`…/Developer/foo`) have ≥4 segments.
+pub fn should_auto_add_project_path(path: &str, home: &str) -> bool {
+    let p = normalize_cwd_path(path);
+    if p.is_empty() || p == "/" || p == "." {
+        return false;
+    }
+    let bytes = p.as_bytes();
+    // Windows drive root: "c:" / "c:/"
+    if bytes.len() <= 3 && bytes.get(1) == Some(&b':') {
+        return false;
+    }
+    let home_n = normalize_cwd_path(home);
+    if !home_n.is_empty() {
+        if p == home_n {
+            return false;
+        }
+        if home_n.starts_with(&format!("{p}/")) {
+            return false;
+        }
+    }
+    p.split('/').filter(|s| !s.is_empty()).count() >= 4
+}
+
+/// Create an untrusted App project for a CLI cwd when missing.
+/// Never auto-trusts. Missing / shallow / home paths are no-ops.
+fn ensure_untrusted_project_for_cwd(cwd: &str) {
+    let home = crate::process_util::user_home();
+    let home_s = home.to_string_lossy();
+    if !should_auto_add_project_path(cwd, home_s.as_ref()) {
+        return;
+    }
+    if !Path::new(cwd).is_dir() {
+        return;
+    }
+    if let Err(e) = store::add_project(cwd.to_string(), false) {
+        tracing::debug!("cli import skip project add {cwd}: {e}");
+    }
+}
+
 /// Pick the newest session among rows whose `cwd` matches `project_path` (pure).
 ///
 /// Compares `updated_at` lexicographically (RFC3339-friendly).
@@ -1754,6 +1797,8 @@ pub fn import_cli_session(
     project_id: Option<String>,
     session_data_mode: &str,
 ) -> Result<SessionMeta, String> {
+    let agent_session_id = validate_agent_session_id(agent_session_id)?;
+
     // Already linked? Skip re-import and return the existing app session.
     if let Some(existing) = store::load_sessions_index()
         .into_iter()
@@ -1787,16 +1832,14 @@ pub fn import_cli_session(
     let history = dir.join("chat_history.jsonl");
     let pairs = parse_chat_history_jsonl(&history)?;
 
-    // Prefer matching App project by path.
+    // Prefer matching App project by path. Missing project folders from a
+    // real CLI cwd are added untrusted — user still confirms trust.
     let project_id = project_id.or_else(|| {
         let cwd = cwd.as_deref()?;
+        ensure_untrusted_project_for_cwd(cwd);
         store::load_projects()
             .into_iter()
-            .find(|p| {
-                let a = p.path.trim_end_matches('/').trim_end_matches('\\');
-                let b = cwd.trim_end_matches('/').trim_end_matches('\\');
-                a == b
-            })
+            .find(|p| cwd_paths_match(&p.path, cwd))
             .map(|p| p.id)
     });
 
@@ -2404,6 +2447,18 @@ mod tests {
         assert!(validate_agent_session_id("sess-ok-123").is_ok());
     }
 
+    #[test]
+    fn import_cli_session_rejects_traversal_ids_before_path_join() {
+        // Must fail closed on the id itself — never scan sessions or join `..`.
+        for id in ["", "   ", "../etc", "a/b", "a\\b", "..", "sess/../x"] {
+            let err = import_cli_session(id, None, None, "shared").unwrap_err();
+            assert!(
+                err.contains("invalid agent_session_id") || err.contains("empty agent_session_id"),
+                "id {id:?} → {err}"
+            );
+        }
+    }
+
     fn make_fake_cli_session(home: &Path, agent_id: &str) -> PathBuf {
         let cwd_enc = percent_encode_path_component("/Users/me/proj");
         let dir = home.join("sessions").join(cwd_enc).join(agent_id);
@@ -2719,5 +2774,23 @@ Total: 1
         assert_eq!(clamp_search_limit(Some(0)), 1);
         assert_eq!(clamp_search_limit(Some(200)), 100);
         assert_eq!(clamp_search_limit(Some(25)), 25);
+    }
+
+    #[test]
+    fn auto_add_project_path_skips_home_and_roots() {
+        let home = "/Users/prax";
+        assert!(should_auto_add_project_path(
+            "/Users/prax/Developer/money-manager-reverse-engineering",
+            home
+        ));
+        assert!(should_auto_add_project_path(
+            "/Users/prax/Developer/PraxAutomations/prax-daily",
+            home
+        ));
+        assert!(!should_auto_add_project_path("/", home));
+        assert!(!should_auto_add_project_path("/Users/prax", home));
+        assert!(!should_auto_add_project_path("/Users/prax/Developer", home));
+        assert!(!should_auto_add_project_path("C:\\", "C:\\Users\\prax"));
+        assert!(!should_auto_add_project_path("", home));
     }
 }

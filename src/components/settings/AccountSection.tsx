@@ -33,6 +33,8 @@ export function AccountSection() {
     onAddAccount,
     onCancelLogin,
     onImportChat,
+    onCliSessionsImported,
+    onOpenCliSession,
     onProviderActivated,
     onProvidersChanged,
     onProviderBalanceLoaded,
@@ -234,6 +236,8 @@ export function AccountSection() {
             onSwitchAccount={onSwitchAccount}
             onRemoveAccount={onRemoveAccount}
             onImportChat={onImportChat}
+            onImported={onCliSessionsImported}
+            onOpenSession={onOpenCliSession}
           />
             )}
           </>
