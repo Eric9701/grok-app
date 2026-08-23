@@ -421,6 +421,17 @@ html.platform-win .window-edge-n {
   z-index: 1;
 }
 
+.workbench--sidebar-motion .sidebar:not(.is-resizing):not(.sidebar--overlay) {
+  transition:
+    width var(--motion-pane) var(--motion-pane-ease),
+    min-width var(--motion-pane) var(--motion-pane-ease),
+    max-width var(--motion-pane) var(--motion-pane-ease),
+    flex-basis var(--motion-pane) var(--motion-pane-ease),
+    border-color var(--motion-pane) ease,
+    opacity 180ms ease,
+    filter 180ms ease;
+}
+
 /*
  * Narrow desktop: overlay the rail instead of squeezing chat.
  * Width stays the open size; motion is transform (compositor), not flex.
