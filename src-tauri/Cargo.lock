@@ -1846,7 +1846,7 @@ dependencies = [
 
 [[package]]
 name = "grok-app"
-version = "0.2.24"
+version = "0.2.25"
 dependencies = [
  "arboard",
  "async-stream",
@@ -1865,6 +1865,7 @@ dependencies = [
  "mac-notification-sys",
  "mac-usernotifications",
  "notify-rust",
+ "objc2",
  "parking_lot",
  "portable-pty",
  "rand 0.8.7",
@@ -1873,6 +1874,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha1",
  "sha2",
  "tauri",
  "tauri-build",

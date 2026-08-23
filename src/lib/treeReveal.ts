@@ -72,8 +72,12 @@ export function measureTreeRevealContent(inner: HTMLElement | null): number {
 
 /**
  * After a chat is moved into an already-open project, content can outgrow
- * the last locked px height. Caller should retarget the lock to the new
- * content px (do not settle to `auto` — that makes the next close snap).
+ * the last locked px height. Collapse-all (and moving chats out) can also
+ * leave the L1 projects wrapper locked taller than the remaining rows,
+ * which parks “Other sessions” under a slab of empty space.
+ * Retarget the lock to the new content px in either direction — do not
+ * settle to `auto` (that makes the next close snap). Ignore a 0px measure
+ * so a transient empty inner does not collapse an open section.
  */
 export function shouldReleaseTreeRevealLock(opts: {
   open: boolean;
@@ -83,7 +87,7 @@ export function shouldReleaseTreeRevealLock(opts: {
 }): boolean {
   if (!opts.open || opts.animatingOpen) return false;
   if (opts.contentPx <= 0) return false;
-  return opts.contentPx > opts.boxPx + 1;
+  return Math.abs(opts.contentPx - opts.boxPx) > 1;
 }
 
 let motionCount = 0;

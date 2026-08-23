@@ -53,12 +53,17 @@ X / web **不做 Host 关键词预跑**；由 agent 通过 tools 调用 `officia
 | `image_to_video` | 单图 → 短视频（图生视频） |
 | `reference_to_video` | 多图参考 + 文案 → 视频 |
 
-脚本：`scripts/official-aux-mcp.mjs`（工具 description 含中英别名，便于 `search_tool` 命中）。Host：`src-tauri/src/official_aux.rs`。
+脚本：`scripts/official-aux-mcp.mjs`（`include_str!` 写入 `agent-home-official/official-aux-mcp.mjs`，打包 App 不依赖仓库路径）。Host：`src-tauri/src/official_aux.rs`。
 
 门闸实现：`should_inject_mcp_for_main()` = inject 开 ∧ 凭证可用 ∧ **`active_route() == Custom`**。
 
 **Solo inject 与 Claude MCP：**  
 默认 `official_aux_with_user_mcp=false` 时，spawn 设置 `GROK_CLAUDE_MCPS_ENABLED=false` / `GROK_CURSOR_MCPS_ENABLED=false`，避免把 `~/.claude.json` 里的 Playwright 等并进会话、拖慢 30s 才结束 connecting（官方-aux 本身约 10ms 即可就绪）。
+
+**Solo inject 与 GROK_HOME `config.toml` MCP：**  
+ACP `mcpServers` 省略用户 MCP **不够**。Grok CLI 仍会从 agent `config.toml` 的 `[mcp_servers.*]` 自动拉起 ChatCut 等 HTTP 服务器（AuthRequired 也进 `search_tool`）。独立模式在 spawn / 开关变更时把这些 server 写成 `enabled = false`（`official-aux` 除外）。共享模式不改写 `~/.grok`。
+
+**规则：** custom + inject 时 `--rules` 要求 **直接** `use_tool official-aux__x_keyword_search` / `official-aux__image_gen`，禁止先 `search_tool`（会命中 ChatCut）。预热进程也带同一套 `--rules`，避免 warm-reuse 丢掉指引。
 
 **绝不**在 custom 主路由把官方 `auth.json` 写回主 `agent-home`。
 

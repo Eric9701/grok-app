@@ -12,7 +12,9 @@ import {
   loadTreeWidth,
   mergeTreeExpandedForFilter,
   persistTreeWidth,
+  replaceResourceTreeChildren,
   saveTreeExpanded,
+  sessionChangePathsKey,
   type ResourceTreeNodeLike,
 } from "./resourceTree";
 
@@ -194,3 +196,35 @@ describe("expandKeysForResourceTreeFilter / mergeTreeExpandedForFilter", () => {
     });
   });
 });
+
+describe("session change tree soft-refresh (#863)", () => {
+  it("sessionChangePathsKey is stable and ignores blanks", () => {
+    expect(sessionChangePathsKey(["b", "a", "a", ""])).toBe("a\nb");
+    expect(sessionChangePathsKey([])).toBe("");
+    expect(sessionChangePathsKey(null)).toBe("");
+  });
+
+  it("replaceResourceTreeChildren swaps root or a nested dir", () => {
+    const nextRoot = replaceResourceTreeChildren(sample, "", [
+      { name: "new.ts", relativePath: "new.ts", isDir: false },
+    ]);
+    expect(nextRoot.map((n) => n.name)).toEqual(["new.ts"]);
+
+    const withLib = replaceResourceTreeChildren(sample, "src/lib", [
+      {
+        name: "resourceTabs.ts",
+        relativePath: "src/lib/resourceTabs.ts",
+        isDir: false,
+      },
+      { name: "fresh.ts", relativePath: "src/lib/fresh.ts", isDir: false },
+    ]);
+    const lib = withLib
+      .find((n) => n.relativePath === "src")!
+      .children!.find((n) => n.relativePath === "src/lib")!;
+    expect(lib.children!.map((c) => c.name)).toEqual([
+      "resourceTabs.ts",
+      "fresh.ts",
+    ]);
+  });
+});
+

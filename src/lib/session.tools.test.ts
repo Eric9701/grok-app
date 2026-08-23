@@ -39,6 +39,78 @@ describe("context compact markers", () => {
     expect(next[0]?.marker).toBe("context_compact");
     expect(next[0]?.compactMeta?.tokensBefore).toBe(1000);
   });
+
+  it("applyContextCompact splits a streaming assistant so the banner is a mid-turn anchor (#855)", () => {
+    const before = applyContextCompact(
+      [
+        { id: "u1", role: "user", content: "long task" },
+        {
+          id: "a1",
+          role: "assistant",
+          content: "",
+          streaming: true,
+          segments: [
+            {
+              kind: "tool",
+              toolCallId: "t1",
+              title: "read",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+      {
+        messageId: "c1",
+        trigger: "auto",
+        tokensBefore: 400_000,
+        tokensAfter: 22_000,
+      },
+    );
+    expect(before.map((m) => m.marker || m.role)).toEqual([
+      "user",
+      "assistant",
+      "context_compact",
+      "assistant",
+    ]);
+    expect(before[1]?.id).toBe("a1__precompact_c1");
+    expect(before[1]?.streaming).toBe(false);
+    expect(before[1]?.segments).toHaveLength(1);
+    expect(before[2]?.marker).toBe("context_compact");
+    expect(before[3]?.id).toBe("a1");
+    expect(before[3]?.streaming).toBe(true);
+    expect(before[3]?.segments ?? []).toEqual([]);
+
+    const afterTool = applyToolEvent(before, {
+      toolCallId: "t2",
+      title: "write",
+      kind: "edit",
+      status: "completed",
+      path: "/tmp/x.ts",
+    });
+    expect(afterTool[2]?.marker).toBe("context_compact");
+    expect(afterTool[3]?.segments?.some((s) => s.kind === "tool" && s.toolCallId === "t2")).toBe(
+      true,
+    );
+    expect(afterTool[1]?.segments?.some((s) => s.kind === "tool" && s.toolCallId === "t2")).toBe(
+      false,
+    );
+  });
+
+  it("applyContextCompact stacks multiple mid-turn banners without pinning them to the tail", () => {
+    let msgs: ChatMessage[] = [
+      { id: "u1", role: "user", content: "go" },
+      { id: "a1", role: "assistant", content: "", streaming: true, segments: [] },
+    ];
+    msgs = applyContextCompact(msgs, { messageId: "c1", trigger: "auto" });
+    msgs = applyContextCompact(msgs, { messageId: "c2", trigger: "auto" });
+    expect(msgs.filter((m) => m.marker === "context_compact").map((m) => m.id)).toEqual([
+      "c1",
+      "c2",
+    ]);
+    expect(msgs[msgs.length - 1]?.role).toBe("assistant");
+    expect(msgs[msgs.length - 1]?.streaming).toBe(true);
+    expect(msgs[msgs.length - 1]?.id).toBe("a1");
+  });
 });
 
 describe("tool activity", () => {

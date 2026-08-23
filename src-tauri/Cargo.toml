@@ -1,6 +1,6 @@
 [package]
 name = "grok-app"
-version = "0.2.24"
+version = "0.2.25"
 description = "Grok — desktop workbench for Grok Build CLI"
 authors = ["RongleCat"]
 edition = "2021"
@@ -49,6 +49,7 @@ chrono = { version = "0.4", features = ["serde", "clock"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart", "system-proxy", "blocking", "socks"] }
 futures-util = "0.3"
 base64 = "0.22"
+sha1 = "0.10"
 sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
@@ -115,6 +116,8 @@ tauri-plugin-window-state = "2"
 [target.'cfg(target_os = "macos")'.dependencies]
 mac-notification-sys = "0.6"
 mac-usernotifications = "0.3"
+# Pet overlay: setPreventsActivation. Launch: NSApp.isActive / firstResponder.
+objc2 = "0.6"
 
 [profile.release]
 codegen-units = 1

@@ -203,7 +203,7 @@
 .perm-bar {
   pointer-events: auto;
   width: 100%;
-  max-width: 42rem;
+  max-width: var(--chat-width-max, 800px);
   margin: 0 auto;
   padding: 10px 12px;
   border-radius: var(--modal-radius, 16px);
@@ -738,17 +738,90 @@
   width: 100%;
 }
 
+/* Empty session keeps the classic ~42rem input; active threads match transcript. */
+.composer-wrap--welcome .composer-stack {
+  max-width: 42rem;
+}
+
+.composer-wrap--welcome .composer-stack .composer,
+.composer-wrap--welcome > .composer {
+  max-width: 42rem;
+}
+
 .composer-welcome-mark {
   pointer-events: none;
+  position: relative;
+  width: 100%;
+  max-width: 42rem;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* Reserve height so composer doesn't jump when mark appears */
-  min-height: 36px;
+  gap: 12px;
   padding: 4px 8px 8px;
   user-select: none;
   flex-shrink: 0;
   contain: layout style;
+}
+
+.composer-welcome-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  transform: translate3d(0, 0, 0);
+}
+
+.composer-welcome-prompt {
+  width: max-content;
+  max-width: calc(100% - 32px);
+  color: var(--text-primary);
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.composer-welcome-mark.is-entering .composer-welcome-brand {
+  animation: composer-welcome-brand-rise 480ms ease both;
+  will-change: transform;
+}
+
+.composer-welcome-mark.is-entering .composer-welcome-prompt {
+  animation: composer-welcome-prompt-type
+    680ms
+    steps(var(--welcome-prompt-steps), end)
+    480ms
+    both;
+  will-change: clip-path;
+}
+
+@keyframes composer-welcome-brand-rise {
+  from {
+    transform: translate3d(0, calc(100% + 12px), 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes composer-welcome-prompt-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-welcome-mark.is-entering .composer-welcome-brand,
+  .composer-welcome-mark.is-entering .composer-welcome-prompt {
+    animation: none;
+  }
 }
 
 /* SuperGrok / SuperGrok Heavy wordmarks (theme via data-theme tokens).
@@ -864,11 +937,11 @@
   line-height: 1;
 }
 
-/* Context bar + composer share width; tight gap when bar is present */
+/* Context bar + composer share transcript reading width */
 .composer-stack {
   pointer-events: none;
   width: 100%;
-  max-width: 42rem;
+  max-width: var(--chat-width-max, 800px);
   display: flex;
   flex-direction: column;
   align-items: stretch;

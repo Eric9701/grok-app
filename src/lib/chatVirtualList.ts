@@ -41,16 +41,16 @@ export const CHAT_DEFAULT_ROW_ESTIMATE_PX = 120;
 export const CHAT_MAX_ROW_ESTIMATE_PX = 8000;
 
 /** Baseline extra px above/below the viewport when browsing history. */
-export const CHAT_OVERSCAN_PX = 1200;
+export const CHAT_OVERSCAN_PX = 4800;
 
 /** Baseline when pinned: more history above the tail so pin feels continuous. */
-export const CHAT_PIN_OVERSCAN_PX = 1600;
+export const CHAT_PIN_OVERSCAN_PX = 6400;
 
 /** Floor / ceiling for adaptive overscan (px). */
-export const CHAT_OVERSCAN_MIN_PX = 700;
-export const CHAT_OVERSCAN_MAX_PX = 1800;
-export const CHAT_PIN_OVERSCAN_MIN_PX = 1000;
-export const CHAT_PIN_OVERSCAN_MAX_PX = 2400;
+export const CHAT_OVERSCAN_MIN_PX = 2800;
+export const CHAT_OVERSCAN_MAX_PX = 9200;
+export const CHAT_PIN_OVERSCAN_MIN_PX = 3600;
+export const CHAT_PIN_OVERSCAN_MAX_PX = 10400;
 
 /**
  * Max index gap when expanding the window for `forceIndices` while **escaped**.
@@ -73,14 +73,15 @@ export const CHAT_IMAGE_CARDS_PER_ROW = 3;
  * are not first measured as ~120px (that underestimates scrollHeight and
  * makes mid-document look "near bottom" → stick bounce).
  *
- * Media: chip attachments (~36px), ratio-aware image cards (≤150px), and
- * inline video cards (~240px) are not reflected in `contentLength` — include
- * them so first paint is closer to final height (fewer remeasure snaps).
+ * Estimates are coarse and intentional: they only seed the prefix-sum table
+ * before rows mount. Real heights commit to `heightsRef` via measureRef.
  */
 export function estimateChatRowHeight(input: {
   contentLength?: number;
   thoughtLength?: number;
   role?: string;
+  rawContent?: string;
+  toolCount?: number;
   /**
    * Non-image attachment chips (file/folder under the bubble), or user-strip
    * 36px thumbs when role is user.
@@ -107,7 +108,8 @@ export function estimateChatRowHeight(input: {
   thoughtExpanded?: boolean;
 }): number {
   if (input.collapsed) return 0;
-  const content = Math.max(0, input.contentLength ?? 0);
+  const rawText = input.rawContent ?? "";
+  const content = Math.max(0, input.contentLength ?? rawText.length);
   const thoughtRaw = Math.max(0, input.thoughtLength ?? 0);
   const thought = input.thoughtExpanded === true ? thoughtRaw : 0;
   const role = (input.role ?? "assistant").toLowerCase();
@@ -123,11 +125,23 @@ export function estimateChatRowHeight(input: {
   ) {
     return 0;
   }
-  // Collapsed CoT is a one-line "Thought" chip, not the raw thought body.
-  const thoughtChrome = !input.thoughtExpanded && thoughtRaw > 0 ? 28 : 0;
-  // ~42 chars/line in the bubble, ~20px line height, role chrome.
-  const lines = Math.ceil((content + thought * 0.5) / 42);
-  const chrome = role === "user" ? 72 : role === "tool" ? 28 : 96;
+  // Collapsed CoT is a ~38px "Thought" chip.
+  const thoughtChrome = !input.thoughtExpanded && thoughtRaw > 0 ? 38 : 0;
+  // Tool phase activity header ("Worked for ...") is ~42px
+  const toolPhaseChrome = (input.toolCount ?? 0) > 0 ? 42 : 0;
+
+  // Modern chat width (~700-900px): ~50-65 chars per line typical.
+  const charsPerLine = role === "user" ? 50 : 65;
+  // Account for explicit newlines in markdown/code
+  const explicitNewlines = rawText ? (rawText.match(/\n/g) || []).length : 0;
+  // Code fence chrome (header bar + padding) ~56px per fence
+  const codeBlockCount = rawText ? (rawText.match(/```/g) || []).length / 2 : 0;
+  const codeChrome = Math.floor(codeBlockCount) * 56;
+
+  const charLines = Math.ceil((content + thought * 0.5) / charsPerLine);
+  const effectiveLines = Math.max(charLines, explicitNewlines + 1);
+  const lineHeight = role === "assistant" ? 23 : 20;
+  const chrome = role === "user" ? 44 : role === "tool" ? 24 : 64;
   const atts = Math.max(0, input.attachmentCount ?? 0);
   // 36px chips + gap; user strip packs to ~70% width (~6–8 chips/row typical).
   // Collapsed default shows ≤3 + "+N" (≤4 slots) on one row when possible.
@@ -142,9 +156,16 @@ export function estimateChatRowHeight(input: {
   const imgBoost = imgRows * CHAT_IMAGE_CARD_ESTIMATE_H;
   const videoBoost = input.hasVideoCard ? 260 : 0;
   const raw =
-    chrome + lines * 20 + thoughtChrome + attBoost + imgBoost + videoBoost;
+    chrome +
+    effectiveLines * lineHeight +
+    thoughtChrome +
+    toolPhaseChrome +
+    codeChrome +
+    attBoost +
+    imgBoost +
+    videoBoost;
   // Tool rows are compact; do not floor them at the assistant default (120px).
-  const floor = role === "tool" ? 0 : CHAT_DEFAULT_ROW_ESTIMATE_PX;
+  const floor = role === "tool" ? 0 : 80;
   return Math.min(CHAT_MAX_ROW_ESTIMATE_PX, Math.max(floor, raw));
 }
 
@@ -192,21 +213,23 @@ export function resolveChatOverscanPx(input: {
   const vh = Math.max(0, input.viewportHeight);
   let px: number;
   if (input.pinToBottom) {
-    // ~1.5 viewports above the tail + small baseline, clamped.
-    const raw = vh * 1.5 + 200;
+    // ~3.6 viewports above the tail + small baseline, clamped. Doubled once
+    // overscan mounts moved off the urgent lane (startTransition in the
+    // virtualizer): more runway costs idle time, not scroll frames.
+    const raw = vh * 3.6 + 600;
     px = Math.round(
       Math.min(
         CHAT_PIN_OVERSCAN_MAX_PX,
-        Math.max(CHAT_PIN_OVERSCAN_MIN_PX, raw, CHAT_PIN_OVERSCAN_PX * 0.75),
+        Math.max(CHAT_PIN_OVERSCAN_MIN_PX, raw, CHAT_PIN_OVERSCAN_PX),
       ),
     );
   } else {
-    // History browse: ~1 viewport of runway.
-    const raw = vh * 1.1 + 100;
+    // History browse: ~2.4 viewports of runway (doubled, see pin note).
+    const raw = vh * 2.4 + 600;
     px = Math.round(
       Math.min(
         CHAT_OVERSCAN_MAX_PX,
-        Math.max(CHAT_OVERSCAN_MIN_PX, raw, CHAT_OVERSCAN_PX * 0.6),
+        Math.max(CHAT_OVERSCAN_MIN_PX, raw, CHAT_OVERSCAN_PX),
       ),
     );
   }

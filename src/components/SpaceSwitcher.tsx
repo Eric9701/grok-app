@@ -6,8 +6,8 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   IconCheck,
-  IconChevronDown,
   IconPlus,
+  IconSwitch,
   IconQueue,
   IconRename,
   IconTrash,
@@ -15,7 +15,6 @@ import {
 import { useFloatingMenu } from "@/lib/floatingMenu";
 import {
   ALL_SPACES_ID,
-  activeSpaceLabel,
   countProjectsInSpace,
   isAllSpacesView,
   isDefaultSpaceId,
@@ -72,11 +71,6 @@ export function SpaceSwitcher({
     deps: [state.spaces.length, state.activeId, open],
   });
 
-  const head = activeSpaceLabel(state, {
-    all: labels.all,
-    default: labels.default,
-    projects: labels.projects,
-  });
   const canEditCurrent =
     !isAllSpacesView(state.activeId) &&
     !!state.spaces.find((s) => s.id === state.activeId);
@@ -100,10 +94,12 @@ export function SpaceSwitcher({
         aria-expanded={open}
         aria-label={labels.switch}
         title={labels.switch}
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
       >
-        <span className="space-switcher__label">{head}</span>
-        <IconChevronDown size={12} />
+        <IconSwitch size={13} />
       </button>
       {open && pos
         ? createPortal(

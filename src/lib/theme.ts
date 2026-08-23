@@ -97,6 +97,184 @@ export function applyThemeToDocument(
   root.setAttribute("data-theme", theme);
 }
 
+let themeTransitionGeneration = 0;
+let activeThemeTransition: ViewTransition | null = null;
+let activeWebKitThemeAnimations: Animation[] = [];
+let themeTransitionCleanupTimer: ReturnType<typeof setTimeout> | null = null;
+
+const WEBKIT_THEME_TRANSITION_DURATION_MS = 200;
+const WEBKIT_THEME_TRANSITION_CLEANUP_MS =
+  WEBKIT_THEME_TRANSITION_DURATION_MS + 50;
+const WEBKIT_THEME_ANIMATED_PROPERTIES = [
+  "color",
+  "backgroundColor",
+  "borderTopColor",
+  "borderRightColor",
+  "borderBottomColor",
+  "borderLeftColor",
+  "outlineColor",
+  "fill",
+  "stroke",
+] as const;
+
+type WebKitThemeAnimatedProperty =
+  (typeof WEBKIT_THEME_ANIMATED_PROPERTIES)[number];
+type WebKitThemeFrame = Partial<Record<WebKitThemeAnimatedProperty, string>>;
+type WebKitThemeSnapshot = {
+  element: Element;
+  before: WebKitThemeFrame;
+};
+
+function readWebKitThemeFrame(style: CSSStyleDeclaration): WebKitThemeFrame {
+  const frame: WebKitThemeFrame = {};
+  for (const property of WEBKIT_THEME_ANIMATED_PROPERTIES) {
+    const value = style[property];
+    if (typeof value === "string") frame[property] = value;
+  }
+  return frame;
+}
+
+function captureVisibleThemeFrames(doc: Document): WebKitThemeSnapshot[] {
+  const view = doc.defaultView;
+  if (!view || typeof view.getComputedStyle !== "function") return [];
+  const width = view.innerWidth;
+  const height = view.innerHeight;
+  const elements = [
+    doc.documentElement,
+    ...Array.from(doc.querySelectorAll("body, body *")),
+  ];
+  const snapshots: WebKitThemeSnapshot[] = [];
+  for (const element of elements) {
+    const rect = element.getBoundingClientRect();
+    if (
+      element !== doc.documentElement &&
+      (rect.width <= 0 ||
+        rect.height <= 0 ||
+        rect.right < 0 ||
+        rect.bottom < 0 ||
+        rect.left > width ||
+        rect.top > height)
+    ) {
+      continue;
+    }
+    snapshots.push({
+      element,
+      before: readWebKitThemeFrame(view.getComputedStyle(element)),
+    });
+  }
+  return snapshots;
+}
+
+function animateThemeFrames(
+  snapshots: WebKitThemeSnapshot[],
+  doc: Document,
+): Animation[] {
+  const view = doc.defaultView;
+  if (!view || typeof view.getComputedStyle !== "function") return [];
+  const animations: Animation[] = [];
+  for (const { element, before } of snapshots) {
+    if (!element.isConnected || typeof element.animate !== "function") continue;
+    const after = readWebKitThemeFrame(view.getComputedStyle(element));
+    const from: WebKitThemeFrame = {};
+    const to: WebKitThemeFrame = {};
+    for (const property of WEBKIT_THEME_ANIMATED_PROPERTIES) {
+      if (before[property] === after[property]) continue;
+      from[property] = before[property];
+      to[property] = after[property];
+    }
+    if (Object.keys(from).length === 0) continue;
+    try {
+      animations.push(
+        element.animate([from, to], {
+          duration: WEBKIT_THEME_TRANSITION_DURATION_MS,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        }),
+      );
+    } catch {
+      /* unsupported SVG / native control property — the theme still applies */
+    }
+  }
+  return animations;
+}
+
+function cancelWebKitThemeAnimations(): void {
+  for (const animation of activeWebKitThemeAnimations) animation.cancel();
+  activeWebKitThemeAnimations = [];
+}
+
+/** Run one user-triggered theme update inside the native page cross-fade. */
+export function runThemeTransition(
+  update: () => void,
+  doc: Document = document,
+): void {
+  const generation = ++themeTransitionGeneration;
+  activeThemeTransition?.skipTransition();
+  activeThemeTransition = null;
+  if (themeTransitionCleanupTimer !== null) {
+    clearTimeout(themeTransitionCleanupTimer);
+    themeTransitionCleanupTimer = null;
+  }
+  const root = doc.documentElement;
+
+  let reduceMotion = false;
+  try {
+    reduceMotion =
+      doc.defaultView?.matchMedia("(prefers-reduced-motion: reduce)").matches ??
+      false;
+  } catch {
+    /* restricted / test window */
+  }
+
+  const commit = () => {
+    if (generation === themeTransitionGeneration) update();
+  };
+  const userAgent = doc.defaultView?.navigator?.userAgent ?? "";
+  // WebKit bug 302256 drops backdrop-filter for the whole snapshot animation.
+  const webKitDropsGlass =
+    /AppleWebKit/i.test(userAgent) &&
+    !/(Chrome|Chromium|CriOS|Edg)/i.test(userAgent);
+  if (reduceMotion || doc.visibilityState === "hidden") {
+    cancelWebKitThemeAnimations();
+    delete root.dataset.themeTransition;
+    commit();
+    return;
+  }
+
+  if (webKitDropsGlass) {
+    // WebKit's root snapshot drops backdrop-filter. Animate only the visible
+    // ink/surface properties with WAAPI so glass and component motion stay live.
+    const snapshots = captureVisibleThemeFrames(doc);
+    cancelWebKitThemeAnimations();
+    root.dataset.themeTransition = "webkit";
+    commit();
+    activeWebKitThemeAnimations = animateThemeFrames(snapshots, doc);
+    themeTransitionCleanupTimer = setTimeout(() => {
+      if (generation !== themeTransitionGeneration) return;
+      themeTransitionCleanupTimer = null;
+      activeWebKitThemeAnimations = [];
+      delete root.dataset.themeTransition;
+    }, WEBKIT_THEME_TRANSITION_CLEANUP_MS);
+    return;
+  }
+
+  cancelWebKitThemeAnimations();
+  delete root.dataset.themeTransition;
+  if (typeof doc.startViewTransition !== "function") {
+    commit();
+    return;
+  }
+
+  root.dataset.themeTransition = "1";
+  const transition = doc.startViewTransition(commit);
+  activeThemeTransition = transition;
+  const cleanup = () => {
+    if (activeThemeTransition !== transition) return;
+    activeThemeTransition = null;
+    delete root.dataset.themeTransition;
+  };
+  void transition.finished.then(cleanup, cleanup);
+}
+
 /**
  * Native chrome lock vs Auto when the user follows the OS.
  *

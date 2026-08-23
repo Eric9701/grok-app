@@ -26,27 +26,37 @@ export function usePaneSplitMotion(opts: {
   sidebarCollapsed: boolean;
   asideCollapsed: boolean;
   phoneLayout?: boolean;
+  /** Left pane is an overlay drawer — its transform already owns the motion. */
+  sidebarOverlay?: boolean;
   /** Right pane is an overlay drawer — cover native webviews during transform. */
   asideOverlay?: boolean;
 }): { paneMotionClass: string } {
   const [, setEpoch] = useState(0);
   const keyRef = useRef<string | null>(null);
+  const asideOverlayRef = useRef(Boolean(opts.asideOverlay));
   const tokenRef = useRef(0);
   const releaseRef = useRef<(() => void) | null>(null);
   const timerRef = useRef<number | null>(null);
 
   const key = `${opts.sidebarCollapsed}:${opts.asideCollapsed}`;
+  const asideOverlay = Boolean(opts.asideOverlay);
+  const asideOverlayModeChanged = asideOverlayRef.current !== asideOverlay;
   if (keyRef.current === null) {
     keyRef.current = key;
-  } else if (keyRef.current !== key) {
+  } else if (keyRef.current !== key || asideOverlayModeChanged) {
     const colon = keyRef.current.indexOf(":");
+    const sidebarChanged =
+      keyRef.current.slice(0, colon) !== String(opts.sidebarCollapsed);
     const asideChanged =
       keyRef.current.slice(colon + 1) !== String(opts.asideCollapsed);
+    const sidebarWidthChanged = sidebarChanged && !opts.sidebarOverlay;
+    const asideOverlayChanged =
+      asideChanged && (asideOverlayRef.current || asideOverlay);
+    const coverChanged = asideOverlayChanged || asideOverlayModeChanged;
     keyRef.current = key;
     if (
       !opts.phoneLayout &&
-      asideChanged &&
-      opts.asideOverlay &&
+      (sidebarWidthChanged || coverChanged) &&
       shouldStartPaneSplitMotion({
         reducedMotion: false,
         isFirstCommit: false,
@@ -55,17 +65,20 @@ export function usePaneSplitMotion(opts: {
     ) {
       if (tokenRef.current) endPaneSplitMotion(tokenRef.current);
       tokenRef.current = beginPaneSplitMotion({
-        cover: true,
-        width: false,
-        sidebar: false,
+        cover: coverChanged,
+        width: sidebarWidthChanged,
+        sidebar: sidebarWidthChanged,
         aside: false,
       });
     }
   }
+  asideOverlayRef.current = asideOverlay;
 
   useLayoutEffect(() => {
     const token = tokenRef.current;
     if (!token) return;
+    const finishOnSidebarWidth = isPaneSplitSidebarMotionActive();
+    const finishOnAsideWidth = isPaneSplitAsideMotionActive();
 
     if (isPaneSplitCoverActive() && !releaseRef.current) {
       releaseRef.current = acquireNativeWebviewCover();
@@ -93,7 +106,12 @@ export function usePaneSplitMotion(opts: {
       const t = e.target;
       if (!(t instanceof HTMLElement)) return;
       if (e.propertyName !== "width") return;
-      if (!t.classList.contains("sidebar") && !t.classList.contains("aside")) {
+      if (t.classList.contains("sidebar") && !finishOnSidebarWidth) return;
+      if (t.classList.contains("aside") && !finishOnAsideWidth) return;
+      if (
+        !t.classList.contains("sidebar") &&
+        !t.classList.contains("aside")
+      ) {
         return;
       }
       finish();
@@ -108,7 +126,13 @@ export function usePaneSplitMotion(opts: {
       document.removeEventListener("transitionend", onEnd);
       unsubBump();
     };
-  }, [opts.sidebarCollapsed, opts.asideCollapsed, opts.phoneLayout]);
+  }, [
+    opts.sidebarCollapsed,
+    opts.asideCollapsed,
+    opts.phoneLayout,
+    opts.sidebarOverlay,
+    opts.asideOverlay,
+  ]);
 
   useEffect(() => {
     return () => {

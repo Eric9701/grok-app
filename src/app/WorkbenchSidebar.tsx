@@ -91,6 +91,7 @@ export type WorkbenchSidebarProps = {
   onNavigateRemoteIm: () => void;
   showUserMenu: boolean;
   setShowUserMenu: Dispatch<SetStateAction<boolean>>;
+  closeImmediately?: boolean;
   theme: Theme;
   themePreference: ThemePreference;
   account: AccountStatus | null;
@@ -142,6 +143,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
     onNavigateRemoteIm,
     showUserMenu,
     setShowUserMenu,
+    closeImmediately = false,
     theme,
     themePreference,
     account,
@@ -348,6 +350,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
         <UserMenu
           open={showUserMenu}
           onClose={() => setShowUserMenu(false)}
+          closeImmediately={closeImmediately}
           theme={theme}
           themePreference={themePreference}
           locale={locale}

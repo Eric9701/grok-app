@@ -1380,6 +1380,7 @@ impl AcpClient {
             // --disallowed-tools which is headless-only). Official route / inject
             // off removes the managed hook file.
             let _ = crate::official_aux::sync_native_media_block_hook_for_current(prep_mode);
+            let _ = crate::extensions::sync_user_mcp_for_official_aux_inject(prep_mode);
             // Heal duplicate keys left by older upsert bugs (e.g. yolo vs yolo_mode).
             // Valid configs are never rewritten. Soft-fail so spawn still attempts.
             match crate::agent_home_config::ensure_agent_home_config_sane(prep_mode) {

@@ -59,7 +59,7 @@ export function ConversationContent({
       <div
         ref={contentRef}
         data-slot="conversation-content"
-        className="messages__col mx-auto flex w-full max-w-[42rem] flex-col gap-6 px-3 pt-5 sm:px-4"
+        className="messages__col mx-auto flex w-full flex-col gap-6 px-3 pt-5 sm:px-4"
       >
         {children}
       </div>

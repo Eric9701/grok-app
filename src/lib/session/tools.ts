@@ -32,16 +32,47 @@ export function applyContextCompact(
     summaryPreview: payload.summaryPreview,
     note: payload.note,
   };
+  const now = new Date().toISOString();
+  const compactRow: ChatMessage = {
+    id,
+    role: "tool",
+    content: payload.content || "context_compact",
+    marker: "context_compact",
+    compactMeta: meta,
+    createdAt: now,
+  };
+
+  // Mid-turn compact must stay a timeline anchor. Live tools / stream chunks
+  // upsert into the current-turn assistant; if we only append the banner after
+  // that assistant, later segments still render above it and cards pile at the
+  // composer. Freeze the bubble that already arrived, keep its id on a fresh
+  // streaming continuation after the banner so applyToolEvent / applyStreamChunk
+  // bind below the compact (#855).
+  const aIdx = findCurrentTurnAssistantIndex(messages);
+  if (aIdx < 0) return [...messages, compactRow];
+  const asst = messages[aIdx]!;
+  if (!asst.streaming && aIdx !== messages.length - 1) {
+    return [...messages, compactRow];
+  }
+  const frozen: ChatMessage = {
+    ...asst,
+    id: `${asst.id}__precompact_${id}`,
+    streaming: false,
+  };
+  const continuation: ChatMessage = {
+    id: asst.id,
+    role: "assistant",
+    content: "",
+    streaming: true,
+    createdAt: now,
+    segments: [],
+  };
   return [
-    ...messages,
-    {
-      id,
-      role: "tool",
-      content: payload.content || "context_compact",
-      marker: "context_compact",
-      compactMeta: meta,
-      createdAt: new Date().toISOString(),
-    },
+    ...messages.slice(0, aIdx),
+    frozen,
+    compactRow,
+    continuation,
+    ...messages.slice(aIdx + 1),
   ];
 }
 

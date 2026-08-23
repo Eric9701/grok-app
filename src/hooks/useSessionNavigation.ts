@@ -77,6 +77,7 @@ export type SessionNavHost = {
     resetUsageAndClock: () => void;
     resetPlanAndGates: () => void;
     newChatTitle: () => string;
+    startWelcomeIntro: () => void;
   };
   plan: {
     stashLeaving: (sessionId: string) => void;
@@ -153,6 +154,7 @@ export function createSessionNavHost(): SessionNavHost {
       resetUsageAndClock: stub("draft.resetUsageAndClock"),
       resetPlanAndGates: stub("draft.resetPlanAndGates"),
       newChatTitle: stub("draft.newChatTitle") as SessionNavHost["draft"]["newChatTitle"],
+      startWelcomeIntro: stub("draft.startWelcomeIntro"),
     },
     plan: {
       stashLeaving: stub("plan.stashLeaving"),
@@ -477,6 +479,7 @@ export function useSessionNavigation(opts: {
       const proj =
         project === undefined ? host.catalog.getActiveProject() : project;
       if (host.catalog.rejectUnusable(proj)) return;
+      host.draft.startWelcomeIntro();
 
       const leavingId = viewingSessionIdRef.current;
       host.composer.stashLeaving(leavingId);

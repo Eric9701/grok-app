@@ -12,6 +12,57 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- **Import Grok Build CLI sessions from Account → Recent sessions**: Import & open a row, or import the listed table into the sidebar. Empty sidebar offers the same when local CLI logs exist. Import may add the CLI cwd as an **untrusted** project (never home `/` or `~/`).
+- **Second SuperGrok login hint** on the account switcher: Add account, then switch. One login stays active.
+
+**中文 · 新增**
+- **从设置 → 账户「近期会话」导入 Grok Build CLI 对话**到侧栏；空侧栏在有本地 CLI 记录时提供同一入口。导入可为 CLI 工作目录补一条**未信任**项目（不会把家目录或 `/` 加成项目）。
+- **账户切换**提示可添加第二个 SuperGrok 登录；同一时间只有一个登录生效。
+
+### Changed
+
+**中文 · 变更**
+
+### Fixed
+- **Context compact cards stay at the moment of compaction (#855)**: mid-turn auto-compact freezes the current assistant bubble, inserts the banner, then continues streaming below it so later tools are not piled on the composer.
+- **Files tree refreshes when the agent creates files (#863)**: open Resources keeps expand state and re-lists root + expanded folders as session write paths change — no need to close and reopen the pane.
+- **Long chat transcript scroll no longer hitches on Worked-for blocks or lift-off (#853)**: Follow-up to #842. Virtual-window growth that still covers the viewport commits in the background (`startTransition`) and at most 3 rows per frame; collapsed tool steps skip `toolExpandBody` until opened; scroll settle uses velocity + a 160ms stillness floor so touchpad lift-off is not treated as a stop; hover is disabled while moving; pin snap restores the pre-commit distance from the bottom so expanding overscan does not bounce.
+- **WeCom webhook auth + ACL fail-closed (#851)**: webhook mode requires `callback_token` and verifies signatures; empty `allowFrom` denies all (use `*` to opt in); loopback bind by default.
+- **Settings segmented controls no longer flash (#856)**: shared `SegmentedControl` for tabs and theme capsules; first mount settles without a vertical expand.
+- **Welcome intro motion + Appearance toggle (#857)**: restored “what to do today” cadence; optional welcome animation (on by default).
+- **Sidebar open/close motion stable (#858)**: wide-window rail eases with the main pane; titlebar safe padding no longer snaps toward traffic lights.
+- **Settings frosts wallpaper behind the stage (#859)**: `app-settings-stage` uses glass blur/saturate under wallpaper.
+- **Theme light/dark transition keeps sidebar blur (#860)**: View Transition elsewhere; WebKit color WAAPI so backdrop-filter stays live.
+- **Pet body edge no longer shows a white fringe (#861)**: same-ink stroke covers AA seams.
+
+- **Composer matches chat reading width after the first turn**: once a session has transcript, the floating input (and permission bar) follow Appearance → chat width via `--chat-width-max`. Empty/new-session welcome still uses the classic `42rem` input.
+- **Sidebar “Other sessions” no longer sits under empty project space**: collapsing every project (or shrinking a folder after a long session list) now retargets the locked L1 projects height to the remaining rows instead of keeping the last expanded px.
+- **Sidebar project header icons**: chevron + space name expand/collapse the project list; space switching is a standalone switch button that appears on row hover like collapse/more; collapse-all stays outside; select, archive-older, and add-project move into a ⋯ menu.
+- **Official-aux X/Imagine on packaged custom mains**: `/Applications/Grok.app` never bundled `scripts/official-aux-mcp.mjs`, so ACP injected `mcpServers count=0` while ChatCut still auto-loaded from independent `agent-home/config.toml`. Host now writes the MCP script into `agent-home-official`, disables user MCP `enabled` flags during solo inject, ships official-aux `--rules` on prewarm, and tells the model to call `official-aux__x_keyword_search` directly instead of `search_tool` (which was resolving to ChatCut).
+
+**中文 · 修复**
+- **「上下文已自动压缩」卡片留在压缩发生的时间点（#855）**：回合中压缩会冻结当前助手气泡、插入横幅，再在下方继续流式输出，后续工具不再堆到输入框上方。
+- **Agent 新建文件后右侧文件树自动刷新（#863）**：保持展开状态，按会话写入路径重列根目录与已展开文件夹，不用关面板再开。
+- **长对话滑过「Worked for …」和抬手时不再卡顿（#853）**：#842 的后续。视口已被覆盖时的窗口扩张走后台提交，每帧最多挂 3 行；折叠的 tool 步骤在展开前不算 `toolExpandBody`；settle 用速度 + 160ms 静止下限，触控板抬手不再被当成停下；滑动中关掉 hover；贴底 snap 恢复 commit 前的离底距离，扩张 overscan 时不再弹跳。
+- **企微 webhook 鉴权 + ACL 默认拒绝（#851）**：webhook 必须填 `callback_token` 并验签；空 `allowFrom` 拒绝全部（显式 `*` 才开放）；默认只绑 loopback。
+- **设置页签/胶囊切换不再闪（#856）**：公共 `SegmentedControl`；首次挂载不纵向展开。
+- **新对话欢迎动画 + 外观开关（#857）**：恢复入场节奏；欢迎动画默认开、可关。
+- **侧栏开合动效稳定（#858）**：宽窗侧栏与主区连续移动；标题栏安全边距不再回弹红绿灯。
+- **壁纸下设置舞台毛玻璃（#859）**：`app-settings-stage` 使用 glass blur。
+- **深浅主题切换保持侧栏模糊（#860）**：非 WebKit 用 View Transition；WebKit 用颜色 WAAPI。
+- **宠物身体外缘白边消除（#861）**：同色描边盖住抗锯齿缝。
+- **有聊天记录后输入框与阅读宽度一致**：会话产生内容后，浮动输入框（及权限条）跟随设置 → 外观的聊天宽度（`--chat-width-max`）。新建/空会话欢迎态仍用原来的 `42rem` 输入框宽度。
+- **侧栏「其他会话」不再被空项目区顶到最下面**：收起全部项目（或长会话列表变短）后，L1 项目区会按剩余行高回缩，而不再锁在上次展开的像素高度。
+- **侧栏项目区顶部图标**：箭头+空间名展开/收起整个项目区；切换空间是独立按钮，和折叠/更多一样只在该行 hover 时出现；折叠全部仍留在外面；多选、按时间归档、添加项目收进 ⋯ 菜单。
+- **打包后自定义主模型的官方 X/画图注入**：正式版 App 找不到 `official-aux-mcp.mjs`，ACP 注入空 MCP，ChatCut 仍从独立 `agent-home/config.toml` 自动拉起。现将脚本写入 `agent-home-official`，solo inject 时关掉用户 MCP 的 `enabled`，预热进程带上官方 `--rules`，并要求模型直接调用 `official-aux__x_keyword_search` 而不是 `search_tool`（后者会命中 ChatCut）。
+
+## [0.2.25] - 2026-08-23
+
+> **Highlight:** Desktop pet mirrors on the right of the screen and no longer wakes the workbench; appearance packs; long chats, files, and Settings stay full-window and responsive; Windows caption/titlebar geometry is honest.
+>
+> **中文 · 亮点：** 桌面宠物在屏幕右侧水平镜像且按下不再唤醒主窗；外观包；长对话、文件树和设置页铺满且更跟手；Windows 标题栏/最大化几何正确。
+
+### Added
 - **Windows `install-latest.cmd`**: with Node / pnpm / Rust / VS Build Tools, double-click to fast-forward `origin/main` and silently install an unsigned side-by-side **grok-app-latest** under `%LOCALAPPDATA%\grok-app-latest`. Does not replace official **Grok**. For people waiting on the next GitHub Release; not a signed production build (`docs/BUILD.md`).
 - **Appearance packs (.grokskin)**: Settings → Appearance can save, import, and export the current skin + wallpaper + crop + clip + overlay. Apply always confirms first. `grok://` and `.grokskin` files write a pending import and never auto-apply. Export bakes the visible wallpaper crop (video uses system ffmpeg when present).
 - **Custom provider extra request headers (#812)**: Settings → Account → Providers can add key/value HTTP headers. They write Grok Build `extra_headers` on `[model.<id>]` (sent verbatim). Use for AgentRouter / AnyRouter WAF (`User-Agent`, `Originator`) or Anthropic `x-api-key`. Empty list omits the field.
@@ -40,8 +91,13 @@ See `docs/llm-wiki/release.md`.
 - **Resources pane lives in `WorkbenchResourcesAside`**: resize handle and SideWorkbench. Skill insert stays on the host.
 - **Search / export / sandbox / reliability overlays live in `WorkbenchDomainOverlays`**: those domain hooks already own state; AppWorkbench keeps session-open and sandbox profile apply.
 - **Thousand-line file budget is 69**: domain CSS parts, session/contextUsage tests, stall-history module, and Remote IM channel catalog are split so `files_ge_1000` sits under 70.
+- **Desktop pet on the right is a horizontal mirror**: Bottom-left keeps the authored ¾-right face. On the right half of the **screen work area** the mark is `scaleX(-1)` so the eyes look toward centre. Position comes from the overlay window (not `window.screenX`, which is 0 in the pet webview). The flip follows while dragging.
+- **macOS workbench sidebar uses the same frost as Settings**: Left rail (sessions + Settings nav) applies `--sidebar-blur` backdrop-filter instead of relying on native vibrancy alone. Settings is available before first navigation and swaps atomically with the workbench; the account portal closes in the same commit. Settings nav width follows the workbench rail. The glass meets the chat column with no opaque black seam. Returning keeps the workbench painted instead of hiding Settings for 320ms and leaving only the wallpaper in WKWebView.
+- **macOS sidebar right edge no longer flashes while dragging**: The seam is an inset hairline on the solid chat column, not a 1px layout border on Sidebar vibrancy. Window drag and split resize no longer alias that pixel light/dark.
+- **Chat transcript scroll no longer thrashes layout on mounted rows**: Virtual rows share a single `ResizeObserver` and measure via `borderBoxSize` instead of synchronous `getBoundingClientRect()` on mount; code block line-wrap/number preferences use in-memory caches to avoid blocking `localStorage` reads; right-edge message node rail uses memoized node IDs and skips redundant tick scrolls.
 - **UI font and terminal font are local-font dropdowns**: Settings → Appearance lists installed families (searchable) instead of a free-text name. UI default is the app sans stack; terminal default is the built-in Nerd Font stack. Reset is unchanged.
 - **Debug dock icon is the white invert**: `pnpm dev` uses `src-tauri/icons/dev` (white plate, dark mark) so the running debug app is distinct from the installed black production icon. Release bundles are unchanged.
+- **Windows AUMID follows the bundled identifier**: `pnpm dev` (`com.grokapp.desktop.dev`) is no longer grouped with official Grok on the taskbar / WinRT toasts. Release stays `com.grokapp.desktop`. Sessions still share App data unless `GROK_APP_HOME` is set.
 - **Resource markdown preview windows long files**: Side-pane `.md` keeps short files as one tree. Files at 200+ lines split on headings (and length caps) and only mount visible sections, instead of ReactMarkdown for the whole buffer.
 - **In-chat find stays off the workbench shell**: Ctrl+F match scanning and stream ticks live in the find bar / transcript island. Opening or closing find still toggles the shell; typing and token growth do not.
 - **Files tree windows long listings**: Side-pane / resource trees keep short folders as a full list. At 32+ visible rows, only the viewport is mounted (28px rows), instead of recursively mapping every expanded entry.
@@ -83,8 +139,13 @@ See `docs/llm-wiki/release.md`.
 - **右栏收进 `WorkbenchResourcesAside`**：拖拽条和 SideWorkbench。插入 skill 仍在宿主。
 - **搜索/导出/沙箱/可靠性弹层收进 `WorkbenchDomainOverlays`**：域 hook 已自持状态；宿主只留打开会话和套用沙箱档。
 - **千行文件预算改为 69**：CSS part、session/contextUsage 测试、stall history、Remote IM 渠道目录拆开，`files_ge_1000` 降到 70 以下。
+- **桌面宠物在屏幕右半边水平镜像**：左侧仍是原来的 ¾ 右视脸。到屏幕工作区右半边时整只 `scaleX(-1)`。位置用宠物窗口坐标（不用 `window.screenX`，浮层 WebView 里经常是 0）。拖动过程中跟着翻。
+- **macOS 主页面侧栏与设置导航同一套毛玻璃**：会话列表和设置左栏都用 `--sidebar-blur` 的 backdrop-filter，不再只靠系统 vibrancy。设置页在首次导航前就已可用，并与工作台原子切换；账户菜单浮层在同一次提交中收起。设置左栏宽度跟工作台侧栏走，玻璃接到聊天列不再夹实色黑边。返回时工作台始终保持已绘制，不再先隐藏设置层并等待 320ms、让 WKWebView 只剩壁纸。
+- **macOS 侧栏右缘拖动不再明暗闪烁**：分割线画在实色聊天列上，不再用 Sidebar 毛玻璃上的 1px layout 边框。拖窗口和拖分割条时那一像素不会再在亮/暗之间跳。
+- **长对话滚动消除挂载重排与同步存储阻塞**：虚拟列表改用单个共享 `ResizeObserver` 并通过 `borderBoxSize` 获取高度，消除新行挂载时的 `getBoundingClientRect()` 强制同步重排（Layout Thrashing）；代码块换行与行号偏好使用内存缓存，避免挂载时同步读取 `localStorage` 阻塞主线程；右侧消息节点轴缓存节点 ID 集合并在可视范围内跳过冗余滚动。
 - **界面字体和终端字体改为本机字体下拉**：设置 → 外观列出本机已安装字体族（可搜索），不再手填名称。界面默认是应用无衬线栈；终端默认是内置 Nerd Font。重置不变。
 - **开发版 Dock 图标改白底反色**：`pnpm dev` 使用 `src-tauri/icons/dev`（白底深色标），和已安装的黑底正式版区分。发布包图标不变。
+- **Windows AUMID 跟随 bundled identifier**：`pnpm dev`（`com.grokapp.desktop.dev`）不再和正式版抢任务栏分组 / WinRT toast。发布包仍是 `com.grokapp.desktop`。会话/设置仍共用，除非设置 `GROK_APP_HOME`。
 - **资源栏 Markdown 对长文件做窗口化**：侧栏 `.md` 短文件仍整树渲染。200 行以上按标题（及长度上限）切块，只挂可见节，不再对整份 buffer 跑 ReactMarkdown。
 - **对话内查找不再打穿工作台**：Ctrl+F 的匹配和流式跳动留在找条 / 对话岛。开关查找仍会切壳；打字和 token 增长不会。
 - **文件树对长列表做窗口化**：侧栏 / 资源树短目录仍整表渲染。可见行达到 32 以上只挂视口（28px 行高），不再递归把每个展开节点打进 DOM。
@@ -114,6 +175,10 @@ See `docs/llm-wiki/release.md`.
 - **仓库 About 与 README 挂上官网**：GitHub 仓库网站、`package.json` `homepage` 与各语言 README 现指向 [https://grok-app.com](https://grok-app.com)（无末尾斜杠）。
 
 ### Fixed
+- **Desktop pet press no longer wakes the workbench**: Dragging or single-clicking the mark only moves it / plays an emote. Double-click opens the main window (or the focused session). The overlay no longer yields key to main on pointer-down, and on macOS it opts out of app activation so a pet press cannot raise a background or hidden workbench.
+- **macOS launch can type and use shortcuts without a first click**: After `show()`, the Host reasserts key/activation once the page has loaded, retries briefly if NSApp stayed inactive while the window claimed key, and points firstResponder at the WKWebView so ⌘, and other web shortcuts reach the DOM.
+- **Settings covers the window with wallpaper on (#846)**: Wallpaper chrome lift no longer forces `position: relative` on the settings overlay. Short tabs (Pet, Archived chats) were shrinking to content height, so wallpaper (and the desktop pet) showed in the leftover strip.
+- **Agent questionnaire no longer freezes the workbench (#844)**: Answering or dismissing `_x.ai/ask_user_question` used to wait on the Host IPC with every control disabled. The modal now closes first and restores only if a failed accept is still the live request. Portaled overlays also opt out of the window-drag region so macOS titlebar drag cannot swallow clicks.
 - **Windows titlebar drag-up no longer grows height (#786)**: Follow-up to #783/#784. Caption maximize stayed up, but dragging the titlebar still stretched the frame. Windows skips JS `start_dragging` (`data-tauri-drag-region="false"`) and keeps compositor caption drag. Host `set_min_size` no longer runs on every `Moved` (tao re-applies inner size and double-counts the shadow offset); it skips while maximized, while the pointer is down, and when the min is unchanged.
 - **Desktop pet stays the chosen body, celebrates once, and no longer stalls on Windows**: Typing and in-progress tools no longer morph the mark into the catalog `!` or orbit/comet ribbons — the rest shape stays, with an attentive/curious face. Colorful belts fire only when the last live turn becomes unread-ready, then a corner pastille. Overlay paint throttles after idle, pauses while hidden, and cursor look events stay on the pet window (no duplicate still-cursor wakeups) so a long-running Windows overlay no longer freezes until restart.
 - **Windows caption maximize stays maximized; titlebar drag moves the window (#783)**: Follow-up to #773/#774. The button defers `maximize()` until after mouse-up so Aero does not drag-to-restore (flash). The `body` visualViewport transform pin is gone — it broke `-webkit-app-region: drag`, so pulling the titlebar up north-resized (bottom never lifted). An 8px top no-drag strip keeps native HTTOP.
@@ -126,6 +191,10 @@ See `docs/llm-wiki/release.md`.
 - **Windows Alt+Tab can type without a click first (#768)**: Tauri `unstable` (side-browser multi-webview) builds the page as a child `WRY_WEBVIEW`, so Alt-Tab / taskbar only activates the outer HWND. The host now forwards `WM_SETFOCUS` / `WM_ACTIVATE` into that child so composer and shortcuts work immediately.
 
 **中文 · 修复**
+- **按下桌面宠物不再唤醒主窗口**：拖动或单击标记只移动 / 做表情；双击才打开主窗口（或聚焦当前会话）。浮层在按下时不再把键盘焦点交回主窗口；macOS 上宠物窗选择不激活应用，避免后台或已隐藏的工作台被带起来。
+- **macOS 启动后不用先点一下就能打字和用快捷键**：`show()` 之后等页面加载完再确认一次键盘焦点/激活；若窗口已是 key 但 NSApp 仍 inactive，短重试几次；并把 firstResponder 指到 WKWebView，让 ⌘, 等网页快捷键进 DOM。
+- **有壁纸时设置页铺满窗口（#846）**：壁纸层级提升不再给设置 overlay 强制 `position: relative`。内容短的页（宠物、归档对话）以前按内容高度收缩，壁纸和桌面宠物会从底下露出来。
+- **Agent 提问弹窗不再卡住工作台（#844）**：回答或忽略 `_x.ai/ask_user_question` 以前会等 Host IPC，期间所有按钮都禁用。现在先关弹窗，只有失败的接受且仍是当前请求时才恢复。浮层也退出窗口拖动区，避免 macOS 标题栏拖动吞掉点击。
 - **Windows 标题栏往上拖不再把窗口拉高（#786）**：#783/#784 的后续。最大化能站住，但拖标题栏仍会拉长窗口。Windows 关掉 JS `start_dragging`（`data-tauri-drag-region="false"`），保留 compositor 标题栏拖动。`set_min_size` 不再在每次 `Moved` 里重设客户区（tao 会把阴影边框加两次）；最大化、按住鼠标、min 没变时都跳过。
 - **桌面宠物以本体为主、只在全部完成时撒彩带，Windows 长跑不再卡死**：打字和工具进行中不再把标记变成感叹号或轨道/彗星彩带，始终显示所选形体（专注/好奇脸）。彩带只在最后一个进行中的回合变成未读完成时播一次，然后右上角亮未读小圆点。空闲后降低绘制频率、隐藏时暂停，光标看向事件只发给宠物窗且静止不再重复唤醒，避免 Windows 透明浮层用久了卡顿卡死、重启才恢复。
 - **Windows 点最大化不再闪回，标题栏往上拖是移动窗口（#783）**：#773/#774 的后续。最大化推迟到鼠标松开之后，避免 Aero 当成拖拽立刻还原。去掉会破坏标题栏拖动的 `body` transform；顶边留 8px 非拖动带，标题栏中部往上拖会把整窗抬起来，不再把下沿无限拉高。

@@ -105,6 +105,12 @@
   line-height: 1.4;
   font-weight: 400;
   font-family: inherit;
+  /* Scroll-perf: rows outside the viewport inside a tall "Worked for …"
+   * phase skip style/layout/paint entirely. `auto 36px` remembers the real
+   * size once rendered; 36px matches GROK_ACTIVITY_STEP_ROW_PX for rows
+   * never rendered yet. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 36px;
 }
 .grok-act__step.is-error {
   color: var(--chat-danger, #c44);

@@ -61,6 +61,10 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
     welcomeBrandKind,
     welcomeProviderBrandNode,
     welcomeSession,
+    welcomeMotionEnabled,
+    welcomeIntroActive,
+    welcomePrompt,
+    setWelcomeIntroActive,
     dockSidebarOccupied,
     mainPane,
     tr,
@@ -88,21 +92,42 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
             data-side-dock={sideDockActive ? "true" : undefined}
           >
             {welcomeSession && welcomeBrandKind && !sideDockActive ? (
-              <div className="composer-welcome-mark">
-                {welcomeProviderBrandNode ?? (
-                  <SuperGrokMark
-                    kind={welcomeBrandKind}
-                    title={
-                      customRouteActive
-                        ? "SuperGrok"
-                        : account?.billing?.subscriptionTier?.trim() ||
-                          (welcomeBrandKind === "heavy"
-                            ? "SuperGrok Heavy"
-                            : "SuperGrok")
-                    }
-                  />
-                )}
-
+              <div
+                className={
+                  "composer-welcome-mark" +
+                  (welcomeMotionEnabled && welcomeIntroActive
+                    ? " is-entering"
+                    : "")
+                }
+              >
+                <div className="composer-welcome-brand">
+                  {welcomeProviderBrandNode ?? (
+                    <SuperGrokMark
+                      kind={welcomeBrandKind}
+                      title={
+                        customRouteActive
+                          ? "SuperGrok"
+                          : account?.billing?.subscriptionTier?.trim() ||
+                            (welcomeBrandKind === "heavy"
+                              ? "SuperGrok Heavy"
+                              : "SuperGrok")
+                      }
+                    />
+                  )}
+                </div>
+                <div
+                  className="composer-welcome-prompt"
+                  style={
+                    {
+                      ["--welcome-prompt-steps"]: String(
+                        Math.max(1, Array.from(String(welcomePrompt ?? "")).length),
+                      ),
+                    } as CSSProperties
+                  }
+                  onAnimationEnd={() => setWelcomeIntroActive(false)}
+                >
+                  {welcomePrompt}
+                </div>
               </div>
             ) : null}
             {perm ? (

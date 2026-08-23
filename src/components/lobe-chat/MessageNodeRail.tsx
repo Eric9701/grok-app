@@ -21,7 +21,6 @@ import type { SessionMessageNode } from "@/lib/sessionMessageNodes";
 import {
   estimateMessageIndexAtY,
   nearestNodeIdFromPaintList,
-  pickActiveNodeIdFromRects,
 } from "@/lib/sessionMessageNodes";
 import type { ChatMessage } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -41,6 +40,8 @@ type TipState = {
   top: number;
   right: number;
 };
+
+import { scrollPerfDebug } from "@/lib/scrollPerfDebug";
 
 export function MessageNodeRail({
   nodes,
@@ -101,17 +102,27 @@ export function MessageNodeRail({
     (activeIndex >= 0 && activeIndex < nodes.length - 1) ||
     (activeIndex < 0 && nodes.length > 0);
 
-  // Keep the active tick roughly in view inside a long rail.
+  const nodeIdSet = useMemo(() => new Set(nodes.map((n) => n.id)), [nodes]);
+
+  // Keep the active tick roughly in view inside a long rail (programmatic jumps only, skip on free-scroll to avoid layout thrashing).
   useEffect(() => {
-    if (activeIndex < 0 || !listRef.current) return;
-    const tick = listRef.current.querySelector(
+    if (activeIndex < 0 || !listRef.current || scrollActiveId != null) return;
+    const list = listRef.current;
+    const tick = list.querySelector(
       `[data-node-id="${CSS.escape(nodes[activeIndex]!.id)}"]`,
     ) as HTMLElement | null;
-    // Instant — smooth nested scroll was a jank source during free reading.
-    tick?.scrollIntoView({ block: "nearest", behavior: "auto" });
-  }, [activeIndex, nodes]);
+    if (!tick) return;
+    const tickTop = tick.offsetTop;
+    const tickBottom = tickTop + tick.offsetHeight;
+    const viewTop = list.scrollTop;
+    const viewBottom = viewTop + list.clientHeight;
+    // Only scroll if outside visible range to avoid redundant scroll operations.
+    if (tickTop < viewTop || tickBottom > viewBottom) {
+      tick.scrollIntoView({ block: "nearest", behavior: "auto" });
+    }
+  }, [activeIndex, nodes, scrollActiveId]);
 
-  // Free-scroll highlight: rAF throttle + one querySelectorAll per frame.
+  // Free-scroll highlight: rAF throttle + pure numerical index calculation on hot scroll path.
   useEffect(() => {
     const viewport = scrollParentRef?.current;
     if (!viewport || nodes.length < 2) return;
@@ -124,34 +135,28 @@ export function MessageNodeRail({
       ) {
         return;
       }
+      const t0 = performance.now();
 
-      const viewportRect = viewport.getBoundingClientRect();
-      const focusY = viewportRect.top + viewport.clientHeight * 0.28;
+      let bestId: string | null = null;
 
-      // Single pass over mounted message rows (virtual window only).
-      const mounted = viewport.querySelectorAll<HTMLElement>("[data-message-id]");
-      const rects: { id: string; top: number; bottom: number }[] = [];
-      const nodeIdSet = new Set(nodes.map((n) => n.id));
-      for (const row of mounted) {
-        const id = row.getAttribute("data-message-id");
-        if (!id || !nodeIdSet.has(id)) continue;
-        const r = row.getBoundingClientRect();
-        rects.push({ id, top: r.top, bottom: r.bottom });
-      }
-
-      let bestId = pickActiveNodeIdFromRects(rects, focusY);
-
-      if (!bestId && messages && messages.length > 0) {
+      // Fast path: pure mathematical index lookup from scrollTop (0 forced reflows)
+      if (messages && messages.length > 0) {
         const y = viewport.scrollTop + viewport.clientHeight * 0.28;
         const msgIdx = estimateMessageIndexAtY(messages, y);
-        // Id walk on the paint list — not journal messageIndex (filtered lists).
         bestId = nearestNodeIdFromPaintList(messages, nodes, msgIdx);
       }
 
+      if (import.meta.env.DEV) {
+        const syncDuration = performance.now() - t0;
+        scrollPerfDebug.recordNodeRailSyncTime(syncDuration, 0);
+      }
+
       if (bestId) {
-        setScrollActiveId((prev) => (prev === bestId ? prev : bestId));
-        // Ref-only parent sync so prev/next track free scroll without setState.
-        onScrollActiveChangeRef.current?.(bestId);
+        setScrollActiveId((prev) => {
+          if (prev === bestId) return prev;
+          onScrollActiveChangeRef.current?.(bestId);
+          return bestId;
+        });
       }
     };
 
@@ -171,7 +176,7 @@ export function MessageNodeRail({
         rafRef.current = null;
       }
     };
-  }, [scrollParentRef, nodes, messages, navLockUntilRef]);
+  }, [scrollParentRef, nodes, nodeIdSet, messages, navLockUntilRef]);
 
   // When parent sets a programmatic activeId, mirror it into scroll state so
   // highlight does not snap back on the next free-scroll frame incorrectly.

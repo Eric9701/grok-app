@@ -3,6 +3,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -70,6 +71,8 @@ import {
   resumeGateClock,
 } from "@/lib/gateClock";
 import { WallpaperMediaLayer } from "@/components/WallpaperMediaLayer";
+import { SidebarCliImportCta } from "@/components/SidebarCliImportCta";
+import { useCliCallLogImport } from "@/hooks/useCliCallLogImport";
 import {
   DEFAULT_LAYOUT,
   SIDEBAR_DEFAULT_WIDTH,
@@ -77,7 +80,6 @@ import {
 import { resolveWorkbenchPaneOverlay } from "@/lib/paneOverlay";
 import { isFakeMaximized } from "@/lib/windowChrome";
 import { usePaneSplitMotion } from "@/hooks/usePaneSplitMotion";
-import { useOpenPresence, VIEW_PRESENCE_MS } from "@/lib/openPresence";
 import { acquireNativeWebviewCover } from "@/lib/nativeWebviewCover";
 import {
   PHONE_KEYBOARD_INSET_VAR,
@@ -640,7 +642,9 @@ import {
   quotaFromHostItem,
   type SwitcherQuota,
 } from "@/lib/accountSwitcherQuota";
-import type { SettingsSectionId } from "@/components/SettingsPage";
+import {
+  type SettingsSectionId,
+} from "@/components/SettingsPage";
 import {
   buildSettingsHash,
   isSettingsSectionId,
@@ -790,6 +794,8 @@ export function AppWorkbench() {
     setShowReplyLength,
     replaceProviderBrandLogo,
     setReplaceProviderBrandLogo,
+    welcomeMotionEnabled,
+    setWelcomeMotionEnabled,
     goalOrchUiEnabled,
     setGoalOrchUiEnabled,
     goalOrchEvents,
@@ -1359,6 +1365,24 @@ export function AppWorkbench() {
   });
   /** Floating composer shell — height drives chat bottom padding. */
   const composerWrapRef = useRef<HTMLDivElement>(null);
+  /** One-shot welcome motion: initial draft and each accepted new-chat action. */
+  const [welcomeIntroActive, setWelcomeIntroActive] = useState(
+    welcomeMotionEnabled,
+  );
+  useEffect(() => {
+    if (!welcomeMotionEnabled) {
+      setWelcomeIntroActive(false);
+      return;
+    }
+    if (!welcomeIntroActive) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const settle = () => {
+      if (reducedMotion.matches) setWelcomeIntroActive(false);
+    };
+    settle();
+    reducedMotion.addEventListener("change", settle);
+    return () => reducedMotion.removeEventListener("change", settle);
+  }, [welcomeIntroActive, welcomeMotionEnabled]);
   /** Set by newChat; applied after chat pane + textarea mount. */
   const pendingComposerFocus = useRef(false);
   const composerFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -1378,6 +1402,10 @@ export function AppWorkbench() {
   const [phoneAccountOpen, setPhoneAccountOpen] = useState(false);
   /** Hash route: workbench | settings/:section | automations */
   const [appView, setAppView] = useState<"workbench" | "settings">("workbench");
+  const settingsNativeCoverReleaseRef = useRef<(() => void) | null>(null);
+  const ensureSettingsNativeCover = useCallback(() => {
+    settingsNativeCoverReleaseRef.current ??= acquireNativeWebviewCover();
+  }, []);
   /** Inside workbench: chat thread vs scheduled tasks vs agent kanban. */
   const [mainPane, setMainPane] = useState<"chat" | "automations" | "kanban">(
     "chat",
@@ -1767,6 +1795,8 @@ export function AppWorkbench() {
   const [perm, setPerm] = useState<PermissionPayload | null>(null);
   const permBarRef = useRef<HTMLDivElement | null>(null);
   const [askUser, setAskUser] = useState<AskUserPayload | null>(null);
+  const askUserRef = useRef(askUser);
+  askUserRef.current = askUser;
   /**
    * Unanswered gates per session (`sessionId` → payload).
    *
@@ -2229,6 +2259,7 @@ export function AppWorkbench() {
     sidebarCollapsed: layout.sidebarCollapsed,
     asideCollapsed: layout.asideCollapsed,
     phoneLayout,
+    sidebarOverlay,
     asideOverlay,
   });
   const [account, setAccount] = useState<api.AccountStatus | null>(null);
@@ -3432,6 +3463,7 @@ export function AppWorkbench() {
         tab,
         last: section == null ? loadSettingsLastRoute() : null,
       });
+      ensureSettingsNativeCover();
       setSettingsSection(loc.section);
       setSettingsTab(loc.tab);
       setAppView("settings");
@@ -3451,7 +3483,7 @@ export function AppWorkbench() {
         }
       }
     },
-    [],
+    [ensureSettingsNativeCover],
   );
 
   /** Settings → Runtime → Tools, scrolled to the workflows card. */
@@ -3467,6 +3499,8 @@ export function AppWorkbench() {
       const fullHash = window.location.hash || "";
       const raw = fullHash.replace(/^#\/?/, "");
       if (raw.startsWith("settings")) {
+        ensureSettingsNativeCover();
+        setShowUserMenu(false);
         const parts = raw.split("/").filter(Boolean);
         // parts[0] === "settings"; parts[1] may be section (ignore ?query)
         const sectionPart = (parts[1] ?? "").split("?")[0];
@@ -3512,7 +3546,7 @@ export function AppWorkbench() {
     syncFromHash();
     window.addEventListener("hashchange", syncFromHash);
     return () => window.removeEventListener("hashchange", syncFromHash);
-  }, []);
+  }, [ensureSettingsNativeCover]);
 
   /**
    * Composition root for session open: other domains' verbs, mutated in place
@@ -3727,6 +3761,9 @@ export function AppWorkbench() {
       setLocalError(null);
     };
     host.draft.newChatTitle = () => tr("session.new");
+    host.draft.startWelcomeIntro = () => {
+      setWelcomeIntroActive(welcomeMotionEnabled);
+    };
     host.connect.isSecondaryWindow = () => isSecondaryWindowRef.current;
     host.connect.isSendInFlight = (sessionId) =>
       isSendInFlightForSession(sessionId);
@@ -9784,6 +9821,7 @@ export function AppWorkbench() {
     !session.sessionId &&
     transcriptMeta.length === 0 &&
     session.state !== "streaming";
+  const welcomePrompt = tr("composer.welcomePrompt");
   const journalPending =
     !!session.sessionId &&
     (transcriptMeta.journalLoading ||
@@ -12809,6 +12847,59 @@ export function AppWorkbench() {
     }
   }, [activeProject?.id, projects, showToast, tr]);
 
+  const unarchivedAppSessionCount = sessions.filter((s) => !s.archived).length;
+  const linkedAgentIds = sessions
+    .map((s) => s.agentSessionId)
+    .filter((id): id is string => !!id);
+  const cliCallLogImport = useCliCallLogImport({
+    callLogs: account?.callLogs,
+    unarchivedAppSessionCount,
+    linkedAgentIds,
+    onImported: () => {
+      void refreshSessions();
+      void refreshProjects();
+    },
+  });
+  const importCliCallLogsFromSidebar = useCallback(async () => {
+    try {
+      const result = await cliCallLogImport.importListed();
+      if (result.imported.length > 0) {
+        showToast(
+          tr("settings.cliSessionsImportedN", {
+            n: String(result.imported.length),
+          }),
+        );
+      }
+      if (result.failed > 0) {
+        showToast(
+          tr("account.callLogsImportPartial", {
+            n: String(result.failed),
+          }),
+          5000,
+        );
+      }
+    } catch (e) {
+      showToast(String(e), 5000);
+    }
+  }, [cliCallLogImport, showToast, tr]);
+  const browseCliSessionsSettings = useCallback(() => {
+    navigateSettings("account");
+    setSettingsFocusAnchor("settings-anchor-account-callLogs");
+  }, [navigateSettings]);
+  const sidebarCliImportCta = cliCallLogImport.showCta ? (
+    <SidebarCliImportCta
+      hint={tr("sidebar.importCliSessionsHint")}
+      importLabel={
+        cliCallLogImport.importing
+          ? tr("settings.cliSessionsImporting")
+          : tr("sidebar.importCliSessions")
+      }
+      browseLabel={tr("account.callLogs")}
+      importing={cliCallLogImport.importing}
+      onImport={() => void importCliCallLogsFromSidebar()}
+      onBrowse={browseCliSessionsSettings}
+    />
+  ) : null;
   const {
     exportMdTarget,
     exportMdBusy,
@@ -14075,20 +14166,22 @@ export function AppWorkbench() {
     [],
   );
 
-  const settingsPresence = useOpenPresence(
-    appView === "settings",
-    true,
-    VIEW_PRESENCE_MS,
+  useLayoutEffect(() => {
+    if (appView === "settings") {
+      ensureSettingsNativeCover();
+      return;
+    }
+    const release = settingsNativeCoverReleaseRef.current;
+    settingsNativeCoverReleaseRef.current = null;
+    release?.();
+  }, [appView, ensureSettingsNativeCover]);
+  useEffect(
+    () => () => {
+      settingsNativeCoverReleaseRef.current?.();
+      settingsNativeCoverReleaseRef.current = null;
+    },
+    [],
   );
-  useEffect(() => {
-    if (!settingsPresence.mounted) return;
-    return acquireNativeWebviewCover();
-  }, [settingsPresence.mounted]);
-  useEffect(() => {
-    if (!showUserMenu) return;
-    void import("@/components/SettingsPage");
-  }, [showUserMenu]);
-
   return (
     <ImageViewerProvider locale={locale}>
     <div
@@ -14102,6 +14195,11 @@ export function AppWorkbench() {
       data-testid="app-shell"
       data-mirror={isMirrorClient() ? "1" : undefined}
       data-phone={phoneLayout ? "1" : undefined}
+      style={
+        {
+          ["--sidebar-rail-width"]: `${layout.sidebarWidth || SIDEBAR_DEFAULT_WIDTH}px`,
+        } as CSSProperties
+      }
     >
       <WindowControls
         visible={useCustomWindowChrome && !isMirrorClient()}
@@ -14223,6 +14321,7 @@ export function AppWorkbench() {
 
       {appGate === "ready" && (
       <>
+      {appView === "settings" ? (
       <WorkbenchSettingsStage
         account={account}
         accountBusy={accountBusy}
@@ -14313,6 +14412,8 @@ export function AppWorkbench() {
         refreshVoiceGate={refreshVoiceGate}
         reopenLastSession={reopenLastSession}
         replaceProviderBrandLogo={replaceProviderBrandLogo}
+        welcomeMotionEnabled={welcomeMotionEnabled}
+        setWelcomeMotionEnabled={setWelcomeMotionEnabled}
         restoreSessions={restoreSessions}
         runAccountLogin={runAccountLogin}
         runAccountLogout={runAccountLogout}
@@ -14405,7 +14506,6 @@ export function AppWorkbench() {
         setZenModeEnabled={setZenModeEnabled}
         settingsFocusAnchor={settingsFocusAnchor}
         settingsLabels={settingsLabels}
-        settingsPresence={settingsPresence}
         settingsSection={settingsSection}
         settingsTab={settingsTab}
         showMessageTimestamps={showMessageTimestamps}
@@ -14445,15 +14545,13 @@ export function AppWorkbench() {
         workflowsEnabled={workflowsEnabled}
         zenMode={zenMode}
       />
+      ) : null}
       <div
         className={
           "workbench" +
           (phoneLayout ? " workbench--phone" : "") +
           (hideChatForSideExpand ? " workbench--side-expanded" : "") +
           (sideDockActive ? " workbench--side-dock" : "") +
-          (appView === "settings" && settingsPresence.entered
-            ? " is-view-idle"
-            : "") +
           paneMotionClass
         }
         aria-hidden={appView === "settings" || undefined}
@@ -14529,6 +14627,7 @@ export function AppWorkbench() {
           onNavigateRemoteIm={() => navigateSettings("remote_im", "im")}
           showUserMenu={showUserMenu}
           setShowUserMenu={setShowUserMenu}
+          closeImmediately={appView === "settings"}
           theme={theme}
           themePreference={themePreference}
           account={account}
@@ -14565,6 +14664,7 @@ export function AppWorkbench() {
           <WorkbenchSessionTree
             tr={tr}
             locale={locale}
+            sidebarCliImportCta={sidebarCliImportCta}
             projects={projects}
             visibleProjects={visibleProjects}
             sessions={sessions}
@@ -15107,6 +15207,10 @@ export function AppWorkbench() {
             welcomeBrandKind={welcomeBrandKind}
             welcomeProviderBrandNode={welcomeProviderBrandNode}
             welcomeSession={welcomeSession}
+            welcomeMotionEnabled={welcomeMotionEnabled}
+            welcomeIntroActive={welcomeIntroActive}
+            welcomePrompt={welcomePrompt}
+            setWelcomeIntroActive={setWelcomeIntroActive}
             dockSidebarOccupied={dockSidebarOccupied}
             dragZone={dragZone}
             mainPane={mainPane}

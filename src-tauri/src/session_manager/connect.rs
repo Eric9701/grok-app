@@ -1584,6 +1584,7 @@ impl SessionManager {
             permission_policy: Some(prefs.permission_policy.clone()),
             product_mode: Some(prefs.mode.clone()),
             sandbox_profile: Some(effective_sandbox.clone()),
+            extra_rules: crate::official_aux::merge_extra_rules(None),
             ..Default::default()
         };
         let (client, mut events) = match AcpClient::spawn_with_options(cli_path, cwd, spawn_opts)

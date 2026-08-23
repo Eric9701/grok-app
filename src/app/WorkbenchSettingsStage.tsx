@@ -3,10 +3,11 @@
  * SettingsPage prop surface so settings chrome can change without opening
  * AppWorkbench.
  */
-import { lazy, Suspense } from "react";
+import { SettingsPage } from "@/components/SettingsPage";
 import { saveMessageTimestampsPref } from "@/lib/messageTimestampsPref";
 import { saveShowReplyLengthPref } from "@/lib/messageLength";
 import { saveReplaceProviderBrandLogoPref } from "@/lib/replaceProviderBrandLogoPref";
+import { saveWelcomeMotionPref } from "@/lib/welcomeMotionPref";
 import { saveMessageTimeFormatPref } from "@/lib/messageTimeFormatPref";
 import { saveSidebarShowRelativeTimePref } from "@/lib/sidebarShowRelativeTimePref";
 import { writeOpenTargetStorage } from "@/lib/openEditorHonesty";
@@ -31,11 +32,6 @@ import {
 import { isValidPolicy, isValidPrefsScope } from "@/lib/grokCatalog";
 import { mapProbeToCliInfo } from "@/lib/cliVersionStatus";
 import type { SessionRow } from "@/lib/app/sidebarModels";
-
-const SettingsPage = lazy(async () => {
-  const m = await import("@/components/SettingsPage");
-  return { default: m.SettingsPage };
-});
 
 export type WorkbenchSettingsStageProps = {
   [key: string]: any;
@@ -73,25 +69,20 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
     setSttEngine, setSttZhScript, setSubagentWorktreeSnapshotEnabled, setSubagentsEnabled, setToast, setTodoGateEnabled,
     setTodoGateMaxFiresPerPrompt, setTrayBusyBadge, setTwoPassCompactionEnabled, setUseLeader, setVoiceDictationAutoSend, setVoiceId,
     setVoiceKeepAgentsOnEnd, setWinTaskbarOverlay, setWindowAlwaysOnTop, setWorkflowsEnabled, setZenModeEnabled, settingsFocusAnchor,
-    settingsLabels, settingsPresence, settingsSection, settingsTab, showMessageTimestamps, showReplyLength,
+    settingsLabels, settingsSection, settingsTab, showMessageTimestamps, showReplyLength,
     showToast, sidebarShowRelativeTime, skin, storeApiKeysInKeychain, streamStallSeconds, sttCustomBaseUrl,
     sttCustomLanguage, sttCustomModel, sttEngine, sttZhScript, subagentWorktreeSnapshotEnabled, subagentsEnabled,
     submitAccountLoginCode, theme, themePreference, themeSchedule, todoGateEnabled, todoGateMaxFiresPerPrompt,
     tr, trayBusyBadge, trayHandlersRef, twoPassCompactionEnabled, unreadSessionIds, useLeader,
     voiceDictationAutoSend, voiceId, voiceKeepAgentsOnEnd, wallpaperRecord, wallpaperScrim, wallpaperUrl,
     winTaskbarOverlay, windowAlwaysOnTop, workflowsEnabled, zenMode,
+    welcomeMotionEnabled, setWelcomeMotionEnabled,
   } = p;
   return (
-          settingsPresence.mounted ? (
         <div
-          className={
-            "app-settings-stage" +
-            (settingsPresence.entered ? " is-open" : "")
-          }
+          className="app-settings-stage is-open"
           data-testid="settings-stage"
-          aria-hidden={!settingsPresence.entered || undefined}
         >
-                <Suspense fallback={null}>
           <SettingsPage
           section={settingsSection}
           tab={settingsTab}
@@ -137,6 +128,11 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
           onReplaceProviderBrandLogo={(v) => {
           saveReplaceProviderBrandLogoPref(v, localStorage);
           setReplaceProviderBrandLogo(v);
+          }}
+          welcomeMotionEnabled={welcomeMotionEnabled}
+          onWelcomeMotionEnabled={(v) => {
+          saveWelcomeMotionPref(v, localStorage);
+          setWelcomeMotionEnabled(v);
           }}
           goalOrchUiEnabled={goalOrchUiEnabled}
           onGoalOrchUiEnabled={(v) => {
@@ -812,8 +808,7 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
           }
           })();
           }}
-          />        </Suspense>
+          />
         </div>
-      ) : null
   );
 }

@@ -169,7 +169,8 @@ export function SidebarTreeReveal({
 
   // Moving a chat into an already-open folder grows the inner list while the
   // outer box may still be locked to the previous px height (or flex-shrunk).
-  // Retarget the lock to the new content px — do not settle to auto.
+  // Collapse-all shrinks nested folders while the L1 wrapper stays locked
+  // tall. Retarget the lock to the new content px — do not settle to auto.
   useEffect(() => {
     if (!open || !presence.mounted) return;
     const box = boxRef.current;

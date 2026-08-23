@@ -190,9 +190,13 @@
   inset-inline-end: auto;
   transform: translateX(-50%) translateY(10px);
   opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity;
+  contain: layout style paint;
   transition:
     opacity 180ms ease,
-    transform 180ms ease;
+    transform 180ms ease,
+    visibility 180ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -200,14 +204,14 @@
   height: 36px;
   border-radius: 999px;
   border: 1px solid var(--chat-code-border);
-  background: color-mix(in srgb, var(--chat-code-bg) 92%, transparent);
-  backdrop-filter: blur(10px);
+  background: var(--chat-code-bg);
   color: var(--chat-text-2);
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 .lobe-chat-back-bottom.is-visible {
   pointer-events: all;
+  visibility: visible;
   transform: translateX(-50%) translateY(0);
   opacity: 1;
 }
@@ -217,7 +221,7 @@
 
 /* Welcome: composer is vertically centered, not bottom-docked — park
  * the control near the viewport bottom with a modest inset. */
-.main__stage:has(.composer-wrap--welcome) .lobe-chat-back-bottom {
+.main__stage--welcome .lobe-chat-back-bottom {
   inset-block-end: 24px;
 }
 
@@ -586,26 +590,32 @@ html[data-chat-density="comfortable"] .lobe-chat,
 }
 
 /*
- * Chat reading width (Settings → Appearance). Prefer html[data-chat-width] so
- * every .lobe-chat__inner picks it up without prop drilling.
+ * Chat reading width (Settings → Appearance).
+ * Hoist --chat-width-max onto html so the floating composer / perm-bar /
+ * composer-stack share the same cap as .lobe-chat__inner (not a hard 42rem).
+ * Element-level .lobe-chat[data-chat-width] kept for local override.
  * narrow ~640 · medium ~800 · wide ~1000 · full = none
  */
-html[data-chat-width="narrow"] .lobe-chat,
+html {
+  --chat-width-max: 800px;
+}
+
+html[data-chat-width="narrow"],
 .lobe-chat[data-chat-width="narrow"] {
   --chat-width-max: 640px;
 }
 
-html[data-chat-width="medium"] .lobe-chat,
+html[data-chat-width="medium"],
 .lobe-chat[data-chat-width="medium"] {
   --chat-width-max: 800px;
 }
 
-html[data-chat-width="wide"] .lobe-chat,
+html[data-chat-width="wide"],
 .lobe-chat[data-chat-width="wide"] {
   --chat-width-max: 1000px;
 }
 
-html[data-chat-width="full"] .lobe-chat,
+html[data-chat-width="full"],
 .lobe-chat[data-chat-width="full"] {
   --chat-width-max: none;
 }
