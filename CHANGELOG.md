@@ -21,7 +21,10 @@ See `docs/llm-wiki/release.md`.
 
 ### Fixed
 
+- **Official-aux X/Imagine on packaged custom mains**: `/Applications/Grok.app` never bundled `scripts/official-aux-mcp.mjs`, so ACP injected `mcpServers count=0` while ChatCut still auto-loaded from independent `agent-home/config.toml`. Host now writes the MCP script into `agent-home-official`, disables user MCP `enabled` flags during solo inject, ships official-aux `--rules` on prewarm, and tells the model to call `official-aux__x_keyword_search` directly instead of `search_tool` (which was resolving to ChatCut).
+
 **中文 · 修复**
+- **打包后自定义主模型的官方 X/画图注入**：正式版 App 找不到 `official-aux-mcp.mjs`，ACP 注入空 MCP，ChatCut 仍从独立 `agent-home/config.toml` 自动拉起。现将脚本写入 `agent-home-official`，solo inject 时关掉用户 MCP 的 `enabled`，预热进程带上官方 `--rules`，并要求模型直接调用 `official-aux__x_keyword_search` 而不是 `search_tool`（后者会命中 ChatCut）。
 
 ## [0.2.25] - 2026-08-23
 

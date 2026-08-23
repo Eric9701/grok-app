@@ -1353,13 +1353,20 @@ pub fn build_session_mcp_servers_with_opts(
     });
 
     if inject {
-        if let Some(entry) = crate::official_aux::mcp_server_acp_entry() {
+        let (entry, reason) = crate::official_aux::mcp_server_acp_entry_reason();
+        if let Some(entry) = entry {
             tracing::info!(
                 target: "official_aux",
                 with_user_mcp = load_user,
                 "injecting official-aux MCP first (custom main only)"
             );
             arr.insert(0, entry);
+        } else {
+            tracing::warn!(
+                target: "official_aux",
+                reason,
+                "official-aux inject is on but MCP entry is missing — X/Imagine will not be official-aux"
+            );
         }
     }
     Value::Array(arr)
@@ -1981,6 +1988,65 @@ pub fn set_mcp_enabled_in_toml(text: &str, name: &str, enabled: bool) -> String 
     crate::agent_home_config::set_table_bool(text, &table, "enabled", enabled)
 }
 
+/// Overlay `enabled` flags so CLI config.toml auto-load matches inject policy.
+///
+/// Grok CLI still starts `[mcp_servers.*]` from GROK_HOME even when ACP
+/// `mcpServers` omits them. Solo official-aux inject must force user MCP
+/// (ChatCut, Playwright, …) `enabled = false` so X search cannot go there.
+/// `official-aux` in config (if any) stays on.
+pub fn apply_inject_mcp_enabled_in_toml(
+    text: &str,
+    solo_inject: bool,
+    prefs: &ExtensionsPrefs,
+) -> String {
+    let defs = parse_mcp_servers_from_toml(text);
+    let mut next = text.to_string();
+    for d in defs {
+        let want = if d.name == "official-aux" {
+            true
+        } else if solo_inject {
+            false
+        } else {
+            is_enabled(&prefs.mcp, &d.name)
+        };
+        next = set_mcp_enabled_in_toml(&next, &d.name, want);
+    }
+    next
+}
+
+/// Independent mode only: rewrite agent-home MCP `enabled` for official-aux
+/// solo inject. Shared mode must not rewrite `~/.grok`.
+pub fn sync_user_mcp_for_official_aux_inject(session_data_mode: &str) -> Result<(), String> {
+    if session_data_mode == "shared" {
+        return Ok(());
+    }
+    let solo = crate::official_aux::should_inject_mcp_for_main()
+        && !crate::official_aux::should_load_user_mcp_with_official_aux();
+    let prefs = load_prefs();
+    let path = {
+        let _ = ensure_app_dirs();
+        agent_config_toml()
+    };
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let existing = fs::read_to_string(&path).unwrap_or_default();
+    if existing.trim().is_empty() {
+        return Ok(());
+    }
+    let next = apply_inject_mcp_enabled_in_toml(&existing, solo, &prefs);
+    if next != existing {
+        fs::write(&path, next).map_err(|e| e.to_string())?;
+        tracing::info!(
+            target: "official_aux",
+            solo_inject = solo,
+            "synced agent-home MCP enabled flags for official-aux inject"
+        );
+        invalidate_mcp_cache();
+    }
+    Ok(())
+}
+
 /// Write App enable prefs into the agent GROK_HOME config.toml `enabled` flags.
 /// Independent mode: agent-home. Shared mode: user `~/.grok/config.toml` (user-initiated).
 pub fn sync_mcp_enabled_to_agent_config(
@@ -2258,6 +2324,42 @@ mod tests {
         // Empty cwd / no config — still a JSON array, never panic.
         let v = build_session_mcp_servers_for_connect(Some("/nonexistent/project/path"));
         assert!(v.is_array(), "connect inject must always yield an array");
+    }
+
+    #[test]
+    fn solo_inject_disables_user_mcp_but_keeps_official_aux() {
+        let toml = r#"
+[mcp_servers.chatcut]
+url = "https://api.chatcut.io/api/external-mcp/mcp"
+enabled = true
+
+[mcp_servers.official-aux]
+command = "node"
+enabled = true
+"#;
+        let prefs = ExtensionsPrefs::default();
+        let solo = apply_inject_mcp_enabled_in_toml(toml, true, &prefs);
+        let defs = parse_mcp_servers_from_toml(&solo);
+        let chatcut = defs.iter().find(|d| d.name == "chatcut").expect("chatcut");
+        assert_eq!(
+            chatcut.enabled,
+            Some(false),
+            "solo inject must disable ChatCut so CLI config.toml auto-load cannot steal X search"
+        );
+        let aux = defs
+            .iter()
+            .find(|d| d.name == "official-aux")
+            .expect("official-aux");
+        assert_eq!(aux.enabled, Some(true));
+
+        let restored = apply_inject_mcp_enabled_in_toml(&solo, false, &prefs);
+        let defs = parse_mcp_servers_from_toml(&restored);
+        let chatcut = defs.iter().find(|d| d.name == "chatcut").expect("chatcut");
+        assert_eq!(
+            chatcut.enabled,
+            Some(true),
+            "default-on prefs restore ChatCut when solo inject is off"
+        );
     }
 
     #[test]

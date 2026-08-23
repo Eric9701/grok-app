@@ -142,6 +142,7 @@ pub fn ensure_official_aux_home() -> Result<PathBuf, String> {
 
     fs::write(official_aux_config_toml(), text)
         .map_err(|e| format!("write official aux config: {e}"))?;
+    let _ = write_official_aux_mcp_script(&home);
     Ok(home)
 }
 
@@ -1081,8 +1082,35 @@ pub fn dispatch_tool(tool: &str, args: &serde_json::Value) -> Result<String, Str
     }
 }
 
+/// Embedded MCP server source (repo `scripts/official-aux-mcp.mjs`).
+///
+/// Packaged `/Applications/Grok.app` has no repo tree and does not bundle this
+/// file as a Tauri resource. Host writes it into `agent-home-official` so ACP
+/// inject still works after an updater install.
+pub const OFFICIAL_AUX_MCP_SCRIPT: &str = include_str!("../../scripts/official-aux-mcp.mjs");
+pub const OFFICIAL_AUX_MCP_SCRIPT_FILE: &str = "official-aux-mcp.mjs";
+
+/// Write (or refresh) the official-aux MCP stdio script under `home`.
+pub fn write_official_aux_mcp_script(home: &Path) -> Result<PathBuf, String> {
+    fs::create_dir_all(home).map_err(|e| format!("official aux home: {e}"))?;
+    let dest = home.join(OFFICIAL_AUX_MCP_SCRIPT_FILE);
+    let current = fs::read_to_string(&dest).unwrap_or_default();
+    if current != OFFICIAL_AUX_MCP_SCRIPT {
+        fs::write(&dest, OFFICIAL_AUX_MCP_SCRIPT)
+            .map_err(|e| format!("write official-aux mcp script: {e}"))?;
+    }
+    Ok(dest)
+}
+
 /// Path to the bundled MCP entry (repo `scripts/official-aux-mcp.mjs`).
+///
+/// Prefer [`write_official_aux_mcp_script`] for ACP inject. This lookup is a
+/// dev/fallback path (cargo tree / cwd).
 pub fn mcp_script_path() -> Option<PathBuf> {
+    let written = official_aux_home().join(OFFICIAL_AUX_MCP_SCRIPT_FILE);
+    if written.is_file() {
+        return Some(written);
+    }
     let mut candidates: Vec<PathBuf> = Vec::new();
     // Compile-time crate dir → repo root (src-tauri/../scripts)
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1115,29 +1143,45 @@ pub fn mcp_script_path() -> Option<PathBuf> {
 
 /// ACP mcpServers entry for official aux tools (stdio Node script).
 pub fn mcp_server_acp_entry() -> Option<serde_json::Value> {
+    mcp_server_acp_entry_reason().0
+}
+
+/// Same as [`mcp_server_acp_entry`], plus why it is `None` (for connect logs).
+pub fn mcp_server_acp_entry_reason() -> (Option<serde_json::Value>, &'static str) {
     if !official_aux_available() {
-        return None;
+        return (None, "official aux credentials missing");
     }
-    let script = mcp_script_path()?;
-    let home = ensure_official_aux_home().ok()?;
+    let home = match ensure_official_aux_home() {
+        Ok(h) => h,
+        Err(_) => return (None, "ensure official aux home failed"),
+    };
+    let script = match write_official_aux_mcp_script(&home) {
+        Ok(p) => p,
+        Err(_) => return (None, "write official-aux mcp script failed"),
+    };
     let settings = store::load_settings();
     let probe = cli_probe::probe_cli(settings.manual_cli_path.as_deref());
-    let cli = probe.path.filter(|p| !p.trim().is_empty())?;
+    let Some(cli) = probe.path.filter(|p| !p.trim().is_empty()) else {
+        return (None, "grok CLI path missing");
+    };
 
     // Prefer node; fall back to `grok` not applicable for MCP protocol.
     let node = which_node().unwrap_or_else(|| "node".into());
 
-    Some(serde_json::json!({
-        "name": "official-aux",
-        "command": node,
-        "args": [script.display().to_string()],
-        "env": [
-            {"name": "OFFICIAL_AUX_HOME", "value": home.display().to_string()},
-            {"name": "OFFICIAL_AUX_MODEL", "value": OFFICIAL_CATALOG_MODEL},
-            {"name": "OFFICIAL_AUX_CLI", "value": cli},
-            {"name": "GROK_HOME", "value": home.display().to_string()},
-        ]
-    }))
+    (
+        Some(serde_json::json!({
+            "name": "official-aux",
+            "command": node,
+            "args": [script.display().to_string()],
+            "env": [
+                {"name": "OFFICIAL_AUX_HOME", "value": home.display().to_string()},
+                {"name": "OFFICIAL_AUX_MODEL", "value": OFFICIAL_CATALOG_MODEL},
+                {"name": "OFFICIAL_AUX_CLI", "value": cli},
+                {"name": "GROK_HOME", "value": home.display().to_string()},
+            ]
+        })),
+        "ok",
+    )
 }
 
 fn which_node() -> Option<String> {
@@ -1223,7 +1267,7 @@ pub const NATIVE_MEDIA_BLOCK_HOOK_SCRIPT: &str = "grok-app-block-native-imagine.
 
 /// Deny reason when native Imagine tools fire on custom main.
 pub fn native_media_block_hook_reason() -> &'static str {
-    "Native Imagine tools (image_gen/image_edit/image_to_video/reference_to_video) are blocked on custom main — agent-home has no official xAI auth. Immediately call use_tool with tool_name official-aux__image_gen (or official-aux__image_edit / official-aux__image_to_video / official-aux__reference_to_video). If needed, search_tool query image_gen or official-aux imagine first. Do NOT fall back to PIL/code art. After a successful official-aux media tool, report the absolute path as plain text — do NOT read_file the image (text-only main models crash on image_url)."
+    "Native Imagine tools (image_gen/image_edit/image_to_video/reference_to_video) are blocked on custom main — agent-home has no official xAI auth. Immediately call use_tool with tool_name official-aux__image_gen (or official-aux__image_edit / official-aux__image_to_video / official-aux__reference_to_video). Do NOT search_tool or use ChatCut. Do NOT fall back to PIL/code art. After a successful official-aux media tool, report the absolute path as plain text — do NOT read_file the image (text-only main models crash on image_url)."
 }
 
 /// Deny reason when read_file targets an image (would inject image_url into DeepSeek etc.).
@@ -1421,16 +1465,11 @@ pub fn sync_native_media_block_hook_for_current(session_data_mode: &str) -> Resu
     sync_native_media_block_hook(session_data_mode, should_inject_mcp_for_main())
 }
 
-/// Session `--rules` block when official-aux is active (DeepSeek etc. need this).
-/// Official Grok main route must not receive this (native tools already exist).
-pub fn inject_session_rules() -> Option<String> {
-    if !should_inject_mcp_for_main() {
-        return None;
-    }
-    Some(
-        r#"Official-aux MCP (server name: official-aux) is the PRIMARY toolbox for this custom main model.
+/// Session `--rules` body when official-aux inject is on (always available for tests).
+pub fn official_aux_session_rules_text() -> &'static str {
+    r#"Official-aux MCP (server name: official-aux) is the PRIMARY toolbox for this custom main model.
 
-Exact tools (call via use_tool with these tool_name values ONLY):
+Exact tools (call via use_tool with these tool_name values ONLY — do NOT search_tool first):
 - official-aux__x_keyword_search  — X/Twitter/推特/推文/x上 关键词搜帖（默认首选）
 - official-aux__x_semantic_search — X 语义/话题搜索
 - official-aux__x_user_search     — X 用户/账号/@handle
@@ -1441,6 +1480,9 @@ Exact tools (call via use_tool with these tool_name values ONLY):
 - official-aux__image_edit        — Imagine 改图 / 修图（需本地参考图路径）
 - official-aux__image_to_video    — 单图 → 短视频 / 图生视频（唯一正确入口）
 - official-aux__reference_to_video — 多图参考 + 文案 → 视频
+
+ChatCut is a video editor MCP. It is NOT X search, web search, or Grok Imagine.
+Ignore ChatCut connect failures for those jobs. Never call chatcut__* / search_stock_media for X.
 
 CRITICAL — native Imagine is BLOCKED on this process:
 - Do NOT call bare tools image_gen / image_edit / image_to_video / reference_to_video.
@@ -1453,19 +1495,18 @@ CRITICAL — native Imagine is BLOCKED on this process:
   The UI shows generated media from the path; you do not need to re-open the file.
 
 When the user asks to search X / Twitter / 推特 / x上 / 推文:
-1. Immediately search_tool query "x_keyword_search" OR "official-aux x" (one call).
-2. Then use_tool official-aux__x_keyword_search with the topic keywords.
-3. Do NOT wait for open-websearch / Playwright / sleep.
+1. Immediately use_tool tool_name="official-aux__x_keyword_search" with the topic keywords.
+2. Do NOT call search_tool. Do NOT use ChatCut, Playwright, open-websearch, curl, or bash as X search.
 
 When the user asks to 画图 / 生成图片 / imagine / image_gen / 出图:
-1. search_tool query "image_gen" OR "official-aux imagine" once if needed.
-2. use_tool tool_name="official-aux__image_gen" with prompt (+ aspect_ratio).
-3. For reference-anchored edits: use_tool official-aux__image_edit with prompt + image path(s).
+1. Immediately use_tool tool_name="official-aux__image_gen" with prompt (+ aspect_ratio).
+2. For reference-anchored edits: use_tool official-aux__image_edit with prompt + image path(s).
+3. Do NOT use ChatCut image-gen / submit_image.
 
 When the user asks to 生成视频 / 图生视频 / animate / make a video:
 1. One source image → use_tool official-aux__image_to_video (image path + optional motion prompt).
 2. Multiple reference images → use_tool official-aux__reference_to_video (prompt + images[]).
-3. Prefer these over Playwright screen-record or curl.
+3. Prefer these over Playwright screen-record, curl, or ChatCut video-gen unless the user asked for ChatCut.
 
 Do NOT:
 - bash sleep while MCP connects
@@ -1475,10 +1516,16 @@ Do NOT:
 - invent image/video paths that were not returned by official-aux media tools
 - call bare image_gen / image_edit after a deny or API-key error
 
-If search_tool is partial/empty, retry once with query "official-aux" or "x_keyword_search" / "image_gen" / "image_to_video", then use_tool. Never busy-wait."#
-            .trim()
-            .to_string(),
-    )
+If official-aux tools are missing from the session, say so — do not substitute ChatCut. Never busy-wait."#
+}
+
+/// Session `--rules` block when official-aux is active (DeepSeek etc. need this).
+/// Official Grok main route must not receive this (native tools already exist).
+pub fn inject_session_rules() -> Option<String> {
+    if !should_inject_mcp_for_main() {
+        return None;
+    }
+    Some(official_aux_session_rules_text().trim().to_string())
 }
 
 /// Narrow path-citation rules for Grok App UI (all routes).
@@ -2345,6 +2392,46 @@ A UI screenshot.
             Some(XSearchIntent::User { query }) => assert_eq!(query, "elonmusk"),
             other => panic!("expected User, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn official_aux_rules_route_x_to_aux_not_chatcut() {
+        let rules = official_aux_session_rules_text();
+        assert!(
+            rules.contains("official-aux__x_keyword_search"),
+            "X search must name the official-aux tool"
+        );
+        assert!(
+            rules.contains("ChatCut") || rules.contains("chatcut"),
+            "rules must tell the model ChatCut is not X search"
+        );
+        assert!(
+            !rules.contains("Immediately search_tool query"),
+            "search_tool-first discovery lets ChatCut steal X search"
+        );
+        assert!(
+            rules.contains("use_tool") && rules.contains("official-aux__x_keyword_search"),
+            "X path must be a direct use_tool"
+        );
+    }
+
+    #[test]
+    fn official_aux_mcp_script_is_embedded() {
+        let js = OFFICIAL_AUX_MCP_SCRIPT;
+        assert!(js.contains("x_keyword_search"));
+        assert!(js.contains("image_gen"));
+        assert!(js.contains("official-aux"));
+        let dir = std::env::temp_dir().join(format!(
+            "grok-official-aux-script-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("temp home");
+        let path = write_official_aux_mcp_script(&dir).expect("write script");
+        assert!(path.is_file());
+        let disk = fs::read_to_string(&path).expect("read");
+        assert_eq!(disk, js);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

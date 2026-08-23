@@ -104,6 +104,9 @@ pub async fn providers_activate(
     .await
     .map_err(|e| e.to_string())??;
 
+    let mode = store::load_settings().session_data_mode.clone();
+    let _ = crate::official_aux::sync_native_media_block_hook_for_current(&mode);
+    let _ = crate::extensions::sync_user_mcp_for_official_aux_inject(&mode);
     // Parked processes keep old GROK_HOME auth/config in memory — kill them.
     mgr.recycle_all_agents(&app, "provider_route").await;
     Ok(result)
@@ -238,6 +241,7 @@ pub async fn providers_remove(
     // a deleted route id.
     let mode = store::load_settings().session_data_mode.clone();
     let _ = crate::official_aux::sync_native_media_block_hook_for_current(&mode);
+    let _ = crate::extensions::sync_user_mcp_for_official_aux_inject(&mode);
     mgr.recycle_all_agents(&app, "provider_route").await;
     Ok(result)
 }
@@ -282,6 +286,7 @@ pub async fn providers_set_default(
 
     let mode = store::load_settings().session_data_mode.clone();
     let _ = crate::official_aux::sync_native_media_block_hook_for_current(&mode);
+    let _ = crate::extensions::sync_user_mcp_for_official_aux_inject(&mode);
     mgr.recycle_all_agents(&app, "provider_route").await;
     Ok(result)
 }

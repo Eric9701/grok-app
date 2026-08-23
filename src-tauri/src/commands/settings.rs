@@ -62,6 +62,7 @@ pub async fn settings_set(
     if official_aux_inject_flip || session_data_mode_changed {
         let mode = settings.session_data_mode.clone();
         let _ = crate::official_aux::sync_native_media_block_hook_for_current(&mode);
+        let _ = crate::extensions::sync_user_mcp_for_official_aux_inject(&mode);
     }
     let no_ask_user_flip = prev.no_ask_user != settings.no_ask_user;
     let disallowed_tools_flip = !crate::acp_client::disallowed_tools_equal(
