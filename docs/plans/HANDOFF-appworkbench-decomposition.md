@@ -55,6 +55,7 @@
    **WP-W21 已落地**：Compact/Queue 弹层 state+JSX → `useCompactDialog` + `useQueueEditDialog` + `WorkbenchComposerModals`（均 <1000）。host 仍绑 send/connect。AppDialog 仍留 workbench。天花板 **17020 / 221 / 90**。
    **WP-W22 已落地**：AppDialog 挂载 → `WorkbenchAppDialogStage`。host 仍 `setAppDialog` 打开。天花板 **16990 / 221 / 90**。
    **WP-W23 已落地**：composer 听写 FSM + live-voice 开合 → `useVoiceDictation`。host 仍持 voiceId/STT/auto-send 与 send()。天花板 **16650 / 218 / 88**。
+   **WP-W24 已落地**：executeSend / submit / 提交后清稿 → `useComposerSend`。host 仍持 connect、live map、settings。天花板 **16030 / 218 / 88**。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。
