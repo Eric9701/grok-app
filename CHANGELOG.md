@@ -24,6 +24,8 @@ See `docs/llm-wiki/release.md`.
 **中文 · 变更**
 
 ### Fixed
+- **Context compact cards stay at the moment of compaction (#855)**: mid-turn auto-compact freezes the current assistant bubble, inserts the banner, then continues streaming below it so later tools are not piled on the composer.
+- **Files tree refreshes when the agent creates files (#863)**: open Resources keeps expand state and re-lists root + expanded folders as session write paths change — no need to close and reopen the pane.
 - **Long chat transcript scroll no longer hitches on Worked-for blocks or lift-off (#853)**: Follow-up to #842. Virtual-window growth that still covers the viewport commits in the background (`startTransition`) and at most 3 rows per frame; collapsed tool steps skip `toolExpandBody` until opened; scroll settle uses velocity + a 160ms stillness floor so touchpad lift-off is not treated as a stop; hover is disabled while moving; pin snap restores the pre-commit distance from the bottom so expanding overscan does not bounce.
 - **WeCom webhook auth + ACL fail-closed (#851)**: webhook mode requires `callback_token` and verifies signatures; empty `allowFrom` denies all (use `*` to opt in); loopback bind by default.
 - **Settings segmented controls no longer flash (#856)**: shared `SegmentedControl` for tabs and theme capsules; first mount settles without a vertical expand.
@@ -39,6 +41,8 @@ See `docs/llm-wiki/release.md`.
 - **Official-aux X/Imagine on packaged custom mains**: `/Applications/Grok.app` never bundled `scripts/official-aux-mcp.mjs`, so ACP injected `mcpServers count=0` while ChatCut still auto-loaded from independent `agent-home/config.toml`. Host now writes the MCP script into `agent-home-official`, disables user MCP `enabled` flags during solo inject, ships official-aux `--rules` on prewarm, and tells the model to call `official-aux__x_keyword_search` directly instead of `search_tool` (which was resolving to ChatCut).
 
 **中文 · 修复**
+- **「上下文已自动压缩」卡片留在压缩发生的时间点（#855）**：回合中压缩会冻结当前助手气泡、插入横幅，再在下方继续流式输出，后续工具不再堆到输入框上方。
+- **Agent 新建文件后右侧文件树自动刷新（#863）**：保持展开状态，按会话写入路径重列根目录与已展开文件夹，不用关面板再开。
 - **长对话滑过「Worked for …」和抬手时不再卡顿（#853）**：#842 的后续。视口已被覆盖时的窗口扩张走后台提交，每帧最多挂 3 行；折叠的 tool 步骤在展开前不算 `toolExpandBody`；settle 用速度 + 160ms 静止下限，触控板抬手不再被当成停下；滑动中关掉 hover；贴底 snap 恢复 commit 前的离底距离，扩张 overscan 时不再弹跳。
 - **企微 webhook 鉴权 + ACL 默认拒绝（#851）**：webhook 必须填 `callback_token` 并验签；空 `allowFrom` 拒绝全部（显式 `*` 才开放）；默认只绑 loopback。
 - **设置页签/胶囊切换不再闪（#856）**：公共 `SegmentedControl`；首次挂载不纵向展开。

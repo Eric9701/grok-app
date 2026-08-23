@@ -234,6 +234,53 @@ export function mergeTreeExpandedForFilter(
   return next;
 }
 
+/**
+ * Stable fingerprint of session edit paths — used to soft-refresh the files
+ * tree when the agent creates/writes files without closing the pane (#863).
+ */
+export function sessionChangePathsKey(
+  paths: readonly string[] | null | undefined,
+): string {
+  if (!paths?.length) return "";
+  const uniq = new Set<string>();
+  for (const p of paths) {
+    const n = (p || "").trim().replace(/\\/g, "/");
+    if (n) uniq.add(n);
+  }
+  return [...uniq].sort().join("\n");
+}
+
+/**
+ * Replace the children of `dirRelative` ("" = root) with `children`.
+ * Marks the directory `loaded: true` when the node supports that field.
+ */
+export function replaceResourceTreeChildren<T extends ResourceTreeNodeLike>(
+  nodes: readonly T[],
+  dirRelative: string,
+  children: readonly T[],
+): T[] {
+  const key = (dirRelative || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  if (!key) {
+    return children.map((c) => ({ ...c })) as T[];
+  }
+  const patch = (list: readonly T[]): T[] =>
+    list.map((n) => {
+      const path = (n.relativePath || "").replace(/\\/g, "/");
+      if (path === key) {
+        return {
+          ...n,
+          children: children.map((c) => ({ ...c })) as T["children"],
+          ...( "loaded" in n ? { loaded: true } : null),
+        } as T;
+      }
+      if (n.children?.length) {
+        return { ...n, children: patch(n.children as T[]) } as T;
+      }
+      return n;
+    });
+  return patch(nodes);
+}
+
 function defaultStorage(): Storage | null {
   try {
     if (typeof localStorage !== "undefined") return localStorage;

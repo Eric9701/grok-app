@@ -75,6 +75,8 @@ import {
   RESOURCE_TREE_ROW_HEIGHT_PX,
   RESOURCE_TREE_VIRTUALIZE_THRESHOLD,
   flattenVisibleResourceTree,
+  replaceResourceTreeChildren,
+  sessionChangePathsKey,
 } from "@/lib/resourceTree";
 import {
   asideSurfaceFromPreviewKind,
@@ -571,6 +573,54 @@ export function ResourceViewer({
     setExpanded({ "": true });
     setQuery("");
   }, [projectPath, refresh, resetTabs]);
+
+  /**
+   * Soft-refresh the files tree when the agent creates/edits files.
+   * Keeps expand state; re-lists root + currently expanded dirs so new
+   * entries appear without closing/reopening the pane (#863).
+   */
+  const sessionChangeKey = useMemo(
+    () => sessionChangePathsKey(sessionChanges.map((c) => c.path)),
+    [sessionChanges],
+  );
+  const sessionChangeKeySeen = useRef("");
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+
+  useEffect(() => {
+    sessionChangeKeySeen.current = "";
+  }, [projectPath]);
+
+  const softRefreshTree = useCallback(async () => {
+    if (!projectPath) return;
+    try {
+      let next = await loadDir("");
+      const openDirs = Object.entries(expandedRef.current)
+        .filter(([, open]) => open)
+        .map(([path]) => path)
+        .filter((path) => path.length > 0);
+      for (const dir of openDirs) {
+        try {
+          const children = await loadDir(dir);
+          next = replaceResourceTreeChildren(next, dir, children);
+        } catch {
+          /* leave prior children for this dir */
+        }
+      }
+      setRoot(next);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [loadDir, projectPath]);
+
+  useEffect(() => {
+    if (!projectPath || !paneActive) return;
+    if (sessionChangeKeySeen.current === sessionChangeKey) return;
+    sessionChangeKeySeen.current = sessionChangeKey;
+    // Empty key: nothing to sync (still record so a later first write refreshes).
+    if (!sessionChangeKey) return;
+    void softRefreshTree();
+  }, [sessionChangeKey, projectPath, paneActive, softRefreshTree]);
 
   const toggleDir = async (node: TreeNode) => {
     const key = node.relativePath;
