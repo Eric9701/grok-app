@@ -118,22 +118,10 @@ import {
   normalizeSessionDataMode,
 } from "@/lib/sessionDataMode";
 import {
-  buildCompactSlashCommand,
-  DEFAULT_COMPACT_PRESET,
   INITIAL_CONTEXT_USAGE,
-  resolveCompactNoteBody,
   resolveContextUsageDisplay,
-  type CompactPresetId,
   type ContextUsageState,
 } from "@/lib/contextUsage";
-import {
-  DEFAULT_COMPACTION_DETAIL,
-  DEFAULT_COMPACTION_MODE,
-  normalizeCompactionDetail,
-  normalizeCompactionMode,
-  type CompactionDetailId,
-  type CompactionModeId,
-} from "@/lib/compactionMode";
 import {
   applyPlanPendingMembership,
   closedSessionPlan,
@@ -465,7 +453,6 @@ import {
 import {
   makeQueuedSend,
   migrateDraftSendClaim,
-  planClearSendQueue,
   queueSessionKey,
   resolveSendQueueStripState,
   shouldEnqueueSend,
@@ -655,10 +642,8 @@ import {
 import { applySideContextOpen } from "@/lib/sideContextOpen";
 import { resolveSidePathDeepLink } from "@/lib/sidePathDeepLink";
 
-import { ConfirmCopyModal } from "@/components/workbench-modals/ConfirmCopyModal";
-import { QueueEditModal } from "@/components/workbench-modals/QueueEditModal";
-import { CompactModal } from "@/components/workbench-modals/CompactModal";
 import { AppDialogHost } from "@/components/workbench-modals/AppDialogHost";
+import { WorkbenchComposerModals } from "@/app/WorkbenchComposerModals";
 import {
   mergeSessionChange,
   summarizeSessionChanges,
@@ -688,7 +673,6 @@ const BottomTerminal = lazy(async () => {
 });
 
 import {
-  installDialogFocus,
   isTypingTarget,
   preferPermissionFocus,
   trapTabKey,
@@ -771,6 +755,8 @@ import { useAccountQuotaAutoRefresh } from "@/hooks/useAccountQuotaAutoRefresh";
 import { useWorkbenchDisplayPrefs } from "@/hooks/useWorkbenchDisplayPrefs";
 import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
 import { useSearchPalette } from "@/hooks/useSearchPalette";
+import { useCompactDialog } from "@/hooks/useCompactDialog";
+import { useQueueEditDialog } from "@/hooks/useQueueEditDialog";
 import { useSessionCatalog } from "@/hooks/useSessionCatalog";
 import {
   createSessionNavHost,
@@ -1312,27 +1298,6 @@ export function AppWorkbench() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
   const [showMcpModal, setShowMcpModal] = useState(false);
-  const [showCompactModal, setShowCompactModal] = useState(false);
-  const [compactNote, setCompactNote] = useState("");
-  /** light / standard / aggressive — seeds note templates (CLI has no intensity flag). */
-  const [compactPreset, setCompactPreset] =
-    useState<CompactPresetId>(DEFAULT_COMPACT_PRESET);
-  /** CLI 0.2.117+ --compaction-mode / GROK_COMPACTION_MODE (global settings). */
-  const [compactionMode, setCompactionMode] =
-    useState<CompactionModeId>(DEFAULT_COMPACTION_MODE);
-  /** CLI 0.2.117+ --compaction-detail (segments only). */
-  const [compactionDetail, setCompactionDetail] =
-    useState<CompactionDetailId>(DEFAULT_COMPACTION_DETAIL);
-  const compactNoteRef = useRef<HTMLInputElement>(null);
-  /**
-   * UI estimate of tokens-before captured when the user confirms manual compact.
-   * Fills banner range when the agent omits `tokensBefore`.
-   */
-  const pendingCompactBeforeRef = useRef<{
-    sessionId: string;
-    tokensBefore: number | null;
-    at: number;
-  } | null>(null);
   const [mcpServers, setMcpServers] = useState<api.McpDto[]>([]);
   const [mcpError, setMcpError] = useState<string | null>(null);
   const [mcpLoading, setMcpLoading] = useState(false);
@@ -1434,7 +1399,6 @@ export function AppWorkbench() {
     path: string;
     name: string;
   } | null>(null);
-  const compactModalRef = useRef<HTMLFormElement>(null);
   /** Filled after `useSearchPalette` mounts; shortcuts bind before that. */
   const searchPaletteApiRef = useRef({
     openPalette: () => {},
@@ -1493,21 +1457,6 @@ export function AppWorkbench() {
   });
 
   // ContextMenu handles outside click + Escape for sidebar menus.
-
-  // Compact slash dialog — focus trap + Escape.
-  useEffect(() => {
-    if (!showCompactModal) return;
-    return installDialogFocus(() => compactModalRef.current, {
-      onEscape: () => {
-        setShowCompactModal(false);
-        setCompactNote("");
-        setCompactPreset(DEFAULT_COMPACT_PRESET);
-      },
-      capture: true,
-      initialFocus: () => compactNoteRef.current,
-      restoreFocus: true,
-    });
-  }, [showCompactModal]);
 
   // Global shortcuts: search, find-in-chat, help, doctor, copy last reply, toggle sidebar, new chat, settings, voice, Esc-stop.
   // Handlers go through refs so we don't re-bind every render.
@@ -1994,6 +1943,14 @@ export function AppWorkbench() {
   const html5DragDepthRef = useRef(0);
   const [, setSetup] = useState({ cli: false, auth: false, project: false });
   const [localError, setLocalError] = useState<string | null>(null);
+  const ensureConnectedRef = useRef<() => Promise<string | null>>(
+    async () => null,
+  );
+  const compact = useCompactDialog({
+    tr,
+    ensureConnectedRef,
+    onFail: setLocalError,
+  });
   /** Expand technical dump under the compact error banner. */
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
   const [cliInfo, setCliInfo] = useState(() =>
@@ -2041,7 +1998,6 @@ export function AppWorkbench() {
     Array<{ name: string; source: string }>
   >([]);
   const [experimentalMemory, setExperimentalMemory] = useState(false);
-  // compactionMode / compactionDetail state lives near compact modal (shared with Settings).
   const [twoPassCompactionEnabled, setTwoPassCompactionEnabled] =
     useState(false);
   const [voiceId, setVoiceId] = useState("eve");
@@ -2181,12 +2137,6 @@ export function AppWorkbench() {
   /** Queue item currently being steered into the live turn. */
   const [guidingQueueItemId, setGuidingQueueItemId] = useState<string | null>(null);
   /** Queue item open in the edit dialog (`null` when closed). */
-  const [queueEditItemId, setQueueEditItemId] = useState<string | null>(null);
-  const [queueEditText, setQueueEditText] = useState("");
-  const queueEditTextareaRef = useRef<HTMLTextAreaElement>(null);
-  /** Clear-all send queue — App-level GlassModal (never window.confirm). */
-  const [sendQueueClearOpen, setSendQueueClearOpen] = useState(false);
-
   const [connecting, setConnecting] = useState(false);
   /** Sync gate for ensureConnected (React state alone races two rapid sends). */
   const connectingRef = useRef(false);
@@ -2919,8 +2869,7 @@ export function AppWorkbench() {
       setAgentProfilePath((settings.agentProfilePath || "").trim());
       setAgentsJson((settings.agentsJson || "").trim());
       setExperimentalMemory(!!settings.experimentalMemory);
-      setCompactionMode(normalizeCompactionMode(settings.compactionMode));
-      setCompactionDetail(normalizeCompactionDetail(settings.compactionDetail));
+      compact.applyFromSettings(settings);
       setTwoPassCompactionEnabled(!!settings.twoPassCompactionEnabled);
       setVoiceId((settings.voiceId || "eve").trim() || "eve");
       setVoiceDictationAutoSend(!!settings.voiceDictationAutoSend);
@@ -3444,7 +3393,7 @@ export function AppWorkbench() {
     },
     pendingAskUserBySessionRef,
     pendingPermBySessionRef,
-    pendingCompactBeforeRef,
+    pendingCompactBeforeRef: compact.pendingBeforeRef,
     clearPendingGatesRef,
     notifyPrefsRef,
     localeRef,
@@ -6271,6 +6220,8 @@ export function AppWorkbench() {
     }
   };
 
+  ensureConnectedRef.current = () => ensureConnected();
+
   const retryAgentConnect = () => {
     const sid = viewingSessionIdRef.current ?? session.sessionId;
     setLocalError(null);
@@ -6285,30 +6236,6 @@ export function AppWorkbench() {
       const next = await ensureConnected({ force: true, sessionId: sid });
       if (next) setLocalError(null);
     })();
-  };
-
-  /**
-   * `/compact [note]` — richer compact dialog:
-   * presets (light/standard/aggressive as note templates; CLI has no intensity flag),
-   * optional keep-note, current usage + honest after estimate when tokens known.
-   * Empty note → `/compact`; non-empty → `/compact {note}`.
-   * Never uses window.prompt (unreliable in Tauri WebView).
-   */
-  const openCompactWithNote = () => {
-    setCompactPreset(DEFAULT_COMPACT_PRESET);
-    setCompactNote(tr("slash.compactPresetNote.standard"));
-    setShowCompactModal(true);
-  };
-
-  const compactPresetNote = (id: CompactPresetId): string => {
-    if (id === "light") return tr("slash.compactPresetNote.light");
-    if (id === "aggressive") return tr("slash.compactPresetNote.aggressive");
-    return tr("slash.compactPresetNote.standard");
-  };
-
-  const selectCompactPreset = (id: CompactPresetId) => {
-    setCompactPreset(id);
-    setCompactNote(compactPresetNote(id));
   };
 
   const attachLabels = useMemo(
@@ -9288,6 +9215,16 @@ export function AppWorkbench() {
     labels: sendQueueLabels,
   });
 
+  const queueEdit = useQueueEditDialog({
+    tr,
+    showToast,
+    activeQueue: sendQueue.activeQueue,
+    updateItem: sendQueue.updateItem,
+    pauseFlush: sendQueue.pauseFlush,
+    releaseFlushHold: sendQueue.releaseFlushHold,
+    clearQueue: sendQueue.clearQueue,
+  });
+
   // sendQueue / composer focus exist only after this point. Mutate in place;
   // do not replace the host object (useSessionNavigation closes over hostRef).
   {
@@ -9369,27 +9306,6 @@ export function AppWorkbench() {
         isSessionLiveStreaming(session.state)
       : true);
 
-  const closeQueueEdit = useCallback(() => {
-    setQueueEditItemId(null);
-    setQueueEditText("");
-    // Resume auto-flush after edit dialog (hold was set while open).
-    sendQueue.releaseFlushHold();
-  }, [sendQueue.releaseFlushHold]);
-
-  const openQueueEdit = useCallback(
-    (item: QueuedSend) => {
-      // Pause auto-flush so the item is not claimed while the dialog is open.
-      sendQueue.pauseFlush();
-      setQueueEditItemId(item.id);
-      setQueueEditText(item.storedDisplay);
-      window.setTimeout(() => {
-        queueEditTextareaRef.current?.focus();
-        queueEditTextareaRef.current?.select();
-      }, 0);
-    },
-    [sendQueue.pauseFlush],
-  );
-
   const sendQueueStrip = useMemo(
     () =>
       resolveSendQueueStripState({
@@ -9398,50 +9314,6 @@ export function AppWorkbench() {
       }),
     [sendQueue.activeQueue, sendQueue.flushHold],
   );
-
-  const sendQueueClearPlan = useMemo(
-    () => planClearSendQueue(sendQueue.activeQueue),
-    [sendQueue.activeQueue],
-  );
-
-  /** Open clear confirm when there is something to clear; no-op when empty. */
-  const requestClearSendQueue = useCallback(() => {
-    const plan = planClearSendQueue(sendQueue.activeQueue);
-    if (!plan.confirmNeeded) {
-      // Empty honesty: nothing to clear (strip should already be hidden).
-      return;
-    }
-    setSendQueueClearOpen(true);
-  }, [sendQueue.activeQueue]);
-
-  const confirmClearSendQueue = useCallback(() => {
-    sendQueue.clearQueue();
-    setSendQueueClearOpen(false);
-  }, [sendQueue.clearQueue]);
-
-  const saveQueueEdit = useCallback(() => {
-    if (!queueEditItemId) return;
-    const item = sendQueue.activeQueue.find((q) => q.id === queueEditItemId);
-    if (!item) {
-      closeQueueEdit();
-      return;
-    }
-    const trimmed = queueEditText.trim();
-    if (!trimmed && item.attachments.length === 0) {
-      showToast(tr("composer.queueEditEmpty"), 2800);
-      return;
-    }
-    sendQueue.updateItem(queueEditItemId, { storedDisplay: trimmed });
-    closeQueueEdit();
-  }, [
-    queueEditItemId,
-    queueEditText,
-    sendQueue.activeQueue,
-    sendQueue.updateItem,
-    closeQueueEdit,
-    showToast,
-    tr,
-  ]);
 
   const sendQueuedMessageNow = useCallback(
     async (item: QueuedSend) => {
@@ -10695,7 +10567,7 @@ export function AppWorkbench() {
             void openMcpModal();
             return;
           case "compact":
-            openCompactWithNote();
+            compact.openWithPresetNote();
             return;
           case "newChat":
             void newChat();
@@ -14835,7 +14707,7 @@ export function AppWorkbench() {
         showStatusModal ||
         showUsageLimitModal ||
         showMcpModal ||
-        showCompactModal ||
+        compact.open ||
         exportMdTarget ||
         exportImageTarget ||
         rewindConfirm ||
@@ -15347,8 +15219,8 @@ export function AppWorkbench() {
         cliAgentSkewRepairing={cliAgentSkewRepairing}
         cliInfo={cliInfo}
         closeToTray={closeToTray}
-        compactionDetail={compactionDetail}
-        compactionMode={compactionMode}
+        compactionDetail={compact.compactionDetail}
+        compactionMode={compact.compactionMode}
         confirmArchiveOlderThan={confirmArchiveOlderThan}
         defaultOpenTarget={defaultOpenTarget}
         deleteSessionsConfirm={deleteSessionsConfirm}
@@ -15428,8 +15300,8 @@ export function AppWorkbench() {
         setCliAgentSkewRepairing={setCliAgentSkewRepairing}
         setCliInfo={setCliInfo}
         setCloseToTray={setCloseToTray}
-        setCompactionDetail={setCompactionDetail}
-        setCompactionMode={setCompactionMode}
+        setCompactionDetail={compact.setCompactionDetail}
+        setCompactionMode={compact.setCompactionMode}
         setDefaultOpenTarget={setDefaultOpenTarget}
         setDisableWebSearch={setDisableWebSearch}
         setDisallowedTools={setDisallowedTools}
@@ -16106,7 +15978,7 @@ export function AppWorkbench() {
             onComposerPasteMediaFallback={onComposerPasteMediaFallback}
             onSlashQueryChange={onSlashQueryChange}
             openAsidePane={openAsidePane}
-            openQueueEdit={openQueueEdit}
+            openQueueEdit={queueEdit.openEdit}
             openSession={openSession}
             openShipFlow={openShipFlow}
             openSideSkillsPanel={openSideSkillsPanel}
@@ -16133,14 +16005,14 @@ export function AppWorkbench() {
             promptHistoryUnfilteredCount={promptHistoryUnfilteredCount}
             providerActiveId={providerActiveId}
             providerActiveSource={providerActiveSource}
-            queueEditItemId={queueEditItemId}
+            queueEditItemId={queueEdit.editItemId}
             queuePreviewLabels={queuePreviewLabels}
             quotes={quotes}
             refreshCliWorktrees={refreshCliWorktrees}
             refreshGitWorktrees={refreshGitWorktrees}
             removeAttachedChat={removeAttachedChat}
             requestClearComposerDraft={requestClearComposerDraft}
-            requestClearSendQueue={requestClearSendQueue}
+            requestClearSendQueue={queueEdit.requestClear}
             resizingSidebar={resizingSidebar}
             resolvePermission={resolvePermission}
             resolveSlashDescription={resolveSlashDescription}
@@ -16156,7 +16028,7 @@ export function AppWorkbench() {
             setAttachChatActive={setAttachChatActive}
             setAttachChatFilter={setAttachChatFilter}
             setAttachments={setAttachments}
-            setCompactNote={setCompactNote}
+            setCompactNote={compact.setNote}
             setGoalMode={setGoalMode}
             setJsonSchemaDraft={setJsonSchemaDraft}
             setMode={setMode}
@@ -16169,7 +16041,7 @@ export function AppWorkbench() {
             setQuotes={setQuotes}
             setRecentPromptHistory={setRecentPromptHistory}
             setResourceOpenTarget={setResourceOpenTarget}
-            setShowCompactModal={setShowCompactModal}
+            setShowCompactModal={compact.setOpen}
             setShowComposerPlus={setShowComposerPlus}
             setShowJsonSchemaModal={setShowJsonSchemaModal}
             setShowUsageLimitModal={setShowUsageLimitModal}
@@ -16382,8 +16254,7 @@ export function AppWorkbench() {
               applyPermissionPolicy(v);
             }}
             onCompact={() => {
-              setCompactNote("");
-              setShowCompactModal(true);
+              compact.openBare();
             }}
           />
           <PhoneAccountSheet
@@ -16798,102 +16669,16 @@ export function AppWorkbench() {
         }}
       />
 
-      {showCompactModal && (
-        <CompactModal
-          locale={locale}
-          formRef={compactModalRef}
-          noteInputRef={compactNoteRef}
-          note={compactNote}
-          preset={compactPreset}
-          compactionMode={compactionMode}
-          compactionDetail={compactionDetail}
-          turnLive={
-            session.state === "streaming" ||
-            session.state === "awaiting_permission"
-          }
-          usage={contextUsageDisplay}
-          onClose={() => {
-            setShowCompactModal(false);
-            setCompactNote("");
-            setCompactPreset(DEFAULT_COMPACT_PRESET);
-          }}
-          onNoteChange={setCompactNote}
-          onPresetChange={selectCompactPreset}
-          onCompactionModeChange={(next) => {
-            setCompactionMode(next);
-            void api.settingsGet().then((s) =>
-              api.settingsSet({ ...s, compactionMode: next }),
-            );
-          }}
-          onCompactionDetailChange={(next) => {
-            setCompactionDetail(next);
-            void api.settingsGet().then((s) =>
-              api.settingsSet({ ...s, compactionDetail: next }),
-            );
-          }}
-          onSubmit={(note, preset) => {
-            const body = resolveCompactNoteBody(
-              note,
-              compactPresetNote(preset),
-            );
-            const uiBefore = contextUsageDisplay.tokens;
-            setShowCompactModal(false);
-            setCompactNote("");
-            setCompactPreset(DEFAULT_COMPACT_PRESET);
-            void (async () => {
-              const cmd = buildCompactSlashCommand(body, { preset });
-              try {
-                const sid = await ensureConnected();
-                if (!sid) {
-                  setLocalError(tr("slash.compactConnectFailed"));
-                  return;
-                }
-                pendingCompactBeforeRef.current = {
-                  sessionId: sid,
-                  tokensBefore:
-                    uiBefore != null && Number.isFinite(uiBefore)
-                      ? Math.floor(uiBefore)
-                      : null,
-                  at: Date.now(),
-                };
-                await api.sessionSend(cmd, null, sid);
-              } catch (err) {
-                pendingCompactBeforeRef.current = null;
-                setLocalError(String(err));
-              }
-            })();
-          }}
-        />
-      )}
-
-      <QueueEditModal
+      <WorkbenchComposerModals
         locale={locale}
-        open={queueEditItemId !== null}
-        text={queueEditText}
-        textareaRef={queueEditTextareaRef}
-        onTextChange={setQueueEditText}
-        onClose={closeQueueEdit}
-        onSave={saveQueueEdit}
-      />
-
-      <ConfirmCopyModal
-        open={sendQueueClearOpen}
-        title={tr("composer.queueClearConfirmTitle")}
-        body={
-          sendQueueClearPlan.confirmNeeded
-            ? tr("composer.queueClearConfirmMessage", {
-                n: String(sendQueueClearPlan.count),
-              })
-            : tr("composer.queueClearEmpty")
+        tr={tr}
+        compact={compact}
+        queueEdit={queueEdit}
+        turnLive={
+          session.state === "streaming" ||
+          session.state === "awaiting_permission"
         }
-        closeLabel={tr("common.close")}
-        cancelLabel={tr("common.cancel")}
-        confirmLabel={tr("composer.queueClearConfirmAction")}
-        danger
-        confirmTestId="queue-clear-confirm"
-        confirmDisabled={!sendQueueClearPlan.confirmNeeded}
-        onClose={() => setSendQueueClearOpen(false)}
-        onConfirm={confirmClearSendQueue}
+        usage={contextUsageDisplay}
       />
 
       {/* In-app confirm / prompt (Tauri WebView has no reliable window.prompt/confirm) */}
