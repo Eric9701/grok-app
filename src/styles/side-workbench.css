@@ -569,6 +569,22 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   overflow: hidden;
 }
 
+/*
+ * `.plan-resource-empty` is also the Resources document empty (max-width
+ * 28rem, start-aligned). As a column flex child that cap left-aligns the
+ * block in a wide side pane. Stretch the shell and keep copy centered so
+ * title / hint / CTA sit in the panel.
+ */
+.sw-plan .plan-resource-empty {
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
 .sw-browser__url-wrap {
   flex: 1;
   min-width: 0;

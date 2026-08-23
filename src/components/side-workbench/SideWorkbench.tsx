@@ -282,8 +282,9 @@ export function SideWorkbench({
     onExpandedChange?.(next.expanded);
   }, [state, setState, onExpandedChange]);
 
-  // Process-only plan tab: live plan auto-open, or planFocusKey bump
+  // Process-only plan tab: live plan auto-open, or a real planFocusKey bump
   // (open-in-resources / review gate) even before a draft is visible.
+  // Initial focusKey 0 is unused — must not steal the empty picker.
   useEffect(() => {
     const { open, nextLastFocusKey } = shouldOpenPlanSideTab({
       autoOpenEnabled: autoOpenPlanTab,
