@@ -90,6 +90,28 @@ describe("shouldReleaseTreeRevealLock", () => {
       }),
     ).toBe(false);
   });
+
+  it("retargets when collapse-all leaves the L1 projects box taller than remaining rows", () => {
+    expect(
+      shouldReleaseTreeRevealLock({
+        open: true,
+        animatingOpen: false,
+        contentPx: 64,
+        boxPx: 480,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not collapse an open box on a 0px measure glitch", () => {
+    expect(
+      shouldReleaseTreeRevealLock({
+        open: true,
+        animatingOpen: false,
+        contentPx: 0,
+        boxPx: 480,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("applyTreeRevealSize", () => {
@@ -275,3 +297,4 @@ describe("sidebar tree text columns", () => {
     expect(src).toMatch(/className="tree-l1__chevron"/);
   });
 });
+
