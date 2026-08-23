@@ -72,7 +72,7 @@ describe("composer tracks chat reading width", () => {
 
   it("side-dock composer avoids min(..., none) with full width", () => {
     const css = stripComments(
-      readFileSync(join(STYLES, "side-workbench.css"), "utf8"),
+      readFileSync(join(STYLES, "side-workbench.part1.css"), "utf8"),
     );
     const dock = css.match(
       /\.composer-wrap--side-dock\s+\.composer\s*\{[^}]*\}/,

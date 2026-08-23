@@ -351,10 +351,15 @@ describe("agent kanban surface is not a todo list", () => {
     expect(palette).toContain('id: "open-kanban"');
     expect(palette).toContain('id: "open-task-board"');
     const workbench = readFileSync(join(root, "app/AppWorkbench.tsx"), "utf8");
+    const sessionModals = readFileSync(
+      join(root, "app/WorkbenchSessionModals.tsx"),
+      "utf8",
+    );
+    const chrome = workbench + sessionModals;
     const sidebar = readFileSync(join(root, "app/WorkbenchSidebar.tsx"), "utf8");
     expect(workbench).toContain("KanbanBoardPage");
     expect(workbench).toContain("navigateKanban");
-    expect(workbench).toContain('hash = "#/kanban"');
+    expect(chrome).toContain('hash = "#/kanban"');
     expect(sidebar).toContain('tr("sidebar.kanban")');
     expect(workbench).toContain('mainPane === "kanban"');
     expect(workbench).toContain("liveVoiceOpen ||");
@@ -364,7 +369,7 @@ describe("agent kanban surface is not a todo list", () => {
       workbench.indexOf("useLiveMapWhen(") + 420,
     );
     expect(liveWhen).toContain('mainPane === "kanban"');
-    expect(workbench).toContain("SessionTaskBoardModal");
+    expect(chrome).toContain("SessionTaskBoardModal");
     expect(workbench).not.toContain("KanbanBoardHost");
     expect(workbench).not.toContain("openKanbanBoard");
     expect(workbench).toContain("onSelectSession={openSessionByIdHandler}");
