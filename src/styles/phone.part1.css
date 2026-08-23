@@ -253,8 +253,10 @@
   }
 
   .app-shell--phone .space-switcher__btn {
+    width: 44px;
     height: 44px;
-    font-size: 13px;
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .app-shell--phone .tree-l1__action {

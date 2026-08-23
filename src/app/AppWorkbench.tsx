@@ -1122,7 +1122,9 @@ import { useBottomTerminal } from "@/hooks/useBottomTerminal";
 import { BottomTerminalToggle } from "@/components/bottom-terminal/BottomTerminalToggle";
 import { useProjectSpaces } from "@/hooks/useProjectSpaces";
 import { SpaceSwitcher } from "@/components/SpaceSwitcher";
+import { SidebarProjectsMoreMenu } from "@/components/SidebarProjectsMoreMenu";
 import {
+  activeSpaceLabel,
   findSpace,
   spaceDisplayName,
   spaceOfProject,
@@ -19370,35 +19372,44 @@ export function AppWorkbench() {
             <div className="tree-l1">
               <button
                 type="button"
-                className="tree-l1__head tree-l1__head--toggle"
+                className="tree-l1__head"
                 onClick={() => setProjectsOpen((v) => !v)}
                 aria-expanded={projectsOpen}
                 aria-label={tr("sidebar.projects")}
               >
-                {projectsOpen ? (
-                  <IconChevronDown size={14} />
-                ) : (
-                  <IconChevronRight size={14} />
-                )}
+                <span className="tree-l1__chevron" aria-hidden>
+                  {projectsOpen ? (
+                    <IconChevronDown size={14} />
+                  ) : (
+                    <IconChevronRight size={14} />
+                  )}
+                </span>
+                <span className="tree-l1__label">
+                  {activeSpaceLabel(projectSpaces.state, {
+                    all: tr("sidebar.spaces.all"),
+                    default: tr("sidebar.spaces.default"),
+                    projects: tr("sidebar.projects"),
+                  })}
+                </span>
               </button>
-              <SpaceSwitcher
-                state={projectSpaces.state}
-                projectIds={projects.map((p) => p.id)}
-                labels={{
-                  projects: tr("sidebar.projects"),
-                  all: tr("sidebar.spaces.all"),
-                  default: tr("sidebar.spaces.default"),
-                  switch: tr("sidebar.spaces.switch"),
-                  new: tr("sidebar.spaces.new"),
-                  rename: tr("sidebar.spaces.rename"),
-                  delete: tr("sidebar.spaces.delete"),
-                }}
-                onSelect={(id) => projectSpaces.switchTo(id)}
-                onNew={() => promptCreateSpace()}
-                onRename={(id) => promptRenameSpace(id)}
-                onDelete={(id) => confirmDeleteSpace(id)}
-              />
               <div className="tree-l1__actions">
+                <SpaceSwitcher
+                  state={projectSpaces.state}
+                  projectIds={projects.map((p) => p.id)}
+                  labels={{
+                    projects: tr("sidebar.projects"),
+                    all: tr("sidebar.spaces.all"),
+                    default: tr("sidebar.spaces.default"),
+                    switch: tr("sidebar.spaces.switch"),
+                    new: tr("sidebar.spaces.new"),
+                    rename: tr("sidebar.spaces.rename"),
+                    delete: tr("sidebar.spaces.delete"),
+                  }}
+                  onSelect={(id) => projectSpaces.switchTo(id)}
+                  onNew={() => promptCreateSpace()}
+                  onRename={(id) => promptRenameSpace(id)}
+                  onDelete={(id) => confirmDeleteSpace(id)}
+                />
                 {sessionSelectMode ? (
                   <Tip label={tr("common.cancel")}>
                     <button
@@ -19413,89 +19424,78 @@ export function AppWorkbench() {
                       <IconClose size={15} />
                     </button>
                   </Tip>
-                ) : selectableSessionCount > 0 ? (
+                ) : (
                   <>
-                    <Tip label={tr("sidebar.select")}>
-                      <button
-                        type="button"
-                        className="tree-l1__action"
-                        aria-label={tr("sidebar.select")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          enterSessionSelectMode();
-                        }}
-                      >
-                        <IconListCheck size={15} />
-                      </button>
-                    </Tip>
-                    {unreadSessionIds.size > 0 ? (
-                      <Tip label={tr("session.clearAllUnread")}>
+                    {projects.length > 0 ? (
+                      <Tip label={tr("sidebar.collapseAllProjects")}>
                         <button
                           type="button"
                           className="tree-l1__action"
-                          aria-label={tr("session.clearAllUnread")}
+                          aria-label={tr("sidebar.collapseAllProjects")}
                           onClick={(e) => {
+                            // Collapse each project folder only — not the L1 section.
                             e.stopPropagation();
-                            handleClearAllSessionUnread();
+                            setExpandedProjects((prev) => {
+                              const next = { ...prev };
+                              for (const p of projects) {
+                                next[p.id] = false;
+                              }
+                              return next;
+                            });
                           }}
                         >
-                          <IconCheck size={15} />
+                          <IconArrowsVerticalCollapse size={15} />
                         </button>
                       </Tip>
                     ) : null}
-                    <Tip label={tr("sidebar.archiveOlder")}>
-                      <button
-                        type="button"
-                        className="tree-l1__action"
-                        aria-label={tr("sidebar.archiveOlder")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCtxMenu({
-                            kind: "archive-older",
-                            x: e.clientX,
-                            y: e.clientY,
-                          });
-                        }}
-                      >
-                        <IconArchive size={15} />
-                      </button>
-                    </Tip>
+                    <SidebarProjectsMoreMenu
+                      label={tr("sidebar.more")}
+                      items={[
+                        ...(selectableSessionCount > 0
+                          ? [
+                              {
+                                id: "select" as const,
+                                label: tr("sidebar.select"),
+                                onClick: () => enterSessionSelectMode(),
+                              },
+                            ]
+                          : []),
+                        ...(unreadSessionIds.size > 0
+                          ? [
+                              {
+                                id: "clearUnread" as const,
+                                label: tr("session.clearAllUnread"),
+                                onClick: () => handleClearAllSessionUnread(),
+                              },
+                            ]
+                          : []),
+                        ...(selectableSessionCount > 0
+                          ? [
+                              {
+                                id: "archiveOlder" as const,
+                                label: tr("sidebar.archiveOlder"),
+                                onClick: (anchor: { x: number; y: number }) =>
+                                  setCtxMenu({
+                                    kind: "archive-older",
+                                    x: anchor.x,
+                                    y: anchor.y,
+                                  }),
+                              },
+                            ]
+                          : []),
+                        ...(!isMirrorClient()
+                          ? [
+                              {
+                                id: "addProject" as const,
+                                label: tr("sidebar.addProject"),
+                                onClick: () => void addProject(false),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
                   </>
-                ) : null}
-                {projects.length > 0 && !sessionSelectMode ? (
-                  <Tip label={tr("sidebar.collapseAllProjects")}>
-                    <button
-                      type="button"
-                      className="tree-l1__action"
-                      aria-label={tr("sidebar.collapseAllProjects")}
-                      onClick={(e) => {
-                        // Collapse each project folder only — not the L1 section.
-                        e.stopPropagation();
-                        setExpandedProjects((prev) => {
-                          const next = { ...prev };
-                          for (const p of projects) {
-                            next[p.id] = false;
-                          }
-                          return next;
-                        });
-                      }}
-                    >
-                      <IconArrowsVerticalCollapse size={15} />
-                    </button>
-                  </Tip>
-                ) : null}
-                {!isMirrorClient() && !sessionSelectMode ? (
-                  <Tip label={tr("sidebar.addProject")}>
-                    <button
-                      type="button"
-                      className="tree-l1__action"
-                      aria-label={tr("sidebar.addProject")}
-                      onClick={() => void addProject(false)}
-                    >
-                      <IconPlus size={15} />
-                    </button>
-                  </Tip>
-                ) : null}
+                )}
               </div>
             </div>
 

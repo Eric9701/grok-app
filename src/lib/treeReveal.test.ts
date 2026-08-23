@@ -298,3 +298,76 @@ describe("sidebar tree text columns", () => {
   });
 });
 
+describe("sidebar projects L1 chrome", () => {
+  const part1 = readFileSync(
+    resolve(__dirname, "../styles/sidebar.part1.css"),
+    "utf8",
+  );
+  const switcher = readFileSync(
+    resolve(__dirname, "../components/SpaceSwitcher.tsx"),
+    "utf8",
+  );
+  const workbench = readFileSync(
+    resolve(__dirname, "../app/AppWorkbench.tsx"),
+    "utf8",
+  );
+  let moreMenu = "";
+  try {
+    moreMenu = readFileSync(
+      resolve(__dirname, "../components/SidebarProjectsMoreMenu.tsx"),
+      "utf8",
+    );
+  } catch {
+    moreMenu = "";
+  }
+  const l1 = workbench.slice(
+    workbench.indexOf("{/* L1 — Projects section */}"),
+    workbench.indexOf("<SidebarTreeReveal open={projectsOpen}"),
+  );
+
+  it("keeps chevron + space name on the L1 head that expands the project list", () => {
+    expect(l1).toMatch(/tree-l1__head/);
+    expect(l1).toMatch(/setProjectsOpen/);
+    expect(l1).toMatch(/tree-l1__label/);
+    expect(l1).toMatch(/activeSpaceLabel/);
+  });
+
+  it("uses an icon-only space switcher, not a name+chevron trigger", () => {
+    expect(switcher).toMatch(/IconSwitch\b/);
+    expect(switcher).not.toMatch(/IconChevronDown/);
+    expect(switcher).not.toMatch(/space-switcher__label/);
+  });
+
+  it("keeps collapse-all as an outer L1 action", () => {
+    expect(l1).toMatch(/sidebar.collapseAllProjects/);
+    expect(l1).toMatch(/IconArrowsVerticalCollapse/);
+  });
+
+  it("moves select, archive, and add into a more menu", () => {
+    expect(l1).toMatch(/SidebarProjectsMoreMenu/);
+    expect(l1).toMatch(/sidebar.more/);
+    expect(l1).not.toMatch(/<IconListCheck/);
+    expect(l1).not.toMatch(/<IconArchive/);
+    expect(l1).not.toMatch(/<IconPlus/);
+    expect(moreMenu).toMatch(/IconMore/);
+    expect(moreMenu).toMatch(/menu-panel context-menu/);
+  });
+
+  it("sizes the space-switcher trigger as an icon button", () => {
+    const block = part1.match(/\.space-switcher__btn\s*\{([^}]+)\}/)?.[1] ?? "";
+    expect(block).toMatch(/width:\s*28px/);
+    expect(block).toMatch(/height:\s*28px/);
+    expect(block).not.toMatch(/padding:\s*0 6px 0 8px/);
+  });
+
+  it("shows the space switcher only with the other hover L1 actions", () => {
+    const actions = l1.slice(l1.indexOf("tree-l1__actions"));
+    expect(actions).toMatch(/<SpaceSwitcher/);
+    expect(l1.slice(0, l1.indexOf("tree-l1__actions"))).not.toMatch(
+      /<SpaceSwitcher/,
+    );
+    expect(part1).toMatch(
+      /\.tree-l1:has\(\.space-switcher\.is-open\) \.tree-l1__actions/,
+    );
+  });
+});
