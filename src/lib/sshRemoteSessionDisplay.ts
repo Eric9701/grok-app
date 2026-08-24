@@ -56,3 +56,55 @@ export function remotePathTip(alias: string, cwd: string): string {
 export function remainingRemoteCount(total: number, loaded: number): number {
   return Math.max(0, total - loaded);
 }
+
+export function normalizeRemoteCwd(cwd: string): string {
+  return cwd.trim().replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+/** Folder label: basename, or parent/base when two cwds share a basename. */
+export function uniqueCwdLabel(
+  cwd: string,
+  allCwds: readonly string[],
+): string {
+  const norm = normalizeRemoteCwd(cwd);
+  const base = cwdBasename(norm) || norm || "/";
+  let clashes = 0;
+  for (const other of allCwds) {
+    const otherNorm = normalizeRemoteCwd(other);
+    const otherBase = cwdBasename(otherNorm) || otherNorm || "/";
+    if (otherBase === base) clashes += 1;
+  }
+  if (clashes <= 1) return base;
+  const parts = norm.split("/").filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+  }
+  return base;
+}
+
+export type RemotePathGroup<T extends { cwd: string } = { cwd: string }> = {
+  cwd: string;
+  label: string;
+  sessions: T[];
+};
+
+/** Group a newest-first remote list by cwd. Group order follows first appearance. */
+export function groupRemoteSessionsByCwd<T extends { cwd: string }>(
+  sessions: readonly T[],
+): RemotePathGroup<T>[] {
+  const order: string[] = [];
+  const map = new Map<string, T[]>();
+  for (const s of sessions) {
+    const key = normalizeRemoteCwd(s.cwd);
+    if (!map.has(key)) {
+      order.push(key);
+      map.set(key, []);
+    }
+    map.get(key)!.push(s);
+  }
+  return order.map((key) => ({
+    cwd: key,
+    label: uniqueCwdLabel(key, order),
+    sessions: map.get(key) ?? [],
+  }));
+}

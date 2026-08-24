@@ -39,6 +39,12 @@ vi.mock("@/providers/SshWatchProvider", () => ({
           title: "帮我看一下 hallucination span",
           updatedAt: new Date(Date.now() - 6 * 24 * 3600 * 1000).toISOString(),
         },
+        {
+          id: "01a0193c-aaaa-7850-9e0c-3a342201cef11",
+          cwd: "/data/pengqlu/code/qwen35-v001-light",
+          title: "第二轮实验",
+          updatedAt: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(),
+        },
       ],
     },
     totalsByAlias: { UTS: 35 },
@@ -69,7 +75,7 @@ afterEach(() => {
 });
 
 describe("SshRemoteSessionRail", () => {
-  it("labels the host, hides the raw UUID, and offers load more", async () => {
+  it("labels the host, groups by path, hides the raw UUID, and offers load more", async () => {
     render(
       <SshRemoteSessionRail
         t={t}
@@ -79,7 +85,15 @@ describe("SshRemoteSessionRail", () => {
       />,
     );
     expect(screen.getByText("远程 UTS")).toBeInTheDocument();
-    expect(document.querySelector(".tree-l3")).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "/data/pengqlu/code/qwen35-v001-light",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "/data/pengqlu/code/idea" }),
+    ).toBeInTheDocument();
+    expect(document.querySelectorAll(".tree-l3--nested").length).toBe(3);
     expect(
       screen.getByRole("button", { name: "qwen35-v001-light" }),
     ).toBeInTheDocument();
@@ -87,12 +101,15 @@ describe("SshRemoteSessionRail", () => {
       screen.getByRole("button", { name: "帮我看一下 hallucination span" }),
     ).toBeInTheDocument();
     expect(
+      screen.getByRole("button", { name: "第二轮实验" }),
+    ).toBeInTheDocument();
+    expect(
       screen.queryByRole("button", {
         name: "01a01907-adf3-7e00-a7a8-aee1082b0556",
       }),
     ).toBeNull();
     expect(screen.getByText("5天前")).toBeInTheDocument();
-    expect(screen.getByText("还有 33 个")).toBeInTheDocument();
+    expect(screen.getByText("还有 32 个")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /加载更多/ }));
     expect(loadMore).toHaveBeenCalledWith("UTS");
   });

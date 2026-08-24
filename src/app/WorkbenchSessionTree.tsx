@@ -34,7 +34,11 @@ import { projectDisplayName } from "@/lib/app/sidebarModels";
 import type { ContextMenuState } from "@/lib/app/appDialogTypes";
 import { areAllIdsSelected } from "@/lib/sessionSelect";
 import { sortSessionsForSidebar } from "@/lib/sidebarDateGroups";
-import { isProjectPathMissing } from "@/lib/projectPath";
+import {
+  hideSshProjectInLocalTree,
+  isProjectPathMissing,
+} from "@/lib/projectPath";
+import { useSshWatch } from "@/providers/SshWatchProvider";
 import { resolveProjectColorCss } from "@/lib/projectColor";
 import { notePreview } from "@/lib/sessionNotes";
 import { SESSION_DROP_ORPHAN } from "@/lib/sessionMoveProject";
@@ -155,6 +159,10 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
     deleteSessionsConfirm,
   } = props;
 
+  const { watchAliases } = useSshWatch();
+  const treeProjects = visibleProjects.filter(
+    (p) => !hideSshProjectInLocalTree(p, watchAliases),
+  );
   const sessionsForProject = (projectId: string) =>
     sessions.filter((s) => s.projectId === projectId && !s.archived);
   const orphanSessions = sessions.filter(
@@ -330,7 +338,7 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
               </div>
             )}
 
-            {visibleProjects.map((proj) => {
+            {treeProjects.map((proj) => {
                 const open = expandedProjects[proj.id] !== false;
                 const projSessions = sessionsForProject(proj.id);
                 const projSessionIds = projSessions.map((s) => s.id);

@@ -4,24 +4,18 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { titleNeedsMarquee } from "@/lib/sidebarTitleMarquee";
 
 type Props = {
   title: string;
 };
 
-/**
- * Approx. hover action strip (pin + archive + menu + left fade).
- * Subtracted from the clip width so marquee can clear icons under the overlay.
- */
-const HOVER_ACTIONS_RESERVE_PX = 78;
-
 /** Gap between duplicated title copies in the seamless loop (px). */
 const MARQUEE_GAP_PX = 28;
 
 /**
- * Sidebar session title: ellipsis at rest; on row hover, if text overflows
- * (including space under overlay icons), marquee-scroll left continuously
- * (one-way seamless loop — never reverse).
+ * Sidebar session title: ellipsis at rest; on row hover, if the title is
+ * wider than this name slot, marquee-scroll left (one-way seamless loop).
  */
 export function SidebarSessionName({ title }: Props) {
   const outerRef = useRef<HTMLSpanElement>(null);
@@ -36,11 +30,9 @@ export function SidebarSessionName({ title }: Props) {
 
     const run = () => {
       const contentW = measure.scrollWidth;
-      const visible = Math.max(8, outer.clientWidth - HOVER_ACTIONS_RESERVE_PX);
-      const overflow = contentW - visible;
-      const needsScroll = overflow > 2;
+      const clipW = outer.clientWidth;
+      const needsScroll = titleNeedsMarquee(contentW, clipW);
       setScrollable(needsScroll);
-      // Seamless loop distance = one copy + gap (second copy aligns at 0).
       setLoopPx(needsScroll ? Math.ceil(contentW + MARQUEE_GAP_PX) : 0);
     };
 
@@ -48,6 +40,7 @@ export function SidebarSessionName({ title }: Props) {
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(run);
     ro.observe(outer);
+    ro.observe(measure);
     return () => ro.disconnect();
   }, [title]);
 

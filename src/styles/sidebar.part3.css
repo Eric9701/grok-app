@@ -814,6 +814,10 @@ html[data-sidebar-density="compact"] .tree-l3 {
   font-size: 12px;
 }
 
+html[data-sidebar-density="compact"] .tree-l3.tree-l3--nested {
+  padding-left: 24px;
+}
+
 html[data-sidebar-density="compact"] .tree-l3__title {
   line-height: 24px;
   gap: 4px;

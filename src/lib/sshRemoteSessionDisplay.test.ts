@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   cwdBasename,
   firstSentenceTitle,
+  groupRemoteSessionsByCwd,
   looksLikeSessionId,
   remainingRemoteCount,
   remotePathTip,
   remoteSessionLabel,
   remoteTitleKey,
+  uniqueCwdLabel,
 } from "./sshRemoteSessionDisplay";
 
 describe("remoteSessionLabel", () => {
@@ -84,6 +86,31 @@ describe("helpers", () => {
   it("takes the last path segment", () => {
     expect(cwdBasename("/data/pengqlu/code/qwen35-v001-light")).toBe(
       "qwen35-v001-light",
+    );
+  });
+});
+
+describe("groupRemoteSessionsByCwd", () => {
+  it("groups by cwd and keeps newest-first order", () => {
+    const groups = groupRemoteSessionsByCwd([
+      { id: "a", cwd: "/data/pengqlu/code/2026-07-25-ICLR" },
+      { id: "b", cwd: "/data/pengqlu" },
+      { id: "c", cwd: "/data/pengqlu/code/2026-07-25-ICLR" },
+    ]);
+    expect(groups.map((g) => g.label)).toEqual([
+      "2026-07-25-ICLR",
+      "pengqlu",
+    ]);
+    expect(groups[0].sessions.map((s) => s.id)).toEqual(["a", "c"]);
+    expect(groups[1].sessions.map((s) => s.id)).toEqual(["b"]);
+  });
+
+  it("disambiguates two cwds with the same basename", () => {
+    expect(
+      uniqueCwdLabel("/work/a/src", ["/work/a/src", "/tmp/a/src"]),
+    ).toBe("a/src");
+    expect(uniqueCwdLabel("/work/only", ["/work/only", "/work/other"])).toBe(
+      "only",
     );
   });
 });
