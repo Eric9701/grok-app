@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.26] - 2026-08-24
+
+> **Highlight:** Import Grok Build CLI sessions from Account; phone mirror on the same Wi-Fi; Windows permission/rewind clicks; long chats stay scrollable.
+>
+> **中文 · 亮点：** 从账户导入 Grok Build CLI 会话；同一 Wi-Fi 手机镜像；Windows 权限/回退按钮可点；长对话滚动不再卡死。
+
 ### Added
 - **Import Grok Build CLI sessions from Account → Recent sessions**: Import & open a row, or import the listed table into the sidebar. Empty sidebar offers the same when local CLI logs exist. Import may add the CLI cwd as an **untrusted** project (never home `/` or `~/`).
 - **Second SuperGrok login hint** on the account switcher: Add account, then switch. One login stays active.
@@ -34,6 +40,9 @@ See `docs/llm-wiki/release.md`.
 - **浅色壁纸可读性**：浅色主题用独立白色 veil、主区更通透；文字保持深色描边，不额外加承载卡片。
 
 ### Fixed
+- **Windows permission bar clicks (#878, #880)**: the card dumped ACP request JSON as the command preview, and Approve / Deny could miss clicks (floating composer is `pointer-events: none` without `no-drag`). Preview is the command/path; buttons stay clickable; busy/error show on the card.
+- **Windows rewind confirm stayed open (#879, #880)**: failures toasted under the modal overlay (`z-index` 60 vs 12000). Toast is portaled above overlays; rewind shows the error in the dialog; the timeline closes before confirm.
+- **Long-chat history browse freeze (#881, #882)**: a 4800px overscan floor remounted too much markdown on a fling. Browse overscan scales down with row count; the pin-to-bottom window is unchanged.
 - **Phone mirror same-LAN access (#875)**: the host bound only `127.0.0.1`, so replacing the URL with a LAN IP returned `ERR_CONNECTION_REFUSED`. Loopback stays the default. **Allow same Wi-Fi** (in-app confirm) rebinds `0.0.0.0` and copies/QRs the detected LAN IPv4. Soft-fail copy no longer claims LAN works without that toggle.
 - **Windows PTY clippy**: `PtySession.pid` is Unix-only (process-group SIGKILL). Windows kill stays on `ChildKiller`, so CI `-D warnings` stays green.
 - **Expanded SideWorkbench vs macOS traffic lights**: when the sidebar is hidden or overlayed, the shared pane chrome pads with `--titlebar-safe-left`.
@@ -63,6 +72,9 @@ See `docs/llm-wiki/release.md`.
 - **Official-aux X/Imagine on packaged custom mains**: `/Applications/Grok.app` never bundled `scripts/official-aux-mcp.mjs`, so ACP injected `mcpServers count=0` while ChatCut still auto-loaded from independent `agent-home/config.toml`. Host now writes the MCP script into `agent-home-official`, disables user MCP `enabled` flags during solo inject, ships official-aux `--rules` on prewarm, and tells the model to call `official-aux__x_keyword_search` directly instead of `search_tool` (which was resolving to ChatCut).
 
 **中文 · 修复**
+- **Windows 权限卡点击无响应（#878, #880）**：预览区曾渲染整段 ACP JSON；浮动输入区 `pointer-events: none` 且权限卡未标 `no-drag`，WebView2 会把点击当成拖窗口。现显示真实命令，按钮可点，失败写在卡片上。
+- **Windows 回退确认窗关不掉（#879, #880）**：错误 toast 被挡在遮罩下。toast 提到 overlay 之上；失败写在弹窗里；打开确认时关掉时间线。
+- **长会话上下滚动卡死（#881, #882）**：浏览历史时 overscan 下限 4800px，一甩挂太多 markdown。现按行数缩小浏览 overscan，钉在底部的窗口不变。
 - **手机镜像同一局域网访问（#875）**：主机原先只绑 `127.0.0.1`，把链接换成局域网 IP 会 `ERR_CONNECTION_REFUSED`。默认仍是回环。开启 **允许同一 Wi-Fi**（应用内确认）后改绑 `0.0.0.0`，复制/二维码使用探测到的局域网 IPv4。隧道失败时的文案不再暗示「换成局域网 IP 就能用」。
 - **Windows PTY clippy**：`PtySession.pid` 仅 Unix 用于进程组 SIGKILL；Windows 仍走 `ChildKiller`，CI `-D warnings` 不再红。
 - **展开侧栏避开 macOS 交通灯**：侧栏隐藏或 overlay 时，共享顶栏使用 `--titlebar-safe-left` 内边距。
