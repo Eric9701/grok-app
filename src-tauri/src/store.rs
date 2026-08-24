@@ -125,6 +125,115 @@ impl Project {
     pub fn is_legacy_general(&self) -> bool {
         self.id == GENERAL_PROJECT_ID || self.system
     }
+
+    /// `path` lives on this OpenSSH Host — never a local `is_dir` check.
+    pub fn is_ssh_remote(&self) -> bool {
+        ssh_alias_of(self).is_some()
+    }
+}
+
+fn ssh_alias_of(p: &Project) -> Option<&str> {
+    p.ssh_alias
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && crate::ssh_remote::is_safe_ssh_alias(s))
+}
+
+/// `add_ssh_project` names rows `{alias}:{path_basename}` with a POSIX cwd.
+/// Used to repair rows that lost `ssh_alias` and were then marked path-missing.
+pub(crate) fn infer_ssh_alias_from_name(name: &str, path: &str) -> Option<String> {
+    let path = path.trim();
+    if path.is_empty() || !path.starts_with('/') {
+        return None;
+    }
+    let (alias, rest) = name.split_once(':')?;
+    let alias = alias.trim();
+    if !crate::ssh_remote::is_safe_ssh_alias(alias) {
+        return None;
+    }
+    let base = Path::new(path).file_name()?.to_string_lossy();
+    if rest.trim() != base.as_ref() {
+        return None;
+    }
+    Some(alias.to_string())
+}
+
+fn apply_ssh_path_health(list: &mut [Project]) -> bool {
+    let mut dirty = false;
+    for p in list {
+        if ssh_alias_of(p).is_some() {
+            if !p.path_ok {
+                p.path_ok = true;
+                dirty = true;
+            }
+            continue;
+        }
+        if PathBuf::from(&p.path).is_dir() {
+            p.path_ok = true;
+            continue;
+        }
+        if let Some(alias) = infer_ssh_alias_from_name(&p.name, &p.path) {
+            p.ssh_alias = Some(alias);
+            p.path_ok = true;
+            dirty = true;
+            continue;
+        }
+        p.path_ok = false;
+    }
+    dirty
+}
+
+fn rehome_sessions_project_id(from_id: &str, to_id: &str) {
+    if from_id == to_id {
+        return;
+    }
+    let _ = update_sessions_index(|sessions| {
+        for s in sessions {
+            if s.project_id.as_deref() == Some(from_id) {
+                s.project_id = Some(to_id.to_string());
+            }
+        }
+        Ok(())
+    });
+}
+
+/// Same OpenSSH alias + remote cwd must be one sidebar folder.
+fn dedup_ssh_projects_by_alias_path(list: &mut Vec<Project>) -> bool {
+    use std::collections::{HashMap, HashSet};
+    let mut groups: HashMap<(String, String), Vec<usize>> = HashMap::new();
+    for (i, p) in list.iter().enumerate() {
+        let Some(alias) = ssh_alias_of(p) else {
+            continue;
+        };
+        groups
+            .entry((alias.to_string(), p.path.clone()))
+            .or_default()
+            .push(i);
+    }
+    let mut drop_ids = HashSet::new();
+    for idxs in groups.values() {
+        if idxs.len() < 2 {
+            continue;
+        }
+        let winner = idxs
+            .iter()
+            .copied()
+            .max_by_key(|&i| list[i].last_opened_at)
+            .expect("non-empty group");
+        let winner_id = list[winner].id.clone();
+        for &i in idxs {
+            if i == winner {
+                continue;
+            }
+            rehome_sessions_project_id(&list[i].id, &winner_id);
+            drop_ids.insert(list[i].id.clone());
+        }
+    }
+    if drop_ids.is_empty() {
+        return false;
+    }
+    list.retain(|p| !drop_ids.contains(&p.id));
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1169,14 +1278,17 @@ pub fn load_projects() -> Vec<Project> {
     // One-shot migration: drop the temporary system:general project row and
     // rehome its sessions to orphan (`project_id = None`) under "其他会话".
     migrate_legacy_general_project(&mut list);
-    for p in &mut list {
-        if p.ssh_alias.as_deref().is_some() {
-            continue;
-        }
-        p.path_ok = PathBuf::from(&p.path).is_dir();
-    }
+    let mut dirty = apply_ssh_path_health(&mut list);
+    dirty |= dedup_ssh_projects_by_alias_path(&mut list);
     // Pin group first; keep manual order within each group (no last_opened sort).
     apply_project_pin_partition(&mut list);
+    if dirty {
+        // Persist repaired ssh_alias / merged duplicates. Nested load via
+        // path_scope is a no-op once the file already has the alias.
+        if let Err(e) = save_projects(&list) {
+            tracing::warn!("repair ssh project rows: {e}");
+        }
+    }
     list
 }
 
@@ -1289,8 +1401,21 @@ pub fn add_ssh_project(alias: &str, path: String, trust: bool) -> Result<Project
     let mut list = load_projects();
     if let Some(existing) = list
         .iter_mut()
-        .find(|p| p.ssh_alias.as_deref() == Some(alias) && p.path == path)
+        .find(|p| ssh_alias_of(p) == Some(alias) && p.path == path)
     {
+        existing.trusted = trust || existing.trusted;
+        existing.last_opened_at = Utc::now();
+        existing.path_ok = true;
+        let clone = existing.clone();
+        save_projects(&list)?;
+        return Ok(clone);
+    }
+    // Same remote cwd, alias dropped (older builds) — restore instead of duplicating.
+    if let Some(existing) = list
+        .iter_mut()
+        .find(|p| p.path == path && ssh_alias_of(p).is_none())
+    {
+        existing.ssh_alias = Some(alias.to_string());
         existing.trusted = trust || existing.trusted;
         existing.last_opened_at = Utc::now();
         existing.path_ok = true;
@@ -2050,7 +2175,7 @@ fn validate_move_target(pid: &Option<String>) -> Result<(), String> {
         if !proj.trusted {
             return Err("session_move_untrusted".into());
         }
-        if !proj.path_ok {
+        if !proj.path_ok && !proj.is_ssh_remote() {
             return Err("session_move_path_missing".into());
         }
     } else {
@@ -4665,6 +4790,115 @@ mod tests {
         );
 
         let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn infer_ssh_alias_from_add_ssh_name() {
+        assert_eq!(
+            infer_ssh_alias_from_name("UTS:2026-07-25-ICLR", "/data/pengqlu/code/2026-07-25-ICLR",),
+            Some("UTS".into())
+        );
+        assert_eq!(
+            infer_ssh_alias_from_name("UTS:pengqlu", "/home/pengqlu"),
+            Some("UTS".into())
+        );
+        assert_eq!(
+            infer_ssh_alias_from_name("UTS:other", "/data/pengqlu/code/2026-07-25-ICLR"),
+            None
+        );
+        assert_eq!(infer_ssh_alias_from_name("UTS:foo", "foo"), None);
+        assert_eq!(infer_ssh_alias_from_name("*:foo", "/data/foo"), None);
+    }
+
+    #[test]
+    fn load_projects_repairs_ssh_alias_and_merges_duplicates() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-ssh-repair-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let older = Utc.with_ymd_and_hms(2026, 8, 24, 11, 0, 0).unwrap();
+        let newer = Utc.with_ymd_and_hms(2026, 8, 24, 12, 0, 0).unwrap();
+        let remote = "/data/pengqlu/code/2026-07-25-ICLR";
+        let mut stale = sample_project("stale-ssh", false, older);
+        stale.name = "UTS:2026-07-25-ICLR".into();
+        stale.path = remote.into();
+        stale.path_ok = false;
+        stale.ssh_alias = None;
+        let mut good = sample_project("good-ssh", false, newer);
+        good.name = "UTS:2026-07-25-ICLR".into();
+        good.path = remote.into();
+        good.path_ok = true;
+        good.ssh_alias = Some("UTS".into());
+        write_json(&projects_file(), &vec![stale.clone(), good.clone()]).expect("seed");
+
+        let mut sess = sample_session("bound-stale", false, older);
+        sess.project_id = Some(stale.id.clone());
+        write_json(&sessions_index_file(), &vec![sess]).expect("seed sessions");
+
+        let listed = load_projects();
+        let hits: Vec<&Project> = listed.iter().filter(|p| p.path == remote).collect();
+        assert_eq!(hits.len(), 1, "duplicate remote folders merged");
+        assert_eq!(hits[0].ssh_alias.as_deref(), Some("UTS"));
+        assert!(hits[0].path_ok, "remote path is not local-missing");
+        assert_eq!(hits[0].id, good.id);
+
+        let reloaded = load_sessions_index();
+        let hit = reloaded
+            .iter()
+            .find(|s| s.id == "bound-stale")
+            .expect("sess");
+        assert_eq!(hit.project_id.as_deref(), Some(good.id.as_str()));
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn add_ssh_project_rebinds_same_path_without_alias() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-ssh-rebind-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut orphan = sample_project("orphan-ssh", false, Utc::now());
+        orphan.name = "my remote".into();
+        orphan.path = "/data/pengqlu/work".into();
+        orphan.path_ok = false;
+        orphan.ssh_alias = None;
+        write_json(&projects_file(), &vec![orphan.clone()]).expect("seed");
+
+        let added = add_ssh_project("UTS", "/data/pengqlu/work".into(), true).expect("add");
+        assert_eq!(added.id, orphan.id);
+        assert_eq!(added.ssh_alias.as_deref(), Some("UTS"));
+        assert!(added.path_ok);
+        let listed = load_projects();
+        assert_eq!(
+            listed
+                .iter()
+                .filter(|p| p.path == "/data/pengqlu/work")
+                .count(),
+            1
+        );
+
         std::env::remove_var("GROK_APP_HOME");
         let _ = fs::remove_dir_all(&tmp);
     }

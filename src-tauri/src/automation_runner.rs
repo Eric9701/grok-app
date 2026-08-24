@@ -359,7 +359,7 @@ async fn run_one(
         if !p.trusted {
             return Err(format!("project not trusted: {}", p.name));
         }
-        if !p.path_ok {
+        if !p.path_ok && !p.is_ssh_remote() {
             return Err(format!("project path missing: {}", p.name));
         }
     }

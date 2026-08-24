@@ -15,6 +15,7 @@ export async function projectsList() {
       pinned?: boolean;
       /** Legacy flag; retired system:general is no longer listed. */
       system?: boolean;
+      sshAlias?: string | null;
     }>
   >("projects_list");
 }

@@ -517,7 +517,7 @@ import {
   canRestoreCodeOnResume,
 } from "@/lib/sessionResumeRestore";
 import {
-  isProjectPathMissing,
+  isProjectFolderMissing,
   isProjectWarmable,
 } from "@/lib/projectPath";
 import {
@@ -3364,7 +3364,7 @@ export function AppWorkbench() {
         setLocalError(tr("project.trustFirst", { name: project.name }));
         return true;
       }
-      if (project && isProjectPathMissing(project.pathOk)) {
+      if (project && isProjectFolderMissing(project)) {
         setLocalError(tr("project.pathMissing", { name: project.name }));
         return true;
       }
@@ -4038,7 +4038,7 @@ export function AppWorkbench() {
           });
           return false;
         }
-        if (proj && isProjectPathMissing(proj.pathOk)) {
+        if (proj && isProjectFolderMissing(proj)) {
           const detail = tr("project.pathMissing", { name: proj.name });
           setLocalError(detail);
           recordAutomationRun({
@@ -14107,7 +14107,7 @@ export function AppWorkbench() {
               />            </Suspense>
           ) : (
           <>
-          {activeProject && isProjectPathMissing(activeProject.pathOk) && (
+          {activeProject && isProjectFolderMissing(activeProject) && (
             <div className="conn-bar">
               <span style={{ fontSize: 12, opacity: 0.9, marginRight: 8 }}>
                 {tr("project.pathMissingShort")}
@@ -14123,7 +14123,7 @@ export function AppWorkbench() {
             </div>
           )}
           {activeProject &&
-            !isProjectPathMissing(activeProject.pathOk) &&
+            !isProjectFolderMissing(activeProject) &&
             !activeProject.trusted && (
             <div className="conn-bar">
               <button

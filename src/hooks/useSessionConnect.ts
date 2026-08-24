@@ -20,7 +20,7 @@ import {
 } from "@/lib/app/sidebarModels";
 import { isActiveJsonSchema } from "@/lib/jsonSchema";
 import { canLiveParticipate } from "@/lib/multiWindow";
-import { isProjectPathMissing } from "@/lib/projectPath";
+import { isProjectFolderMissing } from "@/lib/projectPath";
 import { resolveSessionWorktreeBadge } from "@/lib/gitWorktree";
 import { isViewedSessionConnecting } from "@/lib/connStatus";
 import { migrateDraftSendClaim, queueSessionKey } from "@/lib/sendQueue";
@@ -175,7 +175,7 @@ export function useSessionConnect(opts: {
         );
         return null;
       }
-      if (connectProject && isProjectPathMissing(connectProject.pathOk)) {
+      if (connectProject && isProjectFolderMissing(connectProject)) {
         h.setLocalError(
           h.tr("project.pathMissing", {
             name: projectDisplayName(connectProject, h.tr),

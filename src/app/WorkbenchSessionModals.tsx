@@ -379,6 +379,7 @@ export function WorkbenchSessionModals(p: WorkbenchSessionModalsProps) {
             path: p.path,
             trusted: p.trusted,
             pathOk: p.pathOk,
+            sshAlias: p.sshAlias,
             system: p.system,
           }),
         )}

@@ -859,7 +859,7 @@ pub fn prepare_send(session_id: &str, prompt: &str) -> Result<PreparedSend, Box<
                 format!("project not trusted: {}", p.name),
             )));
         }
-        if !p.path_ok {
+        if !p.path_ok && !p.is_ssh_remote() {
             return Err(Box::new(TurnResult::fail(
                 TurnStatus::Error,
                 session_id,

@@ -10,6 +10,24 @@ export function isProjectPathMissing(
   return pathOk === false;
 }
 
+/**
+ * Local-disk folder is gone. SSH remotes are never missing on this machine —
+ * `path` is the remote cwd, so a local `is_dir` miss is not "路径失效".
+ */
+export function isProjectFolderMissing(
+  project:
+    | {
+        pathOk?: boolean | null;
+        sshAlias?: string | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!project) return false;
+  if (isSshRemoteProject(project)) return false;
+  return isProjectPathMissing(project.pathOk);
+}
+
 /** True when `path` lives on an OpenSSH Host, not this machine. */
 export function isSshRemoteProject(
   project: { sshAlias?: string | null } | null | undefined,
@@ -30,8 +48,7 @@ export function isProjectWarmable(
   } | null,
 ): boolean {
   if (!project) return true;
-  if (isSshRemoteProject(project)) return !!project.trusted;
-  return !!project.trusted && !isProjectPathMissing(project.pathOk);
+  return !!project.trusted && !isProjectFolderMissing(project);
 }
 
 /**

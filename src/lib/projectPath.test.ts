@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   hideSshProjectInLocalTree,
+  isProjectFolderMissing,
   isProjectPathMissing,
   isProjectWarmable,
   isSshRemoteProject,
@@ -15,6 +16,23 @@ describe("isProjectPathMissing", () => {
     expect(isProjectPathMissing(true)).toBe(false);
     expect(isProjectPathMissing(undefined)).toBe(false);
     expect(isProjectPathMissing(null)).toBe(false);
+  });
+});
+
+describe("isProjectFolderMissing", () => {
+  it("is true only for a local folder Host marked missing", () => {
+    expect(isProjectFolderMissing({ pathOk: false })).toBe(true);
+    expect(isProjectFolderMissing({ pathOk: true })).toBe(false);
+    expect(isProjectFolderMissing(null)).toBe(false);
+  });
+
+  it("never treats an SSH remote as a missing local folder", () => {
+    expect(
+      isProjectFolderMissing({
+        pathOk: false,
+        sshAlias: "UTS",
+      }),
+    ).toBe(false);
   });
 });
 
@@ -47,6 +65,13 @@ describe("isProjectWarmable", () => {
         trusted: true,
         pathOk: true,
         sshAlias: "uts",
+      }),
+    ).toBe(true);
+    expect(
+      isProjectWarmable({
+        trusted: true,
+        pathOk: false,
+        sshAlias: "UTS",
       }),
     ).toBe(true);
     expect(
