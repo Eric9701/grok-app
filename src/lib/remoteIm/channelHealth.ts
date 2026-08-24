@@ -1,7 +1,9 @@
 import type { ChannelInstance, ChannelStatusTone, RemoteChannelId } from "./types";
 import {
+  isWecomLoopbackAdvisory,
   normalizeWecomConnectMode,
   validateWecomConfig,
+  wecomAllowExternal,
   wecomHealthHintKeys,
   wecomRequiredNonSecretKeys,
   wecomRequiredSecretKeys,
@@ -597,8 +599,9 @@ export function classifyChannelHealth(
   // at most "configured" — soft-fail, never a live claim.
   const credsUsable = !!instance.hasCredentials && credentialsReady;
 
+  const loopbackAdvisory = isWecomLoopbackAdvisory(instance.lastError);
   let tone: ChannelStatusTone = "unconfigured";
-  if (instance.lastError) {
+  if (instance.lastError && !loopbackAdvisory) {
     tone = "error";
   } else if (
     credsUsable &&
@@ -635,7 +638,7 @@ export function classifyChannelHealth(
   }
 
   // Channel-specific depth (shippable for Feishu / Telegram / WeCom)
-  if (instance.lastError) {
+  if (instance.lastError && !loopbackAdvisory) {
     tone = "error";
   }
 
@@ -683,6 +686,8 @@ export function classifyChannelHealth(
     for (const k of wecomHealthHintKeys(wecomV, {
       openAcl: openAcl && instance.hasCredentials,
       proxySet: !!optionString(opts, "proxy"),
+      allowExternal: wecomAllowExternal(opts),
+      loopbackAdvisory: wecomV.mode === "webhook" && loopbackAdvisory,
     })) {
       hintKeys.push(k);
     }
@@ -843,8 +848,10 @@ export function classifyChannelHealth(
     openAcl,
     credentialsReady,
     missingKeys,
-    lastError: sanitizeChannelError(instance.lastError),
-    hintKeys: uniqueHints.slice(0, 6),
+    lastError: loopbackAdvisory
+      ? null
+      : sanitizeChannelError(instance.lastError),
+    hintKeys: uniqueHints.slice(0, 7),
   };
 }
 

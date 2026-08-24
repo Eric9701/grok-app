@@ -133,6 +133,7 @@ export const frSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "Le point de terminaison WebSocket semble invalide — utilisez wss:// (ou https://) avec un hôte, ou laissez vide pour le défaut de la plateforme.",
   "settings.remoteIm.health.hint.wecomWs": "Connexion longue WebSocket WeCom (aibot) — aucune URL publique n’est requise.",
   "settings.remoteIm.health.hint.wecomWebhook": "Le mode Webhook WeCom nécessite un callback HTTPS public.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "Les callbacks publics nécessitent d’activer allow_external.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "Exposez le callback local avec un tunnel (aide seulement) avant que la vérification d’URL d’entreprise puisse réussir.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "Le mode de connexion a changé — collez les secrets du nouveau mode, puis Enregistrer et connecter.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "Remplissez les champs WeCom requis pour le mode sélectionné (Bot ID/Secret ou Corp + Agent + jeton de callback).",

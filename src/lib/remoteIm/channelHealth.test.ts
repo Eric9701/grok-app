@@ -250,6 +250,33 @@ describe("classifyChannelHealth", () => {
     expect(h2.tone).not.toBe("connected");
     expect(h2.hintKeys.some((k) => k.includes("wecomModeSwitch"))).toBe(true);
     expect(h2.hintKeys.some((k) => k.includes("wecomPublicUrl"))).toBe(true);
+    expect(h2.hintKeys.some((k) => k.includes("wecomLoopbackAllowExternal"))).toBe(
+      true,
+    );
+  });
+
+  it("wecom webhook loopback advisory is a hint, not an error tone", () => {
+    const i = inst("wecom", {
+      hasCredentials: true,
+      enabled: true,
+      options: {
+        connect_mode: "webhook",
+        corp_id: "ww",
+        agent_id: "1",
+      },
+      lastError: "wecom_webhook_loopback_needs_allow_external",
+    });
+    const h = classifyChannelHealth({
+      instance: i,
+      bridgeRunning: true,
+      bridgeLinked: true,
+    });
+    expect(h.tone).not.toBe("error");
+    expect(h.badgeTone).not.toBe("err");
+    expect(h.lastError).toBeNull();
+    expect(
+      h.hintKeys.some((k) => k.includes("wecomLoopbackAllowExternal")),
+    ).toBe(true);
   });
 
   it("dingtalk: stream deep health · never connected without Bridge link", () => {

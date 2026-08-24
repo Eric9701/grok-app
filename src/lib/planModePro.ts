@@ -213,6 +213,10 @@ export function shouldExitComposerPlanModeAfterDecision(input: {
  * Side Workbench / Resources: open or focus the Plan tab.
  * Live plan visibility auto-opens; planFocusKey bumps open even when the
  * plan is not yet visible (bare plan-mode chip → open-in-resources empty).
+ *
+ * `focusKey` is a monotonic bump starting at 0. The unused initial 0 is
+ * not a request — treating 0 vs `lastFocusKey === null` as a bump would
+ * auto-open Plan on every Side Workbench mount (new session → picker gone).
  */
 export function shouldOpenPlanSideTab(input: {
   autoOpenEnabled: boolean;
@@ -226,8 +230,9 @@ export function shouldOpenPlanSideTab(input: {
   let nextLast = input.lastFocusKey;
   let focusBump = false;
   if (input.focusKey != null && input.focusKey !== input.lastFocusKey) {
-    focusBump = true;
     nextLast = input.focusKey;
+    // 0 is the unused counter; real requests are setPlanFocusKey(k => k+1).
+    focusBump = input.focusKey !== 0;
   }
   return {
     open: !!input.planVisible || focusBump,

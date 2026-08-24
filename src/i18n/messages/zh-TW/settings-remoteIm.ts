@@ -133,6 +133,7 @@ export const zhTWSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "WebSocket 端點無效 — 請使用帶主機的 wss://（或 https://），或留空使用平台預設。",
   "settings.remoteIm.health.hint.wecomWs": "企業微信 WebSocket（智慧機器人）長連線 — 無需公網 URL。",
   "settings.remoteIm.health.hint.wecomWebhook": "企業微信 Webhook 模式需要公網 HTTPS 回呼。",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "公網回呼需開啟 allow_external",
   "settings.remoteIm.health.hint.wecomPublicUrl": "須將本機回呼透過隧道暴露為公網 HTTPS 後，企業微信 URL 驗證才可能通過（隧道僅為輔助）。",
   "settings.remoteIm.health.hint.wecomModeSwitch": "連線模式已切換 — 請貼上新模式所需密鑰後「儲存並連線」。",
   "settings.remoteIm.health.hint.wecomMissingKeys": "請依所選模式填寫必填項（Bot ID/Secret，或 Corp + Agent + 回呼 Token）。",

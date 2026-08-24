@@ -133,6 +133,7 @@ export const taSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "WebSocket எண்ட்பாயிண்ட் தவறானதாகத் தெரிகிறது — wss:// (அல்லது ஹோஸ்டுடன் https://) ஐப் பயன்படுத்தவும் அல்லது இயங்குதள இயல்புநிலைக்கு காலியாக விடவும்.",
   "settings.remoteIm.health.hint.wecomWs": "WeCom WebSocket (aibot) நீண்ட இணைப்பு — பொது URL தேவையில்லை.",
   "settings.remoteIm.health.hint.wecomWebhook": "WeCom Webhook பயன்முறையில் பொது HTTPS திரும்ப அழைக்க வேண்டும்.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "பொது கால்பேக்குகளுக்கு allow_external இயக்கப்பட வேண்டும்.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "எண்டர்பிரைஸ் URL சரிபார்ப்பு வெற்றிபெறும் முன், சுரங்கப்பாதை (உதவியாளர் மட்டும்) மூலம் உள்ளூர் அழைப்பை வெளிப்படுத்தவும்.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "இணைப்பு முறை மாற்றப்பட்டது - புதிய பயன்முறையில் இரகசியங்களை ஒட்டவும், பின்னர் சேமித்து இணைக்கவும்.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "தேர்ந்தெடுக்கப்பட்ட பயன்முறைக்கு தேவையான WeCom புலங்களை நிரப்பவும் (Bot ID/Secret அல்லது Corp + Agent + callback token).",

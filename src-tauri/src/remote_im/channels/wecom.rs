@@ -164,6 +164,13 @@ fn const_time_eq(a: &[u8], b: &[u8]) -> bool {
     diff == 0
 }
 
+/// ±5 minutes (Telegram / Slack webhook convention). Outside this window → 401.
+pub const WECOM_TIMESTAMP_SKEW_SECS: i64 = 300;
+
+/// Runtime `last_error` code when webhook mode is bound to loopback only.
+/// UI maps this to an i18n hint; it is advisory, not a connector crash.
+pub const WECOM_WEBHOOK_LOOPBACK_ADVISORY: &str = "wecom_webhook_loopback_needs_allow_external";
+
 /// Official WeCom callback signature:
 /// `SHA1(lexicographically sorted [token, timestamp, nonce, payload])`,
 /// delivered as the `msg_signature` query parameter. Compared constant-time.
@@ -187,6 +194,42 @@ fn wecom_signature_ok(
     }
     let expected = hex::encode(hasher.finalize());
     const_time_eq(expected.as_bytes(), sig.as_bytes())
+}
+
+/// True when `timestamp` (unix seconds) is within ±`WECOM_TIMESTAMP_SKEW_SECS`.
+fn wecom_timestamp_fresh(timestamp: &str, now_unix: i64) -> bool {
+    let Ok(ts) = timestamp.trim().parse::<i64>() else {
+        return false;
+    };
+    now_unix.abs_diff(ts) <= WECOM_TIMESTAMP_SKEW_SECS as u64
+}
+
+/// WeCom signature must match **and** the timestamp must be fresh.
+/// The shared-token header is a non-WeCom fallback and does not carry a
+/// Tencent timestamp — it still authenticates without the replay window.
+fn wecom_callback_authorized(
+    token: &str,
+    timestamp: &str,
+    nonce: &str,
+    payload: &str,
+    signature: Option<&str>,
+    header_token: Option<&str>,
+    now_unix: i64,
+) -> bool {
+    if header_token.is_some_and(|t| const_time_eq(t.as_bytes(), token.as_bytes())) {
+        return true;
+    }
+    wecom_signature_ok(token, timestamp, nonce, payload, signature)
+        && wecom_timestamp_fresh(timestamp, now_unix)
+}
+
+/// Advisory code when webhook listens on loopback (`allow_external` unset).
+fn wecom_webhook_bind_advisory(allow_external: bool) -> Option<&'static str> {
+    if allow_external {
+        None
+    } else {
+        Some(WECOM_WEBHOOK_LOOPBACK_ADVISORY)
+    }
 }
 
 /// Extract `k=v` from an HTTP query string (first occurrence, no decode).
@@ -286,7 +329,11 @@ async fn run_webhook(
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| format!("wecom bind {port}: {e}"))?;
-    let _ = super::super::config::set_instance_last_error(&inst.id, None);
+    if let Some(note) = wecom_webhook_bind_advisory(allow_external) {
+        let _ = super::super::config::set_instance_advisory(&inst.id, Some(note.to_string()));
+    } else {
+        let _ = super::super::config::set_instance_last_error(&inst.id, None);
+    }
 
     // Best-effort corp credential check in background (must not block listen).
     let corp_id = secret_or_opt(&inst.secrets, &inst.options, "corp_id");
@@ -367,15 +414,16 @@ async fn run_webhook(
                     } else {
                         body
                     };
-                    let verified = wecom_signature_ok(
+                    let now = super::super::resilience::now_unix_secs() as i64;
+                    let verified = wecom_callback_authorized(
                         callback_token.as_str(),
                         &timestamp,
                         &nonce,
                         payload_for_sig,
                         sig.as_deref(),
-                    ) || header_token.is_some_and(|t| {
-                        const_time_eq(t.as_bytes(), callback_token.as_bytes())
-                    });
+                        header_token.as_deref(),
+                        now,
+                    );
 
                     // URL verify echo: only echo after verification (WeCom signs
                     // the encrypted echostr during endpoint setup).
@@ -572,6 +620,93 @@ mod tests {
         let a = wecom_signature_ok("t", "123", "n", "p", Some(&sign("t", "123", "n", "p")));
         let b = wecom_signature_ok("123", "t", "p", "n", Some(&sign("t", "123", "n", "p")));
         assert!(a && b);
+    }
+
+    #[test]
+    fn timestamp_freshness_rejects_expired_future_and_invalid() {
+        let now = 1_700_000_000i64;
+        assert!(wecom_timestamp_fresh(&now.to_string(), now));
+        // Inclusive ±300s boundary.
+        assert!(wecom_timestamp_fresh(
+            &(now - WECOM_TIMESTAMP_SKEW_SECS).to_string(),
+            now
+        ));
+        assert!(wecom_timestamp_fresh(
+            &(now + WECOM_TIMESTAMP_SKEW_SECS).to_string(),
+            now
+        ));
+        assert!(!wecom_timestamp_fresh(
+            &(now - WECOM_TIMESTAMP_SKEW_SECS - 1).to_string(),
+            now
+        ));
+        assert!(!wecom_timestamp_fresh(
+            &(now + WECOM_TIMESTAMP_SKEW_SECS + 1).to_string(),
+            now
+        ));
+        assert!(!wecom_timestamp_fresh("", now));
+        assert!(!wecom_timestamp_fresh("not-a-number", now));
+        assert!(!wecom_timestamp_fresh("  ", now));
+    }
+
+    #[test]
+    fn callback_auth_requires_fresh_timestamp_on_signature_path() {
+        let now = 1_700_000_000i64;
+        let token = "tok";
+        let nonce = "n1";
+        let payload = "{\"x\":1}";
+        let fresh = now.to_string();
+        let expired = (now - WECOM_TIMESTAMP_SKEW_SECS - 1).to_string();
+        let future = (now + WECOM_TIMESTAMP_SKEW_SECS + 1).to_string();
+        let sig_fresh = sign(token, &fresh, nonce, payload);
+        let sig_expired = sign(token, &expired, nonce, payload);
+        let sig_future = sign(token, &future, nonce, payload);
+
+        assert!(wecom_callback_authorized(
+            token,
+            &fresh,
+            nonce,
+            payload,
+            Some(&sig_fresh),
+            None,
+            now
+        ));
+        assert!(!wecom_callback_authorized(
+            token,
+            &expired,
+            nonce,
+            payload,
+            Some(&sig_expired),
+            None,
+            now
+        ));
+        assert!(!wecom_callback_authorized(
+            token,
+            &future,
+            nonce,
+            payload,
+            Some(&sig_future),
+            None,
+            now
+        ));
+        // Shared-token header still authenticates without a WeCom timestamp.
+        assert!(wecom_callback_authorized(
+            token,
+            &expired,
+            nonce,
+            payload,
+            None,
+            Some(token),
+            now
+        ));
+    }
+
+    #[test]
+    fn webhook_loopback_advisory_when_not_allow_external() {
+        assert_eq!(
+            wecom_webhook_bind_advisory(false),
+            Some(WECOM_WEBHOOK_LOOPBACK_ADVISORY)
+        );
+        assert_eq!(wecom_webhook_bind_advisory(true), None);
     }
 
     #[test]

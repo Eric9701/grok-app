@@ -133,6 +133,7 @@ export const koSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "WebSocket 엔드포인트가 유효하지 않은 것 같습니다 — 호스트가 있는 wss://(또는 https://)를 쓰거나 플랫폼 기본값을 위해 비워 두세요.",
   "settings.remoteIm.health.hint.wecomWs": "WeCom WebSocket(aibot) 롱 커넥션 — 공개 URL이 필요 없습니다.",
   "settings.remoteIm.health.hint.wecomWebhook": "WeCom 웹훅 모드에는 공개 HTTPS 콜백이 필요합니다.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "공용 콜백에는 allow_external을 켜야 합니다.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "기업 URL 검증이 성공하려면 터널(헬퍼만)로 로컬 콜백을 노출하세요.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "연결 모드가 바뀌었습니다 — 새 모드의 비밀을 붙여넣은 뒤 저장 및 연결하세요.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "선택한 모드에 필요한 WeCom 필드를 채우세요(Bot ID/Secret 또는 Corp + Agent + 콜백 토큰).",

@@ -485,6 +485,7 @@ export const jaWorkspace = {
   "terminal.toggleHide": "ターミナルを隠す",
   "terminal.panelAria": "ターミナルパネル",
   "terminal.new": "新しいターミナル",
+  "terminal.closeAll": "すべてのターミナルを閉じる",
   "terminal.closePanel": "ターミナルパネルを隠す",
   "terminal.resize": "ターミナルのサイズを変更",
   "side.review.scope": "範囲",

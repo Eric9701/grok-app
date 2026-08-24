@@ -18,6 +18,7 @@ import {
   subscribeHostOsTheme,
   subscribeSystemTheme,
   switchTheme,
+  WEBKIT_THEME_SNAPSHOT_MAX_ELEMENTS,
   THEME_STORAGE_KEY,
   toggleTheme,
   toggleThemePreference,
@@ -295,6 +296,70 @@ describe("theme preference + resolve", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("skips WebKit theme snapshot when the DOM exceeds the element cap", () => {
+    const animate = vi.fn();
+    const update = vi.fn();
+    const startViewTransition = vi.fn();
+    const getBoundingClientRect = vi.fn(() => ({
+      bottom: 10,
+      height: 10,
+      left: 0,
+      right: 10,
+      top: 0,
+      width: 10,
+    }));
+    const getComputedStyle = vi.fn(() => ({
+      color: "rgb(0, 0, 0)",
+      backgroundColor: "rgb(255, 255, 255)",
+      borderTopColor: "rgba(0, 0, 0, 0)",
+      borderRightColor: "rgba(0, 0, 0, 0)",
+      borderBottomColor: "rgba(0, 0, 0, 0)",
+      borderLeftColor: "rgba(0, 0, 0, 0)",
+      outlineColor: "rgba(0, 0, 0, 0)",
+      fill: "none",
+      stroke: "none",
+    }));
+    const stubEl = {
+      animate,
+      getBoundingClientRect,
+      isConnected: true,
+    };
+    const listed = Array.from(
+      { length: WEBKIT_THEME_SNAPSHOT_MAX_ELEMENTS },
+      () => stubEl,
+    );
+    const doc = {
+      defaultView: {
+        matchMedia: () => ({ matches: false }),
+        navigator: {
+          userAgent:
+            "Mozilla/5.0 AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15",
+        },
+        innerWidth: 1200,
+        innerHeight: 800,
+        getComputedStyle,
+      },
+      documentElement: {
+        animate,
+        dataset: {} as Record<string, string>,
+        getBoundingClientRect,
+        isConnected: true,
+      },
+      querySelectorAll: () => listed,
+      visibilityState: "visible",
+      startViewTransition,
+    } as unknown as Document;
+
+    runThemeTransition(update, doc);
+
+    expect(update).toHaveBeenCalledOnce();
+    expect(startViewTransition).not.toHaveBeenCalled();
+    expect(animate).not.toHaveBeenCalled();
+    expect(getBoundingClientRect).not.toHaveBeenCalled();
+    expect(getComputedStyle).not.toHaveBeenCalled();
+    expect(doc.documentElement.dataset.themeTransition).toBeUndefined();
   });
 
   it("keeps only the latest rapid theme transition update", async () => {

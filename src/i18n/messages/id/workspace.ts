@@ -485,6 +485,7 @@ export const idWorkspace = {
   "terminal.toggleHide": "Sembunyikan terminal",
   "terminal.panelAria": "Panel terminal",
   "terminal.new": "Terminal baru",
+  "terminal.closeAll": "Tutup semua terminal",
   "terminal.closePanel": "Sembunyikan panel terminal",
   "terminal.resize": "Ubah ukuran terminal",
   "side.review.scope": "Cakupan",

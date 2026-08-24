@@ -29,6 +29,7 @@ import {
   IconBrush as TbBrush,
   IconCalendarTime as TbCalendarTime,
   IconCheck as TbCheck,
+  IconClearAll as TbClearAll,
   IconClipboardList as TbClipboardList,
   IconClock as TbClock,
   IconCode as TbCode,
@@ -273,6 +274,8 @@ export const IconTrash = wrap(TbTrash, { className: "g-icon--danger" });
 export const IconPaperclip = wrap(TbPaperclip);
 export const IconAttach = wrap(TbPaperclip);
 export const IconClose = wrap(TbX);
+/** Close / clear every item in a strip (bottom terminal close-all). */
+export const IconClearAll = wrap(TbClearAll);
 export const IconSend = wrap(TbSend);
 /** Up arrow — composer send button glyph. */
 export const IconArrowUp = wrap(TbArrowUp);

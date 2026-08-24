@@ -2242,6 +2242,10 @@ export function AppWorkbench() {
     },
     [syncViewedTurnClock],
   );
+  const hideChatForSideExpand = shouldHideChatForSideExpand({
+    expanded: sideWorkbench.expanded,
+    phoneLayout,
+  });
   const asideOverlay =
     !phoneLayout &&
     !shouldHideChatForSideExpand({
@@ -2261,6 +2265,7 @@ export function AppWorkbench() {
     phoneLayout,
     sidebarOverlay,
     asideOverlay,
+    asideInFlow: !phoneLayout && !hideChatForSideExpand && !asideOverlay,
   });
   const [account, setAccount] = useState<api.AccountStatus | null>(null);
   voiceSignedInRef.current = !!account?.profile?.signedIn;
@@ -10375,10 +10380,6 @@ export function AppWorkbench() {
     welcomeBrandKind,
   ]);
 
-  const hideChatForSideExpand = shouldHideChatForSideExpand({
-    expanded: sideWorkbench.expanded,
-    phoneLayout,
-  });
   const sidebarPaint =
     layout.sidebarCollapsed || sidebarOverlay
       ? 0
@@ -15233,6 +15234,7 @@ export function AppWorkbench() {
                 state={bottomTerminal.state}
                 onAddTab={bottomTerminal.addTab}
                 onCloseTab={bottomTerminal.closeTab}
+                onCloseAllTabs={bottomTerminal.closeAllTabs}
                 onActivateTab={bottomTerminal.activateTab}
                 onHeightChange={bottomTerminal.setHeight}
                 onClosePanel={bottomTerminal.closePanel}

@@ -133,6 +133,7 @@ export const idSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "Endpoint WebSocket tampak tidak valid — gunakan wss:// (atau https://) dengan host, atau kosongkan untuk bawaan platform.",
   "settings.remoteIm.health.hint.wecomWs": "Koneksi panjang WeCom WebSocket (aibot) — URL publik tidak diperlukan.",
   "settings.remoteIm.health.hint.wecomWebhook": "Mode Webhook WeCom memerlukan callback HTTPS publik.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "Callback publik memerlukan allow_external diaktifkan.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "Ekspos callback lokal dengan terowongan (hanya pembantu) sebelum verifikasi URL perusahaan dapat berhasil.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "Mode koneksi berubah — tempel rahasia untuk mode baru, lalu Simpan & sambungkan.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "Isi bidang WeCom yang diperlukan untuk mode yang dipilih (Bot ID/Secret atau Corp + Agent + token callback).",

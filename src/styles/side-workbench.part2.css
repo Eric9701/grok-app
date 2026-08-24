@@ -1,3 +1,41 @@
+.sw-terminal__xterm .xterm-scrollable-element > .scrollbar.horizontal {
+  display: none !important;
+  height: 0 !important;
+  box-shadow: none !important;
+}
+
+.sw-terminal__xterm .xterm-rows,
+.sw-terminal__xterm canvas {
+  box-shadow: none !important;
+}
+
+/* DOM-renderer fallback: do not let workbench `background: transparent`
+ * rules wipe Starship / ANSI cell backgrounds on row spans. */
+.sw-terminal__xterm .xterm-rows span[style*="background-color"],
+.sw-terminal__xterm .xterm-rows [class*="xterm-bg-"] {
+  background-clip: padding-box;
+}
+
+/* Keep workbench chrome transparent under terminal (veil only on .sw-terminal--pty) */
+.sw.rp:has(.sw-terminal--pty),
+.sw__persist-host:has(.sw-terminal--pty),
+.sw__content:has(.sw-terminal--pty) {
+  background: transparent !important;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  gap: 0;
+  min-height: 0;
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+/* Persist host must stretch so terminal can reach the pane bottom */
+.sw__persist-host:has(.sw-terminal--pty) {
+  display: flex;
+  flex-direction: column;
+}
+
 /* Env menu — solid panel (same family as .sw-plus-menu / context menus).
  * Bare .menu-panel has no surface; without this the rows float over chat. */
 .sw-env-menu.menu-panel,

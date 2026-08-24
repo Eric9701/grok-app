@@ -13,6 +13,7 @@ import {
 import { createT, type Locale } from "@/i18n";
 import {
   IconChevronDown,
+  IconClearAll,
   IconClose,
   IconPlus,
   IconTerminal,
@@ -29,6 +30,7 @@ export type BottomTerminalProps = {
   state: BottomTerminalState;
   onAddTab: () => void;
   onCloseTab: (id: string) => void;
+  onCloseAllTabs: () => void;
   onActivateTab: (id: string) => void;
   onHeightChange: (height: number, maxPx?: number) => void;
   onClosePanel: () => void;
@@ -40,6 +42,7 @@ export function BottomTerminal({
   state,
   onAddTab,
   onCloseTab,
+  onCloseAllTabs,
   onActivateTab,
   onHeightChange,
   onClosePanel,
@@ -140,26 +143,24 @@ export function BottomTerminal({
                   >
                     <IconTerminal size={14} />
                     <span className="rp-tab__name">{label}</span>
-                    {active ? (
-                      <span
-                        className="rp-tab__x"
-                        role="button"
-                        tabIndex={0}
-                        title={tr("side.tabClose")}
-                        onClick={(e) => {
+                    <span
+                      className="rp-tab__x"
+                      role="button"
+                      tabIndex={active ? 0 : -1}
+                      title={tr("side.tabClose")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCloseTab(tab.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
                           e.stopPropagation();
                           onCloseTab(tab.id);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.stopPropagation();
-                            onCloseTab(tab.id);
-                          }
-                        }}
-                      >
-                        <IconClose size={12} />
-                      </span>
-                    ) : null}
+                        }
+                      }}
+                    >
+                      <IconClose size={12} />
+                    </span>
                   </button>
                 );
               })}
@@ -174,6 +175,17 @@ export function BottomTerminal({
                   onClick={onAddTab}
                 >
                   <IconPlus size={16} />
+                </button>
+              </Tip>
+              <Tip label={tr("terminal.closeAll")}>
+                <button
+                  type="button"
+                  className="chrome-btn"
+                  aria-label={tr("terminal.closeAll")}
+                  data-testid="bottom-terminal-close-all"
+                  onClick={onCloseAllTabs}
+                >
+                  <IconClearAll size={16} />
                 </button>
               </Tip>
               <Tip label={tr("terminal.closePanel")}>

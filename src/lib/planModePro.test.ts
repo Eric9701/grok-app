@@ -352,6 +352,28 @@ describe("shouldOpenPlanSideTab", () => {
     expect(r.open).toBe(false);
   });
 
+  it("does not treat the unused initial focus key 0 as a bump", () => {
+    const r = shouldOpenPlanSideTab({
+      autoOpenEnabled: true,
+      planVisible: false,
+      focusKey: 0,
+      lastFocusKey: null,
+    });
+    expect(r.open).toBe(false);
+    expect(r.nextLastFocusKey).toBe(0);
+  });
+
+  it("opens when a real focus bump happens after the unused 0", () => {
+    const r = shouldOpenPlanSideTab({
+      autoOpenEnabled: true,
+      planVisible: false,
+      focusKey: 1,
+      lastFocusKey: 0,
+    });
+    expect(r.open).toBe(true);
+    expect(r.nextLastFocusKey).toBe(1);
+  });
+
   it("respects autoOpenEnabled", () => {
     const r = shouldOpenPlanSideTab({
       autoOpenEnabled: false,

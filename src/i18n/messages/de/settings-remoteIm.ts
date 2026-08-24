@@ -133,6 +133,7 @@ export const deSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "WebSocket-Endpunkt sieht ungültig aus — wss:// (oder https://) mit Host verwenden oder leer lassen für den Plattform-Standard.",
   "settings.remoteIm.health.hint.wecomWs": "WeCom-WebSocket (aibot) Long Connection — keine öffentliche URL nötig.",
   "settings.remoteIm.health.hint.wecomWebhook": "WeCom-Webhook-Modus braucht einen öffentlichen HTTPS-Callback.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "Öffentliche Callbacks erfordern, dass allow_external aktiviert ist.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "Lokalen Callback mit einem Tunnel (nur Helfer) exponieren, bevor die Unternehmens-URL-Verifikation gelingt.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "Verbindungsmodus geändert — Secrets für den neuen Modus einfügen, dann Speichern & verbinden.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "Erforderliche WeCom-Felder für den gewählten Modus ausfüllen (Bot ID/Secret oder Corp + Agent + Callback-Token).",

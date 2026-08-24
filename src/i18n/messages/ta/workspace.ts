@@ -485,6 +485,7 @@ export const taWorkspace = {
   "terminal.toggleHide": "மறை முனையம்",
   "terminal.panelAria": "டெர்மினல் பேனல்",
   "terminal.new": "புதிய முனையம்",
+  "terminal.closeAll": "அனைத்து முனையங்களையும் மூடு",
   "terminal.closePanel": "டெர்மினல் பேனலை மறை",
   "terminal.resize": "டெர்மினலின் அளவை மாற்று",
   "side.review.scope": "எல்லை",

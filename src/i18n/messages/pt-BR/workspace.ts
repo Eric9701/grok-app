@@ -485,6 +485,7 @@ export const ptBRWorkspace = {
   "terminal.toggleHide": "Ocultar terminal",
   "terminal.panelAria": "Painel do terminal",
   "terminal.new": "Novo terminal",
+  "terminal.closeAll": "Fechar todos os terminais",
   "terminal.closePanel": "Ocultar painel do terminal",
   "terminal.resize": "Redimensionar terminal",
   "side.review.scope": "Escopo",

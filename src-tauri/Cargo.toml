@@ -85,6 +85,9 @@ tauri-plugin-autostart = "2"
 portable-pty = "0.9.0"
 tauri-plugin-notification = "2"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # Windows system proxy (WinINET registry) for child-process env injection — NEW-02.
 # `windows` — shell integration (AUMID, Show Desktop / taskbar styles) in win_shell.rs.
 # `tauri-winrt-notification` — toast click (`on_activated`); the notification

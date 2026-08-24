@@ -74,6 +74,7 @@ body > .composer-wrap.composer-wrap--side-dock {
 .composer-wrap--side-dock .composer {
   pointer-events: auto !important;
   width: calc(100% - 8px);
+  /* Match transcript reading width; avoid min(..., none) when full. */
   max-width: var(--chat-width-max, 800px);
   /* Compressed chrome */
   padding: 6px 10px 6px;
@@ -133,6 +134,16 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   background: var(--bg-card) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+/* Expanded pane starts at x=0 when the sidebar is hidden/overlayed. */
+.platform-mac
+  .workbench--side-expanded:has(
+    > .sidebar:is(.sidebar--hidden, .sidebar--overlay)
+  )
+  .aside
+  .sw-chrome {
+  padding-left: var(--titlebar-safe-left, 96px);
 }
 
 /* Content shell under chrome — solid fill; terminal keeps its own veil layer */
@@ -563,6 +574,22 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   overflow: hidden;
 }
 
+/*
+ * `.plan-resource-empty` is also the Resources document empty (max-width
+ * 28rem, start-aligned). As a column flex child that cap left-aligns the
+ * block in a wide side pane. Stretch the shell and keep copy centered so
+ * title / hint / CTA sit in the panel.
+ */
+.sw-plan .plan-resource-empty {
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
 .sw-browser__url-wrap {
   flex: 1;
   min-width: 0;
@@ -815,6 +842,8 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
  */
 .sw-terminal--pty {
   --sw-term-veil: #00000080;
+  /* Inner text inset; FitAddon subtracts .xterm padding. Host stays 0. */
+  --sw-term-pad: 5px;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
@@ -880,7 +909,8 @@ html[data-theme="light"] .sw-terminal--pty {
   margin-left: 0;
 }
 
-/* Zero inset — fills remaining column under status; veil inherited from parent */
+/* Host stays edge-to-edge so the pty veil still paints the full pane.
+ * Text inset lives on `.xterm` (FitAddon subtracts that padding). */
 .sw-terminal__xterm {
   position: relative;
   flex: 1 1 auto;
@@ -904,8 +934,9 @@ html[data-theme="light"] .sw-terminal--pty {
   width: 100% !important;
   height: 100% !important;
   max-height: 100% !important;
-  padding: 0 !important;
+  padding: var(--sw-term-pad, 5px) !important;
   margin: 0 !important;
+  box-sizing: border-box !important;
   background: transparent !important;
   box-shadow: none !important;
   /* Coding ligatures collapse Powerline / `>` runs in JetBrains Mono. */
@@ -929,6 +960,12 @@ html[data-theme="light"] .sw-terminal--pty {
   box-shadow: none !important;
 }
 
+/* Helpers are absolute to the padding box; offset them onto the screen. */
+.sw-terminal__xterm .xterm-helpers {
+  top: var(--sw-term-pad, 5px) !important;
+  left: var(--sw-term-pad, 5px) !important;
+}
+
 .sw-terminal__xterm .xterm-helpers,
 .sw-terminal__xterm .xterm-helper-textarea {
   background: transparent !important;
@@ -950,43 +987,5 @@ html[data-theme="light"] .sw-terminal--pty {
 .sw-terminal__xterm .xterm-scrollable-element > .scrollbar,
 .sw-terminal__xterm .xterm-scrollable-element > .scrollbar > .slider {
   box-shadow: none !important;
-}
-
-.sw-terminal__xterm .xterm-scrollable-element > .scrollbar.horizontal {
-  display: none !important;
-  height: 0 !important;
-  box-shadow: none !important;
-}
-
-.sw-terminal__xterm .xterm-rows,
-.sw-terminal__xterm canvas {
-  box-shadow: none !important;
-}
-
-/* DOM-renderer fallback: do not let workbench `background: transparent`
- * rules wipe Starship / ANSI cell backgrounds on row spans. */
-.sw-terminal__xterm .xterm-rows span[style*="background-color"],
-.sw-terminal__xterm .xterm-rows [class*="xterm-bg-"] {
-  background-clip: padding-box;
-}
-
-/* Keep workbench chrome transparent under terminal (veil only on .sw-terminal--pty) */
-.sw.rp:has(.sw-terminal--pty),
-.sw__persist-host:has(.sw-terminal--pty),
-.sw__content:has(.sw-terminal--pty) {
-  background: transparent !important;
-  box-shadow: none;
-  padding: 0;
-  margin: 0;
-  gap: 0;
-  min-height: 0;
-  height: 100%;
-  flex: 1 1 auto;
-}
-
-/* Persist host must stretch so terminal can reach the pane bottom */
-.sw__persist-host:has(.sw-terminal--pty) {
-  display: flex;
-  flex-direction: column;
 }
 

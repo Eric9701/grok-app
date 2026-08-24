@@ -133,6 +133,7 @@ export const ptBRSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "O endpoint WebSocket parece inválido — use wss:// (ou https://) com um host, ou deixe vazio para o padrão da plataforma.",
   "settings.remoteIm.health.hint.wecomWs": "Conexão longa WebSocket do WeCom (aibot) — nenhuma URL pública necessária.",
   "settings.remoteIm.health.hint.wecomWebhook": "O modo Webhook do WeCom precisa de um callback HTTPS público.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "Callbacks públicos exigem que allow_external esteja ativado.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "Exponha o callback local com um túnel (só helper) antes que a verificação da URL empresarial possa ter sucesso.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "O modo de conexão mudou — cole os segredos do novo modo e depois Salvar e conectar.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "Preencha os campos obrigatórios do WeCom para o modo selecionado (Bot ID/Secret ou Corp + Agent + token de callback).",

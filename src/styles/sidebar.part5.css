@@ -1,6 +1,5 @@
 /* domain CSS chunk (move-only split; selectors unchanged) */
 
-
 .account-mgr__list {
   list-style: none;
   margin: 0;
@@ -800,4 +799,3 @@
   line-height: 1;
   color: var(--text-tertiary);
 }
-

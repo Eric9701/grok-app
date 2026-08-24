@@ -17,6 +17,7 @@ import {
   getChannelSchema,
 } from "./channelSchemas";
 import { credentialsRefFor } from "./secretsApi";
+import { isWecomLoopbackAdvisory } from "./wecomConfig";
 
 const LS_CHANNELS = "grok-app.remoteIm.channels";
 const LS_BRIDGE = "grok-app.remoteIm.bridge";
@@ -207,7 +208,7 @@ export function deriveStatus(
   bridgeRunning: boolean,
   bridgeLinked = false,
 ): ChannelStatusTone {
-  if (inst.lastError) return "error";
+  if (inst.lastError && !isWecomLoopbackAdvisory(inst.lastError)) return "error";
   if (
     inst.hasCredentials &&
     inst.enabled &&

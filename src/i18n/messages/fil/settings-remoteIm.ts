@@ -133,6 +133,7 @@ export const filSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "Mukhang hindi wasto ang WebSocket endpoint — gumamit ng wss:// (o https://) na may host, o iwanang walang laman para sa default ng platform.",
   "settings.remoteIm.health.hint.wecomWs": "WeCom WebSocket (aibot) long connection — hindi kailangan ng pampublikong URL.",
   "settings.remoteIm.health.hint.wecomWebhook": "Kailangan ng WeCom Webhook mode ng pampublikong HTTPS callback.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "Kailangan i-on ang allow_external para sa pampublikong callback.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "Ilantad ang lokal na callback gamit ang tunnel (katulong lang) bago magtagumpay ang enterprise URL verification.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "Nagbago ang mode ng koneksyon — i-paste ang mga sikreto para sa bagong mode, tapos I-save at kumonekta.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "Punuan ang mga kinakailangang field ng WeCom para sa napiling mode (Bot ID/Secret o Corp + Agent + callback token).",

@@ -485,6 +485,7 @@ export const koWorkspace = {
   "terminal.toggleHide": "터미널 숨기기",
   "terminal.panelAria": "터미널 패널",
   "terminal.new": "새 터미널",
+  "terminal.closeAll": "모든 터미널 닫기",
   "terminal.closePanel": "터미널 패널 숨기기",
   "terminal.resize": "터미널 크기 조절",
   "side.review.scope": "범위",

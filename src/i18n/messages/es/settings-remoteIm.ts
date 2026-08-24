@@ -133,6 +133,7 @@ export const esSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "El endpoint WebSocket parece no válido — usa wss:// (o https://) con un host, o déjalo vacío para el valor predeterminado de la plataforma.",
   "settings.remoteIm.health.hint.wecomWs": "Conexión larga WebSocket (aibot) de WeCom — no hace falta URL pública.",
   "settings.remoteIm.health.hint.wecomWebhook": "El modo Webhook de WeCom necesita una devolución de llamada HTTPS pública.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "Las devoluciones de llamada públicas requieren activar allow_external.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "Expón la devolución de llamada local con un túnel (solo ayudante) antes de que pueda tener éxito la verificación de URL de la empresa.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "El modo de conexión cambió — pega los secretos del modo nuevo y luego Guardar y conectar.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "Rellena los campos obligatorios de WeCom del modo seleccionado (Bot ID/Secret o Corp + Agent + token de devolución de llamada).",

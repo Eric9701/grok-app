@@ -8,8 +8,10 @@ import {
   applyBottomTerminalProjectSlice,
   bottomTerminalProjectKey,
   clampBottomTerminalHeight,
+  closeAllBottomTerminalTabs,
   closeBottomTerminal,
   closeBottomTerminalTab,
+  droppedBottomTerminalTabIds,
   emptyBottomTerminalState,
   loadBottomTerminalHeight,
   openBottomTerminal,
@@ -114,9 +116,27 @@ describe("add / close / activate tabs", () => {
     let s = emptyBottomTerminalState();
     s = addBottomTerminalTab(s, { id: "a" });
     s = addBottomTerminalTab(s, { id: "b" });
-    expect(s.tabs.map((t) => t.id)).toEqual(["b", "a"]);
+    expect(s.tabs.map((t) => t.id)).toEqual(["a", "b"]);
     expect(s.activeId).toBe("b");
     expect(s.open).toBe(true);
+  });
+
+  it("keeps the first created tab at index 0 so chip numbers stay stable", () => {
+    let s = emptyBottomTerminalState();
+    s = addBottomTerminalTab(s, { id: "first" });
+    s = addBottomTerminalTab(s, { id: "second" });
+    s = addBottomTerminalTab(s, { id: "third" });
+    expect(s.tabs.map((t) => t.id)).toEqual(["first", "second", "third"]);
+    expect(s.activeId).toBe("third");
+  });
+
+  it("drops the oldest tab when over the cap", () => {
+    let s = emptyBottomTerminalState();
+    s = addBottomTerminalTab(s, { id: "a" }, 2);
+    s = addBottomTerminalTab(s, { id: "b" }, 2);
+    s = addBottomTerminalTab(s, { id: "c" }, 2);
+    expect(s.tabs.map((t) => t.id)).toEqual(["b", "c"]);
+    expect(s.activeId).toBe("c");
   });
 
   it("closing the last tab collapses the panel", () => {
@@ -127,13 +147,46 @@ describe("add / close / activate tabs", () => {
     expect(s.open).toBe(false);
   });
 
-  it("closing the active tab focuses the remaining first tab", () => {
+  it("closing the active tab focuses a neighbor", () => {
     let s = addBottomTerminalTab(emptyBottomTerminalState(), { id: "a" });
     s = addBottomTerminalTab(s, { id: "b" });
-    s = closeBottomTerminalTab(s, "b");
-    expect(s.tabs.map((t) => t.id)).toEqual(["a"]);
-    expect(s.activeId).toBe("a");
-    expect(s.open).toBe(true);
+    s = addBottomTerminalTab(s, { id: "c" });
+    s = closeBottomTerminalTab(s, "c");
+    expect(s.tabs.map((t) => t.id)).toEqual(["a", "b"]);
+    expect(s.activeId).toBe("b");
+
+    s = addBottomTerminalTab(s, { id: "c" });
+    s = setActiveBottomTerminalTab(s, "a");
+    s = closeBottomTerminalTab(s, "a");
+    expect(s.tabs.map((t) => t.id)).toEqual(["b", "c"]);
+    expect(s.activeId).toBe("b");
+  });
+
+  it("reports dropped tab ids for close, close-all, and cap overflow", () => {
+    const a = addBottomTerminalTab(emptyBottomTerminalState(), { id: "a" });
+    const ab = addBottomTerminalTab(a, { id: "b" });
+    expect(droppedBottomTerminalTabIds(ab, closeBottomTerminalTab(ab, "a"))).toEqual(
+      ["a"],
+    );
+    expect(droppedBottomTerminalTabIds(ab, closeAllBottomTerminalTabs(ab))).toEqual(
+      ["a", "b"],
+    );
+    const abc = addBottomTerminalTab(ab, { id: "c" }, 2);
+    expect(droppedBottomTerminalTabIds(ab, abc)).toEqual(["a"]);
+    expect(droppedBottomTerminalTabIds(ab, ab)).toEqual([]);
+    expect(droppedBottomTerminalTabIds(ab, closeBottomTerminal(ab))).toEqual([]);
+  });
+
+  it("close all drops every tab and collapses the panel", () => {
+    let s = addBottomTerminalTab(emptyBottomTerminalState(), { id: "a" });
+    s = addBottomTerminalTab(s, { id: "b" });
+    s = { ...s, height: 300 };
+    s = closeAllBottomTerminalTabs(s);
+    expect(s.tabs).toEqual([]);
+    expect(s.activeId).toBeNull();
+    expect(s.open).toBe(false);
+    expect(s.height).toBe(300);
+    expect(closeAllBottomTerminalTabs(s)).toBe(s);
   });
 
   it("activate ignores unknown ids and is a no-op for the current tab", () => {
