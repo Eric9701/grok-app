@@ -70,7 +70,7 @@
 | WP-W22 | AppDialog overlay into WorkbenchAppDialogStage | PASS | d1f3fa03 | 16835→16810 lines; useState 216; useEffect 85 |
 | WP-W23 | Composer dictation FSM into useVoiceDictation | PASS | 50f1193c | 16810→16468 lines; useState 216→213; useEffect 85→83 |
 | WP-W24 | Composer send path into useComposerSend | PASS | bd17cb47 | 16468→15850 lines; useState 213; useEffect 83 |
-| WP-W25 | Settings overlay nav into useSettingsNavigation | PASS |  | 15956→15612 lines; useState 214→209; useEffect 83→81 |
+| WP-W25 | Settings overlay nav into useSettingsNavigation | PASS | 5003a52a | 15956→15612 lines; useState 214→209; useEffect 83→81 |
 
 ## Metrics log (append-only)
 
