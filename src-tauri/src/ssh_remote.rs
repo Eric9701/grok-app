@@ -151,6 +151,22 @@ pub fn local_acp_cwd_ok(ssh_alias: Option<&str>, cwd: &str) -> bool {
     !t.is_empty() && std::path::Path::new(t).is_dir()
 }
 
+/// Whether ACP `session/new` may use this cwd.
+///
+/// SSH: grok checks the path on the host. A local `is_dir` miss used to abort
+/// connect with `AGENT_CRASHED` after a successful remote handshake.
+/// Local: must be a directory on this machine.
+pub fn acp_session_cwd_ok(ssh_alias: Option<&str>, cwd: &str) -> bool {
+    let t = cwd.trim();
+    if t.is_empty() || t.contains('\0') {
+        return false;
+    }
+    if should_skip_local_acp_spawn(ssh_alias) {
+        return true;
+    }
+    std::path::Path::new(t).is_dir()
+}
+
 /// Same gate as `grok sessions list` / TUI `/resume` for a cwd.
 ///
 /// Disk under `~/.grok/sessions` also stores subagent children and empty
@@ -2906,6 +2922,22 @@ mod tests {
         assert!(!local_acp_cwd_ok(None, ""));
         let here = std::env::temp_dir();
         assert!(local_acp_cwd_ok(None, here.to_string_lossy().as_ref()));
+    }
+
+    #[test]
+    fn acp_session_cwd_ok_skips_local_isdir_for_ssh() {
+        assert!(acp_session_cwd_ok(
+            Some("UTS"),
+            "/data/pengqlu/code/2026-07-25-ICLR",
+        ));
+        assert!(!acp_session_cwd_ok(
+            None,
+            "/data/pengqlu/code/2026-07-25-ICLR",
+        ));
+        assert!(!acp_session_cwd_ok(Some("UTS"), ""));
+        assert!(!acp_session_cwd_ok(Some("UTS"), "/tmp\0x"));
+        let here = std::env::temp_dir();
+        assert!(acp_session_cwd_ok(None, here.to_string_lossy().as_ref()));
     }
 
     #[test]

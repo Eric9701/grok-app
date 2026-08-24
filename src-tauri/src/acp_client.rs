@@ -340,6 +340,8 @@ pub struct AcpClient {
     /// Agent `initialize` advertisement for rewind RPCs.
     /// `None` = unknown (try RPC); `Some(false)` = skip; `Some(true)` = call.
     rewind_supported: ParkingMutex<Option<bool>>,
+    /// OpenSSH alias this process was spawned with. Remote cwd is not local.
+    ssh_alias: Option<String>,
 }
 
 /// Options applied at agent process start (CLI flags).
@@ -1640,8 +1642,9 @@ impl AcpClient {
             crate::wsl_backend::apply_wslenv(&mut cmd);
         }
         tracing::info!(
-            "acp: spawn home={} mode={} model={} effort={:?} native_grok_proxy={} sandbox={:?} max_turns={:?} fork_session={} no_ask_user={} leader={} subagents={} memory={} compaction_mode={} compaction_detail={} compaction_flags={} agent_profile={:?} agents_json={}",
+            "acp: spawn home={} ssh={:?} mode={} model={} effort={:?} native_grok_proxy={} sandbox={:?} max_turns={:?} fork_session={} no_ask_user={} leader={} subagents={} memory={} compaction_mode={} compaction_detail={} compaction_flags={} agent_profile={:?} agents_json={}",
             grok_home.display(),
+            ssh_alias,
             session_data_mode,
             spawn_model,
             opts.effort,
@@ -1705,6 +1708,7 @@ impl AcpClient {
             sandbox_profile: ParkingMutex::new(sandbox.map(|sb| sb.profile.clone())),
             custom_route,
             rewind_supported: ParkingMutex::new(None),
+            ssh_alias: ssh_alias.clone(),
         });
 
         client.start_read_loop(Box::new(stdout));
@@ -1801,6 +1805,7 @@ impl AcpClient {
             // Remote ACP: treat as official-class for reuse (no local auth strip).
             custom_route: false,
             rewind_supported: ParkingMutex::new(None),
+            ssh_alias: None,
         });
         client.start_read_loop(Box::new(read_half));
         Ok((client, event_rx))
@@ -2949,7 +2954,7 @@ impl AcpClient {
         cwd: &str,
     ) -> Result<(String, bool), AgentError> {
         let cwd = cwd.to_string();
-        if !std::path::Path::new(&cwd).is_dir() {
+        if !crate::ssh_remote::acp_session_cwd_ok(self.ssh_alias.as_deref(), &cwd) {
             return Err(AgentError::new(
                 AgentErrorCode::AgentCrashed,
                 format!("project cwd is not a directory: {cwd}"),
@@ -2960,8 +2965,13 @@ impl AcpClient {
         // MCP/OAuth: connect builder skips network refresh + CLI list, and a
         // hard budget falls back to `[]` so session/new|load always proceeds.
         // Official aux side-channel uses empty inject (no nested official-aux MCP).
-        let mcp_servers = if self.empty_mcp_servers {
-            info!("acp session open empty mcpServers (side-channel)");
+        // SSH: do not scan the remote path as a local project.
+        let mcp_servers = if self.empty_mcp_servers || self.ssh_alias.is_some() {
+            if self.ssh_alias.is_some() {
+                info!("acp session open empty mcpServers (ssh remote)");
+            } else {
+                info!("acp session open empty mcpServers (side-channel)");
+            }
             serde_json::json!([])
         } else {
             let project_cwd = cwd.clone();
