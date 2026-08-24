@@ -396,9 +396,13 @@ export async function resetAppData(keepSecrets = true) {
  * (`{project}/.grok/skills`). Optional project cwd; project rows win on name
  * collision and carry `source: "project"`.
  */
-export async function skillsList(projectPath?: string | null) {
+export async function skillsList(
+  projectPath?: string | null,
+  opts?: { sshAlias?: string | null },
+) {
   return invoke<SkillsListResult>("skills_list", {
     projectPath: projectPath ?? null,
+    sshAlias: opts?.sshAlias?.trim() || null,
   });
 }
 

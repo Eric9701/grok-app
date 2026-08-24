@@ -432,6 +432,7 @@ export function SideWorkbench({
                 skills={skillInfos}
                 loading={skillsLoading}
                 hostError={skillsLoadError}
+                sshAlias={sshAlias}
                 onSelectSkill={(skill) => onSelectSkill?.(skill)}
               />
             ) : null}
@@ -455,6 +456,7 @@ export function SideWorkbench({
                       locale={locale}
                       tab={tab}
                       projectPath={projectPath}
+                      sshAlias={sshAlias}
                       active={paneActive && isActive}
                     />
                   </div>

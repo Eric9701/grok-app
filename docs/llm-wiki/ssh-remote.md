@@ -10,7 +10,7 @@ Related: [settings-ia.md](./settings-ia.md), [session-continuity.md](./session-c
 |------|--------|----------|
 | **1** | Settings → Runtime → **SSH**: list `~/.ssh/config` Host aliases, **Test connection**, probe remote `grok` + `~/.grok/auth.json`. Copy-paste install / `grok login --device-auth` when missing. | Open a remote folder, file tree, edit, spawn remote agent, tmux |
 | **1b** | Live search, Watching / Available lists, watch switch (ControlMaster), scan remote Grok sessions into the sidebar, new-session Remote chip + path picker | Spawn `grok` on the host; in-app file tree/edit of remote files |
-| **2** | Remote path as a Project; sidebar tree; markdown preview; text save | Agent cwd on the remote host |
+| **2** | Remote path as a Project; sidebar tree; markdown preview; text save; Terminal `ssh -tt` PTY; Skills via remote `grok inspect`; Browser localhost via SSH `-L` | Agent cwd on the remote host |
 | **3** | Session runs `grok` **on the host** (remote cwd) | Disconnect persistence |
 | **4** | Reconnect via `grok agent leader --no-exit-on-disconnect` | tmux UI |
 
@@ -39,3 +39,6 @@ Related: [settings-ia.md](./settings-ia.md), [session-continuity.md](./session-c
 - Session title marquee only runs when the title is wider than the name slot. Do not subtract a fake hover-icon reserve. Clip the scroll inside the name slot so it never paints over relative time.
 - Opening an imported remote transcript must **not** warm-connect or spawn local `grok agent stdio` with the remote path as cwd. That path is not a local directory; spawn ENOENT is mislabeled `CLI_NOT_FOUND`. Skip when the project has `sshAlias`. Send stays blocked until wave 3.
 - Wave 2: an `sshAlias` project uses Side Workbench Files over OpenSSH (`ssh_list_dir` / `ssh_read_file` / `ssh_write_file`). Relative paths cannot contain `..`. Text/markdown preview and save only, 2 MiB cap. Do not treat the remote path as local `std::fs`. Tests: `join_remote_rel_rejects_escape`.
+- Wave 2 terminal: PTY is `ssh -tt` with ControlMaster, remote `cd` + login shell. Do not spawn local `$SHELL` with the remote path as cwd (`Path::is_dir` would miss and fall back to local HOME). Tests: `ssh_pty_argv_keeps_alias_as_own_word`.
+- Wave 2 skills: `skills_list` with `sshAlias` runs remote `grok inspect --json` plus `{project}/.grok/skills`. Never local inspect using the remote path.
+- Wave 2 browser: loopback URLs (`localhost` / `127.0.0.1` / `::1`) open through SSH `-L` so the embedded webview hits the remote process. Public https stays local. Do not launch an X11 browser on the HPC node. Tests: `loopback_http_url_rewrites_to_local_bind`, [src/lib/sshLoopbackUrl.test.ts](../../src/lib/sshLoopbackUrl.test.ts).

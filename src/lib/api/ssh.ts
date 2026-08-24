@@ -166,3 +166,23 @@ export async function sshOpenSession(
     titleHint: opts?.titleHint ?? null,
   });
 }
+
+export type SshBrowserPrepareResult = {
+  ok: boolean;
+  alias: string;
+  url: string;
+  displayUrl: string;
+  tunneled: boolean;
+  localPort?: number | null;
+  remoteHost?: string | null;
+  remotePort?: number | null;
+  error?: string | null;
+};
+
+/** Loopback URLs on an SSH project: open via SSH -L, not the local machine. */
+export async function sshBrowserPrepare(alias: string, url: string) {
+  return invoke<SshBrowserPrepareResult>("ssh_browser_prepare", {
+    alias,
+    url,
+  });
+}

@@ -8,17 +8,52 @@
 /// Always returns Ok; on CLI missing / timeout, `skills` may still include
 /// project-scanned rows and `error` is set for the inspect failure.
 /// Each skill includes `enabled` from App Extensions prefs (default true).
+///
+/// When `ssh_alias` is set, inspect and the project skill scan run on the
+/// remote host. Do not treat the remote path as a local `std::fs` cwd.
 #[tauri::command]
-pub async fn skills_list(project_path: Option<String>) -> Result<serde_json::Value, String> {
-    let path = project_path.clone();
-    let path_for_scan = project_path.clone();
-    let (parsed, error, project_skills) = tauri::async_runtime::spawn_blocking(move || {
-        let (parsed, error) = run_grok_inspect(path.as_deref());
-        let project_skills = scan_project_skills(path_for_scan.as_deref());
-        (parsed, error, project_skills)
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+pub async fn skills_list(
+    project_path: Option<String>,
+    ssh_alias: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let alias = ssh_alias
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
+    let (parsed, error, project_skills, skill_roots) = if let Some(alias) = alias {
+        let fetch = crate::ssh_remote::ssh_fetch_skills(&alias, project_path.as_deref()).await;
+        let project_skills: Vec<SkillDto> = fetch
+            .project_skills
+            .into_iter()
+            .map(|s| SkillDto {
+                name: s.name,
+                description: s.description,
+                source: s.source,
+                path: s.path,
+                user_invocable: s.user_invocable,
+            })
+            .collect();
+        (
+            fetch.inspect,
+            fetch.error,
+            project_skills,
+            Vec::<String>::new(),
+        )
+    } else {
+        let path = project_path.clone();
+        let path_for_scan = project_path.clone();
+        let (parsed, error, project_skills) = tauri::async_runtime::spawn_blocking(move || {
+            let (parsed, error) = run_grok_inspect(path.as_deref());
+            let project_skills = scan_project_skills(path_for_scan.as_deref());
+            (parsed, error, project_skills)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        let skill_roots = crate::skill_edit::skill_roots_list(project_path.as_deref());
+        (parsed, error, project_skills, skill_roots)
+    };
 
     let inspect_skills = parsed.as_ref().map(parse_skills).unwrap_or_default();
     let skills = merge_skills_prefer_project(inspect_skills, project_skills);
@@ -35,7 +70,6 @@ pub async fn skills_list(project_path: Option<String>) -> Result<serde_json::Val
         .collect();
     let discover = crate::skill_compat::snapshot_from(&flags, hidden_count);
     let skills = attach_skill_enabled(skills);
-    let skill_roots = crate::skill_edit::skill_roots_list(project_path.as_deref());
     let mut out = serde_json::json!({
         "skills": skills,
         "skillRoots": skill_roots,

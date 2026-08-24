@@ -6517,7 +6517,9 @@ export function AppWorkbench() {
     let cancelled = false;
     setSkillsLoading(true);
     void api
-      .skillsList(activeProject?.path ?? null)
+      .skillsList(activeProject?.path ?? null, {
+        sshAlias: activeProject?.sshAlias ?? null,
+      })
       .then((res) => {
         if (cancelled) return;
         const err = (res.error ?? "").trim();
@@ -6544,7 +6546,7 @@ export function AppWorkbench() {
     return () => {
       cancelled = true;
     };
-  }, [activeProject?.path, skillsReloadToken]);
+  }, [activeProject?.path, activeProject?.sshAlias, skillsReloadToken]);
 
   const slashCatalog = useMemo(
     () => buildSlashCatalog(skillInfos),
@@ -14511,6 +14513,7 @@ export function AppWorkbench() {
               <BottomTerminal
                 locale={locale}
                 projectPath={effectiveProjectPath}
+                sshAlias={activeProject?.sshAlias ?? null}
                 state={bottomTerminal.state}
                 onAddTab={bottomTerminal.addTab}
                 onCloseTab={bottomTerminal.closeTab}
