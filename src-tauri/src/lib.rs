@@ -1032,6 +1032,7 @@ pub fn run() {
             ssh_remote::ssh_list_dir,
 
             ssh_remote::ssh_list_sessions,
+            ssh_remote::ssh_open_session,
 
             commands::cli_repair_agent_sidecar,
 

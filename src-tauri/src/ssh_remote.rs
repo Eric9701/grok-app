@@ -4,7 +4,7 @@
 //! Transport is the system `ssh` binary so `~/.ssh/config` (ProxyJump, keys,
 //! ssh-agent) keeps working. Aliases are argv, never interpolated into a shell.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
@@ -1430,6 +1430,306 @@ pub async fn ssh_list_sessions(
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshOpenSessionResult {
+    pub ok: bool,
+    pub alias: String,
+    pub remote_session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    #[serde(default)]
+    pub message_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+fn remote_hist_script(session_id: &str) -> String {
+    format!(
+        r#"SID={session_id}
+SESS="$HOME/.grok/sessions"
+if command -v python3 >/dev/null 2>&1; then
+  SID="$SID" python3 -c '
+import os, sys
+sid = os.environ.get("SID", "")
+root = os.path.expanduser("~/.grok/sessions")
+found = None
+if os.path.isdir(root) and sid:
+    for enc in os.listdir(root):
+        d = os.path.join(root, enc, sid)
+        if os.path.isdir(d):
+            found = d
+            break
+print("GROK_APP_HIST")
+if not found:
+    print("KIND\tmissing")
+    print("GROK_APP_HIST_END")
+    sys.exit(0)
+kind = "empty"
+path = None
+for name, label in (("chat_history.jsonl", "chat_history"), ("updates.jsonl", "updates")):
+    p = os.path.join(found, name)
+    if os.path.isfile(p) and os.path.getsize(p) > 0:
+        kind = label
+        path = p
+        break
+print("KIND\t" + kind)
+if path:
+    f = open(path, "rb")
+    data = f.read(2097152)
+    f.close()
+    sys.stdout.buffer.write(data)
+    if data and not data.endswith(b"\n"):
+        sys.stdout.buffer.write(b"\n")
+print("GROK_APP_HIST_END")
+' && exit 0
+fi
+echo GROK_APP_HIST
+d=$(find "$SESS" -mindepth 2 -maxdepth 2 -type d -name "$SID" 2>/dev/null | head -n 1)
+if [ -z "$d" ]; then
+  echo "KIND	missing"
+  echo GROK_APP_HIST_END
+  exit 0
+fi
+if [ -s "$d/chat_history.jsonl" ]; then
+  echo "KIND	chat_history"
+  head -c 2097152 "$d/chat_history.jsonl"
+  echo
+elif [ -s "$d/updates.jsonl" ]; then
+  echo "KIND	updates"
+  head -c 2097152 "$d/updates.jsonl"
+  echo
+else
+  echo "KIND	empty"
+fi
+echo GROK_APP_HIST_END
+exit 0
+"#
+    )
+}
+
+struct RemoteHist {
+    kind: String,
+    body: String,
+}
+
+fn parse_hist_stdout(stdout: &str) -> Option<RemoteHist> {
+    let mut lines = stdout.lines().map(|l| l.trim_end_matches('\r'));
+    while let Some(line) = lines.next() {
+        if line.trim() != "GROK_APP_HIST" {
+            continue;
+        }
+        let mut kind = "empty".to_string();
+        let mut body = String::new();
+        if let Some(next) = lines.next() {
+            let next = next.trim();
+            if let Some(k) = next.strip_prefix("KIND") {
+                kind = k.trim().trim_start_matches('\t').trim().to_string();
+            } else {
+                body.push_str(next);
+                body.push('\n');
+            }
+        }
+        for rest in lines {
+            if rest.trim() == "GROK_APP_HIST_END" {
+                break;
+            }
+            body.push_str(rest);
+            body.push('\n');
+        }
+        return Some(RemoteHist { kind, body });
+    }
+    None
+}
+
+fn import_index_path() -> std::path::PathBuf {
+    crate::paths::app_data_root().join("ssh-imported-sessions.json")
+}
+
+fn load_import_index() -> HashMap<String, String> {
+    std::fs::read_to_string(import_index_path())
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_import_index(map: &HashMap<String, String>) -> Result<(), String> {
+    let dir = crate::paths::app_data_root();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let raw = serde_json::to_string_pretty(map).map_err(|e| e.to_string())?;
+    std::fs::write(import_index_path(), raw).map_err(|e| e.to_string())
+}
+
+fn persist_imported_journal(
+    app_id: &str,
+    pairs: Vec<(String, String)>,
+) -> Result<(), String> {
+    let now = chrono::Utc::now();
+    let msgs: Vec<crate::store::ChatMessageStored> = pairs
+        .into_iter()
+        .enumerate()
+        .map(|(i, (role, content))| crate::store::ChatMessageStored {
+            id: uuid::Uuid::new_v4().to_string(),
+            role,
+            content,
+            thought: None,
+            created_at: now + chrono::Duration::milliseconds(i as i64),
+            is_error: false,
+            attachments: None,
+            marker: None,
+        })
+        .collect();
+    crate::store::save_messages(app_id, &msgs)
+}
+
+fn pairs_from_hist(hist: &RemoteHist) -> Vec<(String, String)> {
+    if hist.kind == "missing" || hist.kind == "empty" || hist.body.trim().is_empty() {
+        return Vec::new();
+    }
+    if hist.kind == "updates" {
+        let pairs = crate::cli_sessions::parse_acp_updates_text(&hist.body);
+        if !pairs.is_empty() {
+            return pairs;
+        }
+        return crate::cli_sessions::parse_chat_history_text(&hist.body).unwrap_or_default();
+    }
+    crate::cli_sessions::parse_chat_history_text(&hist.body).unwrap_or_else(|_| {
+        crate::cli_sessions::parse_acp_updates_text(&hist.body)
+    })
+}
+
+fn open_fail(alias: String, remote_session_id: String, error: impl Into<String>) -> SshOpenSessionResult {
+    SshOpenSessionResult {
+        ok: false,
+        alias,
+        remote_session_id,
+        app_session_id: None,
+        title: None,
+        project_id: None,
+        message_count: 0,
+        error: Some(error.into()),
+    }
+}
+
+#[tauri::command]
+pub async fn ssh_open_session(
+    alias: String,
+    session_id: String,
+    cwd: Option<String>,
+    title_hint: Option<String>,
+) -> Result<SshOpenSessionResult, String> {
+    let alias = alias.trim().to_string();
+    let session_id = session_id.trim().to_string();
+    if !is_safe_ssh_alias(&alias) {
+        return Ok(open_fail(alias, session_id, "invalid alias"));
+    }
+    if crate::cli_sessions::validate_agent_session_id(&session_id).is_err() {
+        return Ok(open_fail(alias, session_id, "invalid session id"));
+    }
+    let script = remote_hist_script(&session_id);
+    let hist = match run_ssh(&alias, &script, true, 30).await {
+        Err(SshRunErr::Missing) => {
+            return Ok(open_fail(alias, session_id, "ssh missing"));
+        }
+        Err(SshRunErr::Timeout { .. }) => {
+            return Ok(open_fail(alias, session_id, "timeout"));
+        }
+        Err(SshRunErr::Spawn(e)) => {
+            return Ok(open_fail(alias, session_id, truncate_err(&e)));
+        }
+        Ok(run) if !run.success => {
+            let (_code, msg) = classify_ssh_stderr(&run.stderr);
+            return Ok(open_fail(alias, session_id, msg));
+        }
+        Ok(run) => parse_hist_stdout(&run.stdout),
+    };
+    let Some(hist) = hist else {
+        return Ok(open_fail(alias, session_id, "could not read remote session"));
+    };
+    if hist.kind == "missing" {
+        return Ok(open_fail(alias, session_id, "remote session not found"));
+    }
+    let pairs = pairs_from_hist(&hist);
+    if pairs.is_empty() {
+        return Ok(open_fail(
+            alias,
+            session_id,
+            "this session has no chat content",
+        ));
+    }
+    let title = title_hint
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && !looks_like_agent_uuid(s))
+        .or_else(|| {
+            pairs
+                .iter()
+                .find(|(r, _)| r == "user")
+                .map(|(_, c)| crate::session_title::heuristic_title(c))
+        })
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "Remote chat".into());
+
+    let project_id = cwd
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .and_then(|path| crate::store::add_ssh_project(&alias, path.to_string(), true).ok())
+        .map(|p| p.id);
+
+    let key = format!("{alias}:{session_id}");
+    let mut index = load_import_index();
+    let existing = index
+        .get(&key)
+        .cloned()
+        .filter(|id| {
+            crate::store::load_sessions_index()
+                .iter()
+                .any(|s| s.id == *id)
+        });
+
+    let meta = if let Some(app_id) = existing {
+        persist_imported_journal(&app_id, pairs.clone())?;
+        let _ = crate::store::rename_session(&app_id, &title);
+        crate::store::load_sessions_index()
+            .into_iter()
+            .find(|s| s.id == app_id)
+            .ok_or_else(|| "imported session missing after write".to_string())?
+    } else {
+        let meta = crate::store::create_session(project_id.clone(), Some(title.clone()), false)?;
+        persist_imported_journal(&meta.id, pairs)?;
+        index.insert(key, meta.id.clone());
+        save_import_index(&index)?;
+        meta
+    };
+
+    let message_count = crate::store::load_messages(&meta.id).len() as u32;
+    Ok(SshOpenSessionResult {
+        ok: true,
+        alias,
+        remote_session_id: session_id,
+        app_session_id: Some(meta.id),
+        title: Some(meta.title),
+        project_id: meta.project_id,
+        message_count,
+        error: None,
+    })
+}
+
+fn looks_like_agent_uuid(s: &str) -> bool {
+    let s = s.trim();
+    let b = s.as_bytes();
+    b.len() == 36
+        && b[8] == b'-'
+        && b[13] == b'-'
+        && b[18] == b'-'
+        && b[23] == b'-'
+        && s.bytes().all(|c| c == b'-' || c.is_ascii_hexdigit())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1623,6 +1923,20 @@ Host "build-server"
         assert!(s.contains("OFFSET=20"));
         assert!(s.contains("LIMIT=20"));
         assert!(!s.contains("OFFSET={"));
+    }
+
+    #[test]
+    fn parse_hist_stdout_splits_kind_and_body() {
+        let raw = "noise\nGROK_APP_HIST\nKIND\tchat_history\n{\"type\":\"user\",\"content\":\"hi\"}\nGROK_APP_HIST_END\n";
+        let h = parse_hist_stdout(raw).unwrap();
+        assert_eq!(h.kind, "chat_history");
+        assert!(h.body.contains("hello") || h.body.contains("hi"));
+    }
+
+    #[test]
+    fn looks_like_agent_uuid_matches_grok_ids() {
+        assert!(looks_like_agent_uuid("01a01907-adf3-7e00-a7a8-aee1082b0556"));
+        assert!(!looks_like_agent_uuid("帮我看一下 hallucination"));
     }
 
     #[test]

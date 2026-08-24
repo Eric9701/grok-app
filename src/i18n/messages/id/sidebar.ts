@@ -13,6 +13,7 @@ export const idSidebar = {
   "sidebar.remoteRemaining": "{n} more on this host",
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
+  "sidebar.remoteOpening": "Opening…",
   "sidebar.collapseAllProjects": "Ciutkan semua proyek",
   "sidebar.noProjects": "Belum ada proyek. Klik + untuk menambah folder.",
   "sidebar.importCliSessions": "Impor dari Grok Build",

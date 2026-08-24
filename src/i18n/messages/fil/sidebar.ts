@@ -13,6 +13,7 @@ export const filSidebar = {
   "sidebar.remoteRemaining": "{n} more on this host",
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
+  "sidebar.remoteOpening": "Opening…",
   "sidebar.collapseAllProjects": "Ikipot lahat ng proyekto",
   "sidebar.noProjects": "Wala pang proyekto. I-click ang + para magdagdag ng folder.",
   "sidebar.importCliSessions": "I-import mula sa Grok Build",

@@ -13,6 +13,7 @@ export const esSidebar = {
   "sidebar.remoteRemaining": "{n} more on this host",
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
+  "sidebar.remoteOpening": "Opening…",
   "sidebar.collapseAllProjects": "Contraer todos los proyectos",
   "sidebar.noProjects": "Aún no hay proyectos. Pulsa + para añadir una carpeta.",
   "sidebar.importCliSessions": "Importar desde Grok Build",

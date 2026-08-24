@@ -13,6 +13,7 @@ export const ukSidebar = {
   "sidebar.remoteRemaining": "{n} more on this host",
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
+  "sidebar.remoteOpening": "Opening…",
   "sidebar.collapseAllProjects": "Згорнути всі проєкти",
   "sidebar.noProjects": "Проєктів ще немає. Натисніть +, щоб додати теку.",
   "sidebar.importCliSessions": "Імпорт із Grok Build",

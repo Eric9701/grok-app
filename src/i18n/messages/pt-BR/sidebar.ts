@@ -13,6 +13,7 @@ export const ptBRSidebar = {
   "sidebar.remoteRemaining": "{n} more on this host",
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
+  "sidebar.remoteOpening": "Opening…",
   "sidebar.collapseAllProjects": "Recolher todos os projetos",
   "sidebar.noProjects": "Ainda não há projetos. Clique em + para adicionar uma pasta.",
   "sidebar.importCliSessions": "Importar do Grok Build",

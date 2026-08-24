@@ -4,7 +4,6 @@
 import { useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { Tip } from "@/components/ui/tooltip";
 import type { MessageKey, Vars } from "@/i18n";
-import type { Project } from "@/lib/app/sidebarModels";
 import * as api from "@/lib/api";
 import { nextSessionTitle } from "@/lib/sidebarSessionRename";
 import {
@@ -19,10 +18,10 @@ type TFn = (k: MessageKey, vars?: Vars) => string;
 
 type Props = {
   t: TFn;
-  newChat: (project?: Project | null) => void | Promise<void>;
+  onOpenSession: (sessionId: string) => void;
 };
 
-export function SshRemoteSessionRail({ t, newChat }: Props) {
+export function SshRemoteSessionRail({ t, onOpenSession }: Props) {
   const watch = useSshWatch();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -41,19 +40,26 @@ export function SshRemoteSessionRail({ t, newChat }: Props) {
     if (next) watch.renameRemoteSession(alias, id, next);
   };
 
-  const openRow = async (alias: string, cwd: string, id: string) => {
+  const openRow = async (alias: string, cwd: string, id: string, label: string) => {
     if (opening) return;
     setSelectedKey(remoteTitleKey(alias, id));
     setOpenError(null);
-    watch.setDraftRemote({ alias, path: cwd });
-    if (!cwd) {
-      setOpenError(t("sidebar.remoteOpenFailed", { error: untitled }));
-      return;
-    }
+    watch.setDraftRemote({ alias, path: cwd || alias });
     setOpening(true);
     try {
-      const proj = (await api.projectAddSsh(alias, cwd, true)) as Project;
-      await newChat(proj);
+      const r = await api.sshOpenSession(alias, id, {
+        cwd: cwd || null,
+        titleHint: label,
+      });
+      if (!r.ok || !r.appSessionId) {
+        setOpenError(
+          t("sidebar.remoteOpenFailed", {
+            error: r.error || untitled,
+          }),
+        );
+        return;
+      }
+      onOpenSession(r.appSessionId);
     } catch (e) {
       setOpenError(
         t("sidebar.remoteOpenFailed", { error: String(e) }),
@@ -102,7 +108,7 @@ export function SshRemoteSessionRail({ t, newChat }: Props) {
                       onClick={(e: MouseEvent<HTMLButtonElement>) => {
                         if (e.detail > 1) return;
                         if (editing) return;
-                        void openRow(alias, s.cwd, s.id);
+                        void openRow(alias, s.cwd, s.id, label);
                       }}
                       onDoubleClick={(e) => {
                         e.preventDefault();
@@ -160,6 +166,11 @@ export function SshRemoteSessionRail({ t, newChat }: Props) {
           </div>
         );
       })}
+      {opening ? (
+        <div className="sidebar-empty__hint" role="status">
+          {t("sidebar.remoteOpening")}
+        </div>
+      ) : null}
       {openError ? (
         <div className="settings-row__hint is-danger" role="alert">
           {openError}

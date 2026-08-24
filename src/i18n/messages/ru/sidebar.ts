@@ -13,6 +13,7 @@ export const ruSidebar = {
   "sidebar.remoteRemaining": "{n} more on this host",
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
+  "sidebar.remoteOpening": "Opening…",
   "sidebar.collapseAllProjects": "Свернуть все проекты",
   "sidebar.noProjects": "Проектов пока нет. Нажмите +, чтобы добавить папку.",
   "sidebar.importCliSessions": "Импорт из Grok Build",

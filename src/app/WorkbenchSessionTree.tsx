@@ -306,7 +306,10 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
               </div>
             </div>
 
-            <SshRemoteSessionRail t={tr} newChat={newChat} />
+            <SshRemoteSessionRail
+              t={tr}
+              onOpenSession={(id) => onSidebarSessionOpen({ id })}
+            />
             <SidebarTreeReveal open={projectsOpen} className="tree-reveal--projects">
             {projects.length === 0 && (
               <div className="sidebar-empty">

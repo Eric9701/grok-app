@@ -13,6 +13,7 @@ export const deSidebar = {
   "sidebar.remoteRemaining": "{n} more on this host",
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
+  "sidebar.remoteOpening": "Opening…",
   "sidebar.collapseAllProjects": "Alle Projekte einklappen",
   "sidebar.noProjects": "Noch keine Projekte. Klicke auf +, um einen Ordner hinzuzufügen.",
   "sidebar.importCliSessions": "Aus Grok Build importieren",

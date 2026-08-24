@@ -13,6 +13,7 @@ export const zhTWSidebar = {
   "sidebar.remoteRemaining": "還有 {n} 個",
   "sidebar.remoteLoadMore": "載入更多",
   "sidebar.remoteOpenFailed": "無法開啟：{error}",
+  "sidebar.remoteOpening": "正在開啟…",
   "sidebar.collapseAllProjects": "收合全部專案",
   "sidebar.noProjects": "還沒有專案。點擊 + 新增本機目錄。",
   "sidebar.importCliSessions": "從 Grok Build 匯入",

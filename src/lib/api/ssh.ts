@@ -113,3 +113,27 @@ export async function sshListSessions(
     limit: opts?.limit ?? 20,
   });
 }
+
+export type SshOpenSessionResult = {
+  ok: boolean;
+  alias: string;
+  remoteSessionId: string;
+  appSessionId?: string | null;
+  title?: string | null;
+  projectId?: string | null;
+  messageCount?: number | null;
+  error?: string | null;
+};
+
+export async function sshOpenSession(
+  alias: string,
+  sessionId: string,
+  opts?: { cwd?: string | null; titleHint?: string | null },
+) {
+  return invoke<SshOpenSessionResult>("ssh_open_session", {
+    alias,
+    sessionId,
+    cwd: opts?.cwd ?? null,
+    titleHint: opts?.titleHint ?? null,
+  });
+}
