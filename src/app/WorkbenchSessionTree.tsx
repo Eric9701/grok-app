@@ -316,7 +316,7 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
             </div>
 
             {sshWatch.watchAliases.length > 0 ? (
-                <div className="settings-ssh-section" style={{ padding: "8px 10px 4px" }}>
+                <div className="ssh-remote-rail">
                   <div className="sidebar__section-label">
                     {tr("sidebar.remoteSessions")}
                   </div>
@@ -325,41 +325,38 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
                       {tr("sidebar.remoteSessionsHint")}
                     </div>
                   ) : (
-                    <ul className="settings-ssh-sessions">
-                      {remoteRows.slice(0, 24).map((row) => (
-                        <li key={`${row.alias}:${row.id}`}>
-                          <button
-                            type="button"
-                            className="cpm__action"
-                            title={row.cwd}
-                            onClick={() => {
-                              sshWatch.setDraftRemote({
-                                alias: row.alias,
-                                path: row.cwd,
-                              });
-                              void (async () => {
-                                try {
-                                  const proj = (await api.projectAddSsh(
-                                    row.alias,
-                                    row.cwd,
-                                    true,
-                                  )) as Project;
-                                  void newChat(proj);
-                                } catch {
-                                  /* soft-fail */
-                                }
-                              })();
-                            }}
-                          >
-                            <span className="cmm__opt-title">{row.title}</span>
-                            <span className="settings-ssh-session__cwd">
-                              {row.alias}
-                              {row.cwd ? ` · ${row.cwd}` : ""}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    remoteRows.slice(0, 24).map((row) => (
+                      <button
+                        key={`${row.alias}:${row.id}`}
+                        type="button"
+                        className="ssh-remote-rail__row"
+                        title={row.cwd}
+                        onClick={() => {
+                          sshWatch.setDraftRemote({
+                            alias: row.alias,
+                            path: row.cwd,
+                          });
+                          void (async () => {
+                            try {
+                              const proj = (await api.projectAddSsh(
+                                row.alias,
+                                row.cwd,
+                                true,
+                              )) as Project;
+                              void newChat(proj);
+                            } catch {
+                              /* soft-fail */
+                            }
+                          })();
+                        }}
+                      >
+                        <span className="ssh-remote-rail__title">{row.title}</span>
+                        <span className="ssh-remote-rail__meta">
+                          {row.alias}
+                          {row.cwd ? ` · ${row.cwd}` : ""}
+                        </span>
+                      </button>
+                    ))
                   )}
                 </div>
               ) : null}

@@ -1,15 +1,19 @@
 /**
  * Settings → Runtime → SSH: watch list, live search, available hosts.
+ * Layout must use `.settings-card` + `.settings-row` (14px 16px). Do not
+ * render labels outside a settings-row — they sit on the card edge.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "@/lib/api";
-import type { Vars } from "@/i18n";
+import type { MessageKey, Vars } from "@/i18n";
 import { UiSwitch } from "./shared";
 import { partitionSshHosts } from "@/lib/sshHostMatch";
 import { useSshWatch } from "@/providers/SshWatchProvider";
 
+type TFn = (k: MessageKey, vars?: Vars) => string;
+
 type Props = {
-  t: (k: string, vars?: Vars) => string;
+  t: TFn;
 };
 
 export function SshHostsPanel({ t }: Props) {
@@ -110,16 +114,6 @@ export function SshHostsPanel({ t }: Props) {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="settings-card" id="settings-anchor-sshHosts">
-        <div className="settings-row settings-row--stack">
-          <div className="settings-row__hint">{t("settings.ssh.loading")}</div>
-        </div>
-      </div>
-    );
-  }
-
   const desktop = api.isTauri();
   const hosts = list?.hosts ?? [];
 
@@ -145,11 +139,11 @@ export function SshHostsPanel({ t }: Props) {
             {list.error}
           </div>
         ) : null}
-        <div>
+        <div className="settings-row__actions">
           <button
             type="button"
             className="btn btn--ghost btn--sm"
-            disabled={!desktop}
+            disabled={!desktop || loading}
             onClick={() => void refresh()}
           >
             {t("settings.ssh.refresh")}
@@ -157,37 +151,65 @@ export function SshHostsPanel({ t }: Props) {
         </div>
       </div>
 
-      {!desktop ? (
-        <div className="settings-row__hint">{t("settings.ssh.honesty")}</div>
+      {loading ? (
+        <div className="settings-row">
+          <div className="settings-row__hint">{t("settings.ssh.loading")}</div>
+        </div>
+      ) : !desktop ? (
+        <div className="settings-row">
+          <div className="settings-row__hint">{t("settings.ssh.honesty")}</div>
+        </div>
       ) : !list?.configExists ? (
-        <div className="settings-row__hint">
-          {t("settings.ssh.configMissing", {
-            path: list?.configPath || "~/.ssh/config",
-          })}
+        <div className="settings-row">
+          <div className="settings-row__hint">
+            {t("settings.ssh.configMissing", {
+              path: list?.configPath || "~/.ssh/config",
+            })}
+          </div>
         </div>
       ) : hosts.length === 0 ? (
-        <div className="settings-row__hint">{t("settings.ssh.noHosts")}</div>
+        <div className="settings-row">
+          <div className="settings-row__hint">{t("settings.ssh.noHosts")}</div>
+        </div>
       ) : (
         <>
-          <HostSection
-            title={t("settings.ssh.watchingTitle")}
-            hint={t("settings.ssh.watchingHint")}
-            empty={t("settings.ssh.watchingEmpty")}
-            hosts={parts.watching}
-            t={t}
-            watching
-            sshFound={!!list?.sshFound}
-            testing={testing}
-            toggling={toggling}
-            probes={probes}
-            copied={copied}
-            sessionsByAlias={watch.sessionsByAlias}
-            onTest={(a) => void runTest(a)}
-            onWatch={onWatch}
-            onCopy={copy}
-          />
+          <div className="settings-row settings-row--stack">
+            <div className="settings-row__text">
+              <div className="settings-row__label">
+                {t("settings.ssh.watchingTitle")}
+              </div>
+              <div className="settings-row__desc">
+                {t("settings.ssh.watchingHint")}
+              </div>
+            </div>
+          </div>
+          {parts.watching.length === 0 ? (
+            <div className="settings-row">
+              <div className="settings-row__hint">
+                {t("settings.ssh.watchingEmpty")}
+              </div>
+            </div>
+          ) : (
+            parts.watching.map((h) => (
+              <HostRow
+                key={h.alias}
+                host={h}
+                t={t}
+                watching
+                sshFound={!!list?.sshFound}
+                testing={testing}
+                toggling={toggling}
+                probe={probes[h.alias]}
+                copied={copied}
+                sessions={watch.sessionsByAlias[h.alias] ?? []}
+                onTest={() => void runTest(h.alias)}
+                onWatch={(next) => void onWatch(h.alias, next)}
+                onCopy={copy}
+              />
+            ))
+          )}
 
-          <div className="settings-ssh-search">
+          <div className="settings-row settings-row--stack">
             <input
               className="settings-input"
               type="search"
@@ -201,25 +223,49 @@ export function SshHostsPanel({ t }: Props) {
           {query.trim() &&
           parts.watching.length === 0 &&
           parts.available.length === 0 ? (
-            <div className="settings-row__hint">{t("settings.ssh.searchEmpty")}</div>
+            <div className="settings-row">
+              <div className="settings-row__hint">
+                {t("settings.ssh.searchEmpty")}
+              </div>
+            </div>
           ) : (
-            <HostSection
-              title={t("settings.ssh.availableTitle")}
-              hint={t("settings.ssh.availableHint")}
-              empty={t("settings.ssh.availableEmpty")}
-              hosts={parts.available}
-              t={t}
-              watching={false}
-              sshFound={!!list?.sshFound}
-              testing={testing}
-              toggling={toggling}
-              probes={probes}
-              copied={copied}
-              sessionsByAlias={watch.sessionsByAlias}
-              onTest={(a) => void runTest(a)}
-              onWatch={onWatch}
-              onCopy={copy}
-            />
+            <>
+              <div className="settings-row settings-row--stack">
+                <div className="settings-row__text">
+                  <div className="settings-row__label">
+                    {t("settings.ssh.availableTitle")}
+                  </div>
+                  <div className="settings-row__desc">
+                    {t("settings.ssh.availableHint")}
+                  </div>
+                </div>
+              </div>
+              {parts.available.length === 0 ? (
+                <div className="settings-row">
+                  <div className="settings-row__hint">
+                    {t("settings.ssh.availableEmpty")}
+                  </div>
+                </div>
+              ) : (
+                parts.available.map((h) => (
+                  <HostRow
+                    key={h.alias}
+                    host={h}
+                    t={t}
+                    watching={false}
+                    sshFound={!!list?.sshFound}
+                    testing={testing}
+                    toggling={toggling}
+                    probe={probes[h.alias]}
+                    copied={copied}
+                    sessions={[]}
+                    onTest={() => void runTest(h.alias)}
+                    onWatch={(next) => void onWatch(h.alias, next)}
+                    onCopy={copy}
+                  />
+                ))
+              )}
+            </>
           )}
         </>
       )}
@@ -227,120 +273,90 @@ export function SshHostsPanel({ t }: Props) {
   );
 }
 
-function HostSection({
-  title,
-  hint,
-  empty,
-  hosts,
+function HostRow({
+  host,
   t,
   watching,
   sshFound,
   testing,
   toggling,
-  probes,
+  probe,
   copied,
-  sessionsByAlias,
+  sessions,
   onTest,
   onWatch,
   onCopy,
 }: {
-  title: string;
-  hint: string;
-  empty: string;
-  hosts: api.SshHost[];
-  t: (k: string, vars?: Vars) => string;
+  host: api.SshHost;
+  t: TFn;
   watching: boolean;
   sshFound: boolean;
   testing: string | null;
   toggling: string | null;
-  probes: Record<string, api.SshProbeResult>;
+  probe?: api.SshProbeResult;
   copied: string | null;
-  sessionsByAlias: Record<string, api.SshRemoteSession[]>;
-  onTest: (alias: string) => void;
-  onWatch: (alias: string, next: boolean) => void;
+  sessions: api.SshRemoteSession[];
+  onTest: () => void;
+  onWatch: (next: boolean) => void;
   onCopy: (key: string, text: string) => void;
 }) {
+  const busy = testing === host.alias || toggling === host.alias;
+  const meta = [
+    host.user ? t("settings.ssh.user", { user: host.user }) : null,
+    host.hostname || null,
+    host.port ? t("settings.ssh.port", { port: host.port }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <div className="settings-ssh-section">
-      <div className="settings-row__label">{title}</div>
-      <div className="settings-row__hint">{hint}</div>
-      {hosts.length === 0 ? (
-        <div className="settings-row__hint">{empty}</div>
-      ) : (
-        <ul className="settings-ssh-list">
-          {hosts.map((h) => {
-            const probe = probes[h.alias];
-            const busy = testing === h.alias || toggling === h.alias;
-            const meta = [
-              h.user ? t("settings.ssh.user", { user: h.user }) : null,
-              h.hostname || null,
-              h.port ? t("settings.ssh.port", { port: h.port }) : null,
-            ]
-              .filter(Boolean)
-              .join(" · ");
-            const remoteSessions = sessionsByAlias[h.alias] ?? [];
-            return (
-              <li key={h.alias} className="settings-ssh-host">
-                <div className="settings-ssh-host__top">
-                  <div className="settings-ssh-host__id">
-                    <div className="settings-ssh-host__alias">{h.alias}</div>
-                    {meta ? (
-                      <div className="settings-ssh-host__meta">{meta}</div>
-                    ) : null}
-                  </div>
-                  <div className="settings-ssh-host__actions">
-                    <UiSwitch
-                      checked={watching}
-                      disabled={busy || !sshFound}
-                      label={
-                        watching
-                          ? t("settings.ssh.watchOff")
-                          : t("settings.ssh.watchOn")
-                      }
-                      onChange={(next) => onWatch(h.alias, next)}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm"
-                      disabled={busy || !sshFound}
-                      onClick={() => onTest(h.alias)}
-                    >
-                      {testing === h.alias
-                        ? t("settings.ssh.testing")
-                        : t("settings.ssh.test")}
-                    </button>
-                  </div>
-                </div>
-                {probe ? (
-                  <HostProbe t={t} probe={probe} copied={copied} onCopy={onCopy} />
-                ) : watching ? null : (
-                  <div className="settings-row__hint">
-                    {t("settings.ssh.notProbed")}
-                  </div>
-                )}
-                {watching && remoteSessions.length > 0 ? (
-                  <ul className="settings-ssh-sessions">
-                    {remoteSessions.slice(0, 8).map((s) => (
-                      <li key={s.id} className="settings-ssh-session">
-                        <span className="settings-ssh-session__title">
-                          {s.title}
-                        </span>
-                        {s.cwd ? (
-                          <span className="settings-ssh-session__cwd">{s.cwd}</span>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : watching ? (
-                  <div className="settings-row__hint">
-                    {t("settings.ssh.remoteSessionsEmpty")}
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+    <div className="settings-row settings-row--stack">
+      <div className="settings-ssh-hostline">
+        <div className="settings-row__text">
+          <div className="settings-row__label">{host.alias}</div>
+          {meta ? <div className="settings-row__desc">{meta}</div> : null}
+        </div>
+        <div className="settings-ssh-hostline__controls">
+          <UiSwitch
+            checked={watching}
+            disabled={busy || !sshFound}
+            label={
+              watching ? t("settings.ssh.watchOff") : t("settings.ssh.watchOn")
+            }
+            onChange={onWatch}
+          />
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            disabled={busy || !sshFound}
+            onClick={onTest}
+          >
+            {testing === host.alias
+              ? t("settings.ssh.testing")
+              : t("settings.ssh.test")}
+          </button>
+        </div>
+      </div>
+      {probe ? (
+        <HostProbe t={t} probe={probe} copied={copied} onCopy={onCopy} />
+      ) : watching ? null : (
+        <div className="settings-row__hint">{t("settings.ssh.notProbed")}</div>
       )}
+      {watching && sessions.length > 0 ? (
+        <ul className="settings-ssh-sessions">
+          {sessions.slice(0, 8).map((s) => (
+            <li key={s.id} className="settings-ssh-session">
+              <span className="settings-ssh-session__title">{s.title}</span>
+              {s.cwd ? (
+                <span className="settings-ssh-session__cwd">{s.cwd}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : watching ? (
+        <div className="settings-row__hint">
+          {t("settings.ssh.remoteSessionsEmpty")}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -351,7 +367,7 @@ function HostProbe({
   copied,
   onCopy,
 }: {
-  t: (k: string, vars?: Vars) => string;
+  t: TFn;
   probe: api.SshProbeResult;
   copied: string | null;
   onCopy: (key: string, text: string) => void;
@@ -446,7 +462,7 @@ function CopyCmd({
   copyKey: string;
   copied: string | null;
   onCopy: (key: string, text: string) => void;
-  t: (k: string, vars?: Vars) => string;
+  t: TFn;
 }) {
   return (
     <div className="settings-ssh-cmd">

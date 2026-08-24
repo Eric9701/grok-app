@@ -123,7 +123,7 @@ export function SshPathPickerModal({
         {loading ? (
           <div className="settings-row__hint">{t("settings.ssh.loading")}</div>
         ) : (
-          <ul className="settings-ssh-list">
+          <ul className="ssh-path-list">
             {dirs.map((d) => {
               const next = `${listing?.path?.replace(/\/+$/, "") || ""}/${d.name}`.replace(
                 /\/+/g,
@@ -133,7 +133,7 @@ export function SshPathPickerModal({
                 <li key={d.name}>
                   <button
                     type="button"
-                    className="cpm__action"
+                    className="ssh-path-list__row"
                     onClick={() => void browse(next)}
                   >
                     {d.name}/

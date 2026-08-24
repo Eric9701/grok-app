@@ -502,7 +502,7 @@ export const zhSettings = {
   "settings.cliSessionsImportPlan": "将导入 {importable} / {selected}（跳过已关联 {skipped}）",
   "settings.section.agent": "代理",
   "settings.ssh.title": "SSH 主机",
-  "settings.ssh.desc": "读取 ~/.ssh/config 里的 OpenSSH 主机。测试连接会确认隧道是否通，以及远程机器是否已安装并登录 Grok CLI。远程目录和远程 session 会在后续波次加入。",
+  "settings.ssh.desc": "读取 ~/.ssh/config 里的主机。先测试连接，再打开监视以保持 SSH，并列出远程 Grok session。",
   "settings.ssh.loading": "正在加载 SSH 主机…",
   "settings.ssh.refresh": "刷新",
   "settings.ssh.configPath": "配置 {path}",

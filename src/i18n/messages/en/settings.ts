@@ -502,7 +502,7 @@ export const enSettings = {
   "settings.cliSessionsImportPlan": "Import {importable} of {selected} (skip {skipped} already linked)",
   "settings.section.agent": "Agent",
   "settings.ssh.title": "SSH hosts",
-  "settings.ssh.desc": "OpenSSH hosts from ~/.ssh/config. Test a host to confirm the tunnel and whether Grok CLI is installed and signed in on the remote machine. Remote folders and remote agent sessions come in later waves.",
+  "settings.ssh.desc": "Hosts from ~/.ssh/config. Test a connection, then watch a host to keep SSH up and list remote Grok sessions.",
   "settings.ssh.loading": "Loading SSH hosts…",
   "settings.ssh.refresh": "Refresh",
   "settings.ssh.configPath": "Config {path}",

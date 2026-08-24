@@ -502,7 +502,7 @@ export const zhTWSettings = {
   "settings.cliSessionsSearchEmptyHint": "換個關鍵字，或清除搜尋。",
   "settings.cliSessionsImportPlan": "將匯入 {importable} / {selected}（略過已關聯 {skipped}）",
   "settings.ssh.title": "SSH 主機",
-  "settings.ssh.desc": "讀取 ~/.ssh/config 的 OpenSSH 主機。測試連線會確認隧道是否通，以及遠端機器是否已安裝並登入 Grok CLI。遠端目錄與遠端 session 會在後續波次加入。",
+  "settings.ssh.desc": "讀取 ~/.ssh/config 裡的主機。先測試連線，再打開監視以保持 SSH，並列出遠端 Grok session。",
   "settings.ssh.loading": "正在載入 SSH 主機…",
   "settings.ssh.refresh": "重新整理",
   "settings.ssh.configPath": "設定 {path}",
