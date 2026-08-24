@@ -538,5 +538,8 @@ export const idSettings = {
   "settings.ssh.availableEmpty": "No other hosts in this list.",
   "settings.ssh.watchOn": "Start watching",
   "settings.ssh.watchOff": "Stop watching",
+  "settings.ssh.watchStarting": "Connecting…",
+  "settings.ssh.watchStopping": "Stopping…",
+  "settings.ssh.watchError": "Could not change watch: {error}",
   "settings.ssh.remoteSessionsEmpty": "No remote Grok sessions found yet.",
 };

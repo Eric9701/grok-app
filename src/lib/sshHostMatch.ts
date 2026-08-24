@@ -19,6 +19,18 @@ export function matchSshHost(query: string, host: SshHostMatchInput): boolean {
   return hay.includes(q);
 }
 
+export function mergeWatchingSet(
+  persisted: readonly string[],
+  pending: Readonly<Record<string, boolean>>,
+): Set<string> {
+  const set = new Set(persisted);
+  for (const [alias, on] of Object.entries(pending)) {
+    if (on) set.add(alias);
+    else set.delete(alias);
+  }
+  return set;
+}
+
 export function partitionSshHosts<T extends SshHostMatchInput>(
   hosts: readonly T[],
   watching: ReadonlySet<string>,

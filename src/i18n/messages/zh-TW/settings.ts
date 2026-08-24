@@ -539,5 +539,8 @@ export const zhTWSettings = {
   "settings.ssh.availableEmpty": "這一欄沒有其他主機。",
   "settings.ssh.watchOn": "開始監視",
   "settings.ssh.watchOff": "停止監視",
+  "settings.ssh.watchStarting": "正在連線…",
+  "settings.ssh.watchStopping": "正在停止…",
+  "settings.ssh.watchError": "無法切換監視：{error}",
   "settings.ssh.remoteSessionsEmpty": "還沒掃描到遠端 Grok session。",
 };

@@ -539,5 +539,8 @@ export const zhSettings = {
   "settings.ssh.availableEmpty": "这一栏没有其他主机。",
   "settings.ssh.watchOn": "开始监视",
   "settings.ssh.watchOff": "停止监视",
+  "settings.ssh.watchStarting": "正在连接…",
+  "settings.ssh.watchStopping": "正在停止…",
+  "settings.ssh.watchError": "无法切换监视：{error}",
   "settings.ssh.remoteSessionsEmpty": "还没有扫描到远程 Grok session。",
 };

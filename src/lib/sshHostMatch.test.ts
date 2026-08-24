@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchSshHost, partitionSshHosts } from "./sshHostMatch";
+import { matchSshHost, mergeWatchingSet, partitionSshHosts } from "./sshHostMatch";
 
 describe("sshHostMatch", () => {
   const hosts = [
@@ -35,5 +35,12 @@ describe("sshHostMatch", () => {
     const all = partitionSshHosts(hosts, watching, "");
     expect(all.watching.map((h) => h.alias)).toEqual(["gpu"]);
     expect(all.available.map((h) => h.alias)).toEqual(["devbox", "bastion"]);
+  });
+
+  it("merges optimistic pending onto persisted watch aliases", () => {
+    const on = mergeWatchingSet(["gpu"], { devbox: true });
+    expect([...on].sort()).toEqual(["devbox", "gpu"]);
+    const off = mergeWatchingSet(["gpu", "devbox"], { gpu: false });
+    expect([...off]).toEqual(["devbox"]);
   });
 });

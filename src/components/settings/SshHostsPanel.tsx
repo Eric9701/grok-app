@@ -3,11 +3,11 @@
  * Layout must use `.settings-card` + `.settings-row` (14px 16px). Do not
  * render labels outside a settings-row — they sit on the card edge.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as api from "@/lib/api";
 import type { MessageKey, Vars } from "@/i18n";
 import { UiSwitch } from "./shared";
-import { partitionSshHosts } from "@/lib/sshHostMatch";
+import { mergeWatchingSet, partitionSshHosts } from "@/lib/sshHostMatch";
 import { useSshWatch } from "@/providers/SshWatchProvider";
 
 type TFn = (k: MessageKey, vars?: Vars) => string;
@@ -21,10 +21,12 @@ export function SshHostsPanel({ t }: Props) {
   const [list, setList] = useState<api.SshListResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState<string | null>(null);
-  const [toggling, setToggling] = useState<string | null>(null);
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [watchErr, setWatchErr] = useState<Record<string, string>>({});
   const [probes, setProbes] = useState<Record<string, api.SshProbeResult>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const inflightRef = useRef(new Set<string>());
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -86,6 +88,10 @@ export function SshHostsPanel({ t }: Props) {
   };
 
   const watchingSet = useMemo(
+    () => mergeWatchingSet(watch.watchAliases, pending),
+    [watch.watchAliases, pending],
+  );
+  const persistedWatch = useMemo(
     () => new Set(watch.watchAliases),
     [watch.watchAliases],
   );
@@ -95,22 +101,41 @@ export function SshHostsPanel({ t }: Props) {
   );
 
   const onWatch = async (alias: string, next: boolean) => {
-    if (!api.isTauri() || toggling) return;
-    setToggling(alias);
+    if (!api.isTauri()) return;
+    if (inflightRef.current.has(alias)) return;
+    inflightRef.current.add(alias);
+    setPending((p) => ({ ...p, [alias]: next }));
+    setWatchErr((e) => {
+      const n = { ...e };
+      delete n[alias];
+      return n;
+    });
     try {
-      if (next) {
-        let probe = probes[alias];
-        if (!probe?.sshOk) {
-          probe = (await runTest(alias)) ?? probe;
-        }
-        if (!probe?.sshOk) return;
-        if (probe.cli !== "ok") return;
-        await watch.enableWatch(alias);
-      } else {
-        await watch.disableWatch(alias);
+      const r = next
+        ? await watch.enableWatch(alias)
+        : await watch.disableWatch(alias);
+      if (!r.ok) {
+        setWatchErr((e) => ({
+          ...e,
+          [alias]: t("settings.ssh.watchError", {
+            error: r.error || t("settings.ssh.unknownHost"),
+          }),
+        }));
+        return;
       }
+      if (next) void runTest(alias);
+    } catch (err) {
+      setWatchErr((e) => ({
+        ...e,
+        [alias]: t("settings.ssh.watchError", { error: String(err) }),
+      }));
     } finally {
-      setToggling(null);
+      inflightRef.current.delete(alias);
+      setPending((p) => {
+        const n = { ...p };
+        delete n[alias];
+        return n;
+      });
     }
   };
 
@@ -196,9 +221,11 @@ export function SshHostsPanel({ t }: Props) {
                 host={h}
                 t={t}
                 watching
+                confirmed={persistedWatch.has(h.alias)}
+                pending={Object.prototype.hasOwnProperty.call(pending, h.alias)}
+                watchError={watchErr[h.alias]}
                 sshFound={!!list?.sshFound}
                 testing={testing}
-                toggling={toggling}
                 probe={probes[h.alias]}
                 copied={copied}
                 sessions={watch.sessionsByAlias[h.alias] ?? []}
@@ -253,9 +280,11 @@ export function SshHostsPanel({ t }: Props) {
                     host={h}
                     t={t}
                     watching={false}
+                    confirmed={false}
+                    pending={Object.prototype.hasOwnProperty.call(pending, h.alias)}
+                    watchError={watchErr[h.alias]}
                     sshFound={!!list?.sshFound}
                     testing={testing}
-                    toggling={toggling}
                     probe={probes[h.alias]}
                     copied={copied}
                     sessions={[]}
@@ -277,9 +306,11 @@ function HostRow({
   host,
   t,
   watching,
+  confirmed,
+  pending,
+  watchError,
   sshFound,
   testing,
-  toggling,
   probe,
   copied,
   sessions,
@@ -290,9 +321,11 @@ function HostRow({
   host: api.SshHost;
   t: TFn;
   watching: boolean;
+  confirmed: boolean;
+  pending: boolean;
+  watchError?: string;
   sshFound: boolean;
   testing: string | null;
-  toggling: string | null;
   probe?: api.SshProbeResult;
   copied: string | null;
   sessions: api.SshRemoteSession[];
@@ -300,7 +333,7 @@ function HostRow({
   onWatch: (next: boolean) => void;
   onCopy: (key: string, text: string) => void;
 }) {
-  const busy = testing === host.alias || toggling === host.alias;
+  const testingThis = testing === host.alias;
   const meta = [
     host.user ? t("settings.ssh.user", { user: host.user }) : null,
     host.hostname || null,
@@ -309,7 +342,7 @@ function HostRow({
     .filter(Boolean)
     .join(" · ");
   return (
-    <div className="settings-row settings-row--stack">
+    <div className="settings-row settings-row--stack" aria-busy={pending}>
       <div className="settings-ssh-hostline">
         <div className="settings-row__text">
           <div className="settings-row__label">{host.alias}</div>
@@ -318,7 +351,7 @@ function HostRow({
         <div className="settings-ssh-hostline__controls">
           <UiSwitch
             checked={watching}
-            disabled={busy || !sshFound}
+            disabled={!sshFound}
             label={
               watching ? t("settings.ssh.watchOff") : t("settings.ssh.watchOn")
             }
@@ -327,21 +360,32 @@ function HostRow({
           <button
             type="button"
             className="btn btn--ghost btn--sm"
-            disabled={busy || !sshFound}
+            disabled={testingThis || !sshFound}
             onClick={onTest}
           >
-            {testing === host.alias
+            {testingThis
               ? t("settings.ssh.testing")
               : t("settings.ssh.test")}
           </button>
         </div>
       </div>
+      {watchError ? (
+        <div className="settings-row__hint is-danger" role="alert">
+          {watchError}
+        </div>
+      ) : pending ? (
+        <div className="settings-row__hint">
+          {watching
+            ? t("settings.ssh.watchStarting")
+            : t("settings.ssh.watchStopping")}
+        </div>
+      ) : null}
       {probe ? (
         <HostProbe t={t} probe={probe} copied={copied} onCopy={onCopy} />
-      ) : watching ? null : (
+      ) : watching || pending ? null : (
         <div className="settings-row__hint">{t("settings.ssh.notProbed")}</div>
       )}
-      {watching && sessions.length > 0 ? (
+      {confirmed && sessions.length > 0 ? (
         <ul className="settings-ssh-sessions">
           {sessions.slice(0, 8).map((s) => (
             <li key={s.id} className="settings-ssh-session">
@@ -352,7 +396,7 @@ function HostRow({
             </li>
           ))}
         </ul>
-      ) : watching ? (
+      ) : confirmed ? (
         <div className="settings-row__hint">
           {t("settings.ssh.remoteSessionsEmpty")}
         </div>

@@ -31,4 +31,5 @@ Related: [settings-ia.md](./settings-ia.md), [session-continuity.md](./session-c
 
 - Section `runtime`, tab `ssh`, hash `#/settings/runtime/ssh`.
 - Catalog id `runtime.sshHosts`, anchor `settings-anchor-sshHosts`.
-- Host commands: `ssh_list_hosts`, `ssh_test_host` in `src-tauri/src/ssh_remote.rs`.
+- Host commands: `ssh_list_hosts`, `ssh_test_host`, `ssh_watch_start`, `ssh_watch_stop` in `src-tauri/src/ssh_remote.rs`.
+- Watch switch: thumb and Watching / Available partition update immediately. `ssh_watch_start` / `ssh_watch_stop` run after. Failure reverts the switch and shows an error. Missing remote CLI or login is a warning, not a silent no-op.
