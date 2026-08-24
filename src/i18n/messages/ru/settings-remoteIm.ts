@@ -133,6 +133,7 @@ export const ruSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "WebSocket endpoint выглядит неверно — используйте wss:// (или https://) с хостом или оставьте пустым для значения платформы по умолчанию.",
   "settings.remoteIm.health.hint.wecomWs": "Длинное соединение WeCom WebSocket (aibot) — публичный URL не нужен.",
   "settings.remoteIm.health.hint.wecomWebhook": "Режим WeCom Webhook требует публичный HTTPS callback.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "Публичные callback требуют включить allow_external.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "Откройте локальный callback через туннель (только помощник), прежде чем проверка URL предприятия сможет пройти.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "Режим подключения изменён — вставьте секреты для нового режима, затем «Сохранить и подключить».",
   "settings.remoteIm.health.hint.wecomMissingKeys": "Заполните обязательные поля WeCom для выбранного режима (Bot ID/Secret или Corp + Agent + токен callback).",

@@ -1,12 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
+  isWecomLoopbackAdvisory,
   normalizeWecomConnectMode,
   validateWecomConfig,
+  WECOM_WEBHOOK_LOOPBACK_ADVISORY,
+  wecomAllowExternal,
   wecomHealthHintKeys,
   wecomRequiredNonSecretKeys,
   wecomRequiredSecretKeys,
   wecomSoftStatusMessage,
 } from "./wecomConfig";
+
+describe("wecomAllowExternal / loopback advisory", () => {
+  it("reads allow_external and allowExternal", () => {
+    expect(wecomAllowExternal({})).toBe(false);
+    expect(wecomAllowExternal({ allow_external: true })).toBe(true);
+    expect(wecomAllowExternal({ allowExternal: "true" })).toBe(true);
+    expect(isWecomLoopbackAdvisory(WECOM_WEBHOOK_LOOPBACK_ADVISORY)).toBe(
+      true,
+    );
+    expect(isWecomLoopbackAdvisory("ws closed")).toBe(false);
+  });
+});
 
 describe("normalizeWecomConnectMode", () => {
   it("defaults to websocket", () => {
@@ -159,8 +174,26 @@ describe("wecomHealthHintKeys", () => {
     });
     const hints = wecomHealthHintKeys(v, { openAcl: true });
     expect(hints.some((k) => k.includes("wecomWebhook"))).toBe(true);
+    expect(hints.some((k) => k.includes("wecomLoopbackAllowExternal"))).toBe(
+      true,
+    );
     expect(hints.some((k) => k.includes("wecomPublicUrl"))).toBe(true);
     expect(hints.some((k) => k.includes("wecomNoLiveClaim"))).toBe(true);
     expect(hints.some((k) => k.includes("openAcl"))).toBe(true);
+  });
+
+  it("omits loopback hint when allow_external is on", () => {
+    const v = validateWecomConfig({
+      options: {
+        connect_mode: "webhook",
+        corp_id: "ww",
+        agent_id: "1",
+      },
+      secretKeysFilled: new Set(["corp_secret", "callback_token"]),
+    });
+    const hints = wecomHealthHintKeys(v, { allowExternal: true });
+    expect(hints.some((k) => k.includes("wecomLoopbackAllowExternal"))).toBe(
+      false,
+    );
   });
 });

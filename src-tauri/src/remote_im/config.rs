@@ -160,6 +160,21 @@ pub fn set_instance_last_error(instance_id: &str, err: Option<String>) -> Result
     Ok(())
 }
 
+/// Persist a non-fatal runtime note without flipping status to error.
+/// Used for discoverability (e.g. WeCom webhook bound to loopback).
+pub fn set_instance_advisory(instance_id: &str, note: Option<String>) -> Result<(), String> {
+    let mut list = list_instances();
+    let Some(row) = list.iter_mut().find(|x| x.id == instance_id) else {
+        return Ok(());
+    };
+    row.last_error = note;
+    if row.has_credentials {
+        row.status = "configured".into();
+    }
+    write_instances(&list)?;
+    Ok(())
+}
+
 /// Legacy path kept for doctor/docs; Rust runtime does not require Node config.toml.
 pub fn bridge_data_dir() -> PathBuf {
     let dir = app_data_root().join("remote").join("bridge-data");

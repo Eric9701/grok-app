@@ -133,6 +133,7 @@ export const ukSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "Кінцева точка WebSocket виглядає недійсною — використовуйте wss:// (або https://) з хостом, або залиште порожнім для стандартної платформи.",
   "settings.remoteIm.health.hint.wecomWs": "WeCom WebSocket (aibot) довге з’єднання — загальнодоступна URL-адреса не потрібна.",
   "settings.remoteIm.health.hint.wecomWebhook": "Режим WeCom Webhook потребує загальнодоступного зворотного виклику HTTPS.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "Публічні зворотні виклики потребують увімкненого allow_external.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "Відкрийте локальний зворотний виклик за допомогою тунелю (лише допоміжний) до того, як перевірка корпоративної URL-адреси вдасться.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "Режим підключення змінено — вставте секрети для нового режиму, потім Збережіть і підключіться.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "Заповніть необхідні поля WeCom для вибраного режиму (Ідентифікатор бота/Секрет або Корпорація + Агент + маркер зворотного виклику).",

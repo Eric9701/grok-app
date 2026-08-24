@@ -133,6 +133,7 @@ export const enSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "WebSocket endpoint looks invalid — use wss:// (or https://) with a host, or leave empty for the platform default.",
   "settings.remoteIm.health.hint.wecomWs": "WeCom WebSocket (aibot) long connection — no public URL required.",
   "settings.remoteIm.health.hint.wecomWebhook": "WeCom Webhook mode needs a public HTTPS callback.",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "Public callbacks require allow_external to be enabled.",
   "settings.remoteIm.health.hint.wecomPublicUrl": "Expose the local callback with a tunnel (helper only) before enterprise URL verification can succeed.",
   "settings.remoteIm.health.hint.wecomModeSwitch": "Connection mode changed — paste secrets for the new mode, then Save & connect.",
   "settings.remoteIm.health.hint.wecomMissingKeys": "Fill required WeCom fields for the selected mode (Bot ID/Secret or Corp + Agent + callback token).",

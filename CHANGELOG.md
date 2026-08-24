@@ -26,6 +26,10 @@ See `docs/llm-wiki/release.md`.
 - **底部终端标签栏**：鼠标悬停任意标签显示关闭；加号旁增加关闭所有终端。
 
 ### Fixed
+- **WeCom webhook replay window**: signed callbacks whose `timestamp` is outside ±300 seconds are rejected with 401.
+- **WeCom webhook loopback hint**: webhook mode bound to 127.0.0.1 now surfaces that public callbacks need `allow_external` (runtime last_error code + Settings health copy).
+- **CLI session project import**: auto-add uses home-relative depth ≥ 2, so Linux `/home/name/projects` and Windows `C:\Users\name\Documents` are not treated as projects. Missing home refuses.
+- **Theme switch snapshot cap**: WebKit color snapshot skips animation when the live DOM has more than 400 elements, avoiding jank on large trees.
 - **Closing a terminal really kills the shell**: tab × / close-all / overflow / project switch call host `terminal_pty_kill` (process killer + PTY drop), not only hide the chip. Hide-panel still keeps sessions.
 - **Bottom terminal tab numbers follow creation order**: the plus button appends a new chip on the right, so the original Terminal 1 stays Terminal 1 instead of being pushed to Terminal 2.
 - **Terminal prompt inset**: side and bottom PTY text sits 5px inside the pane. The 50% veil still covers the full terminal; padding is on `.xterm`, not the host.
@@ -48,6 +52,10 @@ See `docs/llm-wiki/release.md`.
 - **Official-aux X/Imagine on packaged custom mains**: `/Applications/Grok.app` never bundled `scripts/official-aux-mcp.mjs`, so ACP injected `mcpServers count=0` while ChatCut still auto-loaded from independent `agent-home/config.toml`. Host now writes the MCP script into `agent-home-official`, disables user MCP `enabled` flags during solo inject, ships official-aux `--rules` on prewarm, and tells the model to call `official-aux__x_keyword_search` directly instead of `search_tool` (which was resolving to ChatCut).
 
 **中文 · 修复**
+- **企微 webhook 重放窗口**：`timestamp` 超出 ±300 秒的已签名回调返回 401。
+- **企微 webhook loopback 提示**：未开启 `allow_external` 且绑在 127.0.0.1 时，运行状态与设置页提示「公网回调需开启 allow_external」。
+- **CLI 会话导入项目路径**：按相对 home 深度 ≥ 2 判断，不再把 Linux `/home/name/projects` 或 Windows `C:\Users\name\Documents` 当成项目；取不到 home 则拒绝。
+- **主题切换快照上限**：DOM 超过 400 个元素时跳过 WebKit 颜色快照，避免大树卡帧。
 - **关闭终端会真正杀掉 shell**：标签 × / 关闭全部 / 超出上限 / 切换项目都会走宿主 `terminal_pty_kill`（杀进程 + 关掉 PTY），不是只藏标签。收起面板仍保留会话。
 - **底部终端标签序号跟随创建顺序**：加号把新标签加到右边，原来的「终端 1」不会被挤成「终端 2」。
 - **终端提示符内边距**：侧栏和底部 PTY 文字距面板 5px。50% 遮罩仍铺满整个终端，内边距加在 `.xterm` 上，不加在外壳。

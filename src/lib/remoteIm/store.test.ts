@@ -144,4 +144,17 @@ describe("deriveStatus Bridge honesty", () => {
     expect(deriveStatus(base, true, true)).toBe("connected");
     expect(deriveStatus(base, false, true)).toBe("configured");
   });
+
+  it("does not treat WeCom loopback advisory as an error", () => {
+    const base = {
+      ...createDefaultInstance("wecom"),
+      hasCredentials: true,
+      enabled: true,
+      lastError: "wecom_webhook_loopback_needs_allow_external",
+    };
+    expect(deriveStatus(base, true, true)).toBe("connected");
+    expect(deriveStatus({ ...base, lastError: "ws closed" }, true, true)).toBe(
+      "error",
+    );
+  });
 });

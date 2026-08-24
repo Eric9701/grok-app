@@ -8,6 +8,16 @@
 
 export type WecomConnectMode = "websocket" | "webhook";
 
+/** Host `last_error` code when webhook mode is bound to loopback. */
+export const WECOM_WEBHOOK_LOOPBACK_ADVISORY =
+  "wecom_webhook_loopback_needs_allow_external";
+
+export function isWecomLoopbackAdvisory(
+  raw: string | null | undefined,
+): boolean {
+  return raw === WECOM_WEBHOOK_LOOPBACK_ADVISORY;
+}
+
 export type WecomConfigValidation = {
   ok: boolean;
   /** Missing option / secret keys (never values) */
@@ -67,8 +77,27 @@ export function wecomOptionalKeys(
   mode: WecomConnectMode,
 ): readonly string[] {
   return mode === "webhook"
-    ? ["encoding_aes_key", "port", "callback_path", "enable_markdown"]
+    ? ["encoding_aes_key", "port", "callback_path", "enable_markdown", "allow_external"]
     : ["api_base_url", "proxy"];
+}
+
+function optionTruthy(
+  options: Record<string, unknown> | null | undefined,
+  key: string,
+): boolean {
+  if (!options) return false;
+  const v = options[key];
+  return v === true || v === "true";
+}
+
+/** True when webhook should bind beyond loopback (`allow_external`). */
+export function wecomAllowExternal(
+  options?: Record<string, unknown> | null,
+): boolean {
+  return (
+    optionTruthy(options, "allow_external") ||
+    optionTruthy(options, "allowExternal")
+  );
 }
 
 export type ValidateWecomConfigInput = {
@@ -142,13 +171,21 @@ export function validateWecomConfig(
 /** i18n hint keys for WeCom health card (order preserved, max useful). */
 export function wecomHealthHintKeys(
   validation: WecomConfigValidation,
-  extras?: { openAcl?: boolean; proxySet?: boolean },
+  extras?: {
+    openAcl?: boolean;
+    proxySet?: boolean;
+    allowExternal?: boolean;
+    loopbackAdvisory?: boolean;
+  },
 ): string[] {
   const keys: string[] = [];
   if (validation.mode === "websocket") {
     keys.push("settings.remoteIm.health.hint.wecomWs");
   } else {
     keys.push("settings.remoteIm.health.hint.wecomWebhook");
+    if (extras?.loopbackAdvisory || extras?.allowExternal !== true) {
+      keys.push("settings.remoteIm.health.hint.wecomLoopbackAllowExternal");
+    }
     keys.push("settings.remoteIm.health.hint.wecomPublicUrl");
   }
   // Credentials / mode readiness ≠ live WS or reachable public webhook

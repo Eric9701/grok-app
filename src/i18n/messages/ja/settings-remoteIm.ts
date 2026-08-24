@@ -133,6 +133,7 @@ export const jaSettingsRemoteIm = {
   "settings.remoteIm.health.hint.weiboWsEndpointInvalid": "WebSocket エンドポイントが無効です。ホスト付きの wss://（または https://）を使うか、空欄でプラットフォーム既定を使ってください。",
   "settings.remoteIm.health.hint.wecomWs": "WeCom WebSocket（aibot）の常時接続です。公開 URL は不要です。",
   "settings.remoteIm.health.hint.wecomWebhook": "WeCom の Webhook モードには公開 HTTPS コールバックが必要です。",
+  "settings.remoteIm.health.hint.wecomLoopbackAllowExternal": "公開コールバックには allow_external の有効化が必要です。",
   "settings.remoteIm.health.hint.wecomPublicUrl": "企業側の URL 検証を通すには、ローカルコールバックをトンネルで公開 HTTPS にしてください（トンネルは補助のみ）。",
   "settings.remoteIm.health.hint.wecomModeSwitch": "接続モードを切り替えました。新しいモード用のシークレットを貼り付けてから「保存して接続」してください。",
   "settings.remoteIm.health.hint.wecomMissingKeys": "選択したモードの必須項目を入力してください（Bot ID/Secret、または Corp + Agent + コールバック Token）。",

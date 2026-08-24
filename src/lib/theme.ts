@@ -105,6 +105,8 @@ let themeTransitionCleanupTimer: ReturnType<typeof setTimeout> | null = null;
 const WEBKIT_THEME_TRANSITION_DURATION_MS = 200;
 const WEBKIT_THEME_TRANSITION_CLEANUP_MS =
   WEBKIT_THEME_TRANSITION_DURATION_MS + 50;
+/** Skip the per-element snapshot when the live DOM is this large (jank). */
+export const WEBKIT_THEME_SNAPSHOT_MAX_ELEMENTS = 400;
 const WEBKIT_THEME_ANIMATED_PROPERTIES = [
   "color",
   "backgroundColor",
@@ -134,15 +136,17 @@ function readWebKitThemeFrame(style: CSSStyleDeclaration): WebKitThemeFrame {
   return frame;
 }
 
-function captureVisibleThemeFrames(doc: Document): WebKitThemeSnapshot[] {
+function captureVisibleThemeFrames(doc: Document): WebKitThemeSnapshot[] | null {
   const view = doc.defaultView;
   if (!view || typeof view.getComputedStyle !== "function") return [];
   const width = view.innerWidth;
   const height = view.innerHeight;
-  const elements = [
-    doc.documentElement,
-    ...Array.from(doc.querySelectorAll("body, body *")),
-  ];
+  const listed = doc.querySelectorAll("body, body *");
+  // Count html + body + descendants before allocating / measuring.
+  if (1 + listed.length > WEBKIT_THEME_SNAPSHOT_MAX_ELEMENTS) {
+    return null;
+  }
+  const elements = [doc.documentElement, ...listed];
   const snapshots: WebKitThemeSnapshot[] = [];
   for (const element of elements) {
     const rect = element.getBoundingClientRect();
@@ -244,6 +248,13 @@ export function runThemeTransition(
     // WebKit's root snapshot drops backdrop-filter. Animate only the visible
     // ink/surface properties with WAAPI so glass and component motion stay live.
     const snapshots = captureVisibleThemeFrames(doc);
+    if (snapshots === null) {
+      // Huge DOM: skip the per-element rect/style walk and apply with no animation.
+      cancelWebKitThemeAnimations();
+      delete root.dataset.themeTransition;
+      commit();
+      return;
+    }
     cancelWebKitThemeAnimations();
     root.dataset.themeTransition = "webkit";
     commit();

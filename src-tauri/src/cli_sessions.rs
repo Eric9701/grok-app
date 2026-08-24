@@ -190,8 +190,10 @@ pub fn cwd_paths_match(a: &str, b: &str) -> bool {
 /// Whether a CLI cwd should become an untrusted App project on import (pure).
 ///
 /// Skips filesystem roots, the user home, ancestors of home, and shallow
-/// paths such as `/Users/name` or `/Users/name/Developer`. Real project
-/// folders (`…/Developer/foo`) have ≥4 segments.
+/// folders whose depth relative to home is less than 2 (e.g. `~/Developer`,
+/// `/home/name/projects`, `C:\Users\name\Documents`). Real project folders
+/// (`~/Developer/foo`) sit at least two levels under home. When `home` is
+/// empty, refuse — relative depth cannot be measured.
 pub fn should_auto_add_project_path(path: &str, home: &str) -> bool {
     let p = normalize_cwd_path(path);
     if p.is_empty() || p == "/" || p == "." {
@@ -203,15 +205,20 @@ pub fn should_auto_add_project_path(path: &str, home: &str) -> bool {
         return false;
     }
     let home_n = normalize_cwd_path(home);
-    if !home_n.is_empty() {
-        if p == home_n {
-            return false;
-        }
-        if home_n.starts_with(&format!("{p}/")) {
-            return false;
-        }
+    if home_n.is_empty() {
+        return false;
     }
-    p.split('/').filter(|s| !s.is_empty()).count() >= 4
+    if p == home_n {
+        return false;
+    }
+    if home_n.starts_with(&format!("{p}/")) {
+        return false;
+    }
+    let prefix = format!("{home_n}/");
+    let Some(rest) = p.strip_prefix(&prefix) else {
+        return false;
+    };
+    rest.split('/').filter(|s| !s.is_empty()).count() >= 2
 }
 
 /// Create an untrusted App project for a CLI cwd when missing.
@@ -2792,5 +2799,43 @@ Total: 1
         assert!(!should_auto_add_project_path("/Users/prax/Developer", home));
         assert!(!should_auto_add_project_path("C:\\", "C:\\Users\\prax"));
         assert!(!should_auto_add_project_path("", home));
+    }
+
+    #[test]
+    fn auto_add_project_path_uses_home_relative_depth() {
+        // Linux: `/home/name/projects` is only one level under home.
+        let linux_home = "/home/name";
+        assert!(!should_auto_add_project_path("/home/name", linux_home));
+        assert!(!should_auto_add_project_path(
+            "/home/name/projects",
+            linux_home
+        ));
+        assert!(should_auto_add_project_path(
+            "/home/name/projects/grok-app",
+            linux_home
+        ));
+        assert!(!should_auto_add_project_path(
+            "/opt/company/app",
+            linux_home
+        ));
+
+        // Windows: drive letter inflates absolute segment count.
+        let win_home = r"C:\Users\prax";
+        assert!(!should_auto_add_project_path(r"C:\Users\prax", win_home));
+        assert!(!should_auto_add_project_path(
+            r"C:\Users\prax\Documents",
+            win_home
+        ));
+        assert!(should_auto_add_project_path(
+            r"C:\Users\prax\Documents\grok-app",
+            win_home
+        ));
+        assert!(!should_auto_add_project_path(r"D:\work\app", win_home));
+
+        // Missing home → conservative reject, even for a deep path.
+        assert!(!should_auto_add_project_path(
+            "/home/name/projects/grok-app",
+            ""
+        ));
     }
 }
