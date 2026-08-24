@@ -520,7 +520,7 @@ export const itSettings = {
   "settings.ssh.loginTitle": "Accedi sull’host remoto",
   "settings.ssh.loginHint": "L’accesso con codice dispositivo è per SSH. Copia ed esegui qui; viene allocato un TTY.",
   "settings.ssh.sshBinaryMissing": "Client OpenSSH (ssh) non trovato su questa macchina.",
-  "settings.ssh.honesty": "Questa scheda testa solo SSH e Grok CLI remoto. Non apre ancora una cartella remota né avvia una session remota.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "Non ancora testato",
   "settings.ssh.batchMode": "I test usano OpenSSH con chiave (BatchMode). Nessuna richiesta di password.",
   "settings.ssh.hostKeyHint": "Alla prima connessione esegui ssh {alias} una volta nel terminale per accettare la chiave host.",

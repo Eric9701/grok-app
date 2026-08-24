@@ -520,7 +520,7 @@ export const deSettings = {
   "settings.ssh.loginTitle": "Auf dem Remote-Host anmelden",
   "settings.ssh.loginHint": "Gerätecode-Login ist für SSH gedacht. Hier kopieren und ausführen; es wird ein TTY zugeteilt.",
   "settings.ssh.sshBinaryMissing": "OpenSSH-Client (ssh) wurde auf diesem Rechner nicht gefunden.",
-  "settings.ssh.honesty": "Dieser Tab testet nur SSH und die Remote-Grok-CLI. Er öffnet noch keinen Remote-Ordner und startet keine Remote-Session.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "Noch nicht getestet",
   "settings.ssh.batchMode": "Tests nutzen schlüsselbasiertes OpenSSH (BatchMode). Keine Passwort-Prompts.",
   "settings.ssh.hostKeyHint": "Beim ersten Verbinden einmal ssh {alias} im Terminal ausführen, um den Host-Key zu akzeptieren.",

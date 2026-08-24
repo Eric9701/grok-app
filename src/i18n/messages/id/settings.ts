@@ -520,7 +520,7 @@ export const idSettings = {
   "settings.ssh.loginTitle": "Masuk di host jarak jauh",
   "settings.ssh.loginHint": "Login kode perangkat untuk SSH. Salin dan jalankan di sini; TTY dialokasikan.",
   "settings.ssh.sshBinaryMissing": "Klien OpenSSH (ssh) tidak ditemukan di mesin ini.",
-  "settings.ssh.honesty": "Tab ini hanya menguji SSH dan Grok CLI jarak jauh. Belum membuka folder jarak jauh atau memulai session jarak jauh.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "Belum diuji",
   "settings.ssh.batchMode": "Tes memakai OpenSSH berbasis kunci (BatchMode). Tidak ada prompt kata sandi.",
   "settings.ssh.hostKeyHint": "Jika ini koneksi pertama, jalankan ssh {alias} sekali di terminal untuk menerima kunci host.",

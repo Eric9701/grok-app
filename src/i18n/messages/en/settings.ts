@@ -521,7 +521,7 @@ export const enSettings = {
   "settings.ssh.loginTitle": "Sign in on the remote host",
   "settings.ssh.loginHint": "Device-code login is meant for SSH. Copy and run from this machine; it allocates a TTY.",
   "settings.ssh.sshBinaryMissing": "OpenSSH client (ssh) was not found on this machine.",
-  "settings.ssh.honesty": "This tab only tests SSH and remote Grok CLI. It does not open a remote folder or start a remote session yet.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "Not tested yet",
   "settings.ssh.batchMode": "Tests use key-based OpenSSH (BatchMode). Password prompts are not used.",
   "settings.ssh.hostKeyHint": "If this is the first connection, run ssh {alias} once in a terminal to accept the host key.",

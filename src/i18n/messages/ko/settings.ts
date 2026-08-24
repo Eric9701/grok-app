@@ -520,7 +520,7 @@ export const koSettings = {
   "settings.ssh.loginTitle": "원격 호스트에서 로그인",
   "settings.ssh.loginHint": "디바이스 코드 로그인은 SSH 용입니다. 이 컴퓨터에서 복사해 실행하면 TTY 가 할당됩니다.",
   "settings.ssh.sshBinaryMissing": "이 컴퓨터에서 OpenSSH 클라이언트(ssh)를 찾지 못했습니다.",
-  "settings.ssh.honesty": "이 탭은 SSH 와 원격 Grok CLI 만 검사합니다. 아직 원격 폴더를 열거나 원격 session 을 시작하지 않습니다.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "아직 테스트하지 않음",
   "settings.ssh.batchMode": "테스트는 키 기반 OpenSSH(BatchMode)만 사용합니다. 비밀번호 프롬프트는 쓰지 않습니다.",
   "settings.ssh.hostKeyHint": "처음 연결하는 경우 터미널에서 ssh {alias} 를 한 번 실행해 호스트 키를 수락하세요.",

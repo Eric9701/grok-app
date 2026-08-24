@@ -520,7 +520,7 @@ export const ukSettings = {
   "settings.ssh.loginTitle": "Увійти на віддаленому хості",
   "settings.ssh.loginHint": "Вхід за кодом пристрою розрахований на SSH. Скопіюйте й запустіть тут; виділяється TTY.",
   "settings.ssh.sshBinaryMissing": "Клієнт OpenSSH (ssh) не знайдено на цій машині.",
-  "settings.ssh.honesty": "Ця вкладка лише перевіряє SSH і віддалений Grok CLI. Поки не відкриває віддалену теку і не запускає віддалений session.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "Ще не перевірено",
   "settings.ssh.batchMode": "Перевірки йдуть ключем OpenSSH (BatchMode). Пароль не запитується.",
   "settings.ssh.hostKeyHint": "Під час першого з’єднання виконайте ssh {alias} в терміналі, щоб прийняти ключ хоста.",

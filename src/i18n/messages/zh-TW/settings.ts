@@ -521,7 +521,7 @@ export const zhTWSettings = {
   "settings.ssh.loginTitle": "在遠端主機登入",
   "settings.ssh.loginHint": "裝置碼登入適合 SSH。在本機複製執行，會配置 TTY。",
   "settings.ssh.sshBinaryMissing": "本機找不到 OpenSSH 用戶端（ssh）。",
-  "settings.ssh.honesty": "這個分頁只測試 SSH 與遠端 Grok CLI。還不會開啟遠端目錄，也不會啟動遠端 session。",
+  "settings.ssh.honesty": "開啟 Watch 後會列出遠端會話，並在那台機器上跑 grok。斷線後主機上的 grok agent leader 還在，下次可以接回去。不是 tmux。",
   "settings.ssh.notProbed": "尚未測試",
   "settings.ssh.batchMode": "測試只使用金鑰登入（BatchMode），不會跳出密碼框。",
   "settings.ssh.hostKeyHint": "若是第一次連這台機器，請先在終端機執行 ssh {alias}，接受主機金鑰。",

@@ -1349,7 +1349,9 @@ impl AcpClient {
         let auto_wake_enabled = settings.auto_wake_enabled;
         let two_pass_compaction = settings.two_pass_compaction_enabled;
         let memory_enabled = settings.experimental_memory;
-        let use_leader = ssh_alias.is_none() && settings.use_leader;
+        // SSH Wave 4 always asks for --leader. The remote script fail-opens to
+        // --no-leader if `~/.grok/leader.sock` never appears.
+        let use_leader = ssh_alias.is_some() || settings.use_leader;
         let plan_enabled = settings.plan_enabled;
         let disable_web = settings.disable_web_search;
         // Session override wins when set; else global Settings.

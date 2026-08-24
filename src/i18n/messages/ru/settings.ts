@@ -520,7 +520,7 @@ export const ruSettings = {
   "settings.ssh.loginTitle": "Войти на удалённом хосте",
   "settings.ssh.loginHint": "Вход по коду устройства рассчитан на SSH. Скопируйте и запустите здесь; выделяется TTY.",
   "settings.ssh.sshBinaryMissing": "Клиент OpenSSH (ssh) не найден на этой машине.",
-  "settings.ssh.honesty": "Эта вкладка только проверяет SSH и удалённый Grok CLI. Пока не открывает удалённую папку и не запускает удалённый session.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "Ещё не проверено",
   "settings.ssh.batchMode": "Проверки идут ключом OpenSSH (BatchMode). Пароль не запрашивается.",
   "settings.ssh.hostKeyHint": "При первом подключении выполните ssh {alias} в терминале, чтобы принять ключ хоста.",

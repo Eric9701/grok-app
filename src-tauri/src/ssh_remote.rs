@@ -1029,12 +1029,33 @@ if [ -z "$BIN" ] && [ -x "$HOME/.grok/bin/grok" ]; then BIN="$HOME/.grok/bin/gro
 if [ -z "$BIN" ]; then echo GROK_APP_CLI_MISSING >&2; exit 127; fi
 "#;
 
+/// Start (or reuse) `grok agent leader --no-exit-on-disconnect` on the host
+/// so a dropped SSH stdio client can reconnect. Fail open to `--no-leader`
+/// when the socket never appears (old CLI / start failed).
+const REMOTE_ACP_LEADER: &str = r#"SOCK="${GROK_LEADER_SOCKET:-$HOME/.grok/leader.sock}"
+if [ ! -S "$SOCK" ]; then
+  mkdir -p "$(dirname "$SOCK")" 2>/dev/null || true
+  nohup "$BIN" agent leader --no-exit-on-disconnect --no-auto-update --leader-socket "$SOCK" </dev/null >/dev/null 2>&1 &
+  n=0
+  while [ "$n" -lt 3 ] && [ ! -S "$SOCK" ]; do
+    sleep 1
+    n=$((n+1))
+  done
+fi
+if [ -S "$SOCK" ]; then
+  LEADER_FLAG=--leader
+else
+  LEADER_FLAG=--no-leader
+fi
+"#;
+
 /// One remote `-c` script: cd + `exec grok <quoted flags>`. Never interpolates the alias.
 pub fn ssh_acp_remote_command(remote_cwd: &str, grok_args: &[String]) -> Result<String, String> {
     if remote_cwd.contains('\0') || grok_args.iter().any(|a| a.contains('\0')) {
         return Err("invalid remote ACP command".into());
     }
     let mut script = REMOTE_ACP_HEADER.to_string();
+    script.push_str(REMOTE_ACP_LEADER);
     let dir = remote_cwd.trim();
     if !dir.is_empty() {
         let q = posix_single_quote(dir);
@@ -1044,8 +1065,14 @@ pub fn ssh_acp_remote_command(remote_cwd: &str, grok_args: &[String]) -> Result<
     }
     script.push_str("exec \"$BIN\"");
     for a in grok_args {
+        if a == "--leader" || a == "--no-leader" {
+            continue;
+        }
         script.push(' ');
         script.push_str(&posix_single_quote(a));
+        if a == "agent" {
+            script.push_str(" \"$LEADER_FLAG\"");
+        }
     }
     script.push('\n');
     Ok(script)
@@ -3330,6 +3357,10 @@ Host "build-server"
         assert!(script.contains("'--no-auto-update'"));
         assert!(script.contains("'stdio'"));
         assert!(script.contains("GROK_APP_CLI_MISSING"));
+        assert!(script.contains("agent leader --no-exit-on-disconnect"));
+        assert!(script.contains("\"$LEADER_FLAG\""));
+        assert!(!script.contains("'--no-leader'"));
+        assert!(!script.contains("'--leader'"));
         assert!(!script.contains("UTS"));
         let quoted =
             ssh_acp_remote_command("/tmp", &["--rules".into(), "it's fine".into()]).unwrap();
@@ -3358,8 +3389,35 @@ Host "build-server"
         assert!(script.contains("GROK_APP_CLI_MISSING"));
         assert!(script.contains(posix_single_quote("/data/pengqlu/my proj").as_str()));
         assert!(script.contains("'stdio'"));
+        assert!(script.contains("\"$LEADER_FLAG\""));
+        assert!(script.contains("agent leader --no-exit-on-disconnect"));
         assert!(!script.contains("UTS"));
         assert!(ssh_acp_argv("host;rm", "/tmp", &[]).is_err());
+    }
+
+    #[test]
+    fn ssh_acp_remote_command_fail_opens_leader_flag() {
+        let script = ssh_acp_remote_command(
+            "/tmp",
+            &[
+                "agent".into(),
+                "--leader".into(),
+                "--model".into(),
+                "grok-4.6".into(),
+                "stdio".into(),
+            ],
+        )
+        .unwrap();
+        assert!(script.contains("LEADER_FLAG=--leader"));
+        assert!(script.contains("LEADER_FLAG=--no-leader"));
+        assert!(script.contains("'agent' \"$LEADER_FLAG\""));
+        assert!(script.contains("'--model'"));
+        assert!(script.contains("'grok-4.6'"));
+        assert!(!script.contains("'--leader'"));
+        let i_agent = script.find("'agent'").expect("agent");
+        let i_stdio = script.find("'stdio'").expect("stdio");
+        assert!(i_agent < i_stdio);
+        assert!(script[i_agent..i_stdio].contains("\"$LEADER_FLAG\""));
     }
 
     #[test]

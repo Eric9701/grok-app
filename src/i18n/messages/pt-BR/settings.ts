@@ -520,7 +520,7 @@ export const ptBRSettings = {
   "settings.ssh.loginTitle": "Entrar no host remoto",
   "settings.ssh.loginHint": "O login por código de dispositivo é para SSH. Copie e execute aqui; um TTY é alocado.",
   "settings.ssh.sshBinaryMissing": "Cliente OpenSSH (ssh) não encontrado nesta máquina.",
-  "settings.ssh.honesty": "Esta aba só testa SSH e o Grok CLI remoto. Ainda não abre uma pasta distante nem inicia uma session distante.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "Ainda não testado",
   "settings.ssh.batchMode": "Os testes usam OpenSSH com chave (BatchMode). Sem prompt de senha.",
   "settings.ssh.hostKeyHint": "Na primeira conexão, execute ssh {alias} uma vez no terminal para aceitar a chave do host.",

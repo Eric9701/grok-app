@@ -521,7 +521,7 @@ export const zhSettings = {
   "settings.ssh.loginTitle": "在远程主机登录",
   "settings.ssh.loginHint": "设备码登录适合 SSH。在本机复制运行，会分配 TTY。",
   "settings.ssh.sshBinaryMissing": "本机没有找到 OpenSSH 客户端（ssh）。",
-  "settings.ssh.honesty": "这个页签只测试 SSH 和远程 Grok CLI。还不会打开远程目录，也不会启动远程 session。",
+  "settings.ssh.honesty": "开启 Watch 后会列出远程会话，并在那台机器上跑 grok。断开后主机上的 grok agent leader 还在，下次可以接回去。不是 tmux。",
   "settings.ssh.notProbed": "尚未测试",
   "settings.ssh.batchMode": "测试只用密钥登录（BatchMode），不会弹出密码框。",
   "settings.ssh.hostKeyHint": "如果是第一次连这台机器，先在终端运行 ssh {alias}，接受主机密钥。",

@@ -520,7 +520,7 @@ export const jaSettings = {
   "settings.ssh.loginTitle": "リモートでサインイン",
   "settings.ssh.loginHint": "デバイスコードログインは SSH 向けです。このマシンでコピーして実行すると TTY が割り当てられます。",
   "settings.ssh.sshBinaryMissing": "このマシンに OpenSSH クライアント (ssh) が見つかりません。",
-  "settings.ssh.honesty": "このタブは SSH とリモート Grok CLI の確認だけです。リモートフォルダを開いたりリモート session を開始したりはまだしません。",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "未テスト",
   "settings.ssh.batchMode": "テストは鍵認証のみ（BatchMode）。パスワードプロンプトは使いません。",
   "settings.ssh.hostKeyHint": "初回接続の場合は、ターミナルで ssh {alias} を一度実行してホスト鍵を承認してください。",

@@ -520,7 +520,7 @@ export const filSettings = {
   "settings.ssh.loginTitle": "Mag-sign in sa remote host",
   "settings.ssh.loginHint": "Ang device-code login ay para sa SSH. Kopyahin at patakbuhin dito; may TTY.",
   "settings.ssh.sshBinaryMissing": "Hindi nahanap ang OpenSSH client (ssh) sa makinang ito.",
-  "settings.ssh.honesty": "Tine-test lang ng tab na ito ang SSH at remote Grok CLI. Hindi pa nito binubuksan ang remote folder o sinisimulan ang remote session.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "Hindi pa na-test",
   "settings.ssh.batchMode": "Key-based OpenSSH (BatchMode) lang. Walang password prompt.",
   "settings.ssh.hostKeyHint": "Kung unang connection ito, patakbuhin ang ssh {alias} minsan sa terminal para tanggapin ang host key.",

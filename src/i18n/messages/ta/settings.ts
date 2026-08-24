@@ -520,7 +520,7 @@ export const taSettings = {
   "settings.ssh.loginTitle": "தொலை புரவலரில் உள்நுழை",
   "settings.ssh.loginHint": "சாதனக் குறியீடு உள்நுழைவு SSH-க்கு. இங்கே நகலெடுத்து இயக்கவும்; TTY ஒதுக்கப்படும்.",
   "settings.ssh.sshBinaryMissing": "இந்தக் கணினியில் OpenSSH வாங்கி (ssh) காணவில்லை.",
-  "settings.ssh.honesty": "இந்தத் தாவல் SSH மற்றும் தொலை Grok CLI-ஐ மட்டும் சோதிக்கிறது. தொலைக் கோப்புறையையோ தொலை session-ஐயோ இன்னும் தொடங்காது.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "இன்னும் சோதிக்கவில்லை",
   "settings.ssh.batchMode": "சோதனைகள் சாவி அடிப்படையிலான OpenSSH (BatchMode) மட்டும். கடவுச்சொல் கேட்காது.",
   "settings.ssh.hostKeyHint": "முதல் இணைப்பானால், முனையத்தில் ssh {alias} ஐ ஒருமுறை இயக்கி புரவலர் சாவியை ஏற்கவும்.",

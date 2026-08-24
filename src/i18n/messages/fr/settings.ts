@@ -520,7 +520,7 @@ export const frSettings = {
   "settings.ssh.loginTitle": "Se connecter sur l’hôte distant",
   "settings.ssh.loginHint": "La connexion par code d’appareil est faite pour SSH. Copiez et exécutez ici ; un TTY est alloué.",
   "settings.ssh.sshBinaryMissing": "Client OpenSSH (ssh) introuvable sur cette machine.",
-  "settings.ssh.honesty": "Cet onglet teste seulement SSH et Grok CLI distant. Il n’ouvre pas encore un dossier distant ni une session distante.",
+  "settings.ssh.honesty": "Watching a host lists remote chats and runs grok there. A grok agent leader stays on the host after disconnect so you can reconnect. This is not tmux.",
   "settings.ssh.notProbed": "Pas encore testé",
   "settings.ssh.batchMode": "Les tests utilisent OpenSSH par clé (BatchMode). Pas d’invite mot de passe.",
   "settings.ssh.hostKeyHint": "Pour une première connexion, exécutez ssh {alias} une fois dans un terminal pour accepter la clé d’hôte.",
