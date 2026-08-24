@@ -789,32 +789,72 @@ pub fn percent_decode_path(enc: &str) -> String {
 }
 
 fn control_dir() -> PathBuf {
-    crate::paths::app_data_root().join("ssh-cm")
+    if let Ok(custom) = std::env::var("GROK_APP_SSH_CM") {
+        return PathBuf::from(custom);
+    }
+    // macOS data_dir is `Library/Application Support/...` (spaces). OpenSSH
+    // parses `-o` as a config line, so an unquoted ControlPath there becomes
+    // `keyword controlpath extra arguments at end of line`. cache_dir is
+    // `Library/Caches/...` and shorter for AF_UNIX sun_path.
+    directories::ProjectDirs::from("com", "grokapp", "grok-app")
+        .map(|p| p.cache_dir().join("ssh-cm"))
+        .unwrap_or_else(|| std::env::temp_dir().join("grok-app-ssh-cm"))
 }
 
 fn control_path(alias: &str) -> PathBuf {
     control_dir().join(format!("{alias}.sock"))
 }
 
-fn apply_common_ssh_opts(cmd: &mut Command, alias: &str, mux: bool) {
+/// `-o KEY=VALUE` is a ssh_config line. Quote values that contain spaces.
+fn ssh_config_assignment(key: &str, value: &str) -> String {
+    if ssh_config_value_needs_quotes(value) {
+        format!("{key}=\"{}\"", escape_ssh_config_value(value))
+    } else {
+        format!("{key}={value}")
+    }
+}
+
+fn ssh_config_value_needs_quotes(value: &str) -> bool {
+    value.is_empty()
+        || value.bytes().any(|b| {
+            matches!(
+                b,
+                b' ' | b'\t' | b'"' | b'\'' | b'#' | b'\\' | b'=' | b'\n' | b'\r'
+            )
+        })
+}
+
+fn escape_ssh_config_value(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn push_ssh_opt(cmd: &mut Command, key: &str, value: impl AsRef<str>) {
     cmd.arg("-o")
-        .arg("BatchMode=yes")
-        .arg("-o")
-        .arg(format!("ConnectTimeout={SSH_CONNECT_TIMEOUT_SECS}"))
-        .arg("-o")
-        .arg("PasswordAuthentication=no")
-        .arg("-o")
-        .arg("KbdInteractiveAuthentication=no")
-        .arg("-o")
-        .arg("StrictHostKeyChecking=yes");
+        .arg(ssh_config_assignment(key, value.as_ref()));
+}
+
+fn apply_base_ssh_opts(cmd: &mut Command) {
+    push_ssh_opt(cmd, "BatchMode", "yes");
+    push_ssh_opt(cmd, "ConnectTimeout", SSH_CONNECT_TIMEOUT_SECS.to_string());
+    push_ssh_opt(cmd, "PasswordAuthentication", "no");
+    push_ssh_opt(cmd, "KbdInteractiveAuthentication", "no");
+    push_ssh_opt(cmd, "StrictHostKeyChecking", "yes");
+}
+
+fn apply_control_opts(cmd: &mut Command, alias: &str, master: &str) {
+    push_ssh_opt(cmd, "ControlMaster", master);
+    push_ssh_opt(
+        cmd,
+        "ControlPath",
+        control_path(alias).to_string_lossy().as_ref(),
+    );
+    push_ssh_opt(cmd, "ControlPersist", "yes");
+}
+
+fn apply_common_ssh_opts(cmd: &mut Command, alias: &str, mux: bool) {
+    apply_base_ssh_opts(cmd);
     if mux {
-        let path = control_path(alias);
-        cmd.arg("-o")
-            .arg("ControlMaster=auto")
-            .arg("-o")
-            .arg(format!("ControlPath={}", path.display()))
-            .arg("-o")
-            .arg("ControlPersist=yes");
+        apply_control_opts(cmd, alias, "auto");
     }
 }
 
@@ -1071,14 +1111,9 @@ pub async fn ssh_watch_start(alias: String) -> Result<SshWatchResult, String> {
     let path = control_path(&alias);
     let mut cmd = Command::new(&ssh);
     process_util::apply_no_window_tokio(&mut cmd);
-    apply_common_ssh_opts(&mut cmd, &alias, false);
-    cmd.arg("-o")
-        .arg("ControlMaster=yes")
-        .arg("-o")
-        .arg(format!("ControlPath={}", path.display()))
-        .arg("-o")
-        .arg("ControlPersist=yes")
-        .arg("-fN")
+    apply_base_ssh_opts(&mut cmd);
+    apply_control_opts(&mut cmd, &alias, "yes");
+    cmd.arg("-fN")
         .arg(&alias)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -1107,12 +1142,13 @@ pub async fn ssh_watch_start(alias: String) -> Result<SshWatchResult, String> {
             let stderr = String::from_utf8_lossy(&o.stderr);
             let mut check = Command::new(&ssh);
             process_util::apply_no_window_tokio(&mut check);
-            check
-                .arg("-O")
-                .arg("check")
-                .arg("-o")
-                .arg(format!("ControlPath={}", path.display()))
-                .arg(&alias)
+            check.arg("-O").arg("check");
+            push_ssh_opt(
+                &mut check,
+                "ControlPath",
+                path.to_string_lossy().as_ref(),
+            );
+            check.arg(&alias)
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null());
@@ -1161,11 +1197,9 @@ pub async fn ssh_watch_stop(alias: String) -> Result<SshWatchResult, String> {
         let path = control_path(&alias);
         let mut cmd = Command::new(&ssh);
         process_util::apply_no_window_tokio(&mut cmd);
-        cmd.arg("-O")
-            .arg("exit")
-            .arg("-o")
-            .arg(format!("ControlPath={}", path.display()))
-            .arg(&alias)
+        cmd.arg("-O").arg("exit");
+        push_ssh_opt(&mut cmd, "ControlPath", path.to_string_lossy().as_ref());
+        cmd.arg(&alias)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
@@ -1497,5 +1531,84 @@ Host "build-server"
         assert_eq!(s[0].cwd, "/work");
         assert_eq!(s[0].title, "Fix bug");
         assert_eq!(s[1].title, "id2");
+    }
+
+    #[test]
+    fn controlpath_with_spaces_is_quoted_for_ssh_o() {
+        let path = "/Users/me/Library/Application Support/com.grokapp.grok-app/ssh-cm/UTS.sock";
+        let a = ssh_config_assignment("ControlPath", path);
+        assert_eq!(
+            a,
+            r#"ControlPath="/Users/me/Library/Application Support/com.grokapp.grok-app/ssh-cm/UTS.sock""#
+        );
+        assert!(!a.starts_with("ControlPath=/Users"));
+    }
+
+    #[test]
+    fn simple_controlpath_stays_unquoted() {
+        assert_eq!(
+            ssh_config_assignment("ControlPath", "/tmp/grok-app-ssh-cm/UTS.sock"),
+            "ControlPath=/tmp/grok-app-ssh-cm/UTS.sock"
+        );
+    }
+
+    #[test]
+    fn openssh_rejects_unquoted_controlpath_with_spaces() {
+        let Some(ssh) = find_ssh_binary() else {
+            return;
+        };
+        let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
+        let out = std::process::Command::new(ssh)
+            .args([
+                "-G",
+                "-F",
+                null,
+                "-o",
+                "ControlPath=/tmp/Application Support/x.sock",
+                "-o",
+                "BatchMode=yes",
+                "127.0.0.1",
+            ])
+            .output()
+            .expect("ssh -G");
+        let stderr = String::from_utf8_lossy(&out.stderr).to_ascii_lowercase();
+        assert!(
+            stderr.contains("extra arguments"),
+            "expected OpenSSH extra-arguments error, got: {stderr}"
+        );
+    }
+
+    #[test]
+    fn openssh_accepts_quoted_controlpath_with_spaces() {
+        let Some(ssh) = find_ssh_binary() else {
+            return;
+        };
+        let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
+        let path = "/tmp/Application Support/x.sock";
+        let opt = ssh_config_assignment("ControlPath", path);
+        let out = std::process::Command::new(ssh)
+            .args([
+                "-G",
+                "-F",
+                null,
+                "-o",
+                &opt,
+                "-o",
+                "BatchMode=yes",
+                "127.0.0.1",
+            ])
+            .output()
+            .expect("ssh -G");
+        let stderr = String::from_utf8_lossy(&out.stderr).to_ascii_lowercase();
+        assert!(
+            !stderr.contains("extra arguments"),
+            "quoted ControlPath still rejected: {stderr}"
+        );
+        assert!(out.status.success(), "ssh -G failed: {stderr}");
+        let stdout = String::from_utf8_lossy(&out.stdout).to_ascii_lowercase();
+        assert!(
+            stdout.contains("controlpath"),
+            "ssh -G did not echo controlpath"
+        );
     }
 }
