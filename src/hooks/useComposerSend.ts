@@ -1,6 +1,7 @@
 /**
  * Composer send path: executeSend, submit, and post-submit draft clear.
- * Host remains the composition root (connect, live map, settings).
+ * Host remains the composition root for composer chrome. Connect/live map
+ * live in useSessionConnect; settings prefs in useAppSettingsPrefs.
  */
 import {
   useCallback,

@@ -57,6 +57,8 @@
    **WP-W23 已落地**：composer 听写 FSM + live-voice 开合 → `useVoiceDictation`。host 仍持 voiceId/STT/auto-send 与 send()。天花板 **16650 / 218 / 88**。
    **WP-W24 已落地**：executeSend / submit / 提交后清稿 → `useComposerSend`。host 仍持 connect、live map、settings。天花板 **16030 / 218 / 88**。
    **WP-W25 已落地**：Settings 开合 / section / tab / focus / hash / last-route / native cover → `useSettingsNavigation`。labels 袋 → `settingsLabels.ts`。host 仍持 settingsGet 水合与 prefs 值。天花板 **15790 / 214 / 84**。
+   **WP-W26 已落地**：Host AppSettings prefs 水合 → `parseAppSettingsPrefs` + `useAppSettingsPrefs`。locale/composer chips/CLI probe 仍在 boot。天花板见 W27。
+   **WP-W27 已落地**：ensureConnected + connecting claims + liveMap 订阅 → `useSessionConnect`。#870 验收：改 settings 导航/prefs/connect 不必打开 host 函数体。天花板 **15350 / 160 / 83**。
    **pi**：协作者本机无 pi，按 owner 规则跳过。
    **5 个 worktree**：误会。远端 `main` 已含那些产品改动（本地只是 squash 后残留 SHA）。不挡大拆。
 5. 5.6k 行 JSX 拆为 view shell + 域容器；modals 先经既有 `useAppDialogs` 收口。

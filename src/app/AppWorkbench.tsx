@@ -110,10 +110,6 @@ import {
   type PermissionPayload,
 } from "@/lib/session";
 import {
-  DEFAULT_SESSION_DATA_MODE,
-  normalizeSessionDataMode,
-} from "@/lib/sessionDataMode";
-import {
   INITIAL_CONTEXT_USAGE,
   resolveContextUsageDisplay,
   type ContextUsageState,
@@ -170,7 +166,6 @@ import {
 import * as api from "@/lib/api";
 import { queueComposerPreferenceApply } from "@/lib/composerPrefsBarrier";
 import {
-  DEFAULT_SANDBOX_PROFILE,
   isDangerousSandboxProfile,
   normalizeSandboxProfile,
   sandboxDangerConfirmKey,
@@ -198,17 +193,7 @@ import {
   shouldEscapeCloseSettings,
   shouldEscapeStopGeneration,
 } from "@/lib/escapeStop";
-import {
-  isSameView,
-  shouldAdoptView,
-} from "@/lib/viewFocus";
-import {
-  projectHostIntoLiveMap,
-} from "@/lib/sessionLiveStore";
 import { endOfTurnMarkerContent } from "@/lib/endOfTurn";
-import {
-  reconcileSessionState,
-} from "@/lib/sessionPhase";
 import {
   isMirrorClient,
   mirrorEnsureTransport,
@@ -247,7 +232,6 @@ import {
   pickDefaultEffort,
   pickDefaultModelId,
   resolveContextWindow,
-  type ComposerPrefsScope,
   type EffortOption,
   type ModelOption,
   type PermissionPolicyId,
@@ -280,7 +264,6 @@ import { planDisplayMarkdown } from "@/lib/planBody";
 import {
   connPillForState,
   connPillRetryable,
-  isViewedSessionConnecting,
   shouldDisableReconnectBecauseConnecting,
 } from "@/lib/connStatus";
 import {
@@ -439,13 +422,11 @@ import {
 } from "@/components/PromptHistoryPanel";
 import {
   makeQueuedSend,
-  migrateDraftSendClaim,
   queueSessionKey,
   resolveSendQueueStripState,
   type QueuedSend,
 } from "@/lib/sendQueue";
 import {
-  migrateDraftTurnClock,
   resolveTurnClockKey,
   shouldSyncViewedTurnClock,
 } from "@/lib/turnClock";
@@ -694,7 +675,7 @@ import {
 import type { ContextMenuState } from "@/lib/app/appDialogTypes";
 import { useSessionRuntime } from "@/hooks/useSessionRuntime";
 import { sessionTranscriptStore } from "@/lib/sessionTranscriptStore";
-import { useLiveMapWhen } from "@/hooks/useSessionLiveMap";
+import { useSessionConnect, createSessionConnectHost } from "@/hooks/useSessionConnect";
 import { useComposerController } from "@/hooks/useComposerController";
 import { useTypeToFocusComposer } from "@/hooks/useTypeToFocusComposer";
 import { useAppDialogs } from "@/hooks/useAppDialogs";
@@ -705,6 +686,7 @@ import { useAccountQuotaAutoRefresh } from "@/hooks/useAccountQuotaAutoRefresh";
 import { useWorkbenchDisplayPrefs } from "@/hooks/useWorkbenchDisplayPrefs";
 import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
 import { useSettingsNavigation } from "@/hooks/useSettingsNavigation";
+import { useAppSettingsPrefs } from "@/hooks/useAppSettingsPrefs";
 import { useSearchPalette } from "@/hooks/useSearchPalette";
 import { useCompactDialog } from "@/hooks/useCompactDialog";
 import { useQueueEditDialog } from "@/hooks/useQueueEditDialog";
@@ -1376,8 +1358,6 @@ export function AppWorkbench() {
   const composerFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const [sessionDataMode, setSessionDataMode] = useState(DEFAULT_SESSION_DATA_MODE);
-  const [defaultOpenTarget, setDefaultOpenTarget] = useState("finder");
   const [showUserMenu, setShowUserMenu] = useState(false);
   /** Desktop Connect panel (AC7) — close does not stop host. */
 
@@ -1399,6 +1379,7 @@ export function AppWorkbench() {
   const automationSetupSessionsRef = useRef(new Set<string>());
   const automationAppliedRef = useRef(new Set<string>());
   const sessionNavHostRef = useRef(createSessionNavHost());
+  const sessionConnectHostRef = useRef(createSessionConnectHost());
   const {
     openSession,
     newChat,
@@ -1889,9 +1870,6 @@ export function AppWorkbench() {
   /** Live selectable models from Host (official CLI catalog only; not providers). */
   const [availableModels, setAvailableModels] =
     useState<ModelOption[]>(GROK_BUILD_MODELS);
-  /** Where model/permission chips are remembered. */
-  const [prefsScope, setPrefsScope] =
-    useState<ComposerPrefsScope>("global");
   const sidebarRowMetrics = sidebarSessionRowMetrics(sidebarDensity);
   /** Chat file/url card → open in right resource pane / Side Workbench. */
   const [resourceOpenTarget, setResourceOpenTarget] =
@@ -1932,28 +1910,118 @@ export function AppWorkbench() {
     mapProbeToCliInfo({ found: false }),
   );
   const [cliAgentSkewRepairing, setCliAgentSkewRepairing] = useState(false);
-  const [manualCliPath, setManualCliPath] = useState("");
-  const [acpServerAddr, setAcpServerAddr] = useState("");
-  const [proxyMode, setProxyMode] = useState("system");
-  const [proxyUrl, setProxyUrl] = useState("");
-  const [proxyNoProxy, setProxyNoProxy] = useState("");
-  const [maxConcurrentAgents, setMaxConcurrentAgents] = useState(8);
+  const {
+    sessionDataMode,
+    setSessionDataMode,
+    defaultOpenTarget,
+    setDefaultOpenTarget,
+    prefsScope,
+    setPrefsScope,
+    acpServerAddr,
+    setAcpServerAddr,
+    proxyMode,
+    setProxyMode,
+    proxyUrl,
+    setProxyUrl,
+    proxyNoProxy,
+    setProxyNoProxy,
+    maxConcurrentAgents,
+    setMaxConcurrentAgents,
+    agentIdleMinutes,
+    setAgentIdleMinutes,
+    streamStallSeconds,
+    setStreamStallSeconds,
+    auditLedgerRetentionDays,
+    setAuditLedgerRetentionDays,
+    includePartialMessages,
+    setIncludePartialMessages,
+    maxAgentTurns,
+    setMaxAgentTurns,
+    backgroundWaitPolicy,
+    setBackgroundWaitPolicy,
+    backgroundWaitTimeoutSec,
+    setBackgroundWaitTimeoutSec,
+    storeApiKeysInKeychain,
+    setStoreApiKeysInKeychain,
+    sandboxProfile,
+    setSandboxProfile,
+    preferredAgent,
+    setPreferredAgent,
+    agentProfilePath,
+    setAgentProfilePath,
+    agentsJson,
+    setAgentsJson,
+    agentCatalog,
+    setAgentCatalog,
+    experimentalMemory,
+    setExperimentalMemory,
+    twoPassCompactionEnabled,
+    setTwoPassCompactionEnabled,
+    voiceId,
+    setVoiceId,
+    voiceDictationAutoSend,
+    setVoiceDictationAutoSend,
+    voiceKeepAgentsOnEnd,
+    setVoiceKeepAgentsOnEnd,
+    sttEngine,
+    setSttEngine,
+    sttCustomBaseUrl,
+    setSttCustomBaseUrl,
+    sttCustomModel,
+    setSttCustomModel,
+    sttCustomLanguage,
+    setSttCustomLanguage,
+    sttZhScript,
+    setSttZhScript,
+    allowUnverifiedCliInstall,
+    setAllowUnverifiedCliInstall,
+    lastCliChecksumVerified,
+    subagentsEnabled,
+    setSubagentsEnabled,
+    subagentWorktreeSnapshotEnabled,
+    setSubagentWorktreeSnapshotEnabled,
+    autoWakeEnabled,
+    setAutoWakeEnabled,
+    workflowsEnabled,
+    setWorkflowsEnabled,
+    planEnabled,
+    setPlanEnabled,
+    todoGateEnabled,
+    setTodoGateEnabled,
+    todoGateMaxFiresPerPrompt,
+    setTodoGateMaxFiresPerPrompt,
+    disableWebSearch,
+    setDisableWebSearch,
+    noAskUser,
+    setNoAskUser,
+    disallowedTools,
+    setDisallowedTools,
+    allowedTools,
+    setAllowedTools,
+    useLeader,
+    setUseLeader,
+    reopenLastSession,
+    setReopenLastSession,
+    closeToTray,
+    setCloseToTray,
+    keepTrayForSchedules,
+    setKeepTrayForSchedules,
+    launchAtLogin,
+    setLaunchAtLogin,
+    notifyOnTurnDone,
+    setNotifyOnTurnDone,
+    notifyOnPermission,
+    setNotifyOnPermission,
+    notifyPrefsRef,
+    lastSessionId,
+    setLastSessionId,
+    manualCliPath,
+    setManualCliPath,
+    hydrateFromSettings,
+  } = useAppSettingsPrefs();
   /** Last process_limit event for Settings / Reliability honesty (ids only). */
   const [lastProcessLimit, setLastProcessLimit] =
     useState<ProcessLimitEvent | null>(null);
-  const [agentIdleMinutes, setAgentIdleMinutes] = useState(30);
-  const [streamStallSeconds, setStreamStallSeconds] = useState(600);
-  /** Tool audit ledger retention days: 7 | 30 | 90 | 0 = unlimited. */
-  const [auditLedgerRetentionDays, setAuditLedgerRetentionDays] = useState(0);
-  /** Headless partial stream events (CLI 0.2.117+). */
-  const [includePartialMessages, setIncludePartialMessages] = useState(false);
-  /** 0 = omit `--max-turns` (CLI default). */
-  const [maxAgentTurns, setMaxAgentTurns] = useState(0);
-  /** Headless bg wait: wait | no_wait | timeout (CLI 0.2.117+). */
-  const [backgroundWaitPolicy, setBackgroundWaitPolicy] = useState("wait");
-  const [backgroundWaitTimeoutSec, setBackgroundWaitTimeoutSec] = useState(600);
-  const [storeApiKeysInKeychain, setStoreApiKeysInKeychain] = useState(false);
-  const [sandboxProfile, setSandboxProfile] = useState(DEFAULT_SANDBOX_PROFILE);
   const {
     open: sandboxWizardOpen,
     mode: sandboxWizardMode,
@@ -1963,31 +2031,6 @@ export function AppWorkbench() {
     skip: skipSandboxWizard,
     finishApply: finishSandboxWizardApply,
   } = useSandboxWizard({ sandboxProfile });
-  /** Preferred CLI agent definition for spawn (`""` = CLI default). */
-  const [preferredAgent, setPreferredAgent] = useState("");
-  /** Optional `grok agent --agent-profile <PATH>` (empty = omit). */
-  const [agentProfilePath, setAgentProfilePath] = useState("");
-  /** Optional top-level `grok --agents <JSON>` (empty = omit). */
-  const [agentsJson, setAgentsJson] = useState("");
-  const [agentCatalog, setAgentCatalog] = useState<
-    Array<{ name: string; source: string }>
-  >([]);
-  const [experimentalMemory, setExperimentalMemory] = useState(false);
-  const [twoPassCompactionEnabled, setTwoPassCompactionEnabled] =
-    useState(false);
-  const [voiceId, setVoiceId] = useState("eve");
-  const [voiceDictationAutoSend, setVoiceDictationAutoSend] = useState(false);
-  const [voiceKeepAgentsOnEnd, setVoiceKeepAgentsOnEnd] = useState(true);
-  const [sttEngine, setSttEngine] = useState("official");
-  const [sttCustomBaseUrl, setSttCustomBaseUrl] = useState("");
-  const [sttCustomModel, setSttCustomModel] = useState("");
-  const [sttCustomLanguage, setSttCustomLanguage] = useState("");
-  const [sttZhScript, setSttZhScript] = useState("auto");
-  const [allowUnverifiedCliInstall, setAllowUnverifiedCliInstall] =
-    useState(false);
-  const [lastCliChecksumVerified, setLastCliChecksumVerified] = useState<
-    boolean | null
-  >(null);
   const voiceDictationAutoSendRef = useRef(false);
   const sendRef = useRef<(() => Promise<void>) | null>(null);
   const {
@@ -2015,35 +2058,7 @@ export function AppWorkbench() {
     notifyRef: voiceNotifyRef,
   });
   voiceStealsEscapeRef.current = voiceStealsEscapeNow;
-  const [subagentsEnabled, setSubagentsEnabled] = useState(true);
-  const [subagentWorktreeSnapshotEnabled, setSubagentWorktreeSnapshotEnabled] =
-    useState(false);
-  const [autoWakeEnabled, setAutoWakeEnabled] = useState(false);
-  const [workflowsEnabled, setWorkflowsEnabled] = useState(false);
-  const [planEnabled, setPlanEnabled] = useState(true);
-  const [todoGateEnabled, setTodoGateEnabled] = useState(false);
-  const [todoGateMaxFiresPerPrompt, setTodoGateMaxFiresPerPrompt] =
-    useState(3);
-  const [disableWebSearch, setDisableWebSearch] = useState(false);
-  const [noAskUser, setNoAskUser] = useState(false);
-  const [disallowedTools, setDisallowedTools] = useState<string[]>([]);
-  const [allowedTools, setAllowedTools] = useState<string[]>([]);
-  const [useLeader, setUseLeader] = useState(false);
-  /** Default off → launch on draft new-chat page. */
-  const [reopenLastSession, setReopenLastSession] = useState(false);
-  const [closeToTray, setCloseToTray] = useState(true);
-  const [keepTrayForSchedules, setKeepTrayForSchedules] = useState(true);
-  const [launchAtLogin, setLaunchAtLogin] = useState(false);
-  /** Desktop notification prefs (default on). Refs keep event listeners fresh. */
-  const [notifyOnTurnDone, setNotifyOnTurnDone] = useState(true);
-  const [notifyOnPermission, setNotifyOnPermission] = useState(true);
-  const notifyPrefsRef = useRef({
-    notifyOnTurnDone: true,
-    notifyOnPermission: true,
-  });
-  notifyPrefsRef.current = { notifyOnTurnDone, notifyOnPermission };
-  const [lastSessionId, setLastSessionId] = useState<string | null>(null);
-  const didRestoreLastRef = useRef(false);
+    const didRestoreLastRef = useRef(false);
   const [tasksPanelOpen, setTasksPanelOpen] = useState(false);
   const [agentDashboardOpen, setAgentDashboardOpen] = useState(false);
   const [taskBoardOpen, setTaskBoardOpen] = useState(false);
@@ -2117,50 +2132,31 @@ export function AppWorkbench() {
     sawToolActivity?: boolean;
   } | null>(null);
 
-  // Full multi-session liveMap only while chrome that needs every row is open
-  // (Reliability / Agents dashboard / task board / stall / Live Voice chips).
-  const liveMap = useLiveMapWhen(
-    showReliability ||
+  const {
+    connecting,
+    connectingBySessionRef,
+    ensureConnectCountRef,
+    liveMap,
+    claimSessionConnection,
+    releaseSessionConnection,
+    syncEnsureConnectingUi,
+    ensureConnected,
+    retryAgentConnect,
+  } = useSessionConnect({
+    hostRef: sessionConnectHostRef,
+    liveMapEnabled:
+      showReliability ||
       agentDashboardOpen ||
       taskBoardOpen ||
       opsEntryOpen ||
       streamStall != null ||
       liveVoiceOpen ||
       mainPane === "kanban",
-  );
+    viewedSessionId: session.sessionId,
+  });
   /** Queue item currently being steered into the live turn. */
   const [guidingQueueItemId, setGuidingQueueItemId] = useState<string | null>(null);
   /** Queue item open in the edit dialog (`null` when closed). */
-  const [connecting, setConnecting] = useState(false);
-  /** Sync gate for ensureConnected (React state alone races two rapid sends). */
-  const connectingRef = useRef(false);
-  /** Host connection claims are per session; warm-connect must not block B on A. */
-  const connectingBySessionRef = useRef<Set<string>>(new Set());
-  const ensureConnectCountRef = useRef(0);
-  const claimSessionConnection = (sessionId: string | null | undefined) => {
-    const key = queueSessionKey(sessionId);
-    const set = connectingBySessionRef.current;
-    if (set.has(key)) return false;
-    set.add(key);
-    return true;
-  };
-  const releaseSessionConnection = (keys: Iterable<string>) => {
-    const set = connectingBySessionRef.current;
-    for (const key of keys) set.delete(key);
-  };
-  const syncEnsureConnectingUi = () => {
-    const viewedActive = isViewedSessionConnecting(
-      viewingSessionIdRef.current ?? session.sessionId,
-      connectingBySessionRef.current,
-    );
-    connectingRef.current = viewedActive;
-    setConnecting(viewedActive);
-  };
-  // Switching chats must re-project the per-session claim; a foreign
-  // handshake must not keep this view on 连接中.
-  useEffect(() => {
-    syncEnsureConnectingUi();
-  }, [session.sessionId]);
   /** Effort changes respawn the CLI; sends must wait for that write to settle. */
   const effortApplyRef = useRef<Promise<void>>(Promise.resolve());
   /** Live provider retry progress (session://retry); cleared on success/stop/error. */
@@ -2551,17 +2547,7 @@ export function AppWorkbench() {
           const pref = parseLocalePreference(settings.locale);
           setLocalePreference(pref);
           setLocale(resolveLocalePreference(pref));
-          if (
-            settings.composerPrefsScope &&
-            isValidPrefsScope(settings.composerPrefsScope)
-          ) {
-            setPrefsScope(settings.composerPrefsScope);
-          }
-          setSessionDataMode(
-            normalizeSessionDataMode(
-              settings.sessionDataMode || DEFAULT_SESSION_DATA_MODE,
-            ),
-          );
+          hydrateFromSettings(settings);
         }
         const catalog: ModelOption[] =
           modelsRes?.models?.length
@@ -2669,7 +2655,6 @@ export function AppWorkbench() {
         setLocalePreference(pref);
         setLocale(resolveLocalePreference(pref));
       }
-      setManualCliPath(settings.manualCliPath || cli.path || "");
       setCliInfo(mapProbeToCliInfo(cli));
       const cliSeed: SetupCliInfo = {
         found: cli.found,
@@ -2744,12 +2729,6 @@ export function AppWorkbench() {
             })
           : GROK_BUILD_MODELS;
       setAvailableModels(catalog);
-      if (
-        settings.composerPrefsScope &&
-        isValidPrefsScope(settings.composerPrefsScope)
-      ) {
-        setPrefsScope(settings.composerPrefsScope);
-      }
       // Bootstrap: global-effective prefs (context re-resolved when project/session changes).
       const prefs = await api
         .composerPrefsResolve({ projectId: null, sessionId: null })
@@ -2786,159 +2765,8 @@ export function AppWorkbench() {
           );
         }
       }
-      setSessionDataMode(
-        normalizeSessionDataMode(
-          settings.sessionDataMode || DEFAULT_SESSION_DATA_MODE,
-        ),
-      );
-      {
-        const openTarget =
-          (settings as { defaultOpenTarget?: string }).defaultOpenTarget ||
-          "finder";
-        setDefaultOpenTarget(openTarget);
-        // Keep Resource/Review session storage aligned with Host settings.
-        writeOpenTargetStorage(openTarget);
-      }
-      setAcpServerAddr(settings.acpServerAddr || "");
-      {
-        const st = settings as {
-          proxyMode?: string;
-          proxyUrl?: string | null;
-          proxyNoProxy?: string | null;
-        };
-        setProxyMode(st.proxyMode || "system");
-        setProxyUrl(st.proxyUrl || "");
-        setProxyNoProxy(st.proxyNoProxy || "");
-      }
-      setMaxConcurrentAgents(
-        typeof settings.maxConcurrentAgents === "number" &&
-          settings.maxConcurrentAgents >= 1
-          ? Math.min(32, Math.round(settings.maxConcurrentAgents))
-          : 3,
-      );
-      setAgentIdleMinutes(
-        typeof settings.agentIdleMinutes === "number" &&
-          settings.agentIdleMinutes >= 1
-          ? Math.min(1440, Math.round(settings.agentIdleMinutes))
-          : 30,
-      );
-      setStreamStallSeconds(
-        typeof settings.streamStallSeconds === "number" &&
-          settings.streamStallSeconds >= 15
-          ? Math.min(900, Math.round(settings.streamStallSeconds))
-          : 120,
-      );
-      {
-        const raw = settings.auditLedgerRetentionDays;
-        const n =
-          typeof raw === "number" && Number.isFinite(raw) ? Math.floor(raw) : 0;
-        setAuditLedgerRetentionDays(
-          n === 7 || n === 30 || n === 90 ? n : 0,
-        );
-      }
-      setIncludePartialMessages(!!settings.includePartialMessages);
-      {
-        const raw = settings.maxAgentTurns;
-        setMaxAgentTurns(
-          typeof raw === "number" && raw > 0
-            ? Math.min(200, Math.round(raw))
-            : 0,
-        );
-      }
-      {
-        const pol = (settings.backgroundWaitPolicy || "wait")
-          .trim()
-          .toLowerCase()
-          .replace(/-/g, "_");
-        setBackgroundWaitPolicy(
-          pol === "no_wait" || pol === "timeout" ? pol : "wait",
-        );
-        const ts = settings.backgroundWaitTimeoutSec;
-        setBackgroundWaitTimeoutSec(
-          typeof ts === "number" && Number.isFinite(ts)
-            ? Math.min(3600, Math.max(1, Math.round(ts)))
-            : 600,
-        );
-      }
-      setStoreApiKeysInKeychain(!!settings.storeApiKeysInKeychain);
-      {
-        const sb = (settings.sandboxProfile || DEFAULT_SANDBOX_PROFILE)
-          .trim()
-          .toLowerCase();
-        setSandboxProfile(
-          normalizeSandboxProfile(sb) ?? DEFAULT_SANDBOX_PROFILE,
-        );
-      }
-      setPreferredAgent((settings.preferredAgent || "").trim());
-      setAgentProfilePath((settings.agentProfilePath || "").trim());
-      setAgentsJson((settings.agentsJson || "").trim());
-      setExperimentalMemory(!!settings.experimentalMemory);
+      hydrateFromSettings(settings, { fallbackCliPath: cli.path });
       compact.applyFromSettings(settings);
-      setTwoPassCompactionEnabled(!!settings.twoPassCompactionEnabled);
-      setVoiceId((settings.voiceId || "eve").trim() || "eve");
-      setVoiceDictationAutoSend(!!settings.voiceDictationAutoSend);
-      setVoiceKeepAgentsOnEnd(
-        settings.voiceKeepAgentsOnEnd !== false,
-      );
-      setSttEngine((settings.sttEngine || "official").trim() || "official");
-      setSttCustomBaseUrl(settings.sttCustomBaseUrl || "");
-      setSttCustomModel(settings.sttCustomModel || "");
-      setSttCustomLanguage(settings.sttCustomLanguage || "");
-      setSttZhScript(
-        (settings.sttZhScript || "auto").trim() || "auto",
-      );
-
-      setAllowUnverifiedCliInstall(!!settings.allowUnverifiedCliInstall);
-      setLastCliChecksumVerified(
-        typeof settings.lastCliChecksumVerified === "boolean"
-          ? settings.lastCliChecksumVerified
-          : null,
-      );
-      setSubagentsEnabled(settings.subagentsEnabled !== false);
-      setSubagentWorktreeSnapshotEnabled(
-        !!settings.subagentWorktreeSnapshotEnabled,
-      );
-      setAutoWakeEnabled(!!settings.autoWakeEnabled);
-      setWorkflowsEnabled(!!settings.workflowsEnabled);
-      setPlanEnabled(settings.planEnabled !== false);
-      setTodoGateEnabled(!!settings.todoGateEnabled);
-      {
-        const raw = settings.todoGateMaxFiresPerPrompt;
-        setTodoGateMaxFiresPerPrompt(
-          typeof raw === "number" && raw > 0
-            ? Math.min(20, Math.max(1, Math.round(raw)))
-            : 3,
-        );
-      }
-      setDisableWebSearch(!!settings.disableWebSearch);
-      setNoAskUser(!!settings.noAskUser);
-      setDisallowedTools(
-        Array.isArray(settings.disallowedTools)
-          ? settings.disallowedTools.filter(
-              (x): x is string => typeof x === "string",
-            )
-          : [],
-      );
-      setAllowedTools(
-        Array.isArray(settings.allowedTools)
-          ? settings.allowedTools.filter(
-              (x): x is string => typeof x === "string",
-            )
-          : [],
-      );
-      setUseLeader(!!settings.useLeader);
-      // Opt-in only (missing key / false → draft new chat on launch).
-      setReopenLastSession(settings.reopenLastSession === true);
-      setCloseToTray(settings.closeToTray !== false);
-      setKeepTrayForSchedules(settings.keepTrayForSchedules !== false);
-      setLaunchAtLogin(settings.launchAtLogin === true);
-      setNotifyOnTurnDone(settings.notifyOnTurnDone !== false);
-      setNotifyOnPermission(settings.notifyOnPermission !== false);
-      setLastSessionId(
-        typeof settings.lastSessionId === "string"
-          ? settings.lastSessionId.trim() || null
-          : null,
-      );
       void api
         .agentsCatalog(null)
         .then((cat) => {
@@ -3441,6 +3269,34 @@ export function AppWorkbench() {
    * so `useSessionNavigation` never captures a stale host object.
    */
   {
+    const connectHost = sessionConnectHostRef.current;
+    connectHost.tr = tr;
+    connectHost.session = session;
+    connectHost.mode = mode;
+    connectHost.connecting = connecting;
+    connectHost.activeProject = activeProject;
+    connectHost.generalWorkspacePath = generalWorkspacePath;
+    connectHost.gitWorktrees = gitWorktrees;
+    connectHost.isSecondaryWindowRef = isSecondaryWindowRef;
+    connectHost.liveHostRef = liveHostRef;
+    connectHost.viewingSessionIdRef = viewingSessionIdRef;
+    connectHost.messagesBySessionRef = messagesBySessionRef;
+    connectHost.turnStartedAtBySessionRef = turnStartedAtBySessionRef;
+    connectHost.sendInFlightRef = sendInFlightRef;
+    connectHost.sendInFlightBySessionRef = sendInFlightBySessionRef;
+    connectHost.sendEpochBySessionRef = sendEpochBySessionRef;
+    connectHost.sessionJsonSchemaRef = sessionJsonSchemaRef;
+    connectHost.currentViewFocus = currentViewFocus;
+    connectHost.syncViewedTurnClock = syncViewedTurnClock;
+    connectHost.setLocalError = setLocalError;
+    connectHost.setSession = setSession;
+    connectHost.setLiveHost = setLiveHost;
+    connectHost.setLiveMap = setLiveMap;
+    connectHost.setSessionJsonSchema = setSessionJsonSchema;
+    connectHost.setActiveProject = setActiveProject;
+    connectHost.setExpandedProjects = setExpandedProjects;
+    connectHost.setHistoryOpen = setHistoryOpen;
+    connectHost.refreshSessions = refreshSessions;
     const host = sessionNavHostRef.current;
     host.chrome.goToChat = () => {
       setMainPane("chat");
@@ -5856,292 +5712,7 @@ export function AppWorkbench() {
     [tr],
   );
 
-  /**
-   * Ensure app session row + silent CLI connect.
-   * Creates store session only on first send (draft → real).
-   * Reconnects when disconnected / crashed. Pass force to tear down a "ready"
-   * session that may be wedged (e.g. after a timeout).
-   * Returns the live session id when ready, else null.
-   *
-   * Prefer `opts.sessionId` (e.g. queue flush target) over the render-time
-   * `session` closure so connect never binds the wrong chat after a switch.
-   *
-   * Does not yank the UI if the user already switched to another session while
-   * connect is in flight; still updates liveHost so the sidebar spinner tracks work.
-   */
-  const ensureConnected = async (
-    forceOrOpts:
-      | boolean
-      | { force?: boolean; sessionId?: string | null } = false,
-  ): Promise<string | null> => {
-    // Session-keyed pool: secondary may connect when the user sends (shared Host).
-    if (!canLiveParticipate(isSecondaryWindowRef.current)) {
-      return null;
-    }
-    const opts =
-      typeof forceOrOpts === "boolean"
-        ? { force: forceOrOpts, sessionId: undefined as string | null | undefined }
-        : forceOrOpts;
-    const force = !!opts.force;
-    // Explicit target wins; else the session this render is bound to.
-    const preferredId =
-      opts.sessionId !== undefined ? opts.sessionId : session.sessionId;
-
-    // Bound project when set; unbound chats use general workspace cwd on Host.
-    const connectProject =
-      activeProject && !isGeneralProject(activeProject) ? activeProject : null;
-    if (connectProject && !connectProject.trusted) {
-      setLocalError(
-        tr("project.trustFirst", {
-          name: projectDisplayName(connectProject, tr),
-        }),
-      );
-      return null;
-    }
-    if (connectProject && isProjectPathMissing(connectProject.pathOk)) {
-      setLocalError(
-        tr("project.pathMissing", {
-          name: projectDisplayName(connectProject, tr),
-        }),
-      );
-      return null;
-    }
-    // Fast path: already ready on the *preferred* session (not merely "any" ready).
-    if (
-      !force &&
-      preferredId &&
-      session.sessionId === preferredId &&
-      session.state === "ready" &&
-      !session.lastError
-    ) {
-      return preferredId;
-    }
-    // Live host may already be on the target even if viewed session differs.
-    if (!force && preferredId) {
-      const live = liveHostRef.current;
-      if (
-        live.sessionId === preferredId &&
-        live.state === "ready" &&
-        !live.lastError
-      ) {
-        return preferredId;
-      }
-    }
-    // Serialize connects with a ref so two rapid sends cannot both pass a stale
-    // `connecting` state check (React setState is async).
-    const connectKey = queueSessionKey(preferredId);
-    const heldConnectKeys = new Set<string>([connectKey]);
-    if (connectingBySessionRef.current.has(connectKey)) {
-      // Another connect is in flight — do not drop the caller's send. Wait briefly
-      // for the in-flight connect if it targets the same preferred session.
-      const waitStart = Date.now();
-      while (
-        connectingBySessionRef.current.has(connectKey) &&
-        Date.now() - waitStart < 120_000
-      ) {
-        await new Promise((r) => setTimeout(r, 50));
-        const live = liveHostRef.current;
-        if (
-          preferredId &&
-          live.sessionId === preferredId &&
-          live.state === "ready" &&
-          !live.lastError
-        ) {
-          return preferredId;
-        }
-      }
-      if (connectingBySessionRef.current.has(connectKey)) return null;
-    }
-    if (!claimSessionConnection(preferredId)) return null;
-    ensureConnectCountRef.current += 1;
-    syncEnsureConnectingUi();
-    // Capture view identity before awaits. Drafts are all `null`, so the epoch
-    // is what distinguishes "still on my draft" from "user opened a new one".
-    const originView = currentViewFocus();
-    try {
-      let sessionId = preferredId ?? null;
-      // First send: materialize draft into a real session (project or orphan).
-      // `hasHost`, not `isTauri`: phone mirror clients have a backend too and
-      // `session.create` is on the mirror allowlist — otherwise phone chats are
-      // never persisted (connect runs with sessionId undefined).
-      if (!sessionId && api.hasHost()) {
-        const meta = (await api.sessionCreate(
-          connectProject?.id,
-          tr("session.new"),
-        )) as { id: string; title?: string };
-        sessionId = meta.id;
-        // Atomically move the draft connection claim onto the real id. After
-        // this synchronous handoff, a second send to the materialized session
-        // observes the same claim, while a newly opened draft stays independent.
-        const materializedKey = queueSessionKey(sessionId);
-        if (!heldConnectKeys.has(materializedKey)) {
-          const claims = connectingBySessionRef.current;
-          if (claims.has(materializedKey)) return null;
-          claims.delete(connectKey);
-          heldConnectKeys.delete(connectKey);
-          claims.add(materializedKey);
-          heldConnectKeys.add(materializedKey);
-        }
-        // Same handoff for the send claim. Heal re-arms on setSession(newId)
-        // below; if the claim stayed on __draft__ until connect returned,
-        // it looked like the turn never left.
-        if (
-          migrateDraftSendClaim(
-            sendInFlightBySessionRef.current,
-            sendEpochBySessionRef.current,
-            sessionId,
-          )
-        ) {
-          sendInFlightRef.current =
-            sendInFlightBySessionRef.current.size > 0;
-        }
-        // Persist draft-page JSON Schema onto the new session before connect
-        // so spawn can take top-level `grok --json-schema`.
-        const pendingSchema = sessionJsonSchemaRef.current?.trim() || "";
-        if (
-          pendingSchema &&
-          isActiveJsonSchema(pendingSchema) &&
-          api.isTauri()
-        ) {
-          try {
-            const saved = await api.sessionSetJsonSchema(
-              meta.id,
-              pendingSchema,
-            );
-            const next =
-              typeof saved.jsonSchema === "string" && saved.jsonSchema.trim()
-                ? saved.jsonSchema
-                : pendingSchema;
-            setSessionJsonSchema(next);
-          } catch {
-            /* best-effort; prompt wrap still applies */
-          }
-        }
-        // Bind draft messages cache to the new id (was under null / unkeyed).
-        const draftMsgs = messagesBySessionRef.current.get("__draft__");
-        if (draftMsgs?.length) {
-          messagesBySessionRef.current.set(meta.id, draftMsgs);
-          messagesBySessionRef.current.delete("__draft__");
-        }
-        if (migrateDraftTurnClock(turnStartedAtBySessionRef.current, meta.id)) {
-          syncViewedTurnClock(meta.id);
-        }
-        // Auto-tag worktree-bound chats when cwd is a linked worktree.
-        if (api.isTauri() && connectProject?.path) {
-          const linked = resolveSessionWorktreeBadge(
-            null,
-            connectProject.path,
-            gitWorktrees,
-          );
-          if (linked?.path) {
-            try {
-              await api.sessionSetWorktree(meta.id, {
-                worktreePath: linked.path,
-                worktreeBranch: linked.branch,
-              });
-            } catch {
-              /* soft-fail */
-            }
-          }
-        }
-        // Only take over the workbench if the user has not navigated since.
-        // `viewingSessionIdRef.current === null` used to pass here, which is how
-        // opening a new chat in another project got yanked back to this one.
-        if (shouldAdoptView(originView, currentViewFocus(), meta.id)) {
-          viewingSessionIdRef.current = meta.id;
-          setSession((prev) => ({
-            ...prev,
-            sessionId: meta.id,
-            title: meta.title || tr("session.new"),
-          }));
-          // Sidebar reveal belongs to the takeover — never re-expand a project
-          // the user has already navigated away from.
-          if (connectProject) {
-            setActiveProject((prev) => prev ?? connectProject);
-            setExpandedProjects((e) => ({
-              ...e,
-              [connectProject.id]: true,
-            }));
-          } else {
-            setHistoryOpen(true);
-          }
-        }
-        await refreshSessions();
-      }
-      const snap = await api.sessionConnect({
-        // Host falls back to workspaces/general when path is omitted.
-        projectPath: connectProject?.path || generalWorkspacePath || undefined,
-        sessionId: sessionId ?? undefined,
-        mode,
-      });
-      setLiveHost(snap);
-      liveHostRef.current = snap;
-      // Only rebind the viewed session when the user is still on it (or has not
-      // navigated since this connect started).
-      if (
-        snap.sessionId &&
-        shouldAdoptView(originView, currentViewFocus(), snap.sessionId)
-      ) {
-        viewingSessionIdRef.current = snap.sessionId;
-        setSession((prev) => ({
-          ...snap,
-          state: reconcileSessionState(snap.state, prev.state),
-        }));
-        setLiveMap((prev) =>
-          projectHostIntoLiveMap(prev, {
-            sessionId: snap.sessionId,
-            state: snap.state,
-            streamingMessageId: snap.streamingMessageId,
-          }),
-        );
-      }
-      if (snap.lastError || snap.state !== "ready") {
-        const code = snap.lastError?.code ?? "AGENT_CRASHED";
-        const msg = snap.lastError?.message ?? "connect failed";
-        if (viewingSessionIdRef.current === (snap.sessionId || sessionId)) {
-          setLocalError(`${code}: ${msg}`);
-        }
-        return null;
-      }
-      if (viewingSessionIdRef.current === (snap.sessionId || sessionId)) {
-        setLocalError(null);
-      }
-      // Always return the connected id even if the user switched away mid-connect
-      // so executeSend can still sessionSend for the original target.
-      return snap.sessionId || sessionId || null;
-    } catch (e) {
-      // Only surface the error on the view that asked for the connect.
-      if (
-        (preferredId != null && viewingSessionIdRef.current === preferredId) ||
-        isSameView(originView, currentViewFocus())
-      ) {
-        setLocalError(String(e));
-      }
-      return null;
-    } finally {
-      releaseSessionConnection(heldConnectKeys);
-      ensureConnectCountRef.current = Math.max(0, ensureConnectCountRef.current - 1);
-      syncEnsureConnectingUi();
-    }
-  };
-
   ensureConnectedRef.current = () => ensureConnected();
-
-  const retryAgentConnect = () => {
-    const sid = viewingSessionIdRef.current ?? session.sessionId;
-    setLocalError(null);
-    void (async () => {
-      if (session.state === "connecting" || connecting) {
-        try {
-          await api.sessionStop(sid);
-        } catch {
-          /* Host may not have bound ACP yet */
-        }
-      }
-      const next = await ensureConnected({ force: true, sessionId: sid });
-      if (next) setLocalError(null);
-    })();
-  };
 
   const attachLabels = useMemo(
     () => ({

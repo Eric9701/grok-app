@@ -1,6 +1,7 @@
 /**
  * Settings overlay stage. Navigation lives in useSettingsNavigation;
- * this file owns the SettingsPage prop surface. Host still hydrates prefs.
+ * prefs hydrate in useAppSettingsPrefs. This file owns the SettingsPage
+ * prop surface.
  */
 import { SettingsPage } from "@/components/SettingsPage";
 import { saveMessageTimestampsPref } from "@/lib/messageTimestampsPref";

@@ -43,9 +43,9 @@ APP_ORCH_FILES = (
 # Decreasing ceilings at current combined scale. Ratchet down each
 # workbench-extraction WP. The old 6000/100/50 numbers measured the 26-line
 # shell after the God Component was renamed — not a budget to grow into.
-APP_LINES_CEILING = 15790
-APP_USESTATE_CEILING = 214
-APP_USEEFFECT_CEILING = 84
+APP_LINES_CEILING = 15350
+APP_USESTATE_CEILING = 160
+APP_USEEFFECT_CEILING = 83
 
 
 def lines_of(path: Path) -> int:

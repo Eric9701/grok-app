@@ -365,8 +365,8 @@ describe("agent kanban surface is not a todo list", () => {
     expect(workbench).toContain("liveVoiceOpen ||");
     expect(workbench).toContain('mainPane === "kanban"');
     const liveWhen = workbench.slice(
-      workbench.indexOf("useLiveMapWhen("),
-      workbench.indexOf("useLiveMapWhen(") + 420,
+      workbench.indexOf("liveMapEnabled:"),
+      workbench.indexOf("liveMapEnabled:") + 420,
     );
     expect(liveWhen).toContain('mainPane === "kanban"');
     expect(chrome).toContain("SessionTaskBoardModal");
