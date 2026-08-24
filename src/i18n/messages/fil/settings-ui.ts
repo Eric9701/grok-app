@@ -16,6 +16,7 @@ export const filSettingsUi = {
   "settings.tab.interface": "Interface",
   "settings.tab.cli": "CLI",
   "settings.tab.connection": "Koneksyon",
+  "settings.tab.ssh": "SSH",
   "settings.tab.network": "Network",
   "settings.proxyMode": "Proxy",
   "settings.proxyModeDesc": "Paano inaabot ng app at mga proseso ng agent ang network. Sinusunod ng System ang OS proxy (kasama ang loopback PAC); nagtatakda ang Manual ng URL; pinipilit ng Direct ang walang proxy. Mas piliin ang system HTTP o Manual http://127.0.0.1:7890 kaysa TUN kapag posible.",

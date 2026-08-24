@@ -34,6 +34,7 @@ import { IconArchive, IconDoctor } from "@/components/icons";
 import { NetworkProbeField } from "./NetworkProbeField";
 import { AcpServerField } from "./AcpServerField";
 import { WslBackendField } from "./WslBackendField";
+import { SshHostsPanel } from "./SshHostsPanel";
 import { detectAppPlatform } from "@/lib/appPlatform";
 import { resolveLocale, type MessageKey } from "@/i18n";
 import {
@@ -307,6 +308,11 @@ export function RuntimeSection() {
                 }
               >
                 <CliWorktreeDbPanel t={t} />
+              </div>
+            )}
+            {activeTab === "ssh" && (
+              <div className={rowHighlight("settings-anchor-sshHosts")}>
+                <SshHostsPanel t={t} />
               </div>
             )}
             {activeTab === "connection" && (

@@ -16,6 +16,7 @@ export const zhTWSettingsUi = {
   "settings.tab.interface": "介面",
   "settings.tab.cli": "CLI",
   "settings.tab.connection": "連線",
+  "settings.tab.ssh": "SSH",
   "settings.tab.network": "網路",
   "settings.proxyMode": "代理",
   "settings.proxyModeDesc": "應用與 Agent 處理程序的連線方式。系統＝跟隨作業系統代理（含本機 PAC）；手動＝固定位址；直連＝不走代理。能走系統 HTTP 或手動 http://127.0.0.1:7890 時不必開 TUN。",

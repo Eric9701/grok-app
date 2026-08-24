@@ -16,6 +16,7 @@ export const ukSettingsUi = {
   "settings.tab.interface": "Інтерфейс",
   "settings.tab.cli": "CLI",
   "settings.tab.connection": "З’єднання",
+  "settings.tab.ssh": "SSH",
   "settings.tab.network": "Мережа",
   "settings.proxyMode": "Проксі",
   "settings.proxyModeDesc": "Як програма та процеси агента досягають мережі. Система слідує за проксі-сервером ОС (включаючи loopback PAC); Ручне закріплення URL-адреси; Пряме примусове відсутність проксі. Надавайте перевагу системному HTTP або Manual http://127.0.0.1:7890 над TUN, коли це можливо.",

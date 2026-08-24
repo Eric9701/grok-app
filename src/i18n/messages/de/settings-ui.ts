@@ -16,6 +16,7 @@ export const deSettingsUi = {
   "settings.tab.interface": "Oberfläche",
   "settings.tab.cli": "CLI",
   "settings.tab.connection": "Verbindung",
+  "settings.tab.ssh": "SSH",
   "settings.tab.network": "Netzwerk",
   "settings.proxyMode": "Proxy",
   "settings.proxyModeDesc": "Wie App- und Agent-Prozesse das Netzwerk erreichen. System folgt dem OS-Proxy (inkl. Loopback-PAC); Manuell pinnt eine URL; Direct erzwingt keinen Proxy. Wenn möglich System-HTTP oder Manuell http://127.0.0.1:7890 statt TUN bevorzugen.",

@@ -63,6 +63,8 @@ mod cli_worktrees;
 
 mod wsl_backend;
 
+mod ssh_remote;
+
 mod side_browser_blob;
 mod side_browser_host;
 
@@ -1018,6 +1020,10 @@ pub fn run() {
             commands::probe_cli,
 
             commands::wsl_status,
+
+            ssh_remote::ssh_list_hosts,
+
+            ssh_remote::ssh_test_host,
 
             commands::cli_repair_agent_sidecar,
 
