@@ -1294,7 +1294,7 @@ fn imported_user_content(v: &Value, raw: &str) -> Option<String> {
     if let Some(q) = extract_user_query(raw) {
         return Some(q);
     }
-    if raw.contains("<system-reminder>") {
+    if raw.contains("<system-reminder>") || raw.contains("<user_info>") {
         return None;
     }
     if let Some(reason) = chat_history_synthetic_reason(v) {

@@ -31,11 +31,13 @@ vi.mock("@/providers/SshWatchProvider", () => ({
           id: "01a01907-adf3-7e00-a7a8-aee1082b0556",
           cwd: "/data/pengqlu/code/qwen35-v001-light",
           title: "01a01907-adf3-7e00-a7a8-aee1082b0556",
+          updatedAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
         },
         {
           id: "01a0192c-d7f4-7850-9e0c-3a342201cef10",
           cwd: "/data/pengqlu/code/idea",
           title: "帮我看一下 hallucination span",
+          updatedAt: new Date(Date.now() - 6 * 24 * 3600 * 1000).toISOString(),
         },
       ],
     },
@@ -68,15 +70,30 @@ afterEach(() => {
 
 describe("SshRemoteSessionRail", () => {
   it("labels the host, hides the raw UUID, and offers load more", async () => {
-    render(<SshRemoteSessionRail t={t} onOpenSession={onOpenSession} />);
+    render(
+      <SshRemoteSessionRail
+        t={t}
+        locale="zh"
+        showRelativeTime
+        onOpenSession={onOpenSession}
+      />,
+    );
     expect(screen.getByText("远程 UTS")).toBeInTheDocument();
-    expect(screen.getByText("qwen35-v001-light")).toBeInTheDocument();
-    expect(screen.getByText("帮我看一下 hallucination span")).toBeInTheDocument();
+    expect(document.querySelector(".tree-l3")).toBeTruthy();
     expect(
-      screen.queryByText("01a01907-adf3-7e00-a7a8-aee1082b0556"),
+      screen.getByRole("button", { name: "qwen35-v001-light" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "帮我看一下 hallucination span" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "01a01907-adf3-7e00-a7a8-aee1082b0556",
+      }),
     ).toBeNull();
+    expect(screen.getByText("5天前")).toBeInTheDocument();
     expect(screen.getByText("还有 33 个")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "加载更多" }));
+    await userEvent.click(screen.getByRole("button", { name: /加载更多/ }));
     expect(loadMore).toHaveBeenCalledWith("UTS");
   });
 
@@ -87,11 +104,18 @@ describe("SshRemoteSessionRail", () => {
         resolveOpen = r;
       }),
     );
-    render(<SshRemoteSessionRail t={t} onOpenSession={onOpenSession} />);
+    render(
+      <SshRemoteSessionRail
+        t={t}
+        locale="zh"
+        showRelativeTime
+        onOpenSession={onOpenSession}
+      />,
+    );
     await userEvent.click(
       screen.getByRole("button", { name: "qwen35-v001-light" }),
     );
-    expect(await screen.findByText("打开中…")).toBeInTheDocument();
+    expect(await screen.findByLabelText("打开中…")).toBeInTheDocument();
     resolveOpen({
       ok: true,
       alias: "UTS",
@@ -112,7 +136,14 @@ describe("SshRemoteSessionRail", () => {
       title: "qwen35-v001-light",
       messageCount: 4,
     });
-    render(<SshRemoteSessionRail t={t} onOpenSession={onOpenSession} />);
+    render(
+      <SshRemoteSessionRail
+        t={t}
+        locale="zh"
+        showRelativeTime
+        onOpenSession={onOpenSession}
+      />,
+    );
     await userEvent.click(
       screen.getByRole("button", { name: "qwen35-v001-light" }),
     );

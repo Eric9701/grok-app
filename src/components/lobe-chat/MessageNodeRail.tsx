@@ -21,6 +21,7 @@ import type { SessionMessageNode } from "@/lib/sessionMessageNodes";
 import {
   estimateMessageIndexAtY,
   nearestNodeIdFromPaintList,
+  pickActiveNodeIdFromRects,
 } from "@/lib/sessionMessageNodes";
 import type { ChatMessage } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -139,8 +140,23 @@ export function MessageNodeRail({
 
       let bestId: string | null = null;
 
-      // Fast path: pure mathematical index lookup from scrollTop (0 forced reflows)
-      if (messages && messages.length > 0) {
+      // Mounted rows beat height estimates — one tall imported assistant
+      // answer otherwise keeps the active tick in the middle of the rail.
+      const focusY =
+        viewport.getBoundingClientRect().top + viewport.clientHeight * 0.28;
+      const rects: { id: string; top: number; bottom: number }[] = [];
+      for (const n of nodes) {
+        const el = viewport.querySelector(
+          `[data-message-id="${CSS.escape(n.id)}"]`,
+        );
+        if (!(el instanceof HTMLElement)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.height <= 0) continue;
+        rects.push({ id: n.id, top: r.top, bottom: r.bottom });
+      }
+      if (rects.length > 0) {
+        bestId = pickActiveNodeIdFromRects(rects, focusY);
+      } else if (messages && messages.length > 0) {
         const y = viewport.scrollTop + viewport.clientHeight * 0.28;
         const msgIdx = estimateMessageIndexAtY(messages, y);
         bestId = nearestNodeIdFromPaintList(messages, nodes, msgIdx);

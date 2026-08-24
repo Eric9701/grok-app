@@ -308,6 +308,8 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
 
             <SshRemoteSessionRail
               t={tr}
+              locale={locale}
+              showRelativeTime={sidebarShowRelativeTime}
               onOpenSession={(id) => onSidebarSessionOpen({ id })}
             />
             <SidebarTreeReveal open={projectsOpen} className="tree-reveal--projects">

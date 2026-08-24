@@ -701,60 +701,7 @@
 }
 
 .ssh-remote-rail {
-  padding: 4px var(--tree-rail-pad, 10px) 10px;
-}
-
-.ssh-remote-rail__host + .ssh-remote-rail__host {
-  margin-top: 8px;
-}
-
-.ssh-remote-rail .sidebar__section-label {
-  margin-left: 0;
-  margin-right: 0;
-}
-
-.ssh-remote-rail__row {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  width: 100%;
-  padding: 6px 8px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.ssh-remote-rail__row:hover,
-.ssh-remote-rail__row.is-active {
-  background: var(--bg-hover);
-}
-
-.ssh-remote-rail__title {
-  font-size: 13px;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ssh-remote-rail__status {
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.ssh-remote-rail__rename {
-  width: 100%;
-}
-
-.ssh-remote-rail__more {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 6px 8px 2px;
+  padding: 4px 0 8px;
 }
 
 .project-block {

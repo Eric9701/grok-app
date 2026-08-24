@@ -987,8 +987,20 @@ for mt, sid, enc, d in rows[off:off+lim]:
                                 bits.append(str(p.get("text") or ""))
                         text = " ".join(bits)
                     text = text.strip()
-                    if text:
-                        title = text.splitlines()[0].strip()
+                    if not text:
+                        continue
+                    if "<user_query>" in text:
+                        a = text.find("<user_query>") + 12
+                        b = text.find("</user_query>", a)
+                        chunk = text[a:b] if b > a else text[a:]
+                        title = chunk.strip().splitlines()[0].strip() if chunk.strip() else ""
+                        if title:
+                            break
+                        continue
+                    if "<system-reminder>" in text or "<user_info>" in text:
+                        continue
+                    title = text.splitlines()[0].strip()
+                    if title:
                         break
                 f.close()
             except Exception:
@@ -1143,11 +1155,7 @@ pub fn parse_sess_stdout(stdout: &str) -> Option<(u32, Vec<SshRemoteSession>)> {
                 id: id.to_string(),
                 cwd: percent_decode_path(enc),
                 title: title.to_string(),
-                updated_at: if mtime.is_empty() || mtime == "0" {
-                    None
-                } else {
-                    Some(mtime.to_string())
-                },
+                updated_at: unix_mtime_to_rfc3339(mtime),
             });
         }
         let total = total.unwrap_or(sessions.len() as u32);
@@ -1730,6 +1738,15 @@ pub async fn ssh_open_session(
     })
 }
 
+fn unix_mtime_to_rfc3339(mtime: &str) -> Option<String> {
+    let n: i64 = mtime.parse().ok()?;
+    if n <= 0 {
+        return None;
+    }
+    let secs = if n > 1_000_000_000_000 { n / 1000 } else { n };
+    chrono::DateTime::from_timestamp(secs, 0).map(|d| d.to_rfc3339())
+}
+
 fn looks_like_agent_uuid(s: &str) -> bool {
     let s = s.trim();
     let b = s.as_bytes();
@@ -1973,7 +1990,9 @@ Host "build-server"
         assert_eq!(s.len(), 2);
         assert_eq!(s[0].cwd, "/work");
         assert_eq!(s[0].title, "Fix bug");
+        assert!(s[0].updated_at.as_deref().unwrap_or("").contains("1970"));
         assert_eq!(s[1].title, "");
+        assert_eq!(s[1].updated_at, None);
     }
 
     #[test]
