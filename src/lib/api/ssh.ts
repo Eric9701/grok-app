@@ -84,6 +84,7 @@ export type SshListSessionsResult = {
   ok: boolean;
   alias: string;
   sessions: SshRemoteSession[];
+  total?: number | null;
   error?: string | null;
 };
 
@@ -102,6 +103,13 @@ export async function sshListDir(alias: string, path?: string | null) {
   });
 }
 
-export async function sshListSessions(alias: string) {
-  return invoke<SshListSessionsResult>("ssh_list_sessions", { alias });
+export async function sshListSessions(
+  alias: string,
+  opts?: { offset?: number; limit?: number },
+) {
+  return invoke<SshListSessionsResult>("ssh_list_sessions", {
+    alias,
+    offset: opts?.offset ?? 0,
+    limit: opts?.limit ?? 20,
+  });
 }

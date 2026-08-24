@@ -41,8 +41,7 @@ import { SESSION_DROP_ORPHAN } from "@/lib/sessionMoveProject";
 import { isMirrorClient } from "@/lib/mirrorTransport";
 import type { SidebarProjectReorderApi } from "@/hooks/useSidebarProjectReorder";
 import type { ProjectSpacesState } from "@/lib/projectSpaces";
-import { useSshWatch } from "@/providers/SshWatchProvider";
-import * as api from "@/lib/api";
+import { SshRemoteSessionRail } from "@/components/SshRemoteSessionRail";
 
 type TFn = ReturnType<typeof createT>;
 
@@ -155,14 +154,6 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
     sidebarCliImportCta,
     deleteSessionsConfirm,
   } = props;
-
-  const sshWatch = useSshWatch();
-  const remoteRows = sshWatch.watchAliases.flatMap((alias) =>
-    (sshWatch.sessionsByAlias[alias] ?? []).map((s) => ({
-      alias,
-      ...s,
-    })),
-  );
 
   const sessionsForProject = (projectId: string) =>
     sessions.filter((s) => s.projectId === projectId && !s.archived);
@@ -315,51 +306,7 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
               </div>
             </div>
 
-            {sshWatch.watchAliases.length > 0 ? (
-                <div className="ssh-remote-rail">
-                  <div className="sidebar__section-label">
-                    {tr("sidebar.remoteSessions")}
-                  </div>
-                  {remoteRows.length === 0 ? (
-                    <div className="sidebar-empty__hint">
-                      {tr("sidebar.remoteSessionsHint")}
-                    </div>
-                  ) : (
-                    remoteRows.slice(0, 24).map((row) => (
-                      <button
-                        key={`${row.alias}:${row.id}`}
-                        type="button"
-                        className="ssh-remote-rail__row"
-                        title={row.cwd}
-                        onClick={() => {
-                          sshWatch.setDraftRemote({
-                            alias: row.alias,
-                            path: row.cwd,
-                          });
-                          void (async () => {
-                            try {
-                              const proj = (await api.projectAddSsh(
-                                row.alias,
-                                row.cwd,
-                                true,
-                              )) as Project;
-                              void newChat(proj);
-                            } catch {
-                              /* soft-fail */
-                            }
-                          })();
-                        }}
-                      >
-                        <span className="ssh-remote-rail__title">{row.title}</span>
-                        <span className="ssh-remote-rail__meta">
-                          {row.alias}
-                          {row.cwd ? ` · ${row.cwd}` : ""}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              ) : null}
+            <SshRemoteSessionRail t={tr} newChat={newChat} />
             <SidebarTreeReveal open={projectsOpen} className="tree-reveal--projects">
             {projects.length === 0 && (
               <div className="sidebar-empty">

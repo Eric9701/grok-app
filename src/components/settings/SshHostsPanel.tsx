@@ -8,6 +8,7 @@ import * as api from "@/lib/api";
 import type { MessageKey, Vars } from "@/i18n";
 import { UiSwitch } from "./shared";
 import { mergeWatchingSet, partitionSshHosts } from "@/lib/sshHostMatch";
+import { remoteSessionLabel } from "@/lib/sshRemoteSessionDisplay";
 import { useSshWatch } from "@/providers/SshWatchProvider";
 
 type TFn = (k: MessageKey, vars?: Vars) => string;
@@ -389,7 +390,13 @@ function HostRow({
         <ul className="settings-ssh-sessions">
           {sessions.slice(0, 8).map((s) => (
             <li key={s.id} className="settings-ssh-session">
-              <span className="settings-ssh-session__title">{s.title}</span>
+              <span className="settings-ssh-session__title">
+                {remoteSessionLabel({
+                  title: s.title,
+                  cwd: s.cwd,
+                  untitled: s.id.slice(0, 8),
+                })}
+              </span>
               {s.cwd ? (
                 <span className="settings-ssh-session__cwd">{s.cwd}</span>
               ) : null}

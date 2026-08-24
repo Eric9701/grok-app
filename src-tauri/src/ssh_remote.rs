@@ -919,27 +919,116 @@ exit 0
     )
 }
 
-const REMOTE_SESS_SCRIPT: &str = r#"echo GROK_APP_SESS
+fn remote_sess_script(offset: u32, limit: u32) -> String {
+    let offset = offset.min(50_000);
+    let limit = limit.clamp(1, 50);
+    format!(
+        r#"OFFSET={offset} LIMIT={limit}
 SESS="$HOME/.grok/sessions"
+if command -v python3 >/dev/null 2>&1; then
+  OFFSET="$OFFSET" LIMIT="$LIMIT" python3 -c '
+import json, os
+root = os.path.expanduser("~/.grok/sessions")
+off = int(os.environ.get("OFFSET", "0"))
+lim = int(os.environ.get("LIMIT", "20"))
+rows = []
+if os.path.isdir(root):
+    for enc in os.listdir(root):
+        base = os.path.join(root, enc)
+        if not os.path.isdir(base):
+            continue
+        for sid in os.listdir(base):
+            d = os.path.join(base, sid)
+            if not os.path.isdir(d) or sid.startswith("."):
+                continue
+            try:
+                mt = os.path.getmtime(d)
+            except OSError:
+                continue
+            rows.append((mt, sid, enc, d))
+rows.sort(reverse=True)
+print("GROK_APP_SESS")
+print("TOTAL\t%d" % len(rows))
+for mt, sid, enc, d in rows[off:off+lim]:
+    title = ""
+    sp = os.path.join(d, "summary.json")
+    if os.path.isfile(sp):
+        try:
+            s = json.load(open(sp))
+            title = (s.get("generated_title") or s.get("session_summary") or s.get("title") or "").strip()
+        except Exception:
+            title = ""
+    if not title:
+        hp = os.path.join(d, "chat_history.jsonl")
+        if os.path.isfile(hp):
+            try:
+                f = open(hp)
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        o = json.loads(line)
+                    except Exception:
+                        continue
+                    role = o.get("type") or o.get("role") or ""
+                    if role != "user":
+                        continue
+                    c = o.get("content")
+                    text = ""
+                    if isinstance(c, str):
+                        text = c
+                    elif isinstance(c, list):
+                        bits = []
+                        for p in c:
+                            if isinstance(p, str):
+                                bits.append(p)
+                            elif isinstance(p, dict):
+                                bits.append(str(p.get("text") or ""))
+                        text = " ".join(bits)
+                    text = text.strip()
+                    if text:
+                        title = text.splitlines()[0].strip()
+                        break
+                f.close()
+            except Exception:
+                pass
+    title = title.replace("\t", " ").replace("\n", " ").replace("\r", " ")[:160]
+    print("%s\t%s\t%d\t%s" % (sid, enc, int(mt), title))
+' && exit 0
+fi
+echo GROK_APP_SESS
 if [ ! -d "$SESS" ]; then
+  echo "TOTAL	0"
   exit 0
 fi
-find "$SESS" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | head -n 80 | while IFS= read -r d; do
+tmp=$(mktemp 2>/dev/null || echo /tmp/grok-app-sess.$$)
+find "$SESS" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | while IFS= read -r d; do
+  mt=$(stat -c %Y "$d" 2>/dev/null || date -r "$d" +%s 2>/dev/null || echo 0)
+  printf "%s\t%s\n" "$mt" "$d"
+done | sort -nr > "$tmp"
+total=$(wc -l < "$tmp" | tr -d " ")
+echo "TOTAL	$total"
+i=0
+while IFS= read -r line; do
+  i=$((i + 1))
+  if [ "$i" -le "$OFFSET" ]; then continue; fi
+  if [ "$i" -gt $((OFFSET + LIMIT)) ]; then break; fi
+  mt=${{line%%	*}}
+  d=${{line#*	}}
   id=$(basename "$d")
   enc=$(basename "$(dirname "$d")")
-  mtime=$(date -r "$d" +%s 2>/dev/null || stat -c %Y "$d" 2>/dev/null || echo 0)
-  title="$id"
+  title=""
   if [ -f "$d/summary.json" ]; then
-    t=$(sed -n 's/.*"generated_title"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$d/summary.json" | head -n 1)
-    if [ -z "$t" ]; then
-      t=$(sed -n 's/.*"session_summary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$d/summary.json" | head -n 1)
-    fi
-    if [ -n "$t" ]; then title="$t"; fi
+    title=$(sed -n "s/.*\"generated_title\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$d/summary.json" | head -n 1)
   fi
-  printf '%s\t%s\t%s\t%s\n' "$id" "$enc" "$mtime" "$title"
-done
+  printf "%s\t%s\t%s\t%s\n" "$id" "$enc" "$mt" "$title"
+done < "$tmp"
+rm -f "$tmp"
 exit 0
-"#;
+"#
+    )
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -975,6 +1064,8 @@ pub struct SshListSessionsResult {
     pub ok: bool,
     pub alias: String,
     pub sessions: Vec<SshRemoteSession>,
+    #[serde(default)]
+    pub total: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -1018,16 +1109,26 @@ fn parse_ls_stdout(stdout: &str) -> Option<(String, Vec<SshDirEntry>)> {
     None
 }
 
-pub fn parse_sess_stdout(stdout: &str) -> Option<Vec<SshRemoteSession>> {
+pub fn parse_sess_stdout(stdout: &str) -> Option<(u32, Vec<SshRemoteSession>)> {
     let mut lines = stdout.lines().map(|l| l.trim_end_matches('\r'));
     while let Some(line) = lines.next() {
         if line.trim() != "GROK_APP_SESS" {
             continue;
         }
         let mut sessions = Vec::new();
+        let mut total: Option<u32> = None;
         for rest in lines {
             let rest = rest.trim();
             if rest.is_empty() {
+                continue;
+            }
+            if rest.starts_with("TOTAL") {
+                let n = rest
+                    .split(|c: char| c == '\t' || c == ' ')
+                    .nth(1)
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0);
+                total = Some(n);
                 continue;
             }
             let mut parts = rest.splitn(4, '\t');
@@ -1041,11 +1142,7 @@ pub fn parse_sess_stdout(stdout: &str) -> Option<Vec<SshRemoteSession>> {
             sessions.push(SshRemoteSession {
                 id: id.to_string(),
                 cwd: percent_decode_path(enc),
-                title: if title.is_empty() {
-                    id.to_string()
-                } else {
-                    title.to_string()
-                },
+                title: title.to_string(),
                 updated_at: if mtime.is_empty() || mtime == "0" {
                     None
                 } else {
@@ -1053,7 +1150,8 @@ pub fn parse_sess_stdout(stdout: &str) -> Option<Vec<SshRemoteSession>> {
                 },
             });
         }
-        return Some(sessions);
+        let total = total.unwrap_or(sessions.len() as u32);
+        return Some((total, sessions));
     }
     None
 }
@@ -1288,51 +1386,47 @@ pub async fn ssh_list_dir(alias: String, path: Option<String>) -> Result<SshList
     }
 }
 
+fn sess_fail(alias: String, error: impl Into<String>) -> SshListSessionsResult {
+    SshListSessionsResult {
+        ok: false,
+        alias,
+        sessions: Vec::new(),
+        total: 0,
+        error: Some(error.into()),
+    }
+}
+
 #[tauri::command]
-pub async fn ssh_list_sessions(alias: String) -> Result<SshListSessionsResult, String> {
+pub async fn ssh_list_sessions(
+    alias: String,
+    offset: Option<u32>,
+    limit: Option<u32>,
+) -> Result<SshListSessionsResult, String> {
     let alias = alias.trim().to_string();
     if !is_safe_ssh_alias(&alias) {
-        return Ok(SshListSessionsResult {
-            ok: false,
-            alias,
-            sessions: Vec::new(),
-            error: Some("invalid alias".into()),
-        });
+        return Ok(sess_fail(alias, "invalid alias"));
     }
-    match run_ssh(&alias, REMOTE_SESS_SCRIPT, true, SSH_OVERALL_TIMEOUT_SECS).await {
-        Err(SshRunErr::Missing) => Ok(SshListSessionsResult {
-            ok: false,
-            alias,
-            sessions: Vec::new(),
-            error: Some("ssh missing".into()),
-        }),
-        Err(SshRunErr::Timeout { .. }) => Ok(SshListSessionsResult {
-            ok: false,
-            alias,
-            sessions: Vec::new(),
-            error: Some("timeout".into()),
-        }),
-        Err(SshRunErr::Spawn(e)) => Ok(SshListSessionsResult {
-            ok: false,
-            alias,
-            sessions: Vec::new(),
-            error: Some(truncate_err(&e)),
-        }),
+    let offset = offset.unwrap_or(0);
+    let limit = limit.unwrap_or(20);
+    let remote = remote_sess_script(offset, limit);
+    match run_ssh(&alias, &remote, true, SSH_OVERALL_TIMEOUT_SECS).await {
+        Err(SshRunErr::Missing) => Ok(sess_fail(alias, "ssh missing")),
+        Err(SshRunErr::Timeout { .. }) => Ok(sess_fail(alias, "timeout")),
+        Err(SshRunErr::Spawn(e)) => Ok(sess_fail(alias, truncate_err(&e))),
         Ok(run) if !run.success => {
             let (_code, msg) = classify_ssh_stderr(&run.stderr);
+            Ok(sess_fail(alias, msg))
+        }
+        Ok(run) => {
+            let (total, sessions) = parse_sess_stdout(&run.stdout).unwrap_or((0, Vec::new()));
             Ok(SshListSessionsResult {
-                ok: false,
+                ok: true,
                 alias,
-                sessions: Vec::new(),
-                error: Some(msg),
+                sessions,
+                total,
+                error: None,
             })
         }
-        Ok(run) => Ok(SshListSessionsResult {
-            ok: true,
-            alias,
-            sessions: parse_sess_stdout(&run.stdout).unwrap_or_default(),
-            error: None,
-        }),
     }
 }
 
@@ -1524,13 +1618,22 @@ Host "build-server"
     }
 
     #[test]
+    fn remote_sess_script_embeds_page_bounds() {
+        let s = remote_sess_script(20, 20);
+        assert!(s.contains("OFFSET=20"));
+        assert!(s.contains("LIMIT=20"));
+        assert!(!s.contains("OFFSET={"));
+    }
+
+    #[test]
     fn parse_remote_sessions() {
-        let raw = "noise\nGROK_APP_SESS\nid1\t%2Fwork\t171000\tFix bug\nid2\t%2Ftmp\t0\t\n";
-        let s = parse_sess_stdout(raw).unwrap();
+        let raw = "noise\nGROK_APP_SESS\nTOTAL\t35\nid1\t%2Fwork\t171000\tFix bug\nid2\t%2Ftmp\t0\t\n";
+        let (total, s) = parse_sess_stdout(raw).unwrap();
+        assert_eq!(total, 35);
         assert_eq!(s.len(), 2);
         assert_eq!(s[0].cwd, "/work");
         assert_eq!(s[0].title, "Fix bug");
-        assert_eq!(s[1].title, "id2");
+        assert_eq!(s[1].title, "");
     }
 
     #[test]
