@@ -29,7 +29,15 @@ export async function projectAdd(path: string, trust: boolean) {
 }
 
 export async function projectAddSsh(alias: string, path: string, trust: boolean) {
-  return invoke("project_add_ssh", { alias, path, trust });
+  return invoke<{
+    id: string;
+    name: string;
+    path: string;
+    trusted: boolean;
+    pathOk: boolean;
+    pinned?: boolean;
+    sshAlias?: string | null;
+  }>("project_add_ssh", { alias, path, trust });
 }
 
 /**

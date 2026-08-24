@@ -1901,6 +1901,27 @@ export function AppWorkbench() {
   const html5DragDepthRef = useRef(0);
   const [, setSetup] = useState({ cli: false, auth: false, project: false });
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const newRemoteChat = useCallback(
+    async (alias: string, cwd: string) => {
+      const path = cwd.trim();
+      if (!path) return;
+      try {
+        const added = (await api.projectAddSsh(alias, path, true)) as Project;
+        setProjects(mapProjectsList((await api.projectsList()) as Project[]));
+        const full: Project = {
+          ...added,
+          trusted: true,
+          pathOk: true,
+          sshAlias: added.sshAlias?.trim() || alias,
+        };
+        await newChat(full);
+      } catch (e) {
+        setLocalError(String(e));
+      }
+    },
+    [newChat],
+  );
   const ensureConnectedRef = useRef<() => Promise<string | null>>(
     async () => null,
   );
@@ -13937,6 +13958,7 @@ export function AppWorkbench() {
             projectReorder={projectReorder}
             openProjectMenu={openProjectMenu}
             newChat={newChat}
+            onNewRemoteConversation={newRemoteChat}
             relocateProject={relocateProject}
             trustProject={trustProject}
             viewingSessionId={session.sessionId}

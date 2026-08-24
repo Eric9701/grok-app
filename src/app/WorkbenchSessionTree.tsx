@@ -82,6 +82,7 @@ export type WorkbenchSessionTreeProps = {
   projectReorder: SidebarProjectReorderApi;
   openProjectMenu: (e: MouseEvent, proj: Project) => void;
   newChat: (project?: Project | null) => void | Promise<void>;
+  onNewRemoteConversation?: (alias: string, cwd: string) => void;
   relocateProject: (proj: Project) => void | Promise<void>;
   trustProject: (proj?: Project | null) => void | Promise<void>;
   viewingSessionId: string | null;
@@ -137,6 +138,7 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
     projectReorder,
     openProjectMenu,
     newChat,
+    onNewRemoteConversation,
     relocateProject,
     trustProject,
     viewingSessionId,
@@ -319,6 +321,7 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
               locale={locale}
               showRelativeTime={sidebarShowRelativeTime}
               onOpenSession={(id) => onSidebarSessionOpen({ id })}
+              onNewConversation={onNewRemoteConversation}
             />
             <SidebarTreeReveal open={projectsOpen} className="tree-reveal--projects">
             {projects.length === 0 && (

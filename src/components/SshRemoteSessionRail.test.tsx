@@ -11,6 +11,7 @@ import * as api from "@/lib/api";
 
 const loadMore = vi.fn();
 const onOpenSession = vi.fn();
+const onNewConversation = vi.fn();
 const setDraftRemote = vi.fn();
 const renameRemoteSession = vi.fn();
 
@@ -66,6 +67,7 @@ function t(k: MessageKey, vars?: Vars): string {
   if (k === "sidebar.remoteLoadMore") return "加载更多";
   if (k === "sidebar.remoteOpening") return "打开中…";
   if (k === "sidebar.remoteOpenFailed") return `无法打开：${vars?.error ?? ""}`;
+  if (k === "sidebar.newConversation") return "新建会话";
   return String(k);
 }
 
@@ -168,5 +170,30 @@ describe("SshRemoteSessionRail", () => {
       expect(api.sshOpenSession).toHaveBeenCalled();
       expect(onOpenSession).toHaveBeenCalledWith("app-1");
     });
+  });
+
+  it("starts a new conversation in the remote folder path", async () => {
+    render(
+      <SshRemoteSessionRail
+        t={t}
+        locale="zh"
+        showRelativeTime
+        onOpenSession={onOpenSession}
+        onNewConversation={onNewConversation}
+      />,
+    );
+    const pens = screen.getAllByTestId("ssh-remote-new-conversation");
+    expect(pens.length).toBe(2);
+    await userEvent.click(pens[0]);
+    expect(onNewConversation).toHaveBeenCalledWith(
+      "UTS",
+      "/data/pengqlu/code/qwen35-v001-light",
+    );
+    expect(setDraftRemote).toHaveBeenCalledWith({
+      alias: "UTS",
+      path: "/data/pengqlu/code/qwen35-v001-light",
+    });
+    expect(api.sshOpenSession).not.toHaveBeenCalled();
+    expect(onOpenSession).not.toHaveBeenCalled();
   });
 });

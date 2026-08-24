@@ -10,8 +10,9 @@ import {
 import { SidebarSessionName } from "@/components/SidebarSessionName";
 import { SidebarSessionRelativeTime } from "@/components/SidebarSessionRelativeTime";
 import { SidebarTreeReveal } from "@/components/SidebarTreeReveal";
-import { IconFolder } from "@/components/icons";
+import { IconFolder, IconNewChat as IconSquarePen } from "@/components/icons";
 import { Spinner } from "@/components/ui/spinner";
+import { Tip } from "@/components/ui/tooltip";
 import type { Locale, MessageKey, Vars } from "@/i18n";
 import * as api from "@/lib/api";
 import { nextSessionTitle } from "@/lib/sidebarSessionRename";
@@ -31,6 +32,7 @@ type Props = {
   locale: Locale;
   showRelativeTime: boolean;
   onOpenSession: (sessionId: string) => void;
+  onNewConversation?: (alias: string, cwd: string) => void;
 };
 
 function pathFoldKey(alias: string, cwd: string): string {
@@ -42,6 +44,7 @@ export function SshRemoteSessionRail({
   locale,
   showRelativeTime,
   onOpenSession,
+  onNewConversation,
 }: Props) {
   const watch = useSshWatch();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -176,6 +179,31 @@ export function SshRemoteSessionRail({
                             <IconFolder size={15} />
                           </span>
                           <span className="tree-l2__name">{group.label}</span>
+                          <span
+                            className="tree-l2__actions"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Tip label={t("sidebar.newConversation")}>
+                              <button
+                                type="button"
+                                className="tree-icon-btn"
+                                disabled={!group.cwd.trim()}
+                                aria-label={t("sidebar.newConversation")}
+                                data-testid="ssh-remote-new-conversation"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!group.cwd.trim()) return;
+                                  watch.setDraftRemote({
+                                    alias,
+                                    path: group.cwd,
+                                  });
+                                  onNewConversation?.(alias, group.cwd);
+                                }}
+                              >
+                                <IconSquarePen size={14} />
+                              </button>
+                            </Tip>
+                          </span>
                         </div>
                         <SidebarTreeReveal open={pathExpanded}>
                           <div className="tree-l3-list">
