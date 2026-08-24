@@ -60,6 +60,8 @@ struct PtySession {
     writer: Box<dyn Write + Send>,
     master: Box<dyn MasterPty + Send>,
     killer: Box<dyn ChildKiller + Send + Sync>,
+    /// Unix process-group kill only; Windows uses `ChildKiller`.
+    #[cfg(unix)]
     pid: Option<u32>,
 }
 
@@ -195,6 +197,7 @@ pub fn spawn(
 
     // Waiter owns Child; kill() uses clone_killer so we can signal while wait() blocks.
     let killer = child.clone_killer();
+    #[cfg(unix)]
     let pid = child.process_id();
     let (exit_tx, exit_rx) = std::sync::mpsc::channel::<Option<u32>>();
     thread::Builder::new()
@@ -215,6 +218,7 @@ pub fn spawn(
                 writer,
                 master: pair.master,
                 killer,
+                #[cfg(unix)]
                 pid,
             },
         );
