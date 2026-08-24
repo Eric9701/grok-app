@@ -20,7 +20,7 @@ import {
 } from "@/lib/app/sidebarModels";
 import { isActiveJsonSchema } from "@/lib/jsonSchema";
 import { canLiveParticipate } from "@/lib/multiWindow";
-import { isProjectPathMissing, isSshRemoteProject } from "@/lib/projectPath";
+import { isProjectPathMissing } from "@/lib/projectPath";
 import { resolveSessionWorktreeBadge } from "@/lib/gitWorktree";
 import { isViewedSessionConnecting } from "@/lib/connStatus";
 import { migrateDraftSendClaim, queueSessionKey } from "@/lib/sendQueue";
@@ -181,10 +181,6 @@ export function useSessionConnect(opts: {
             name: projectDisplayName(connectProject, h.tr),
           }),
         );
-        return null;
-      }
-      if (isSshRemoteProject(connectProject)) {
-        h.setLocalError(h.tr("sidebar.remoteAgentLater"));
         return null;
       }
       if (

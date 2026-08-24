@@ -281,48 +281,16 @@ impl SessionManager {
             let _ = store::update_session_meta(&meta);
         }
 
-        // SSH remote project: imported transcript only. Do not spawn local grok
-        // with the remote path as cwd (ENOENT → CLI_NOT_FOUND). Wave 3 later.
-        let ssh_project = meta.project_id.as_deref().and_then(|pid| {
+        // SSH remote project: grok runs on the host (wave 3). Keep the alias
+        // for spawn wrap; do not treat the remote path as a local cwd.
+        let ssh_alias = meta.project_id.as_deref().and_then(|pid| {
             store::load_projects()
                 .into_iter()
                 .find(|p| p.id == pid)
                 .filter(|p| crate::ssh_remote::should_skip_local_acp_spawn(p.ssh_alias.as_deref()))
+                .and_then(|p| p.ssh_alias)
+                .map(|s| s.trim().to_string())
         });
-        if let Some(p) = ssh_project {
-            let mut cleared_self = false;
-            {
-                let mut guard = self.inner.lock();
-                let drop_self = guard.as_ref().is_some_and(|s| {
-                    s.app_session_id == meta.id && s.acp.as_ref().is_none_or(|c| !c.is_alive())
-                });
-                if drop_self {
-                    let _ = guard.take();
-                    cleared_self = true;
-                }
-            }
-            tracing::info!(
-                target: "session",
-                session = %meta.id,
-                alias = ?p.ssh_alias,
-                "ssh remote project — skip local ACP spawn"
-            );
-            let snap = SessionSnapshot {
-                session_id: Some(meta.id.clone()),
-                agent_session_id: None,
-                state: SessionState::Idle,
-                last_error: None,
-                streaming_message_id: None,
-                backend: Self::backend_name(),
-                model_id: meta.model_id.clone(),
-                project_path: Some(p.path.clone()),
-                title: meta.title.clone(),
-            };
-            if cleared_self {
-                Self::emit_state(&app, &snap);
-            }
-            return Ok(snap);
-        }
 
         // Resolve cwd: explicit path → session's project path → general workspace.
         // Never use process cwd (Dock-launched macOS apps often have cwd `/`).
@@ -367,7 +335,16 @@ impl SessionManager {
         let prefs =
             store::resolve_composer_prefs(meta.project_id.as_deref(), Some(meta.id.as_str()));
         let policy = PermissionPolicy::parse(&prefs.permission_policy);
-        let agent_model = crate::providers::agent_spawn_model_id(&prefs.model_id);
+        let agent_model = if ssh_alias.is_some() {
+            let m = prefs.model_id.trim();
+            if m.is_empty() || crate::providers::is_custom_provider_id(m) {
+                crate::providers::OFFICIAL_CATALOG_MODEL.to_string()
+            } else {
+                m.to_string()
+            }
+        } else {
+            crate::providers::agent_spawn_model_id(&prefs.model_id)
+        };
 
         // Pending CLI --fork-session: must cold-spawn so open can call session/fork.
         // Never no-op / unpark a warm process that still holds the source agent id.
@@ -713,7 +690,7 @@ impl SessionManager {
         // attached to their owner; sharing an Arc across sessions lets
         // unstamped load replay and process-level kill paths corrupt or abort
         // a co-tenant.
-        if !pending_fork {
+        if !pending_fork && ssh_alias.is_none() {
             let eff_sandbox = {
                 let project_sandbox = meta.project_id.as_deref().and_then(|pid| {
                     store::load_projects()
@@ -1038,26 +1015,30 @@ impl SessionManager {
 
         // Real ACP cold spawn (one process per App session — no cross-session rebind).
         // WSL backend probes inside the distro (a WSL-only install has no native grok.exe).
-        let probe = crate::wsl_backend::probe_cli_for_settings(
-            &settings,
-            settings.manual_cli_path.as_deref(),
-        );
-        if !probe.found {
-            {
-                let mut guard = self.inner.lock();
-                if let Some(s) = guard.as_mut() {
-                    let _ = s.fsm.connect_failed(AgentError::new(
-                        AgentErrorCode::CliNotFound,
-                        "Grok Build CLI not found. Install Grok Build or set path in Settings.",
-                    ));
+        // SSH: grok lives on the host — do not require a local binary.
+        let cli_path = if ssh_alias.is_some() {
+            std::path::PathBuf::from("grok")
+        } else {
+            let probe = crate::wsl_backend::probe_cli_for_settings(
+                &settings,
+                settings.manual_cli_path.as_deref(),
+            );
+            if !probe.found {
+                {
+                    let mut guard = self.inner.lock();
+                    if let Some(s) = guard.as_mut() {
+                        let _ = s.fsm.connect_failed(AgentError::new(
+                            AgentErrorCode::CliNotFound,
+                            "Grok Build CLI not found. Install Grok Build or set path in Settings.",
+                        ));
+                    }
                 }
+                let snap = self.snapshot();
+                Self::emit_state(&app, &snap);
+                return Ok(snap);
             }
-            let snap = self.snapshot();
-            Self::emit_state(&app, &snap);
-            return Ok(snap);
-        }
-
-        let cli_path = std::path::PathBuf::from(probe.path.unwrap());
+            std::path::PathBuf::from(probe.path.unwrap())
+        };
         // Effective sandbox: project override > app Settings (affects --sandbox / GROK_SANDBOX).
         let project_sandbox = meta.project_id.as_deref().and_then(|pid| {
             store::load_projects()
@@ -1084,13 +1065,24 @@ impl SessionManager {
                 .as_ref()
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty()),
-            plugin_dirs: meta.plugin_dirs.clone(),
-            extra_rules: crate::official_aux::merge_extra_rules(
+            plugin_dirs: if ssh_alias.is_some() {
+                Vec::new()
+            } else {
+                meta.plugin_dirs.clone()
+            },
+            extra_rules: if ssh_alias.is_some() {
                 meta.extra_rules
                     .as_ref()
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty()),
-            ),
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            } else {
+                crate::official_aux::merge_extra_rules(
+                    meta.extra_rules
+                        .as_ref()
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty()),
+                )
+            },
             max_agent_turns: meta.max_agent_turns,
             system_prompt_override: meta
                 .system_prompt_override
@@ -1101,6 +1093,7 @@ impl SessionManager {
             fork_session: fork_agent,
             grok_home_override: None,
             empty_mcp_servers: false,
+            ssh_alias: ssh_alias.clone(),
         };
 
         let cwd_str = cwd.to_string_lossy().to_string();

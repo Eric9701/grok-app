@@ -18,9 +18,9 @@ export function isSshRemoteProject(
 }
 
 /**
- * Warm-connect may spawn a local `grok agent stdio` with `project.path` as cwd.
- * SSH remotes are not local dirs — spawning them reports CLI_NOT_FOUND (ENOENT).
- * Null project (orphan / other sessions) stays warmable.
+ * Warm-connect may spawn `grok agent stdio`. SSH remotes spawn through OpenSSH
+ * with the remote path as cwd — they are warmable when trusted. Local folders
+ * still require a real directory. Null project (orphan) stays warmable.
  */
 export function isProjectWarmable(
   project: {
@@ -30,7 +30,7 @@ export function isProjectWarmable(
   } | null,
 ): boolean {
   if (!project) return true;
-  if (isSshRemoteProject(project)) return false;
+  if (isSshRemoteProject(project)) return !!project.trusted;
   return !!project.trusted && !isProjectPathMissing(project.pathOk);
 }
 

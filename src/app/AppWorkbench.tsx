@@ -519,7 +519,6 @@ import {
 import {
   isProjectPathMissing,
   isProjectWarmable,
-  isSshRemoteProject,
 } from "@/lib/projectPath";
 import {
   normalizeProjectColor,
@@ -11826,42 +11825,7 @@ export function AppWorkbench() {
     };
   }, [closeSideTabOrWindow]);
 
-  const error =
-    isSshRemoteProject(activeProject) && session.lastError?.code === "CLI_NOT_FOUND"
-      ? null
-      : session.lastError;
-  // Imported SSH transcripts used to spawn local grok with the remote path as
-  // cwd (ENOENT → CLI_NOT_FOUND). Drop that leftover on the viewed remote chat.
-  useEffect(() => {
-    if (!isSshRemoteProject(activeProject)) return;
-    if (session.lastError?.code !== "CLI_NOT_FOUND") return;
-    setSession((prev) => {
-      if (prev.lastError?.code !== "CLI_NOT_FOUND") return prev;
-      return {
-        ...prev,
-        lastError: null,
-        state: prev.state === "disconnected" ? "idle" : prev.state,
-      };
-    });
-    setLocalError(null);
-    const live = liveHostRef.current;
-    if (
-      live.sessionId === session.sessionId &&
-      live.lastError?.code === "CLI_NOT_FOUND"
-    ) {
-      setLiveHost({
-        ...live,
-        lastError: null,
-        state: live.state === "disconnected" ? "idle" : live.state,
-      });
-    }
-  }, [
-    activeProject,
-    session.lastError?.code,
-    session.sessionId,
-    setLiveHost,
-    setSession,
-  ]);
+  const error = session.lastError;
   const errorBanner = useMemo(
     () =>
       presentErrorBanner(error, localError, locale, {

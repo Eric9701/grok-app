@@ -41,10 +41,17 @@ describe("isProjectWarmable", () => {
     expect(isProjectWarmable({ trusted: true, pathOk: false })).toBe(false);
   });
 
-  it("never warms an SSH remote even when pathOk is true", () => {
+  it("warms a trusted SSH remote (grok runs on the host)", () => {
     expect(
       isProjectWarmable({
         trusted: true,
+        pathOk: true,
+        sshAlias: "uts",
+      }),
+    ).toBe(true);
+    expect(
+      isProjectWarmable({
+        trusted: false,
         pathOk: true,
         sshAlias: "uts",
       }),

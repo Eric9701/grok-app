@@ -117,9 +117,9 @@ pub fn is_safe_ssh_alias(alias: &str) -> bool {
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'_' | b'-'))
 }
 
-/// Wave 3 will spawn grok on the host. Until then, a project with `ssh_alias`
-/// must not run local `grok agent stdio` — the remote path is not a local cwd
-/// and spawn ENOENT is mislabeled CLI_NOT_FOUND.
+/// True when this project lives on an OpenSSH host. Do not treat its path as
+/// local `std::fs`. Wave 3 spawns `grok agent stdio` through `ssh`, never as a
+/// local child with the remote path as cwd.
 pub fn should_skip_local_acp_spawn(ssh_alias: Option<&str>) -> bool {
     ssh_alias
         .map(str::trim)
@@ -977,6 +977,75 @@ pub fn ssh_pty_argv(alias: &str, remote_cwd: Option<&str>) -> Result<Vec<String>
     args.push(alias.to_string());
     args.push(ssh_pty_remote_cmd(remote_cwd));
     Ok(args)
+}
+
+/// Remote launch for ACP stdio. `$1` is cwd, remaining `"$@"` are grok flags.
+/// Alias and user paths stay argv — never concatenated into this script.
+pub const REMOTE_ACP_LAUNCH: &str = r#"export PATH="$HOME/.grok/bin:$PATH"
+BIN=$(command -v grok 2>/dev/null || true)
+if [ -z "$BIN" ] && [ -x "$HOME/.grok/bin/grok" ]; then BIN="$HOME/.grok/bin/grok"; fi
+if [ -z "$BIN" ]; then echo GROK_APP_CLI_MISSING >&2; exit 127; fi
+if [ -n "$1" ]; then
+  case "$1" in
+    ~*) DIR="$HOME${1#~}" ;;
+    *) DIR="$1" ;;
+  esac
+  if [ -d "$DIR" ]; then cd "$DIR" || exit 1; fi
+fi
+shift
+exec "$BIN" "$@"
+"#;
+
+/// `ssh -T` argv prefix: ControlMaster, then `bash -lc` + cwd. Caller appends grok flags.
+pub fn ssh_acp_prefix_argv(alias: &str, remote_cwd: &str) -> Result<Vec<String>, String> {
+    if !is_safe_ssh_alias(alias) {
+        return Err("invalid SSH host alias".into());
+    }
+    if remote_cwd.contains('\0') {
+        return Err("invalid remote cwd".into());
+    }
+    let ssh = find_ssh_binary()
+        .ok_or_else(|| "OpenSSH client (ssh) was not found on this machine".to_string())?;
+    let _ = ensure_control_dir();
+    let mut args = vec![ssh.to_string_lossy().into_owned(), "-T".to_string()];
+    push_ssh_opt_argv(&mut args, "BatchMode", "yes");
+    push_ssh_opt_argv(
+        &mut args,
+        "ConnectTimeout",
+        &SSH_CONNECT_TIMEOUT_SECS.to_string(),
+    );
+    push_ssh_opt_argv(&mut args, "PasswordAuthentication", "no");
+    push_ssh_opt_argv(&mut args, "KbdInteractiveAuthentication", "no");
+    push_ssh_opt_argv(&mut args, "StrictHostKeyChecking", "yes");
+    push_ssh_opt_argv(&mut args, "RequestTTY", "no");
+    push_ssh_opt_argv(&mut args, "ControlMaster", "auto");
+    push_ssh_opt_argv(
+        &mut args,
+        "ControlPath",
+        control_path(alias).to_string_lossy().as_ref(),
+    );
+    push_ssh_opt_argv(&mut args, "ControlPersist", "yes");
+    args.push(alias.to_string());
+    args.push("bash".into());
+    args.push("-lc".into());
+    args.push(REMOTE_ACP_LAUNCH.to_string());
+    args.push("x".into());
+    args.push(remote_cwd.to_string());
+    Ok(args)
+}
+
+/// Local `ssh` process whose remote side execs `grok agent stdio` in `remote_cwd`.
+pub fn start_ssh_acp_command(
+    alias: &str,
+    remote_cwd: &str,
+) -> Result<tokio::process::Command, String> {
+    let argv = ssh_acp_prefix_argv(alias, remote_cwd)?;
+    let mut cmd = tokio::process::Command::new(&argv[0]);
+    crate::process_util::apply_no_window_tokio(&mut cmd);
+    for a in argv.iter().skip(1) {
+        cmd.arg(a);
+    }
+    Ok(cmd)
 }
 
 /// Remote snippet for an interactive PTY. Never interpolates the alias.
@@ -1985,6 +2054,21 @@ fn save_import_index(map: &HashMap<String, String>) -> Result<(), String> {
     std::fs::write(import_index_path(), raw).map_err(|e| e.to_string())
 }
 
+fn bind_imported_agent_session(
+    mut meta: crate::store::SessionMeta,
+    remote_id: &str,
+) -> Result<crate::store::SessionMeta, String> {
+    let rid = remote_id.trim();
+    if crate::cli_sessions::validate_agent_session_id(rid).is_err() {
+        return Ok(meta);
+    }
+    if meta.agent_session_id.as_deref() != Some(rid) {
+        meta.agent_session_id = Some(rid.to_string());
+        crate::store::update_session_meta(&meta)?;
+    }
+    Ok(meta)
+}
+
 fn persist_imported_journal(app_id: &str, pairs: Vec<(String, String)>) -> Result<(), String> {
     let now = chrono::Utc::now();
     let msgs: Vec<crate::store::ChatMessageStored> = pairs
@@ -2127,6 +2211,7 @@ pub async fn ssh_open_session(
         save_import_index(&index)?;
         meta
     };
+    let meta = bind_imported_agent_session(meta, &session_id)?;
 
     let message_count = crate::store::load_messages(&meta.id).len() as u32;
     Ok(SshOpenSessionResult {
@@ -3124,6 +3209,27 @@ Host "build-server"
         assert!(remote.contains("/data/pengqlu/code"));
         assert!(!argv.iter().any(|a| a.contains("ssh UTS")));
         assert!(ssh_pty_argv("host;rm", None).is_err());
+    }
+
+    #[test]
+    fn ssh_acp_prefix_keeps_alias_and_cwd_as_argv() {
+        let Some(_) = find_ssh_binary() else {
+            return;
+        };
+        let argv = ssh_acp_prefix_argv("UTS", "/data/pengqlu/my proj").expect("argv");
+        assert_eq!(argv[1], "-T");
+        assert!(!argv.iter().any(|a| a == "-tt"));
+        assert!(argv.iter().any(|a| a == "UTS"));
+        assert!(argv.iter().any(|a| a.contains("ControlMaster=auto")));
+        assert!(argv.iter().any(|a| a == "bash"));
+        assert!(argv.iter().any(|a| a == "-lc"));
+        let cwd_idx = argv.iter().position(|a| a == "/data/pengqlu/my proj");
+        assert_eq!(cwd_idx, Some(argv.len() - 1));
+        assert_eq!(argv[argv.len() - 2], "x");
+        let script = argv.iter().find(|a| a.contains("GROK_APP_CLI_MISSING"));
+        assert!(script.is_some());
+        assert!(!script.unwrap().contains("UTS"));
+        assert!(ssh_acp_prefix_argv("host;rm", "/tmp").is_err());
     }
 
     #[test]

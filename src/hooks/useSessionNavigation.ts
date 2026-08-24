@@ -37,7 +37,6 @@ import {
   shouldDeferWarmConnectForForeignBusy,
   shouldSkipWarmConnect,
 } from "@/lib/multiWindow";
-import { isSshRemoteProject } from "@/lib/projectPath";
 import { sessionShellStore } from "@/lib/sessionShellStore";
 import { sessionTranscriptStore } from "@/lib/sessionTranscriptStore";
 import { useSessionShellActions } from "@/hooks/useSessionShell";
@@ -375,23 +374,6 @@ export function useSessionNavigation(opts: {
       const hostAfter = hostRef.current;
       hostAfter.catalog.setActiveProject(proj);
       bindShellSession(s);
-      if (isSshRemoteProject(proj)) {
-        // Imported remote transcript. Do not keep a leftover CLI_NOT_FOUND
-        // from a prior local spawn that used the remote path as cwd.
-        const idle = {
-          ...IDLE_SNAPSHOT,
-          sessionId: s.id,
-          title: s.title || "Untitled",
-          state: "idle" as const,
-          backend: "grok_agent_stdio",
-          lastError: null,
-        };
-        setSession(idle);
-        const liveHost = sessionShellStore.getLiveHost();
-        if (liveHost.sessionId === s.id) {
-          setLiveHost({ ...liveHost, lastError: null, state: "idle" });
-        }
-      }
       if (openingSessionIdRef.current === s.id) {
         openingSessionIdRef.current = null;
       }
