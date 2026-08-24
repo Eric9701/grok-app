@@ -71,8 +71,8 @@
 | WP-W23 | Composer dictation FSM into useVoiceDictation | PASS | 50f1193c | 16810→16468 lines; useState 216→213; useEffect 85→83 |
 | WP-W24 | Composer send path into useComposerSend | PASS | bd17cb47 | 16468→15850 lines; useState 213; useEffect 83 |
 | WP-W25 | Settings overlay nav into useSettingsNavigation | PASS | 5003a52a | 15956→15612 lines; useState 214→209; useEffect 83→81 |
-| WP-W26 | Settings prefs hydrate into useAppSettingsPrefs | PASS |  | 15612→15471 lines; useState 209→156 |
-| WP-W27 | Session connect + live map into useSessionConnect | PASS |  | 15471→15183 lines; useState 156→155; useEffect 81→80 |
+| WP-W26 | Settings prefs hydrate into useAppSettingsPrefs | PASS | aae65cf4 | 15612→15471 lines; useState 209→156 |
+| WP-W27 | Session connect + live map into useSessionConnect | PASS | aae65cf4 | 15471→15183 lines; useState 156→155; useEffect 81→80 |
 
 ## Metrics log (append-only)
 
