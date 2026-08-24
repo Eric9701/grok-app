@@ -1030,6 +1030,8 @@ pub fn run() {
             ssh_remote::ssh_watch_stop,
 
             ssh_remote::ssh_list_dir,
+            ssh_remote::ssh_read_file,
+            ssh_remote::ssh_write_file,
 
             ssh_remote::ssh_list_sessions,
             ssh_remote::ssh_open_session,

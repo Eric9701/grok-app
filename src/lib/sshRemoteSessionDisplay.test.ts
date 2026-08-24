@@ -3,6 +3,7 @@ import {
   cwdBasename,
   firstSentenceTitle,
   groupRemoteSessionsByCwd,
+  joinRemoteRelative,
   looksLikeSessionId,
   remainingRemoteCount,
   remotePathTip,
@@ -81,6 +82,18 @@ describe("helpers", () => {
 
   it("keys overlay titles by host and id", () => {
     expect(remoteTitleKey("UTS", "abc")).toBe("UTS:abc");
+  });
+
+  it("joins remote relative paths and rejects escape", () => {
+    expect(joinRemoteRelative("/data/code", "README.md")).toBe(
+      "/data/code/README.md",
+    );
+    expect(joinRemoteRelative("/data/code/", "docs/a.md")).toBe(
+      "/data/code/docs/a.md",
+    );
+    expect(() => joinRemoteRelative("/data/code", "../etc/passwd")).toThrow(
+      /escapes/,
+    );
   });
 
   it("takes the last path segment", () => {

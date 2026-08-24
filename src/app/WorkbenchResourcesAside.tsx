@@ -32,6 +32,7 @@ export type WorkbenchResourcesAsideProps = {
   asidePaint: number;
   beginAsideResize: (width: number) => void;
   effectiveProjectPath: string | null;
+  sshAlias?: string | null;
   projectName: string;
   sideIsGitProject: boolean;
   sideWorkbench: SideWorkbenchState;
@@ -74,6 +75,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
     asidePaint,
     beginAsideResize,
     effectiveProjectPath,
+    sshAlias = null,
     projectName,
     sideIsGitProject,
     sideWorkbench,
@@ -153,6 +155,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
           <SideWorkbench
             locale={locale}
             projectPath={effectiveProjectPath}
+            sshAlias={sshAlias}
             projectName={projectName}
             isGitProject={sideIsGitProject}
             state={sideWorkbench}

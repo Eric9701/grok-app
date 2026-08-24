@@ -61,6 +61,22 @@ export function normalizeRemoteCwd(cwd: string): string {
   return cwd.trim().replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
+/** Join a remote POSIX root with a relative path. Rejects `..`. */
+export function joinRemoteRelative(root: string, relative: string): string {
+  const base = root.trim().replace(/\/+$/, "");
+  const rel = relative.trim().replace(/^(\.\/)+/, "").replace(/^\/+/, "");
+  if (!rel || rel === ".") return base;
+  const parts = base.split("/").filter(Boolean);
+  for (const c of rel.split("/")) {
+    if (!c || c === ".") continue;
+    if (c === "..") {
+      throw new Error("path escapes project root");
+    }
+    parts.push(c);
+  }
+  return `/${parts.join("/")}`;
+}
+
 /** Folder label: basename, or parent/base when two cwds share a basename. */
 export function uniqueCwdLabel(
   cwd: string,

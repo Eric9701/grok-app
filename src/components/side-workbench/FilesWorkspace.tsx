@@ -55,10 +55,13 @@ import {
 } from "@/lib/resourceTree";
 import { isResourceDraftDirty } from "@/lib/resourceEdit";
 import { pathBaseName } from "@/lib/sessionChanges";
+import { joinRemoteRelative } from "@/lib/sshRemoteSessionDisplay";
 
 export type FilesWorkspaceProps = {
   locale: Locale | string;
   projectPath: string | null;
+  /** OpenSSH Host alias — list/read/write go over SSH. */
+  sshAlias?: string | null;
   projectName?: string | null;
   /** Shared tree visibility (SideWorkbenchState.treeVisible). */
   treeVisible: boolean;
@@ -90,6 +93,7 @@ const NOOP_ASYNC = async () => {};
 export function FilesWorkspace({
   locale,
   projectPath,
+  sshAlias = null,
   projectName,
   treeVisible,
   onTreeVisibleChange,
@@ -132,6 +136,7 @@ export function FilesWorkspace({
 
   const fileTabs = useResourceFileTabs({
     projectPath,
+    sshAlias,
     sideMode: "files",
     tr,
     setError,
@@ -182,6 +187,31 @@ export function FilesWorkspace({
     async (relative: string): Promise<TreeNode[]> => {
       if (!projectPath || !api.isTauri()) return [];
       try {
+        if (sshAlias) {
+          const dir = relative
+            ? joinRemoteRelative(projectPath, relative)
+            : projectPath;
+          const listing = await api.sshListDir(sshAlias, dir);
+          if (!listing.ok) {
+            setError(listing.error || tr("resources.openFailed"));
+            return [];
+          }
+          return (listing.entries || []).map((e) => {
+            const rel = relative ? `${relative.replace(/\/+$/, "")}/${e.name}` : e.name;
+            const ext = e.isDir
+              ? ""
+              : (e.name.split(".").pop() || "").toLowerCase();
+            return {
+              name: e.name,
+              relativePath: rel,
+              isDir: !!e.isDir,
+              size: 0,
+              ext,
+              children: e.isDir ? [] : undefined,
+              loaded: !e.isDir,
+            };
+          });
+        }
         const entries = await api.fsListDir(projectPath, relative);
         return (entries || []).map((e) => ({
           name: e.name,
@@ -197,7 +227,7 @@ export function FilesWorkspace({
         return [];
       }
     },
-    [projectPath],
+    [projectPath, sshAlias, tr],
   );
 
   const refresh = useCallback(async () => {
@@ -241,7 +271,7 @@ export function FilesWorkspace({
       // Full classify only for extension-less names that might be folders.
       const base = norm.split("/").pop() || norm;
       const looksLikeFile = base.includes(".") && !base.endsWith(".");
-      if (!looksLikeFile && api.isTauri()) {
+      if (!looksLikeFile && api.isTauri() && !sshAlias) {
         try {
           const classified = await api.pathsClassify([p]);
           if (cancelled) return;

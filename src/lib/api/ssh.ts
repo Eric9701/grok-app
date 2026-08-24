@@ -1,6 +1,7 @@
 /** API domain: SSH remote hosts (Settings → Runtime → SSH). */
 
 import { invoke, isTauri } from "./host";
+import type { FsReadResult, FsWriteResult } from "./fs";
 
 export type SshHost = {
   alias: string;
@@ -124,6 +125,34 @@ export type SshOpenSessionResult = {
   messageCount?: number | null;
   error?: string | null;
 };
+
+export async function sshReadFile(
+  alias: string,
+  projectPath: string,
+  relative: string,
+) {
+  return invoke<FsReadResult>("ssh_read_file", {
+    alias,
+    projectPath,
+    relative,
+  });
+}
+
+export async function sshWriteFile(
+  alias: string,
+  projectPath: string,
+  relative: string,
+  content: string,
+  expectedMtimeMs?: number | null,
+) {
+  return invoke<FsWriteResult>("ssh_write_file", {
+    alias,
+    projectPath,
+    relative,
+    content,
+    expectedMtimeMs: expectedMtimeMs ?? null,
+  });
+}
 
 export async function sshOpenSession(
   alias: string,

@@ -791,6 +791,58 @@ pub fn posix_single_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 
+/// Join a remote POSIX project root with a relative path. Rejects `..`.
+pub fn join_remote_rel(root: &str, relative: &str) -> Result<String, String> {
+    let root = root.trim().trim_end_matches('/');
+    if root.is_empty() || !root.starts_with('/') || root.contains('\0') {
+        return Err("invalid remote project root".into());
+    }
+    if relative.contains('\0') {
+        return Err("invalid path".into());
+    }
+    let rel = relative
+        .trim()
+        .trim_start_matches("./")
+        .trim_start_matches('/');
+    let mut parts: Vec<&str> = root.split('/').filter(|s| !s.is_empty()).collect();
+    if !rel.is_empty() && rel != "." {
+        for c in rel.split('/') {
+            if c.is_empty() || c == "." {
+                continue;
+            }
+            if c == ".." {
+                return Err("path escapes project root".into());
+            }
+            parts.push(c);
+        }
+    }
+    Ok(format!("/{}", parts.join("/")))
+}
+
+fn remote_file_kind(name: &str) -> &'static str {
+    let ext = std::path::Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match ext.as_str() {
+        "md" | "mdx" | "markdown" => "markdown",
+        "json" | "jsonc" => "json",
+        "rs" | "ts" | "tsx" | "js" | "jsx" | "py" | "go" | "java" | "toml" | "yml" | "yaml"
+        | "css" | "html" | "sh" => "code",
+        _ => "text",
+    }
+}
+
+fn remote_file_mime(kind: &str) -> &'static str {
+    match kind {
+        "markdown" => "text/markdown",
+        "json" => "application/json",
+        "code" => "text/plain",
+        _ => "text/plain",
+    }
+}
+
 pub fn percent_decode_path(enc: &str) -> String {
     let bytes = enc.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
@@ -895,22 +947,51 @@ enum SshRunErr {
 }
 
 async fn run_ssh(alias: &str, remote: &str, mux: bool, secs: u64) -> Result<SshRun, SshRunErr> {
+    run_ssh_io(alias, remote, mux, secs, None).await
+}
+
+async fn run_ssh_io(
+    alias: &str,
+    remote: &str,
+    mux: bool,
+    secs: u64,
+    stdin: Option<&[u8]>,
+) -> Result<SshRun, SshRunErr> {
     let ssh = find_ssh_binary().ok_or(SshRunErr::Missing)?;
     let mut cmd = Command::new(&ssh);
     process_util::apply_no_window_tokio(&mut cmd);
     apply_common_ssh_opts(&mut cmd, alias, mux);
-    cmd.arg(alias)
-        .arg(remote)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
+    cmd.arg(alias).arg(remote);
+    if stdin.is_some() {
+        cmd.stdin(Stdio::piped());
+    } else {
+        cmd.stdin(Stdio::null());
+    }
+    cmd.stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     let started = Instant::now();
-    match timeout(Duration::from_secs(secs), cmd.output()).await {
+    let fut = async {
+        if let Some(bytes) = stdin {
+            let mut child = cmd.spawn().map_err(|e| e.to_string())?;
+            if let Some(mut sin) = child.stdin.take() {
+                use tokio::io::AsyncWriteExt;
+                sin.write_all(bytes).await.map_err(|e| e.to_string())?;
+                drop(sin);
+            }
+            child
+                .wait_with_output()
+                .await
+                .map_err(|e| e.to_string())
+        } else {
+            cmd.output().await.map_err(|e| e.to_string())
+        }
+    };
+    match timeout(Duration::from_secs(secs), fut).await {
         Err(_) => Err(SshRunErr::Timeout {
             latency_ms: started.elapsed().as_millis() as u64,
         }),
-        Ok(Err(e)) => Err(SshRunErr::Spawn(e.to_string())),
+        Ok(Err(e)) => Err(SshRunErr::Spawn(e)),
         Ok(Ok(o)) => Ok(SshRun {
             success: o.status.success(),
             stdout: String::from_utf8_lossy(&o.stdout).into_owned(),
@@ -1434,6 +1515,223 @@ pub async fn ssh_list_dir(alias: String, path: Option<String>) -> Result<SshList
                 error: Some("remote ls failed".into()),
             }),
         },
+    }
+}
+
+const MAX_SSH_TEXT_BYTES: u64 = 2 * 1024 * 1024;
+
+const REMOTE_READ_PY: &str = r#"python3 -c '
+import json, os, sys, time
+path = os.environ.get("GROK_APP_FILE", "")
+rel = os.environ.get("GROK_APP_REL", "")
+name = os.path.basename(path) or "file"
+def emit(obj):
+    sys.stdout.write("GROK_APP_READ\n")
+    sys.stdout.write(json.dumps(obj, ensure_ascii=False))
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+if not path or not os.path.isfile(path):
+    emit({"ok": False, "error": "not a file", "name": name, "relativePath": rel, "absolutePath": path, "size": 0, "kind": "text", "mime": "text/plain", "truncated": False, "mtimeMs": 0, "text": None})
+    sys.exit(0)
+st = os.stat(path)
+size = st.st_size
+mtime_ms = int(st.st_mtime * 1000)
+limit = 2097152
+raw = open(path, "rb").read(limit + 1)
+truncated = len(raw) > limit
+raw = raw[:limit]
+text = None
+err = None
+try:
+    text = raw.decode("utf-8")
+except Exception:
+    err = "not utf-8 text"
+    text = None
+emit({"ok": err is None, "error": err, "name": name, "relativePath": rel, "absolutePath": path, "size": size, "kind": "text", "mime": "text/plain", "truncated": truncated, "mtimeMs": mtime_ms, "text": text})
+'
+"#;
+
+const REMOTE_WRITE_PY: &str = r#"python3 -c '
+import json, os, sys, time
+path = os.environ.get("GROK_APP_FILE", "")
+rel = os.environ.get("GROK_APP_REL", "")
+exp = os.environ.get("GROK_APP_EXPECT_MTIME", "").strip()
+def emit(obj):
+    sys.stdout.write("GROK_APP_WRITE\n")
+    sys.stdout.write(json.dumps(obj, ensure_ascii=False))
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+if not path or not os.path.isfile(path):
+    emit({"ok": False, "error": "not a file: " + path})
+    sys.exit(0)
+data = sys.stdin.buffer.read()
+if len(data) > 2097152:
+    emit({"ok": False, "error": "file too large to save in-app (max 2097152 bytes)"})
+    sys.exit(0)
+st = os.stat(path)
+actual = int(st.st_mtime * 1000)
+if exp:
+    try:
+        expected = int(exp)
+    except Exception:
+        expected = 0
+    if expected > 0 and actual > 0 and actual != expected:
+        emit({"ok": False, "error": "CONFLICT: file changed on disk (mtime %d, expected %d)" % (actual, expected)})
+        sys.exit(0)
+parent = os.path.dirname(path)
+tmp = os.path.join(parent, ".%s.grok-save-%d" % (os.path.basename(path), os.getpid()))
+open(tmp, "wb").write(data)
+os.replace(tmp, path)
+st = os.stat(path)
+emit({"ok": True, "relativePath": rel, "absolutePath": path, "size": st.st_size, "mtimeMs": int(st.st_mtime * 1000)})
+'
+"#;
+
+fn remote_read_script(abs: &str, rel: &str) -> String {
+    format!(
+        "export GROK_APP_FILE={}\nexport GROK_APP_REL={}\n{REMOTE_READ_PY}",
+        posix_single_quote(abs),
+        posix_single_quote(rel),
+    )
+}
+
+fn remote_write_script(abs: &str, rel: &str, expected_mtime_ms: Option<u64>) -> String {
+    let exp = expected_mtime_ms
+        .filter(|n| *n > 0)
+        .map(|n| n.to_string())
+        .unwrap_or_default();
+    format!(
+        "export GROK_APP_FILE={}\nexport GROK_APP_REL={}\nexport GROK_APP_EXPECT_MTIME={}\n{REMOTE_WRITE_PY}",
+        posix_single_quote(abs),
+        posix_single_quote(rel),
+        posix_single_quote(&exp),
+    )
+}
+
+fn parse_marked_json(stdout: &str, marker: &str) -> Option<serde_json::Value> {
+    let idx = stdout.find(marker)?;
+    let rest = stdout[idx + marker.len()..].trim_start();
+    let line = rest.lines().next()?.trim();
+    serde_json::from_str(line).ok()
+}
+
+fn ssh_io_err(run: SshRunErr) -> String {
+    match run {
+        SshRunErr::Missing => "ssh missing".into(),
+        SshRunErr::Timeout { .. } => "timeout".into(),
+        SshRunErr::Spawn(e) => truncate_err(&e),
+    }
+}
+
+#[tauri::command]
+pub async fn ssh_read_file(
+    alias: String,
+    project_path: String,
+    relative: String,
+) -> Result<crate::fs_browser::FsReadResult, String> {
+    let alias = alias.trim().to_string();
+    if !is_safe_ssh_alias(&alias) {
+        return Err("invalid alias".into());
+    }
+    let rel = relative.trim().to_string();
+    let abs = join_remote_rel(&project_path, &rel)?;
+    let name = abs.rsplit('/').next().unwrap_or("file").to_string();
+    let kind = remote_file_kind(&name);
+    let mime = remote_file_mime(kind).to_string();
+    let script = remote_read_script(&abs, &rel);
+    match run_ssh(&alias, &script, true, SSH_OVERALL_TIMEOUT_SECS).await {
+        Err(e) => Err(ssh_io_err(e)),
+        Ok(run) if !run.success => {
+            let (_code, msg) = classify_ssh_stderr(&run.stderr);
+            Err(msg)
+        }
+        Ok(run) => {
+            let v = parse_marked_json(&run.stdout, "GROK_APP_READ")
+                .ok_or_else(|| "remote read failed".to_string())?;
+            let err = v
+                .get("error")
+                .and_then(|x| x.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string());
+            if v.get("ok").and_then(|x| x.as_bool()) == Some(false) {
+                if let Some(e) = err.clone() {
+                    if e.starts_with("not a file") {
+                        return Err(e);
+                    }
+                }
+            }
+            Ok(crate::fs_browser::FsReadResult {
+                relative_path: rel,
+                name,
+                absolute_path: abs,
+                size: v.get("size").and_then(|x| x.as_u64()).unwrap_or(0),
+                kind: kind.to_string(),
+                mime,
+                text: v
+                    .get("text")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string()),
+                base64: None,
+                stream: false,
+                truncated: v.get("truncated").and_then(|x| x.as_bool()).unwrap_or(false),
+                error: err,
+                mtime_ms: v.get("mtimeMs").and_then(|x| x.as_u64()).unwrap_or(0),
+            })
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn ssh_write_file(
+    alias: String,
+    project_path: String,
+    relative: String,
+    content: String,
+    expected_mtime_ms: Option<u64>,
+) -> Result<crate::fs_browser::FsWriteResult, String> {
+    let alias = alias.trim().to_string();
+    if !is_safe_ssh_alias(&alias) {
+        return Err("invalid alias".into());
+    }
+    let rel = relative.trim().to_string();
+    let abs = join_remote_rel(&project_path, &rel)?;
+    if content.len() as u64 > MAX_SSH_TEXT_BYTES {
+        return Err(format!(
+            "file too large to save in-app (max {MAX_SSH_TEXT_BYTES} bytes)"
+        ));
+    }
+    let script = remote_write_script(&abs, &rel, expected_mtime_ms);
+    match run_ssh_io(
+        &alias,
+        &script,
+        true,
+        SSH_OVERALL_TIMEOUT_SECS,
+        Some(content.as_bytes()),
+    )
+    .await
+    {
+        Err(e) => Err(ssh_io_err(e)),
+        Ok(run) if !run.success => {
+            let (_code, msg) = classify_ssh_stderr(&run.stderr);
+            Err(msg)
+        }
+        Ok(run) => {
+            let v = parse_marked_json(&run.stdout, "GROK_APP_WRITE")
+                .ok_or_else(|| "remote write failed".to_string())?;
+            if v.get("ok").and_then(|x| x.as_bool()) == Some(false) {
+                let err = v
+                    .get("error")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("remote write failed");
+                return Err(err.to_string());
+            }
+            Ok(crate::fs_browser::FsWriteResult {
+                relative_path: rel,
+                absolute_path: abs,
+                size: v.get("size").and_then(|x| x.as_u64()).unwrap_or(0),
+                mtime_ms: v.get("mtimeMs").and_then(|x| x.as_u64()).unwrap_or(0),
+            })
+        }
     }
 }
 
@@ -2025,6 +2323,28 @@ Host "build-server"
     fn percent_decode_cwd() {
         assert_eq!(percent_decode_path("%2Fhome%2Fme%2Fproj"), "/home/me/proj");
         assert_eq!(percent_decode_path("/plain"), "/plain");
+    }
+
+    #[test]
+    fn join_remote_rel_rejects_escape() {
+        assert_eq!(
+            join_remote_rel("/data/pengqlu/code", "README.md").unwrap(),
+            "/data/pengqlu/code/README.md"
+        );
+        assert_eq!(
+            join_remote_rel("/data/pengqlu/code/", "docs/a.md").unwrap(),
+            "/data/pengqlu/code/docs/a.md"
+        );
+        assert!(join_remote_rel("/data/pengqlu/code", "../etc/passwd").is_err());
+        assert!(join_remote_rel("relative", "a.md").is_err());
+    }
+
+    #[test]
+    fn parse_marked_json_reads_header_line() {
+        let raw = "noise\nGROK_APP_READ\n{\"ok\":true,\"size\":4,\"text\":\"hi\"}\n";
+        let v = parse_marked_json(raw, "GROK_APP_READ").unwrap();
+        assert_eq!(v.get("ok").and_then(|x| x.as_bool()), Some(true));
+        assert_eq!(v.get("text").and_then(|x| x.as_str()), Some("hi"));
     }
 
     #[test]

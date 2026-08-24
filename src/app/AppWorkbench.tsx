@@ -14535,6 +14535,7 @@ export function AppWorkbench() {
           asidePaint={asidePaint}
           beginAsideResize={beginAsideResize}
           effectiveProjectPath={effectiveProjectPath}
+          sshAlias={activeProject?.sshAlias ?? null}
           projectName={
             activeProject
               ? projectDisplayName(activeProject, tr)

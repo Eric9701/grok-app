@@ -39,6 +39,8 @@ import type { FileTab, SideMode } from "./types";
 
 export type UseResourceFileTabsArgs = {
   projectPath: string | null;
+  /** When set, list/read/write go through OpenSSH, not local fs. */
+  sshAlias?: string | null;
   sideMode: SideMode;
   tr: (key: MessageKey, vars?: Record<string, string>) => string;
   setError: Dispatch<SetStateAction<string | null>>;
@@ -47,6 +49,7 @@ export type UseResourceFileTabsArgs = {
 
 export function useResourceFileTabs({
   projectPath,
+  sshAlias = null,
   sideMode,
   tr,
   setError,
@@ -216,7 +219,9 @@ const reloadActiveFile = useCallback(async () => {
   );
   try {
     let r: api.FsReadResult;
-    if (projectPath && tab.relativePath && !tab.relativePath.startsWith("/") && !/^[A-Za-z]:[\\/]/.test(tab.relativePath)) {
+    if (sshAlias && projectPath && tab.relativePath) {
+      r = await api.sshReadFile(sshAlias, projectPath, tab.relativePath);
+    } else if (projectPath && tab.relativePath && !tab.relativePath.startsWith("/") && !/^[A-Za-z]:[\\/]/.test(tab.relativePath)) {
       r = await api.fsReadFile(projectPath, tab.relativePath);
     } else if (tab.absolutePath) {
       r = await api.fsReadAbsolute(tab.absolutePath);
@@ -238,7 +243,7 @@ const reloadActiveFile = useCallback(async () => {
       ),
     );
   }
-}, [activeId, projectPath, tabs, tr]);
+}, [activeId, projectPath, sshAlias, tabs, tr]);
 
 const saveActiveFile = useCallback(
   async (opts?: { force?: boolean }) => {
@@ -272,7 +277,15 @@ const saveActiveFile = useCallback(
           : true);
 
       let w: api.FsWriteResult;
-      if (underProject && projectPath) {
+      if (sshAlias && projectPath && tab.relativePath) {
+        w = await api.sshWriteFile(
+          sshAlias,
+          projectPath,
+          tab.relativePath,
+          tab.draftText,
+          expected,
+        );
+      } else if (underProject && projectPath) {
         w = await api.fsWriteFile(
           projectPath,
           tab.relativePath,
@@ -326,7 +339,7 @@ const saveActiveFile = useCallback(
       }
     }
   },
-  [activeId, projectPath, tabs, tr],
+  [activeId, projectPath, sshAlias, tabs, tr],
 );
 
 const openFile = async (relativePath: string) => {
@@ -380,7 +393,9 @@ const openFile = async (relativePath: string) => {
   setTabs((prev) => mergeFileTabsFromOpen(prev, open, tab));
   setActiveId(id);
   try {
-    const r = await api.fsReadFile(projectPath, relativePath);
+    const r = sshAlias
+      ? await api.sshReadFile(sshAlias, projectPath, relativePath)
+      : await api.fsReadFile(projectPath, relativePath);
     const src = await resolvePreviewSrc(r);
     applyReadResult(id, r, src, relativePath);
   } catch (e) {
@@ -487,9 +502,22 @@ const openAbsoluteFile = useCallback(
         norm.startsWith("/") ||
         /^[A-Za-z]:[\\/]/.test(norm) ||
         norm.startsWith("\\\\");
-      const r = looksAbs
-        ? await api.fsReadAbsolute(norm)
-        : await api.fsOpenPath(norm, projectPath);
+      let r: api.FsReadResult;
+      if (sshAlias && projectPath) {
+        const root = projectPath.replace(/[/\\]+$/, "").replace(/\\/g, "/");
+        const abs = norm.replace(/\\/g, "/");
+        const rel =
+          abs === root
+            ? ""
+            : abs.startsWith(`${root}/`)
+              ? abs.slice(root.length + 1)
+              : abs.replace(/^\/+/, "");
+        r = await api.sshReadFile(sshAlias, projectPath, rel);
+      } else {
+        r = looksAbs
+          ? await api.fsReadAbsolute(norm)
+          : await api.fsOpenPath(norm, projectPath);
+      }
       const src = await resolvePreviewSrc(r);
       // Prefer project-relative tab key when file is under project
       let relKey = r.relativePath || baseName(norm);
@@ -530,7 +558,7 @@ const openAbsoluteFile = useCallback(
       );
     }
   },
-  [notifyCapSoftFail, projectPath, tabs, tr],
+  [notifyCapSoftFail, projectPath, sshAlias, tabs, tr],
 );
 
 const openChangeInPane = useCallback(
