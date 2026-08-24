@@ -115,6 +115,9 @@ pub struct Project {
     /// `None` → no color accent (migration-safe default).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
+    /// When set, `path` is on this OpenSSH Host, not the local disk.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh_alias: Option<String>,
 }
 
 impl Project {
@@ -459,6 +462,10 @@ pub struct AppSettings {
     /// process (`--no-leader`). Advanced; multiple clients can share one backend.
     #[serde(default)]
     pub use_leader: bool,
+    /// OpenSSH Host aliases with watch enabled: keep a ControlMaster and
+    /// scan remote Grok sessions. Empty = none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ssh_watch_aliases: Vec<String>,
     /// xAI realtime voice id (e.g. `eve`).
     #[serde(default = "default_voice_id")]
     pub voice_id: String,
@@ -692,6 +699,7 @@ impl Default for AppSettings {
             agent_profile_path: String::new(),
             agents_json: String::new(),
             use_leader: false,
+            ssh_watch_aliases: Vec::new(),
             voice_id: default_voice_id(),
             voice_dictation_auto_send: false,
             voice_keep_agents_on_end: true,
@@ -1162,6 +1170,9 @@ pub fn load_projects() -> Vec<Project> {
     // rehome its sessions to orphan (`project_id = None`) under "其他会话".
     migrate_legacy_general_project(&mut list);
     for p in &mut list {
+        if p.ssh_alias.as_deref().is_some() {
+            continue;
+        }
         p.path_ok = PathBuf::from(&p.path).is_dir();
     }
     // Pin group first; keep manual order within each group (no last_opened sort).
@@ -1251,8 +1262,58 @@ pub fn add_project(path: String, trust: bool) -> Result<Project, String> {
         permission_policy: None,
         sandbox_profile: None,
         color: None,
+        ssh_alias: None,
     };
     // New projects land at the end of the unpinned group (after pin partition).
+    list.push(p.clone());
+    apply_project_pin_partition(&mut list);
+    save_projects(&list)?;
+    Ok(p)
+}
+
+/// Register a remote OpenSSH folder as a project. `path` is the remote cwd.
+pub fn add_ssh_project(alias: &str, path: String, trust: bool) -> Result<Project, String> {
+    if !crate::ssh_remote::is_safe_ssh_alias(alias) {
+        return Err("invalid SSH alias".into());
+    }
+    let path = path.trim().to_string();
+    if path.is_empty() || path.contains('\0') {
+        return Err("invalid remote path".into());
+    }
+    let name = PathBuf::from(&path)
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| path.clone());
+    let label = format!("{alias}:{name}");
+    let mut list = load_projects();
+    if let Some(existing) = list.iter_mut().find(|p| {
+        p.ssh_alias.as_deref() == Some(alias) && p.path == path
+    }) {
+        existing.trusted = trust || existing.trusted;
+        existing.last_opened_at = Utc::now();
+        existing.path_ok = true;
+        let clone = existing.clone();
+        save_projects(&list)?;
+        return Ok(clone);
+    }
+    let p = Project {
+        id: Uuid::new_v4().to_string(),
+        name: label,
+        path,
+        trusted: trust,
+        last_opened_at: Utc::now(),
+        path_ok: true,
+        pinned: false,
+        system: false,
+        model_id: None,
+        effort: None,
+        mode: None,
+        permission_policy: None,
+        sandbox_profile: None,
+        color: None,
+        ssh_alias: Some(alias.to_string()),
+    };
     list.push(p.clone());
     apply_project_pin_partition(&mut list);
     save_projects(&list)?;
@@ -3939,6 +4000,7 @@ mod tests {
             permission_policy: None,
             sandbox_profile: None,
             color: None,
+            ssh_alias: None,
         });
         write_json(&projects_file(), &projects).expect("seed projects");
         let mut sessions: Vec<SessionMeta> = read_json_recover(&sessions_index_file());
@@ -4019,6 +4081,7 @@ mod tests {
             permission_policy: None,
             sandbox_profile: None,
             color: None,
+            ssh_alias: None,
         }
     }
 

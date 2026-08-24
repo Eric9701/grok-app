@@ -6,6 +6,8 @@ export const ruSidebar = {
   "sidebar.search": "Поиск",
   "sidebar.projects": "Проекты",
   "sidebar.addProject": "Добавить проект",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "Свернуть все проекты",
   "sidebar.noProjects": "Проектов пока нет. Нажмите +, чтобы добавить папку.",
   "sidebar.importCliSessions": "Импорт из Grok Build",

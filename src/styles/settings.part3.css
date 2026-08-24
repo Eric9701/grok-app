@@ -50,6 +50,42 @@
   margin-top: 6px;
 }
 
+.settings-ssh-search {
+  margin: 12px 0 8px;
+}
+
+.settings-ssh-section {
+  margin-top: 12px;
+}
+
+.settings-ssh-host__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.settings-ssh-sessions {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-ssh-session,
+.settings-ssh-session__title {
+  font-size: 12px;
+}
+
+.settings-ssh-session__cwd {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
 
 .settings-acp-chip.is-ok .settings-acp-chip__dot {
   background: var(--success, #3d9a5f);

@@ -6,6 +6,8 @@ export const filSidebar = {
   "sidebar.search": "Maghanap",
   "sidebar.projects": "Mga proyekto",
   "sidebar.addProject": "Magdagdag ng proyekto",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "Ikipot lahat ng proyekto",
   "sidebar.noProjects": "Wala pang proyekto. I-click ang + para magdagdag ng folder.",
   "sidebar.importCliSessions": "I-import mula sa Grok Build",

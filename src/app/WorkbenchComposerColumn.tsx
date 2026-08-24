@@ -4,12 +4,13 @@
  */
 import * as api from "@/lib/api";
 import { ComposerProjectMenu } from "@/components/ComposerProjectMenu";
+import { ComposerRemoteMenu } from "@/components/ComposerRemoteMenu";
 import { ComposerWorktreeMenu } from "@/components/ComposerWorktreeMenu";
 import { PermissionCountdown } from "@/components/PermissionCountdown";
 import { SuperGrokMark } from "@/components/SuperGrokMark";
 import { IconFileDiff, IconGitBranch } from "@/components/icons";
 import { Tip } from "@/components/ui/tooltip";
-import { projectDisplayName } from "@/lib/app/sidebarModels";
+import { mapProjectsList, projectDisplayName } from "@/lib/app/sidebarModels";
 import { isMirrorClient } from "@/lib/mirrorTransport";
 import {
   displayPermissionPreview,
@@ -30,6 +31,8 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
     activeProject,
     addProjectFromPicker,
     bindSessionProject,
+    setProjects,
+    setLocalError,
     cliWorktrees,
     cliWorktreesAvailable,
     cliWorktreesLoading,
@@ -298,6 +301,36 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
                   }}
                   onAdd={() => {
                     void addProjectFromPicker({ bindSession: true });
+                  }}
+                />
+                <ComposerRemoteMenu
+                  t={tr}
+                  disabled={
+                    session.state === "streaming" ||
+                    session.state === "awaiting_permission"
+                  }
+                  onOpenRemote={(alias, path) => {
+                    void (async () => {
+                      try {
+                        const proj = (await api.projectAddSsh(
+                          alias,
+                          path,
+                          true,
+                        )) as (typeof projects)[number];
+                        if (typeof setProjects === "function") {
+                          setProjects(
+                            mapProjectsList(
+                              (await api.projectsList()) as typeof projects,
+                            ),
+                          );
+                        }
+                        void bindSessionProject(proj);
+                      } catch (e) {
+                        if (typeof setLocalError === "function") {
+                          setLocalError(String(e));
+                        }
+                      }
+                    })();
                   }}
                 />
                 {activeProject && gitWorktreesAvailable === true ? (

@@ -41,6 +41,8 @@ import { SESSION_DROP_ORPHAN } from "@/lib/sessionMoveProject";
 import { isMirrorClient } from "@/lib/mirrorTransport";
 import type { SidebarProjectReorderApi } from "@/hooks/useSidebarProjectReorder";
 import type { ProjectSpacesState } from "@/lib/projectSpaces";
+import { useSshWatch } from "@/providers/SshWatchProvider";
+import * as api from "@/lib/api";
 
 type TFn = ReturnType<typeof createT>;
 
@@ -153,6 +155,14 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
     sidebarCliImportCta,
     deleteSessionsConfirm,
   } = props;
+
+  const sshWatch = useSshWatch();
+  const remoteRows = sshWatch.watchAliases.flatMap((alias) =>
+    (sshWatch.sessionsByAlias[alias] ?? []).map((s) => ({
+      alias,
+      ...s,
+    })),
+  );
 
   const sessionsForProject = (projectId: string) =>
     sessions.filter((s) => s.projectId === projectId && !s.archived);
@@ -305,6 +315,54 @@ export function WorkbenchSessionTree(props: WorkbenchSessionTreeProps) {
               </div>
             </div>
 
+            {sshWatch.watchAliases.length > 0 ? (
+                <div className="settings-ssh-section" style={{ padding: "8px 10px 4px" }}>
+                  <div className="sidebar__section-label">
+                    {tr("sidebar.remoteSessions")}
+                  </div>
+                  {remoteRows.length === 0 ? (
+                    <div className="sidebar-empty__hint">
+                      {tr("sidebar.remoteSessionsHint")}
+                    </div>
+                  ) : (
+                    <ul className="settings-ssh-sessions">
+                      {remoteRows.slice(0, 24).map((row) => (
+                        <li key={`${row.alias}:${row.id}`}>
+                          <button
+                            type="button"
+                            className="cpm__action"
+                            title={row.cwd}
+                            onClick={() => {
+                              sshWatch.setDraftRemote({
+                                alias: row.alias,
+                                path: row.cwd,
+                              });
+                              void (async () => {
+                                try {
+                                  const proj = (await api.projectAddSsh(
+                                    row.alias,
+                                    row.cwd,
+                                    true,
+                                  )) as Project;
+                                  void newChat(proj);
+                                } catch {
+                                  /* soft-fail */
+                                }
+                              })();
+                            }}
+                          >
+                            <span className="cmm__opt-title">{row.title}</span>
+                            <span className="settings-ssh-session__cwd">
+                              {row.alias}
+                              {row.cwd ? ` · ${row.cwd}` : ""}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
             <SidebarTreeReveal open={projectsOpen} className="tree-reveal--projects">
             {projects.length === 0 && (
               <div className="sidebar-empty">

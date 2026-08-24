@@ -527,5 +527,16 @@ export const koSettings = {
   "settings.ssh.user": "사용자 {user}",
   "settings.ssh.port": "포트 {port}",
   "settings.ssh.identity": "키 {path}",
-  "settings.ssh.unknownHost": "알 수 없는 호스트"
+  "settings.ssh.unknownHost": "알 수 없는 호스트",
+  "settings.ssh.searchPlaceholder": "Filter hosts…",
+  "settings.ssh.searchEmpty": "No hosts match this search.",
+  "settings.ssh.watchingTitle": "Watching",
+  "settings.ssh.watchingHint": "Keep SSH up and scan Grok sessions on the host. Turn off to stop scanning.",
+  "settings.ssh.watchingEmpty": "No hosts are watching yet. Enable a host below.",
+  "settings.ssh.availableTitle": "Available hosts",
+  "settings.ssh.availableHint": "Hosts from ~/.ssh/config that are not watching.",
+  "settings.ssh.availableEmpty": "No other hosts in this list.",
+  "settings.ssh.watchOn": "Start watching",
+  "settings.ssh.watchOff": "Stop watching",
+  "settings.ssh.remoteSessionsEmpty": "No remote Grok sessions found yet.",
 };

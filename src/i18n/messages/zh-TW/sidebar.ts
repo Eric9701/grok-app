@@ -6,6 +6,8 @@ export const zhTWSidebar = {
   "sidebar.search": "搜尋",
   "sidebar.projects": "專案",
   "sidebar.addProject": "新增專案",
+  "sidebar.remoteSessions": "遠端 session",
+  "sidebar.remoteSessionsHint": "正在監視 SSH 主機。主機上的 session 會出現在這裡。",
   "sidebar.collapseAllProjects": "收合全部專案",
   "sidebar.noProjects": "還沒有專案。點擊 + 新增本機目錄。",
   "sidebar.importCliSessions": "從 Grok Build 匯入",

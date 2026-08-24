@@ -28,6 +28,10 @@ export async function projectAdd(path: string, trust: boolean) {
   return invoke("project_add", { path, trust });
 }
 
+export async function projectAddSsh(alias: string, path: string, trust: boolean) {
+  return invoke("project_add_ssh", { alias, path, trust });
+}
+
 /**
  * Persist sidebar project order. Host pin-partitions so unpinned items
  * cannot sit above pinned ones. Returns the final ordered list.

@@ -9,6 +9,7 @@ Related: [settings-ia.md](./settings-ia.md), [session-continuity.md](./session-c
 | Wave | Ships | Does not |
 |------|--------|----------|
 | **1** | Settings → Runtime → **SSH**: list `~/.ssh/config` Host aliases, **Test connection**, probe remote `grok` + `~/.grok/auth.json`. Copy-paste install / `grok login --device-auth` when missing. | Open a remote folder, file tree, edit, spawn remote agent, tmux |
+| **1b** | Live search, Watching / Available lists, watch switch (ControlMaster), scan remote Grok sessions into the sidebar, new-session Remote chip + path picker | Spawn `grok` on the host; in-app file tree/edit of remote files |
 | **2** | Remote path as a Project; sidebar tree; markdown preview; text save | Agent cwd on the remote host |
 | **3** | Session runs `grok` **on the host** (remote cwd) | Disconnect persistence |
 | **4** | Reconnect via `grok agent leader --no-exit-on-disconnect` | tmux UI |

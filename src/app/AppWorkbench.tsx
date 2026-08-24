@@ -14302,6 +14302,8 @@ export function AppWorkbench() {
             attachments={attachments}
             availableModels={availableModels}
             bindSessionProject={bindSessionProject}
+            setProjects={setProjects}
+            setLocalError={setLocalError}
             canGuideQueuedMessage={canGuideQueuedMessage}
             channelEffortOptions={channelEffortOptions}
             chatAttachments={chatAttachments}

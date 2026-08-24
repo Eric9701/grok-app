@@ -514,6 +514,15 @@ pub async fn project_add(path: String, trust: bool) -> Result<Project, String> {
 }
 
 #[tauri::command]
+pub async fn project_add_ssh(
+    alias: String,
+    path: String,
+    trust: bool,
+) -> Result<Project, String> {
+    store::add_ssh_project(&alias, path, trust)
+}
+
+#[tauri::command]
 pub async fn project_remove(id: String) -> Result<(), String> {
     // Unlink from app only — disk folder + sessions retained.
     store::remove_project(&id)

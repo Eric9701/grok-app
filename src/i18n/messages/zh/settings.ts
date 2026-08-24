@@ -528,5 +528,16 @@ export const zhSettings = {
   "settings.ssh.user": "用户 {user}",
   "settings.ssh.port": "端口 {port}",
   "settings.ssh.identity": "密钥 {path}",
-  "settings.ssh.unknownHost": "未知主机"
+  "settings.ssh.unknownHost": "未知主机",
+  "settings.ssh.searchPlaceholder": "筛选主机…",
+  "settings.ssh.searchEmpty": "没有匹配的主机。",
+  "settings.ssh.watchingTitle": "监视中",
+  "settings.ssh.watchingHint": "保持 SSH 连接，并扫描该主机上的 Grok session。关闭后停止扫描。",
+  "settings.ssh.watchingEmpty": "还没有正在监视的主机。在下方打开开关。",
+  "settings.ssh.availableTitle": "可连接主机",
+  "settings.ssh.availableHint": "~/.ssh/config 里尚未监视的主机。",
+  "settings.ssh.availableEmpty": "这一栏没有其他主机。",
+  "settings.ssh.watchOn": "开始监视",
+  "settings.ssh.watchOff": "停止监视",
+  "settings.ssh.remoteSessionsEmpty": "还没有扫描到远程 Grok session。",
 };

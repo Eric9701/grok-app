@@ -6,6 +6,8 @@ export const koSidebar = {
   "sidebar.search": "검색",
   "sidebar.projects": "프로젝트",
   "sidebar.addProject": "프로젝트 추가",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "모든 프로젝트 접기",
   "sidebar.noProjects": "프로젝트가 없습니다. +를 눌러 폴더를 추가하세요.",
   "sidebar.importCliSessions": "Grok Build에서 가져오기",

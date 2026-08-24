@@ -6,6 +6,8 @@ export const frSidebar = {
   "sidebar.search": "Rechercher",
   "sidebar.projects": "Projets",
   "sidebar.addProject": "Ajouter un projet",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "Replier tous les projets",
   "sidebar.noProjects": "Aucun projet. Cliquez sur + pour ajouter un dossier.",
   "sidebar.importCliSessions": "Importer depuis Grok Build",

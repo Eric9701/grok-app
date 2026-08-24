@@ -6,6 +6,8 @@ export const deSidebar = {
   "sidebar.search": "Suchen",
   "sidebar.projects": "Projekte",
   "sidebar.addProject": "Projekt hinzufügen",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "Alle Projekte einklappen",
   "sidebar.noProjects": "Noch keine Projekte. Klicke auf +, um einen Ordner hinzuzufügen.",
   "sidebar.importCliSessions": "Aus Grok Build importieren",

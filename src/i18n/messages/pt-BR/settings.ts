@@ -527,5 +527,16 @@ export const ptBRSettings = {
   "settings.ssh.user": "usuário {user}",
   "settings.ssh.port": "porta {port}",
   "settings.ssh.identity": "chave {path}",
-  "settings.ssh.unknownHost": "host desconhecido"
+  "settings.ssh.unknownHost": "host desconhecido",
+  "settings.ssh.searchPlaceholder": "Filter hosts…",
+  "settings.ssh.searchEmpty": "No hosts match this search.",
+  "settings.ssh.watchingTitle": "Watching",
+  "settings.ssh.watchingHint": "Keep SSH up and scan Grok sessions on the host. Turn off to stop scanning.",
+  "settings.ssh.watchingEmpty": "No hosts are watching yet. Enable a host below.",
+  "settings.ssh.availableTitle": "Available hosts",
+  "settings.ssh.availableHint": "Hosts from ~/.ssh/config that are not watching.",
+  "settings.ssh.availableEmpty": "No other hosts in this list.",
+  "settings.ssh.watchOn": "Start watching",
+  "settings.ssh.watchOff": "Stop watching",
+  "settings.ssh.remoteSessionsEmpty": "No remote Grok sessions found yet.",
 };

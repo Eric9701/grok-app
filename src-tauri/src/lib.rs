@@ -1025,6 +1025,14 @@ pub fn run() {
 
             ssh_remote::ssh_test_host,
 
+            ssh_remote::ssh_watch_start,
+
+            ssh_remote::ssh_watch_stop,
+
+            ssh_remote::ssh_list_dir,
+
+            ssh_remote::ssh_list_sessions,
+
             commands::cli_repair_agent_sidecar,
 
             commands::acp_test_connection,
@@ -1064,6 +1072,8 @@ pub fn run() {
             commands::general_workspace_path,
 
             commands::project_add,
+
+            commands::project_add_ssh,
 
             commands::project_add_dialog,
 

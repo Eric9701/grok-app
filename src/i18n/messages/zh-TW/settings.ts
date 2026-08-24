@@ -528,5 +528,16 @@ export const zhTWSettings = {
   "settings.ssh.user": "使用者 {user}",
   "settings.ssh.port": "連接埠 {port}",
   "settings.ssh.identity": "金鑰 {path}",
-  "settings.ssh.unknownHost": "未知主機"
+  "settings.ssh.unknownHost": "未知主機",
+  "settings.ssh.searchPlaceholder": "篩選主機…",
+  "settings.ssh.searchEmpty": "沒有符合的主機。",
+  "settings.ssh.watchingTitle": "監視中",
+  "settings.ssh.watchingHint": "保持 SSH 連線，並掃描該主機上的 Grok session。關閉後停止掃描。",
+  "settings.ssh.watchingEmpty": "還沒有正在監視的主機。在下方打開開關。",
+  "settings.ssh.availableTitle": "可連線主機",
+  "settings.ssh.availableHint": "~/.ssh/config 裡尚未監視的主機。",
+  "settings.ssh.availableEmpty": "這一欄沒有其他主機。",
+  "settings.ssh.watchOn": "開始監視",
+  "settings.ssh.watchOff": "停止監視",
+  "settings.ssh.remoteSessionsEmpty": "還沒掃描到遠端 Grok session。",
 };

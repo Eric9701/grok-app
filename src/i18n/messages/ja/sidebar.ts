@@ -6,6 +6,8 @@ export const jaSidebar = {
   "sidebar.search": "検索",
   "sidebar.projects": "プロジェクト",
   "sidebar.addProject": "プロジェクトを追加",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "すべてのプロジェクトを折りたたむ",
   "sidebar.noProjects": "プロジェクトがありません。+ を押してフォルダーを追加してください。",
   "sidebar.importCliSessions": "Grok Build からインポート",

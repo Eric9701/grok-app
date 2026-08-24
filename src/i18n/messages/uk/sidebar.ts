@@ -6,6 +6,8 @@ export const ukSidebar = {
   "sidebar.search": "Пошук",
   "sidebar.projects": "Проєкти",
   "sidebar.addProject": "Додати проєкт",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "Згорнути всі проєкти",
   "sidebar.noProjects": "Проєктів ще немає. Натисніть +, щоб додати теку.",
   "sidebar.importCliSessions": "Імпорт із Grok Build",

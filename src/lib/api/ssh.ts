@@ -51,3 +51,57 @@ export async function sshListHosts(): Promise<SshListResult> {
 export async function sshTestHost(alias: string): Promise<SshProbeResult> {
   return invoke<SshProbeResult>("ssh_test_host", { alias });
 }
+
+export type SshWatchResult = {
+  ok: boolean;
+  alias: string;
+  watching: boolean;
+  error?: string | null;
+  errorCode?: string | null;
+};
+
+export type SshDirEntry = {
+  name: string;
+  isDir: boolean;
+};
+
+export type SshListDirResult = {
+  ok: boolean;
+  alias: string;
+  path: string;
+  entries: SshDirEntry[];
+  error?: string | null;
+};
+
+export type SshRemoteSession = {
+  id: string;
+  cwd: string;
+  title: string;
+  updatedAt?: string | null;
+};
+
+export type SshListSessionsResult = {
+  ok: boolean;
+  alias: string;
+  sessions: SshRemoteSession[];
+  error?: string | null;
+};
+
+export async function sshWatchStart(alias: string) {
+  return invoke<SshWatchResult>("ssh_watch_start", { alias });
+}
+
+export async function sshWatchStop(alias: string) {
+  return invoke<SshWatchResult>("ssh_watch_stop", { alias });
+}
+
+export async function sshListDir(alias: string, path?: string | null) {
+  return invoke<SshListDirResult>("ssh_list_dir", {
+    alias,
+    path: path ?? null,
+  });
+}
+
+export async function sshListSessions(alias: string) {
+  return invoke<SshListSessionsResult>("ssh_list_sessions", { alias });
+}

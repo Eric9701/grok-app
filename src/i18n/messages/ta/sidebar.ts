@@ -6,6 +6,8 @@ export const taSidebar = {
   "sidebar.search": "தேடு",
   "sidebar.projects": "திட்டங்கள்",
   "sidebar.addProject": "திட்டத்தைச் சேர்",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "அனைத்துத் திட்டங்களையும் சுருக்கு",
   "sidebar.noProjects": "இன்னும் திட்டங்கள் இல்லை. கோப்புறையைச் சேர்க்க + ஐ அழுத்தவும்.",
   "sidebar.importCliSessions": "Grok Build இலிருந்து இறக்குமதி செய்",

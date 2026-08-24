@@ -6,6 +6,8 @@ export const idSidebar = {
   "sidebar.search": "Cari",
   "sidebar.projects": "Proyek",
   "sidebar.addProject": "Tambah proyek",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "Ciutkan semua proyek",
   "sidebar.noProjects": "Belum ada proyek. Klik + untuk menambah folder.",
   "sidebar.importCliSessions": "Impor dari Grok Build",

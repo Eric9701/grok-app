@@ -6,6 +6,8 @@ export const ptBRSidebar = {
   "sidebar.search": "Buscar",
   "sidebar.projects": "Projetos",
   "sidebar.addProject": "Adicionar projeto",
+  "sidebar.remoteSessions": "Remote sessions",
+  "sidebar.remoteSessionsHint": "Watching SSH hosts. Sessions on the host show up here.",
   "sidebar.collapseAllProjects": "Recolher todos os projetos",
   "sidebar.noProjects": "Ainda não há projetos. Clique em + para adicionar uma pasta.",
   "sidebar.importCliSessions": "Importar do Grok Build",

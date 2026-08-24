@@ -6,6 +6,8 @@ export const zhSidebar = {
   "sidebar.search": "搜索",
   "sidebar.projects": "项目",
   "sidebar.addProject": "添加项目",
+  "sidebar.remoteSessions": "远程 session",
+  "sidebar.remoteSessionsHint": "正在监视 SSH 主机。主机上的 session 会出现在这里。",
   "sidebar.collapseAllProjects": "收起全部项目",
   "sidebar.noProjects": "还没有项目。点击 + 添加本地目录。",
   "sidebar.importCliSessions": "从 Grok Build 导入",

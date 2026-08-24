@@ -763,6 +763,545 @@ pub async fn ssh_test_host(alias: String) -> Result<SshProbeResult, String> {
     }
 }
 
+pub fn posix_single_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+pub fn percent_decode_path(enc: &str) -> String {
+    let bytes = enc.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(v) = u8::from_str_radix(
+                std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""),
+                16,
+            ) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn control_dir() -> PathBuf {
+    crate::paths::app_data_root().join("ssh-cm")
+}
+
+fn control_path(alias: &str) -> PathBuf {
+    control_dir().join(format!("{alias}.sock"))
+}
+
+fn apply_common_ssh_opts(cmd: &mut Command, alias: &str, mux: bool) {
+    cmd.arg("-o")
+        .arg("BatchMode=yes")
+        .arg("-o")
+        .arg(format!("ConnectTimeout={SSH_CONNECT_TIMEOUT_SECS}"))
+        .arg("-o")
+        .arg("PasswordAuthentication=no")
+        .arg("-o")
+        .arg("KbdInteractiveAuthentication=no")
+        .arg("-o")
+        .arg("StrictHostKeyChecking=yes");
+    if mux {
+        let path = control_path(alias);
+        cmd.arg("-o")
+            .arg("ControlMaster=auto")
+            .arg("-o")
+            .arg(format!("ControlPath={}", path.display()))
+            .arg("-o")
+            .arg("ControlPersist=yes");
+    }
+}
+
+struct SshRun {
+    success: bool,
+    stdout: String,
+    stderr: String,
+    latency_ms: u64,
+}
+
+enum SshRunErr {
+    Missing,
+    Timeout { latency_ms: u64 },
+    Spawn(String),
+}
+
+async fn run_ssh(alias: &str, remote: &str, mux: bool, secs: u64) -> Result<SshRun, SshRunErr> {
+    let ssh = find_ssh_binary().ok_or(SshRunErr::Missing)?;
+    let mut cmd = Command::new(&ssh);
+    process_util::apply_no_window_tokio(&mut cmd);
+    apply_common_ssh_opts(&mut cmd, alias, mux);
+    cmd.arg(alias)
+        .arg(remote)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let started = Instant::now();
+    match timeout(Duration::from_secs(secs), cmd.output()).await {
+        Err(_) => Err(SshRunErr::Timeout {
+            latency_ms: started.elapsed().as_millis() as u64,
+        }),
+        Ok(Err(e)) => Err(SshRunErr::Spawn(e.to_string())),
+        Ok(Ok(o)) => Ok(SshRun {
+            success: o.status.success(),
+            stdout: String::from_utf8_lossy(&o.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&o.stderr).into_owned(),
+            latency_ms: started.elapsed().as_millis() as u64,
+        }),
+    }
+}
+
+fn remote_ls_script(dir: &str) -> String {
+    let q = posix_single_quote(dir);
+    format!(
+        r#"DIR={q}
+if [ -z "$DIR" ]; then DIR="$HOME"; fi
+case "$DIR" in
+  ~*) DIR="$HOME${{DIR#~}}" ;;
+esac
+if [ ! -d "$DIR" ]; then
+  echo GROK_APP_LS_ERR
+  echo not_a_dir
+  exit 0
+fi
+cd "$DIR" || {{ echo GROK_APP_LS_ERR; echo cd_fail; exit 0; }}
+echo GROK_APP_LS
+pwd
+ls -1p 2>/dev/null | head -n 400
+exit 0
+"#
+    )
+}
+
+const REMOTE_SESS_SCRIPT: &str = r#"echo GROK_APP_SESS
+SESS="$HOME/.grok/sessions"
+if [ ! -d "$SESS" ]; then
+  exit 0
+fi
+find "$SESS" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | head -n 80 | while IFS= read -r d; do
+  id=$(basename "$d")
+  enc=$(basename "$(dirname "$d")")
+  mtime=$(date -r "$d" +%s 2>/dev/null || stat -c %Y "$d" 2>/dev/null || echo 0)
+  title="$id"
+  if [ -f "$d/summary.json" ]; then
+    t=$(sed -n 's/.*"generated_title"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$d/summary.json" | head -n 1)
+    if [ -z "$t" ]; then
+      t=$(sed -n 's/.*"session_summary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$d/summary.json" | head -n 1)
+    fi
+    if [ -n "$t" ]; then title="$t"; fi
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$id" "$enc" "$mtime" "$title"
+done
+exit 0
+"#;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshDirEntry {
+    pub name: String,
+    pub is_dir: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshListDirResult {
+    pub ok: bool,
+    pub alias: String,
+    pub path: String,
+    pub entries: Vec<SshDirEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshRemoteSession {
+    pub id: String,
+    pub cwd: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshListSessionsResult {
+    pub ok: bool,
+    pub alias: String,
+    pub sessions: Vec<SshRemoteSession>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshWatchResult {
+    pub ok: bool,
+    pub alias: String,
+    pub watching: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+}
+
+fn parse_ls_stdout(stdout: &str) -> Option<(String, Vec<SshDirEntry>)> {
+    let mut lines = stdout.lines().map(|l| l.trim_end_matches('\r'));
+    while let Some(line) = lines.next() {
+        if line.trim() == "GROK_APP_LS_ERR" {
+            return None;
+        }
+        if line.trim() == "GROK_APP_LS" {
+            let path = lines.next().unwrap_or("").trim().to_string();
+            let mut entries = Vec::new();
+            for rest in lines {
+                let name = rest.trim();
+                if name.is_empty() || name == "." || name == ".." {
+                    continue;
+                }
+                let is_dir = name.ends_with('/');
+                let name = name.trim_end_matches('/').to_string();
+                if name.is_empty() {
+                    continue;
+                }
+                entries.push(SshDirEntry { name, is_dir });
+            }
+            return Some((path, entries));
+        }
+    }
+    None
+}
+
+pub fn parse_sess_stdout(stdout: &str) -> Option<Vec<SshRemoteSession>> {
+    let mut lines = stdout.lines().map(|l| l.trim_end_matches('\r'));
+    while let Some(line) = lines.next() {
+        if line.trim() != "GROK_APP_SESS" {
+            continue;
+        }
+        let mut sessions = Vec::new();
+        for rest in lines {
+            let rest = rest.trim();
+            if rest.is_empty() {
+                continue;
+            }
+            let mut parts = rest.splitn(4, '\t');
+            let id = parts.next().unwrap_or("").trim();
+            let enc = parts.next().unwrap_or("").trim();
+            let mtime = parts.next().unwrap_or("").trim();
+            let title = parts.next().unwrap_or("").trim();
+            if id.is_empty() {
+                continue;
+            }
+            sessions.push(SshRemoteSession {
+                id: id.to_string(),
+                cwd: percent_decode_path(enc),
+                title: if title.is_empty() {
+                    id.to_string()
+                } else {
+                    title.to_string()
+                },
+                updated_at: if mtime.is_empty() || mtime == "0" {
+                    None
+                } else {
+                    Some(mtime.to_string())
+                },
+            });
+        }
+        return Some(sessions);
+    }
+    None
+}
+
+fn persist_watch_alias(alias: &str, on: bool) -> Result<Vec<String>, String> {
+    let mut s = crate::store::load_settings();
+    let mut set: Vec<String> = s
+        .ssh_watch_aliases
+        .into_iter()
+        .filter(|a| is_safe_ssh_alias(a))
+        .collect();
+    if on {
+        if !set.iter().any(|a| a == alias) {
+            set.push(alias.to_string());
+        }
+    } else {
+        set.retain(|a| a != alias);
+    }
+    s.ssh_watch_aliases = set.clone();
+    crate::store::save_settings(&s)?;
+    Ok(set)
+}
+
+#[tauri::command]
+pub async fn ssh_watch_start(alias: String) -> Result<SshWatchResult, String> {
+    let alias = alias.trim().to_string();
+    if !is_safe_ssh_alias(&alias) {
+        return Ok(SshWatchResult {
+            ok: false,
+            alias,
+            watching: false,
+            error: Some("Host alias is not a concrete OpenSSH Host name".into()),
+            error_code: Some("invalid_alias".into()),
+        });
+    }
+    let Some(ssh) = find_ssh_binary() else {
+        return Ok(SshWatchResult {
+            ok: false,
+            alias,
+            watching: false,
+            error: Some("OpenSSH client (ssh) was not found on this machine".into()),
+            error_code: Some("ssh_missing".into()),
+        });
+    };
+    let dir = control_dir();
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return Ok(SshWatchResult {
+            ok: false,
+            alias,
+            watching: false,
+            error: Some(format!("Could not create SSH control dir: {e}")),
+            error_code: Some("other".into()),
+        });
+    }
+    let path = control_path(&alias);
+    let mut cmd = Command::new(&ssh);
+    process_util::apply_no_window_tokio(&mut cmd);
+    apply_common_ssh_opts(&mut cmd, &alias, false);
+    cmd.arg("-o")
+        .arg("ControlMaster=yes")
+        .arg("-o")
+        .arg(format!("ControlPath={}", path.display()))
+        .arg("-o")
+        .arg("ControlPersist=yes")
+        .arg("-fN")
+        .arg(&alias)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let out = timeout(Duration::from_secs(SSH_OVERALL_TIMEOUT_SECS), cmd.output()).await;
+    match out {
+        Err(_) => {
+            return Ok(SshWatchResult {
+                ok: false,
+                alias,
+                watching: false,
+                error: Some("Connection timed out".into()),
+                error_code: Some("timeout".into()),
+            });
+        }
+        Ok(Err(e)) => {
+            return Ok(SshWatchResult {
+                ok: false,
+                alias,
+                watching: false,
+                error: Some(truncate_err(&e.to_string())),
+                error_code: Some("other".into()),
+            });
+        }
+        Ok(Ok(o)) if !o.status.success() => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            let mut check = Command::new(&ssh);
+            process_util::apply_no_window_tokio(&mut check);
+            check
+                .arg("-O")
+                .arg("check")
+                .arg("-o")
+                .arg(format!("ControlPath={}", path.display()))
+                .arg(&alias)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+            let already = timeout(Duration::from_secs(3), check.output())
+                .await
+                .ok()
+                .and_then(|r| r.ok())
+                .map(|c| c.status.success())
+                .unwrap_or(false);
+            if !already {
+                let (code, msg) = classify_ssh_stderr(&stderr);
+                return Ok(SshWatchResult {
+                    ok: false,
+                    alias,
+                    watching: false,
+                    error: Some(msg),
+                    error_code: Some(code.into()),
+                });
+            }
+        }
+        Ok(Ok(_)) => {}
+    }
+    persist_watch_alias(&alias, true)?;
+    Ok(SshWatchResult {
+        ok: true,
+        alias,
+        watching: true,
+        error: None,
+        error_code: None,
+    })
+}
+
+#[tauri::command]
+pub async fn ssh_watch_stop(alias: String) -> Result<SshWatchResult, String> {
+    let alias = alias.trim().to_string();
+    if !is_safe_ssh_alias(&alias) {
+        return Ok(SshWatchResult {
+            ok: false,
+            alias,
+            watching: false,
+            error: Some("Host alias is not a concrete OpenSSH Host name".into()),
+            error_code: Some("invalid_alias".into()),
+        });
+    }
+    if let Some(ssh) = find_ssh_binary() {
+        let path = control_path(&alias);
+        let mut cmd = Command::new(&ssh);
+        process_util::apply_no_window_tokio(&mut cmd);
+        cmd.arg("-O")
+            .arg("exit")
+            .arg("-o")
+            .arg(format!("ControlPath={}", path.display()))
+            .arg(&alias)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        let _ = timeout(Duration::from_secs(5), cmd.output()).await;
+    }
+    persist_watch_alias(&alias, false)?;
+    Ok(SshWatchResult {
+        ok: true,
+        alias,
+        watching: false,
+        error: None,
+        error_code: None,
+    })
+}
+
+#[tauri::command]
+pub async fn ssh_list_dir(alias: String, path: Option<String>) -> Result<SshListDirResult, String> {
+    let alias = alias.trim().to_string();
+    if !is_safe_ssh_alias(&alias) {
+        return Ok(SshListDirResult {
+            ok: false,
+            alias,
+            path: path.unwrap_or_default(),
+            entries: Vec::new(),
+            error: Some("invalid alias".into()),
+        });
+    }
+    let dir = path.unwrap_or_default();
+    if dir.contains('\0') {
+        return Ok(SshListDirResult {
+            ok: false,
+            alias,
+            path: dir,
+            entries: Vec::new(),
+            error: Some("invalid path".into()),
+        });
+    }
+    match run_ssh(&alias, &remote_ls_script(&dir), true, SSH_OVERALL_TIMEOUT_SECS).await {
+        Err(SshRunErr::Missing) => Ok(SshListDirResult {
+            ok: false,
+            alias,
+            path: dir,
+            entries: Vec::new(),
+            error: Some("ssh missing".into()),
+        }),
+        Err(SshRunErr::Timeout { .. }) => Ok(SshListDirResult {
+            ok: false,
+            alias,
+            path: dir,
+            entries: Vec::new(),
+            error: Some("timeout".into()),
+        }),
+        Err(SshRunErr::Spawn(e)) => Ok(SshListDirResult {
+            ok: false,
+            alias,
+            path: dir,
+            entries: Vec::new(),
+            error: Some(truncate_err(&e)),
+        }),
+        Ok(run) if !run.success => {
+            let (code, msg) = classify_ssh_stderr(&run.stderr);
+            Ok(SshListDirResult {
+                ok: false,
+                alias,
+                path: dir,
+                entries: Vec::new(),
+                error: Some(format!("{code}: {msg}")),
+            })
+        }
+        Ok(run) => match parse_ls_stdout(&run.stdout) {
+            Some((path, entries)) => Ok(SshListDirResult {
+                ok: true,
+                alias,
+                path,
+                entries,
+                error: None,
+            }),
+            None => Ok(SshListDirResult {
+                ok: false,
+                alias,
+                path: dir,
+                entries: Vec::new(),
+                error: Some("remote ls failed".into()),
+            }),
+        },
+    }
+}
+
+#[tauri::command]
+pub async fn ssh_list_sessions(alias: String) -> Result<SshListSessionsResult, String> {
+    let alias = alias.trim().to_string();
+    if !is_safe_ssh_alias(&alias) {
+        return Ok(SshListSessionsResult {
+            ok: false,
+            alias,
+            sessions: Vec::new(),
+            error: Some("invalid alias".into()),
+        });
+    }
+    match run_ssh(&alias, REMOTE_SESS_SCRIPT, true, SSH_OVERALL_TIMEOUT_SECS).await {
+        Err(SshRunErr::Missing) => Ok(SshListSessionsResult {
+            ok: false,
+            alias,
+            sessions: Vec::new(),
+            error: Some("ssh missing".into()),
+        }),
+        Err(SshRunErr::Timeout { .. }) => Ok(SshListSessionsResult {
+            ok: false,
+            alias,
+            sessions: Vec::new(),
+            error: Some("timeout".into()),
+        }),
+        Err(SshRunErr::Spawn(e)) => Ok(SshListSessionsResult {
+            ok: false,
+            alias,
+            sessions: Vec::new(),
+            error: Some(truncate_err(&e)),
+        }),
+        Ok(run) if !run.success => {
+            let (_code, msg) = classify_ssh_stderr(&run.stderr);
+            Ok(SshListSessionsResult {
+                ok: false,
+                alias,
+                sessions: Vec::new(),
+                error: Some(msg),
+            })
+        }
+        Ok(run) => Ok(SshListSessionsResult {
+            ok: true,
+            alias,
+            sessions: parse_sess_stdout(&run.stdout).unwrap_or_default(),
+            error: None,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -936,5 +1475,27 @@ Host "build-server"
             "Host key verification failed.\n",
         );
         assert_eq!(code, "host_key");
+    }
+
+    #[test]
+    fn posix_single_quote_escapes() {
+        assert_eq!(posix_single_quote("abc"), "'abc'");
+        assert_eq!(posix_single_quote("a'b"), "'a'\\''b'");
+    }
+
+    #[test]
+    fn percent_decode_cwd() {
+        assert_eq!(percent_decode_path("%2Fhome%2Fme%2Fproj"), "/home/me/proj");
+        assert_eq!(percent_decode_path("/plain"), "/plain");
+    }
+
+    #[test]
+    fn parse_remote_sessions() {
+        let raw = "noise\nGROK_APP_SESS\nid1\t%2Fwork\t171000\tFix bug\nid2\t%2Ftmp\t0\t\n";
+        let s = parse_sess_stdout(raw).unwrap();
+        assert_eq!(s.len(), 2);
+        assert_eq!(s[0].cwd, "/work");
+        assert_eq!(s[0].title, "Fix bug");
+        assert_eq!(s[1].title, "id2");
     }
 }
