@@ -46,4 +46,19 @@ describe("softCloseMarkdown", () => {
   it("returns empty as-is", () => {
     expect(softCloseMarkdown("", true)).toBe("");
   });
+
+  it("closes incomplete KaTeX delimiters while streaming", () => {
+    expect(softCloseMarkdown("$$\\tau=0.53", true)).toBe("$$\\tau=0.53$$");
+    expect(softCloseMarkdown("$x=1", true)).toBe("$x=1$");
+    expect(softCloseMarkdown("**$$\\tau", true)).toBe("**$$\\tau$$**");
+  });
+
+  it("leaves balanced math alone and ignores $ inside fences", () => {
+    expect(softCloseMarkdown("$$\\tau=0.53$$", true)).toBe("$$\\tau=0.53$$");
+    const fenced = "```js\nconst n = $x\n";
+    const out = softCloseMarkdown(fenced, true);
+    expect(out).toContain("const n = $x");
+    expect(out.endsWith("\n```")).toBe(true);
+    expect(out).not.toContain("$x$");
+  });
 });

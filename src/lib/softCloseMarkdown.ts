@@ -21,6 +21,8 @@ export function softCloseMarkdown(src: string, streaming: boolean): string {
   let italicStar = 0; // single *
   let italicUnder = 0; // single _
   let inlineCode = 0; // single `
+  let displayMath = 0; // $$
+  let inlineMath = 0; // $
 
   let i = 0;
   const n = src.length;
@@ -45,6 +47,16 @@ export function softCloseMarkdown(src: string, streaming: boolean): string {
     const prev = i > 0 ? src[i - 1] : "";
     const escaped = prev === "\\";
 
+    if (!escaped && src.startsWith("$$", i)) {
+      displayMath += 1;
+      i += 2;
+      continue;
+    }
+    if (!escaped && ch === "$") {
+      inlineMath += 1;
+      i += 1;
+      continue;
+    }
     if (!escaped && src.startsWith("**", i)) {
       bold += 1;
       i += 2;
@@ -86,6 +98,9 @@ export function softCloseMarkdown(src: string, streaming: boolean): string {
   }
 
   let s = src;
+  // Close math before emphasis so `**$$\tau` becomes `**$$\tau$$**`.
+  if (displayMath % 2 === 1) s += "$$";
+  if (inlineMath % 2 === 1) s += "$";
   if (bold % 2 === 1) s += "**";
   if (strike % 2 === 1) s += "~~";
   if (underlineBold % 2 === 1) s += "__";

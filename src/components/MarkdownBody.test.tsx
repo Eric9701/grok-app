@@ -21,4 +21,12 @@ describe("MarkdownBody http(s) links", () => {
     expect(html).toContain('href="#section"');
     expect(html).not.toContain("md-body__link");
   });
+
+  it("renders $$LaTeX$$ with KaTeX", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownBody>{String.raw`Area is $$\tau=0.53$$.`}</MarkdownBody>,
+    );
+    expect(html).toContain("katex");
+    expect(html).not.toContain("$$\\tau");
+  });
 });

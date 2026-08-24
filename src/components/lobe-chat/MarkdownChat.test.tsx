@@ -5,8 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { cleanup, render } from "@testing-library/react";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import {
   MARKDOWN_CHAT_LEAF_COMPONENTS,
+  MARKDOWN_CHAT_REHYPE_PLUGINS,
   MARKDOWN_CHAT_REMARK_PLUGINS,
   MarkdownChat,
 } from "./MarkdownChat";
@@ -15,8 +17,21 @@ afterEach(cleanup);
 
 describe("MarkdownChat", () => {
   it("keeps a stable remarkPlugins array", () => {
-    expect(MARKDOWN_CHAT_REMARK_PLUGINS).toEqual([remarkGfm]);
+    expect(MARKDOWN_CHAT_REMARK_PLUGINS).toEqual([remarkGfm, remarkMath]);
     expect(MARKDOWN_CHAT_REMARK_PLUGINS[0]).toBe(remarkGfm);
+    expect(MARKDOWN_CHAT_REMARK_PLUGINS[1]).toBe(remarkMath);
+    expect(MARKDOWN_CHAT_REHYPE_PLUGINS).toHaveLength(1);
+  });
+
+  it("renders $$LaTeX$$ with KaTeX instead of leaving the delimiters", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownChat>
+        {String.raw`$$\tau=0.53$$ 是基线均值，$$H_{10}=1.40$$、$$\lambda=0.60$$。`}
+      </MarkdownChat>,
+    );
+    expect(html).toContain("katex");
+    expect(html).not.toContain("$$\\tau");
+    expect(html).toContain("0.53");
   });
 
   it("reuses module-level leaf components when find is off", () => {
