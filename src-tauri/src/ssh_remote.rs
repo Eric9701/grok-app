@@ -1455,6 +1455,10 @@ SESS="$HOME/.grok/sessions"
 if command -v python3 >/dev/null 2>&1; then
   SID="$SID" python3 -c '
 import os, sys
+def emit(s):
+    sys.stdout.write(s)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
 sid = os.environ.get("SID", "")
 root = os.path.expanduser("~/.grok/sessions")
 found = None
@@ -1464,10 +1468,10 @@ if os.path.isdir(root) and sid:
         if os.path.isdir(d):
             found = d
             break
-print("GROK_APP_HIST")
+emit("GROK_APP_HIST")
 if not found:
-    print("KIND\tmissing")
-    print("GROK_APP_HIST_END")
+    emit("KIND\tmissing")
+    emit("GROK_APP_HIST_END")
     sys.exit(0)
 kind = "empty"
 path = None
@@ -1477,15 +1481,16 @@ for name, label in (("chat_history.jsonl", "chat_history"), ("updates.jsonl", "u
         kind = label
         path = p
         break
-print("KIND\t" + kind)
+emit("KIND\t" + kind)
 if path:
-    f = open(path, "rb")
+    f = open(path, "r", encoding="utf-8", errors="replace")
     data = f.read(2097152)
     f.close()
-    sys.stdout.buffer.write(data)
-    if data and not data.endswith(b"\n"):
-        sys.stdout.buffer.write(b"\n")
-print("GROK_APP_HIST_END")
+    sys.stdout.write(data)
+    if data and not data.endswith("\n"):
+        sys.stdout.write("\n")
+    sys.stdout.flush()
+emit("GROK_APP_HIST_END")
 ' && exit 0
 fi
 echo GROK_APP_HIST
@@ -1518,32 +1523,38 @@ struct RemoteHist {
 }
 
 fn parse_hist_stdout(stdout: &str) -> Option<RemoteHist> {
-    let mut lines = stdout.lines().map(|l| l.trim_end_matches('\r'));
-    while let Some(line) = lines.next() {
-        if line.trim() != "GROK_APP_HIST" {
-            continue;
-        }
-        let mut kind = "empty".to_string();
-        let mut body = String::new();
-        if let Some(next) = lines.next() {
-            let next = next.trim();
-            if let Some(k) = next.strip_prefix("KIND") {
+    let marker = "GROK_APP_HIST";
+    let idx = stdout.find(marker)?;
+    let prefix = &stdout[..idx];
+    let rest = &stdout[idx + marker.len()..];
+    let mut kind = "empty".to_string();
+    let mut body = String::new();
+    let mut after_kind = false;
+    for line in rest.lines().map(|l| l.trim_end_matches('\r')) {
+        let trimmed = line.trim();
+        if !after_kind {
+            if let Some(k) = trimmed.strip_prefix("KIND") {
                 kind = k.trim().trim_start_matches('\t').trim().to_string();
-            } else {
-                body.push_str(next);
-                body.push('\n');
+                after_kind = true;
+                continue;
             }
-        }
-        for rest in lines {
-            if rest.trim() == "GROK_APP_HIST_END" {
-                break;
+            if trimmed.is_empty() || trimmed == marker {
+                continue;
             }
-            body.push_str(rest);
-            body.push('\n');
+            after_kind = true;
         }
-        return Some(RemoteHist { kind, body });
+        if trimmed == "GROK_APP_HIST_END" {
+            break;
+        }
+        body.push_str(line);
+        body.push('\n');
     }
-    None
+    // Python used to mix print() and buffer.write(), so the jsonl landed
+    // *before* GROK_APP_HIST and the wrapped body was empty.
+    if body.trim().is_empty() && !prefix.trim().is_empty() {
+        body = prefix.to_string();
+    }
+    Some(RemoteHist { kind, body })
 }
 
 fn import_index_path() -> std::path::PathBuf {
@@ -1927,10 +1938,25 @@ Host "build-server"
 
     #[test]
     fn parse_hist_stdout_splits_kind_and_body() {
-        let raw = "noise\nGROK_APP_HIST\nKIND\tchat_history\n{\"type\":\"user\",\"content\":\"hi\"}\nGROK_APP_HIST_END\n";
+        let raw = "GROK_APP_HIST\nKIND\tchat_history\n{\"type\":\"user\",\"content\":\"hi\"}\nGROK_APP_HIST_END\n";
         let h = parse_hist_stdout(raw).unwrap();
         assert_eq!(h.kind, "chat_history");
-        assert!(h.body.contains("hello") || h.body.contains("hi"));
+        assert!(h.body.contains("hi"));
+        let pairs = pairs_from_hist(&h);
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].1, "hi");
+    }
+
+    #[test]
+    fn parse_hist_recovers_jsonl_emitted_before_markers() {
+        // Repro: python print() + stdout.buffer.write() on a non-TTY SSH pipe.
+        let raw = "{\"type\":\"user\",\"content\":\"<user_query>\\n标注任务\\n</user_query>\"}\n{\"type\":\"assistant\",\"content\":\"ok\"}\nGROK_APP_HIST\nKIND\tchat_history\nGROK_APP_HIST_END\n";
+        let h = parse_hist_stdout(raw).unwrap();
+        assert_eq!(h.kind, "chat_history");
+        let pairs = pairs_from_hist(&h);
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0].1, "标注任务");
+        assert_eq!(pairs[1].1, "ok");
     }
 
     #[test]

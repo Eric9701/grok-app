@@ -740,6 +740,11 @@
   white-space: nowrap;
 }
 
+.ssh-remote-rail__status {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
 .ssh-remote-rail__rename {
   width: 100%;
 }

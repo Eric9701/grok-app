@@ -80,6 +80,29 @@ describe("SshRemoteSessionRail", () => {
     expect(loadMore).toHaveBeenCalledWith("UTS");
   });
 
+  it("shows opening on the clicked row", async () => {
+    let resolveOpen: (v: api.SshOpenSessionResult) => void = () => {};
+    vi.mocked(api.sshOpenSession).mockReturnValue(
+      new Promise((r) => {
+        resolveOpen = r;
+      }),
+    );
+    render(<SshRemoteSessionRail t={t} onOpenSession={onOpenSession} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "qwen35-v001-light" }),
+    );
+    expect(await screen.findByText("打开中…")).toBeInTheDocument();
+    resolveOpen({
+      ok: true,
+      alias: "UTS",
+      remoteSessionId: "01a01907-adf3-7e00-a7a8-aee1082b0556",
+      appSessionId: "app-1",
+    });
+    await waitFor(() => {
+      expect(onOpenSession).toHaveBeenCalledWith("app-1");
+    });
+  });
+
   it("opens remote transcript into a local session", async () => {
     vi.mocked(api.sshOpenSession).mockResolvedValue({
       ok: true,

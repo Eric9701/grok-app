@@ -96,6 +96,7 @@ export function SshRemoteSessionRail({ t, onOpenSession }: Props) {
                 const tip = remotePathTip(alias, s.cwd);
                 const editing = editingKey === key;
                 const active = selectedKey === key;
+                const busy = opening && active;
                 return (
                   <Tip key={key} label={tip} placement="bottom">
                     <button
@@ -104,6 +105,7 @@ export function SshRemoteSessionRail({ t, onOpenSession }: Props) {
                         "ssh-remote-rail__row" +
                         (active ? " is-active" : "")
                       }
+                      aria-busy={busy || undefined}
                       aria-label={label}
                       onClick={(e: MouseEvent<HTMLButtonElement>) => {
                         if (e.detail > 1) return;
@@ -142,13 +144,25 @@ export function SshRemoteSessionRail({ t, onOpenSession }: Props) {
                           onBlur={() => commitRename(alias, s.id, label)}
                         />
                       ) : (
-                        <span className="ssh-remote-rail__title">{label}</span>
+                        <>
+                          <span className="ssh-remote-rail__title">{label}</span>
+                          {busy ? (
+                            <span className="ssh-remote-rail__status" role="status">
+                              {t("sidebar.remoteOpening")}
+                            </span>
+                          ) : null}
+                        </>
                       )}
                     </button>
                   </Tip>
                 );
               })
             )}
+            {openError && selectedKey?.startsWith(`${alias}:`) ? (
+              <div className="settings-row__hint is-danger" role="alert">
+                {openError}
+              </div>
+            ) : null}
             {remaining > 0 ? (
               <div className="ssh-remote-rail__more">
                 <div className="sidebar-empty__hint">
@@ -166,16 +180,6 @@ export function SshRemoteSessionRail({ t, onOpenSession }: Props) {
           </div>
         );
       })}
-      {opening ? (
-        <div className="sidebar-empty__hint" role="status">
-          {t("sidebar.remoteOpening")}
-        </div>
-      ) : null}
-      {openError ? (
-        <div className="settings-row__hint is-danger" role="alert">
-          {openError}
-        </div>
-      ) : null}
     </div>
   );
 }
