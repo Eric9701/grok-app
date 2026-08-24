@@ -1430,11 +1430,12 @@ impl AcpClient {
         }
 
         // Native: `grok …`; WSL: `wsl.exe [-d] --cd <linux_cwd> -- <linux_cli> …`
-        // SSH: `ssh -T alias bash -lc … cwd` then grok flags as extra argv.
+        // SSH: collect grok flags first, then wrap as one remote `ssh -T` script.
+        // OpenSSH joins the remote command into a single `-c` string — extra
+        // argv after `bash -lc` is not a real argv array on the host.
         // (env vars set on the Windows process and forwarded via WSLENV).
-        let mut cmd = if let Some(ref alias) = ssh_alias {
-            crate::ssh_remote::start_ssh_acp_command(alias, cwd.to_string_lossy().as_ref())
-                .map_err(|e| AgentError::new(AgentErrorCode::CliNotFound, e))?
+        let mut cmd = if ssh_alias.is_some() {
+            Command::new("grok")
         } else if let Some(ref w) = wsl_launch {
             let linux_cwd = crate::wsl_backend::windows_path_to_wsl(&cwd).map_err(|e| {
                 AgentError::new(
@@ -1578,6 +1579,19 @@ impl AcpClient {
             cmd.arg(a);
         }
         cmd.arg("stdio");
+        if let Some(ref alias) = ssh_alias {
+            let grok_args: Vec<String> = cmd
+                .as_std()
+                .get_args()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect();
+            cmd = crate::ssh_remote::start_ssh_acp_command(
+                alias,
+                cwd.to_string_lossy().as_ref(),
+                &grok_args,
+            )
+            .map_err(|e| AgentError::new(AgentErrorCode::CliNotFound, e))?;
+        }
         if ssh_alias.is_none() && wsl_launch.is_none() {
             cmd.current_dir(&cwd);
         }
