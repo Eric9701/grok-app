@@ -53,6 +53,8 @@ export const idSidebar = {
   "sidebar.archivedToast": "{n} obrolan diarsipkan",
   "sidebar.restoredToast": "{n} obrolan dipulihkan",
   "sidebar.deletedToast": "{n} obrolan dihapus",
+  "sidebar.remoteDeleteConfirm": "Permanently delete “{name}” on {alias}? The remote Grok session is removed.",
+  "sidebar.remoteDeleteManyConfirm": "Permanently delete {n} remote chats on {alias}?",
   "sidebar.archiveOlder": "Arsipkan yang lebih lama dari…",
   "sidebar.archiveOlderDays": "Lebih dari {days} hari",
   "sidebar.archiveOlderDaysCount": "Lebih dari {days} hari ({n})",

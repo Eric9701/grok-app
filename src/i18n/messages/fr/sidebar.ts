@@ -53,6 +53,8 @@ export const frSidebar = {
   "sidebar.archivedToast": "{n} conversations archivées",
   "sidebar.restoredToast": "{n} conversations restaurées",
   "sidebar.deletedToast": "{n} conversations supprimées",
+  "sidebar.remoteDeleteConfirm": "Permanently delete “{name}” on {alias}? The remote Grok session is removed.",
+  "sidebar.remoteDeleteManyConfirm": "Permanently delete {n} remote chats on {alias}?",
   "sidebar.archiveOlder": "Archiver au-delà de…",
   "sidebar.archiveOlderDays": "Plus de {days} jours",
   "sidebar.archiveOlderDaysCount": "Plus de {days} jours ({n})",

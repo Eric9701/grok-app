@@ -53,6 +53,8 @@ export const ptBRSidebar = {
   "sidebar.archivedToast": "{n} conversas arquivadas",
   "sidebar.restoredToast": "{n} conversas restauradas",
   "sidebar.deletedToast": "{n} conversas excluídas",
+  "sidebar.remoteDeleteConfirm": "Permanently delete “{name}” on {alias}? The remote Grok session is removed.",
+  "sidebar.remoteDeleteManyConfirm": "Permanently delete {n} remote chats on {alias}?",
   "sidebar.archiveOlder": "Arquivar mais antigas que…",
   "sidebar.archiveOlderDays": "Mais de {days} dias",
   "sidebar.archiveOlderDaysCount": "Mais de {days} dias ({n})",

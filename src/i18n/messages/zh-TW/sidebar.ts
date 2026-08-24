@@ -53,6 +53,8 @@ export const zhTWSidebar = {
   "sidebar.archivedToast": "已封存 {n} 個對話",
   "sidebar.restoredToast": "已還原 {n} 個對話",
   "sidebar.deletedToast": "已永久刪除 {n} 個對話",
+  "sidebar.remoteDeleteConfirm": "確定永久刪除 {alias} 上的「{name}」？遠端 Grok 會話會被刪掉。",
+  "sidebar.remoteDeleteManyConfirm": "確定永久刪除 {alias} 上的 {n} 個遠端會話？",
   "sidebar.archiveOlder": "封存超過…天的對話",
   "sidebar.archiveOlderDays": "超過 {days} 天",
   "sidebar.archiveOlderDaysCount": "超過 {days} 天（{n}）",

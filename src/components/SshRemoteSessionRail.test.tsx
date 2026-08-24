@@ -3,7 +3,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SshRemoteSessionRail } from "./SshRemoteSessionRail";
 import type { MessageKey, Vars } from "@/i18n";
@@ -12,14 +12,17 @@ import * as api from "@/lib/api";
 const loadMore = vi.fn();
 const onOpenSession = vi.fn();
 const onNewConversation = vi.fn();
+const onImportedSessionsChanged = vi.fn();
 const setDraftRemote = vi.fn();
 const renameRemoteSession = vi.fn();
+const refreshSessions = vi.fn();
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...actual,
     sshOpenSession: vi.fn(),
+    sshDeleteSessions: vi.fn(),
   };
 });
 
@@ -54,7 +57,7 @@ vi.mock("@/providers/SshWatchProvider", () => ({
     setDraftRemote,
     enableWatch: vi.fn(),
     disableWatch: vi.fn(),
-    refreshSessions: vi.fn(),
+    refreshSessions,
     loadMore,
     renameRemoteSession,
   }),
@@ -68,6 +71,21 @@ function t(k: MessageKey, vars?: Vars): string {
   if (k === "sidebar.remoteOpening") return "打开中…";
   if (k === "sidebar.remoteOpenFailed") return `无法打开：${vars?.error ?? ""}`;
   if (k === "sidebar.newConversation") return "新建会话";
+  if (k === "sidebar.menu") return "菜单";
+  if (k === "sidebar.select") return "选择";
+  if (k === "sidebar.selectedCount") return `已选 ${vars?.n} 项`;
+  if (k === "sidebar.deleteSelected") return `删除 ${vars?.n}`;
+  if (k === "sidebar.selectAllInGroup") return "全选";
+  if (k === "sidebar.deselectAllInGroup") return "取消全选";
+  if (k === "sidebar.remoteDeleteConfirm")
+    return `确定删除 ${vars?.alias} 上的「${vars?.name}」？`;
+  if (k === "sidebar.remoteDeleteManyConfirm")
+    return `确定删除 ${vars?.alias} 上的 ${vars?.n} 个？`;
+  if (k === "session.delete") return "删除会话";
+  if (k === "session.deleteTitle") return "删除会话";
+  if (k === "session.deleteManyTitle") return "删除会话";
+  if (k === "session.renamePrompt") return "重命名";
+  if (k === "common.cancel") return "取消";
   return String(k);
 }
 
@@ -195,5 +213,54 @@ describe("SshRemoteSessionRail", () => {
     });
     expect(api.sshOpenSession).not.toHaveBeenCalled();
     expect(onOpenSession).not.toHaveBeenCalled();
+  });
+
+  it("Cmd/Ctrl click enters select mode and does not open", async () => {
+    render(
+      <SshRemoteSessionRail
+        t={t}
+        locale="zh"
+        showRelativeTime
+        onOpenSession={onOpenSession}
+      />,
+    );
+    const row = screen.getByRole("button", { name: "qwen35-v001-light" });
+    fireEvent.click(row, { metaKey: true });
+    expect(api.sshOpenSession).not.toHaveBeenCalled();
+    expect(onOpenSession).not.toHaveBeenCalled();
+    expect(row).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("已选 1 项")).toBeInTheDocument();
+  });
+
+  it("right-click delete confirms and removes the remote session", async () => {
+    vi.mocked(api.sshDeleteSessions).mockResolvedValue({
+      ok: true,
+      alias: "UTS",
+      deleted: ["01a01907-adf3-7e00-a7a8-aee1082b0556"],
+      missing: [],
+    });
+    render(
+      <SshRemoteSessionRail
+        t={t}
+        locale="zh"
+        showRelativeTime
+        onOpenSession={onOpenSession}
+        onImportedSessionsChanged={onImportedSessionsChanged}
+      />,
+    );
+    const row = screen.getByRole("button", { name: "qwen35-v001-light" });
+    fireEvent.contextMenu(row);
+    await userEvent.click(screen.getByRole("menuitem", { name: "删除会话" }));
+    expect(
+      screen.getByText("确定删除 UTS 上的「qwen35-v001-light」？"),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "删除会话" }));
+    await waitFor(() => {
+      expect(api.sshDeleteSessions).toHaveBeenCalledWith("UTS", [
+        "01a01907-adf3-7e00-a7a8-aee1082b0556",
+      ]);
+      expect(refreshSessions).toHaveBeenCalledWith("UTS");
+      expect(onImportedSessionsChanged).toHaveBeenCalled();
+    });
   });
 });

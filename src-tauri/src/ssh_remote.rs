@@ -2313,6 +2313,196 @@ pub async fn ssh_open_session(
     })
 }
 
+const SSH_DELETE_MAX: usize = 50;
+
+const REMOTE_DEL_PY: &str = r##"python3 -c '
+import os, sys, shutil
+root = os.path.expanduser("~/.grok/sessions")
+sys.stdout.write("GROK_APP_DEL\n")
+sys.stdout.flush()
+ids = [ln.strip() for ln in sys.stdin.read().splitlines() if ln.strip()]
+for sid in ids:
+    if (not sid) or ("/" in sid) or ("\\" in sid) or sid in (".", "..") or (".." in sid):
+        sys.stdout.write(sid + "\tbad\n")
+        continue
+    found = None
+    if os.path.isdir(root):
+        for enc in os.listdir(root):
+            d = os.path.join(root, enc, sid)
+            if os.path.isdir(d):
+                found = d
+                break
+    if not found:
+        sys.stdout.write(sid + "\tmissing\n")
+        continue
+    try:
+        shutil.rmtree(found)
+        sys.stdout.write(sid + "\tok\n")
+    except Exception:
+        sys.stdout.write(sid + "\terror\n")
+'
+"##;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshDeleteSessionsResult {
+    pub ok: bool,
+    pub alias: String,
+    pub deleted: Vec<String>,
+    #[serde(default)]
+    pub missing: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+pub(crate) fn parse_del_stdout(stdout: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut on = false;
+    for line in stdout.lines() {
+        if line.trim() == "GROK_APP_DEL" {
+            on = true;
+            continue;
+        }
+        if !on {
+            continue;
+        }
+        let Some((id, status)) = line.split_once('\t') else {
+            continue;
+        };
+        let id = id.trim();
+        let status = status.trim();
+        if id.is_empty() || status.is_empty() {
+            continue;
+        }
+        out.push((id.to_string(), status.to_string()));
+    }
+    out
+}
+
+fn forget_local_for_remote(alias: &str, remote_id: &str) {
+    let key = format!("{alias}:{remote_id}");
+    let mut index = load_import_index();
+    let mut app_ids: Vec<String> = Vec::new();
+    if let Some(id) = index.remove(&key) {
+        app_ids.push(id);
+    }
+    let _ = save_import_index(&index);
+    for s in crate::store::load_sessions_index() {
+        if s.agent_session_id.as_deref() == Some(remote_id) {
+            app_ids.push(s.id);
+        }
+    }
+    app_ids.sort();
+    app_ids.dedup();
+    for id in app_ids {
+        let _ = crate::store::delete_session(&id);
+    }
+}
+
+#[tauri::command]
+pub async fn ssh_delete_sessions(
+    alias: String,
+    session_ids: Vec<String>,
+) -> Result<SshDeleteSessionsResult, String> {
+    let alias = alias.trim().to_string();
+    if !is_safe_ssh_alias(&alias) {
+        return Ok(SshDeleteSessionsResult {
+            ok: false,
+            alias,
+            deleted: Vec::new(),
+            missing: Vec::new(),
+            error: Some("invalid alias".into()),
+        });
+    }
+    let mut ids: Vec<String> = Vec::new();
+    for raw in session_ids {
+        match crate::cli_sessions::validate_agent_session_id(&raw) {
+            Ok(id) => {
+                if !ids.iter().any(|x| x == id) {
+                    ids.push(id.to_string());
+                }
+            }
+            Err(_) => {}
+        }
+        if ids.len() >= SSH_DELETE_MAX {
+            break;
+        }
+    }
+    if ids.is_empty() {
+        return Ok(SshDeleteSessionsResult {
+            ok: true,
+            alias,
+            deleted: Vec::new(),
+            missing: Vec::new(),
+            error: None,
+        });
+    }
+    let stdin = ids.join("\n");
+    let run = match run_ssh_io(&alias, REMOTE_DEL_PY, true, 30, Some(stdin.as_bytes())).await {
+        Err(SshRunErr::Missing) => {
+            return Ok(SshDeleteSessionsResult {
+                ok: false,
+                alias,
+                deleted: Vec::new(),
+                missing: Vec::new(),
+                error: Some("ssh missing".into()),
+            });
+        }
+        Err(SshRunErr::Timeout { .. }) => {
+            return Ok(SshDeleteSessionsResult {
+                ok: false,
+                alias,
+                deleted: Vec::new(),
+                missing: Vec::new(),
+                error: Some("timeout".into()),
+            });
+        }
+        Err(SshRunErr::Spawn(e)) => {
+            return Ok(SshDeleteSessionsResult {
+                ok: false,
+                alias,
+                deleted: Vec::new(),
+                missing: Vec::new(),
+                error: Some(truncate_err(&e)),
+            });
+        }
+        Ok(run) if !run.success => {
+            let (_code, msg) = classify_ssh_stderr(&run.stderr);
+            return Ok(SshDeleteSessionsResult {
+                ok: false,
+                alias,
+                deleted: Vec::new(),
+                missing: Vec::new(),
+                error: Some(msg),
+            });
+        }
+        Ok(run) => run,
+    };
+    let rows = parse_del_stdout(&run.stdout);
+    let mut deleted = Vec::new();
+    let mut missing = Vec::new();
+    for (id, status) in rows {
+        match status.as_str() {
+            "ok" | "missing" => {
+                forget_local_for_remote(&alias, &id);
+                if status == "ok" {
+                    deleted.push(id);
+                } else {
+                    missing.push(id);
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(SshDeleteSessionsResult {
+        ok: true,
+        alias,
+        deleted,
+        missing,
+        error: None,
+    })
+}
+
 // ── Remote skills (`grok inspect --json` + project `.grok/skills`) ─────────
 
 #[derive(Debug, Clone)]
@@ -3393,6 +3583,23 @@ Host "build-server"
         assert!(script.contains("agent leader --no-exit-on-disconnect"));
         assert!(!script.contains("UTS"));
         assert!(ssh_acp_argv("host;rm", "/tmp", &[]).is_err());
+    }
+
+    #[test]
+    fn parse_del_stdout_reads_status_rows() {
+        let rows = parse_del_stdout("noise\nGROK_APP_DEL\na\tok\nb\tmissing\nbadline\nc\terror\n");
+        assert_eq!(
+            rows,
+            vec![
+                ("a".into(), "ok".into()),
+                ("b".into(), "missing".into()),
+                ("c".into(), "error".into()),
+            ]
+        );
+        assert!(parse_del_stdout("").is_empty());
+        assert!(REMOTE_DEL_PY.contains("shutil.rmtree"));
+        assert!(REMOTE_DEL_PY.contains("GROK_APP_DEL"));
+        assert!(!REMOTE_DEL_PY.contains("UTS"));
     }
 
     #[test]

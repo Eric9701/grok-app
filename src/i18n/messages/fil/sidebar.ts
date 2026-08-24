@@ -53,6 +53,8 @@ export const filSidebar = {
   "sidebar.archivedToast": "Na-archive ang {n} chat",
   "sidebar.restoredToast": "Naibalik ang {n} chat",
   "sidebar.deletedToast": "Nabura ang {n} chat",
+  "sidebar.remoteDeleteConfirm": "Permanently delete “{name}” on {alias}? The remote Grok session is removed.",
+  "sidebar.remoteDeleteManyConfirm": "Permanently delete {n} remote chats on {alias}?",
   "sidebar.archiveOlder": "I-archive ang mas luma sa…",
   "sidebar.archiveOlderDays": "Mahigit {days} araw",
   "sidebar.archiveOlderDaysCount": "Mahigit {days} araw ({n})",

@@ -53,6 +53,8 @@ export const jaSidebar = {
   "sidebar.archivedToast": "{n} 件のチャットをアーカイブしました",
   "sidebar.restoredToast": "{n} 件のチャットを復元しました",
   "sidebar.deletedToast": "{n} 件のチャットを削除しました",
+  "sidebar.remoteDeleteConfirm": "Permanently delete “{name}” on {alias}? The remote Grok session is removed.",
+  "sidebar.remoteDeleteManyConfirm": "Permanently delete {n} remote chats on {alias}?",
   "sidebar.archiveOlder": "指定日数より古いものをアーカイブ…",
   "sidebar.archiveOlderDays": "{days} 日より前",
   "sidebar.archiveOlderDaysCount": "{days} 日より前（{n} 件）",

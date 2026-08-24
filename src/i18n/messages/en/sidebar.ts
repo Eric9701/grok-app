@@ -53,6 +53,8 @@ export const enSidebar = {
   "sidebar.archivedToast": "Archived {n} chats",
   "sidebar.restoredToast": "Restored {n} chats",
   "sidebar.deletedToast": "Deleted {n} chats",
+  "sidebar.remoteDeleteConfirm": "Permanently delete “{name}” on {alias}? The remote Grok session is removed.",
+  "sidebar.remoteDeleteManyConfirm": "Permanently delete {n} remote chats on {alias}?",
   "sidebar.archiveOlder": "Archive older than…",
   "sidebar.archiveOlderDays": "Older than {days} days",
   "sidebar.archiveOlderDaysCount": "Older than {days} days ({n})",

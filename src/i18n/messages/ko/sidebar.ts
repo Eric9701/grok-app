@@ -53,6 +53,8 @@ export const koSidebar = {
   "sidebar.archivedToast": "대화 {n}개를 보관했습니다",
   "sidebar.restoredToast": "대화 {n}개를 복원했습니다",
   "sidebar.deletedToast": "대화 {n}개를 삭제했습니다",
+  "sidebar.remoteDeleteConfirm": "Permanently delete “{name}” on {alias}? The remote Grok session is removed.",
+  "sidebar.remoteDeleteManyConfirm": "Permanently delete {n} remote chats on {alias}?",
   "sidebar.archiveOlder": "오래된 대화 보관…",
   "sidebar.archiveOlderDays": "{days}일 이전",
   "sidebar.archiveOlderDaysCount": "{days}일 이전 ({n}개)",

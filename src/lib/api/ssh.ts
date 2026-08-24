@@ -167,6 +167,21 @@ export async function sshOpenSession(
   });
 }
 
+export type SshDeleteSessionsResult = {
+  ok: boolean;
+  alias: string;
+  deleted: string[];
+  missing?: string[];
+  error?: string | null;
+};
+
+export async function sshDeleteSessions(alias: string, sessionIds: string[]) {
+  return invoke<SshDeleteSessionsResult>("ssh_delete_sessions", {
+    alias,
+    sessionIds,
+  });
+}
+
 export type SshBrowserPrepareResult = {
   ok: boolean;
   alias: string;

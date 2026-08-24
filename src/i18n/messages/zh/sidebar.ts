@@ -53,6 +53,8 @@ export const zhSidebar = {
   "sidebar.archivedToast": "已归档 {n} 个会话",
   "sidebar.restoredToast": "已恢复 {n} 个会话",
   "sidebar.deletedToast": "已永久删除 {n} 个会话",
+  "sidebar.remoteDeleteConfirm": "确定永久删除 {alias} 上的「{name}」？远程 Grok 会话会被删掉。",
+  "sidebar.remoteDeleteManyConfirm": "确定永久删除 {alias} 上的 {n} 个远程会话？",
   "sidebar.archiveOlder": "归档超过…天的会话",
   "sidebar.archiveOlderDays": "超过 {days} 天",
   "sidebar.archiveOlderDaysCount": "超过 {days} 天（{n}）",

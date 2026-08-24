@@ -53,6 +53,8 @@ export const ukSidebar = {
   "sidebar.archivedToast": "Архівовано чатів: {n}",
   "sidebar.restoredToast": "Відновлено чатів: {n}",
   "sidebar.deletedToast": "Видалено чатів: {n}",
+  "sidebar.remoteDeleteConfirm": "Permanently delete “{name}” on {alias}? The remote Grok session is removed.",
+  "sidebar.remoteDeleteManyConfirm": "Permanently delete {n} remote chats on {alias}?",
   "sidebar.archiveOlder": "Архівувати старіші за…",
   "sidebar.archiveOlderDays": "Старіші за {days} днів",
   "sidebar.archiveOlderDaysCount": "Старіші за {days} днів ({n})",

@@ -53,6 +53,8 @@ export const taSidebar = {
   "sidebar.archivedToast": "{n} உரையாடல்கள் காப்பகப்படுத்தப்பட்டன",
   "sidebar.restoredToast": "{n} உரையாடல்கள் மீட்டெடுக்கப்பட்டன",
   "sidebar.deletedToast": "{n} உரையாடல்கள் நீக்கப்பட்டன",
+  "sidebar.remoteDeleteConfirm": "Permanently delete “{name}” on {alias}? The remote Grok session is removed.",
+  "sidebar.remoteDeleteManyConfirm": "Permanently delete {n} remote chats on {alias}?",
   "sidebar.archiveOlder": "இதைவிடப் பழையவற்றைக் காப்பகப்படுத்து…",
   "sidebar.archiveOlderDays": "{days} நாட்களுக்கு மேல் பழையவை",
   "sidebar.archiveOlderDaysCount": "{days} நாட்களுக்கு மேல் பழையவை ({n})",

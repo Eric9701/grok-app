@@ -13961,6 +13961,7 @@ export function AppWorkbench() {
             openProjectMenu={openProjectMenu}
             newChat={newChat}
             onNewRemoteConversation={newRemoteChat}
+            onImportedSessionsChanged={() => void refreshSessions()}
             relocateProject={relocateProject}
             trustProject={trustProject}
             viewingSessionId={session.sessionId}
