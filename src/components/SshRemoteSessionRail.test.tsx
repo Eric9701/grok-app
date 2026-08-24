@@ -232,6 +232,48 @@ describe("SshRemoteSessionRail", () => {
     expect(screen.getByText("已选 1 项")).toBeInTheDocument();
   });
 
+  it("Cmd/Ctrl click on a second row keeps both selected", async () => {
+    render(
+      <SshRemoteSessionRail
+        t={t}
+        locale="zh"
+        showRelativeTime
+        onOpenSession={onOpenSession}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "qwen35-v001-light" }), {
+      metaKey: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "第二轮实验" }), {
+      metaKey: true,
+    });
+    expect(
+      screen.getByRole("button", { name: "qwen35-v001-light" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: "第二轮实验" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByText("已选 2 项")).toBeInTheDocument();
+    expect(onOpenSession).not.toHaveBeenCalled();
+  });
+
+  it("Cmd/Ctrl mousedown plus click selects once (does not toggle off)", async () => {
+    render(
+      <SshRemoteSessionRail
+        t={t}
+        locale="zh"
+        showRelativeTime
+        onOpenSession={onOpenSession}
+      />,
+    );
+    const row = screen.getByRole("button", { name: "qwen35-v001-light" });
+    fireEvent.mouseDown(row, { metaKey: true, button: 0 });
+    fireEvent.click(row, { metaKey: true });
+    expect(row).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("已选 1 项")).toBeInTheDocument();
+  });
+
   it("right-click delete confirms and removes the remote session", async () => {
     vi.mocked(api.sshDeleteSessions).mockResolvedValue({
       ok: true,

@@ -28,6 +28,7 @@ import type { Locale, MessageKey, Vars } from "@/i18n";
 import * as api from "@/lib/api";
 import {
   areAllIdsSelected,
+  isSelectModifierEvent,
   rangeIdsInclusive,
   toggleIdInSet,
   toggleIdsInSet,
@@ -94,6 +95,8 @@ export function SshRemoteSessionRail({
   const [confirm, setConfirm] = useState<RemoteDeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Cmd/Ctrl mousedown already toggled — ignore the following click. */
+  const modSelectLockRef = useRef(false);
 
   const orderedKeys = useMemo(() => {
     const keys: string[] = [];
@@ -401,10 +404,25 @@ export function SshRemoteSessionRail({
                                   aria-checked={selectMode ? checked : undefined}
                                   aria-label={label}
                                   data-remote-session-key={key}
+                                  onMouseDown={(e: MouseEvent<HTMLDivElement>) => {
+                                    if (editing) return;
+                                    if (e.button !== 0) return;
+                                    if (!isSelectModifierEvent(e)) return;
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    modSelectLockRef.current = true;
+                                    toggleSelect(key, { shiftKey: e.shiftKey });
+                                  }}
                                   onClick={(e: MouseEvent<HTMLDivElement>) => {
                                     if (e.detail > 1) return;
                                     if (editing) return;
-                                    if (e.metaKey || e.ctrlKey || selectMode) {
+                                    if (modSelectLockRef.current) {
+                                      modSelectLockRef.current = false;
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      return;
+                                    }
+                                    if (selectMode || isSelectModifierEvent(e)) {
                                       e.preventDefault();
                                       toggleSelect(key, { shiftKey: e.shiftKey });
                                       return;
