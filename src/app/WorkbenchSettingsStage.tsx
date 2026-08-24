@@ -1,7 +1,6 @@
 /**
- * Settings overlay stage. Host keeps settings state; this file owns the
- * SettingsPage prop surface so settings chrome can change without opening
- * AppWorkbench.
+ * Settings overlay stage. Navigation lives in useSettingsNavigation;
+ * this file owns the SettingsPage prop surface. Host still hydrates prefs.
  */
 import { SettingsPage } from "@/components/SettingsPage";
 import { saveMessageTimestampsPref } from "@/lib/messageTimestampsPref";

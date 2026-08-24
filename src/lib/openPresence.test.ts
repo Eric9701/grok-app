@@ -84,6 +84,10 @@ describe("floating pop CSS", () => {
     resolve(__dirname, "../app/AppWorkbench.tsx"),
     "utf8",
   );
+  const settingsNav = readFileSync(
+    resolve(__dirname, "../hooks/useSettingsNavigation.ts"),
+    "utf8",
+  );
   const settingsStage = readFileSync(
     resolve(__dirname, "../app/WorkbenchSettingsStage.tsx"),
     "utf8",
@@ -116,7 +120,7 @@ describe("floating pop CSS", () => {
     expect(stageCss).not.toMatch(/transform\s*:/);
     expect(stageCss).not.toMatch(/(?:transition|animation)\s*:/);
     expect(stageCss).toMatch(/z-index:\s*20/);
-    expect(appWorkbench).toMatch(/\{appView === "settings" \? \(/);
+    expect(appWorkbench).toMatch(/\{settingsOpen \? \(/);
     expect(appWorkbench).not.toMatch(/settingsPresence|VIEW_PRESENCE_MS/);
     expect(settings).not.toMatch(/settings-stage-(?:enter|leave)/);
   });
@@ -150,37 +154,28 @@ describe("floating pop CSS", () => {
   });
 
   it("closes the account portal immediately when settings takes over", () => {
-    expect(appWorkbench).toMatch(/closeImmediately=\{appView === "settings"\}/);
+    expect(appWorkbench).toMatch(/closeImmediately=\{settingsOpen\}/);
     expect(userMenu).toMatch(
       /useOpenPresence\(\s*open,\s*true,\s*closeImmediately \? 0 : OPEN_PRESENCE_MS,\s*\)/,
     );
     expect(userMenu).toMatch(
       /const panel\s*=\s*!closeImmediately\s*&&\s*panelPresence\.mounted/,
     );
-    const hashRoute = appWorkbench.slice(
-      appWorkbench.indexOf("const syncFromHash = () =>"),
-      appWorkbench.indexOf("window.addEventListener(\"hashchange\""),
-    );
-    expect(hashRoute).toMatch(
-      /if \(raw\.startsWith\("settings"\)\) \{\s*ensureSettingsNativeCover\(\);\s*setShowUserMenu\(false\);/,
+    expect(settingsNav).toMatch(
+      /if \(route\.kind === "settings-explicit"\) \{\s*ensureSettingsNativeCover\(\);\s*optsRef\.current\.onMenuClose\(\);/,
     );
   });
 
   it("covers native child webviews before committing settings", () => {
-    const navigateStart = appWorkbench.indexOf(
-      "const navigateSettings = useCallback(",
-    );
-    const navigateEnd = appWorkbench.indexOf(
-      "/** Settings → Runtime",
-      navigateStart,
-    );
-    const navigate = appWorkbench.slice(navigateStart, navigateEnd);
+    const navigateStart = settingsNav.indexOf("const navigateSettings = useCallback(");
+    const navigateEnd = settingsNav.indexOf("const closeSettings = useCallback(", navigateStart);
+    const navigate = settingsNav.slice(navigateStart, navigateEnd);
     expect(navigate.indexOf("ensureSettingsNativeCover();")).toBeGreaterThan(0);
     expect(navigate.indexOf("ensureSettingsNativeCover();")).toBeLessThan(
-      navigate.indexOf('setAppView("settings")'),
+      navigate.indexOf("setSettingsOpen(true)"),
     );
-    expect(appWorkbench).toMatch(
-      /useLayoutEffect\(\(\) => \{\s*if \(appView === "settings"\)/,
+    expect(settingsNav).toMatch(
+      /useLayoutEffect\(\(\) => \{\s*if \(settingsOpen\)/,
     );
   });
 

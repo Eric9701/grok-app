@@ -3,7 +3,6 @@ import {
   Suspense,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -80,7 +79,6 @@ import {
 import { resolveWorkbenchPaneOverlay } from "@/lib/paneOverlay";
 import { isFakeMaximized } from "@/lib/windowChrome";
 import { usePaneSplitMotion } from "@/hooks/usePaneSplitMotion";
-import { acquireNativeWebviewCover } from "@/lib/nativeWebviewCover";
 import {
   PHONE_KEYBOARD_INSET_VAR,
   keyboardInsetBottom,
@@ -520,7 +518,6 @@ import {
   PR_HUB_ANCHOR_ID,
   buildPrHubDeepLink,
   parseGithubPrNumber,
-  parsePrHubDeepLink,
 } from "@/lib/prHubDeepLink";
 import {
   buildForkWorktreeName,
@@ -645,17 +642,7 @@ import {
 import {
   type SettingsSectionId,
 } from "@/components/SettingsPage";
-import {
-  buildSettingsHash,
-  isSettingsSectionId,
-  parseSettingsHash,
-  type SettingsTabId,
-} from "@/lib/settingsCatalog";
-import {
-  loadSettingsLastRoute,
-  resolveOpenSettingsLocation,
-  saveSettingsLastRoute,
-} from "@/lib/settingsLastRoute";
+import { isSettingsSectionId } from "@/lib/settingsCatalog";
 import {
   isAccountConnected,
   loadCachedSuperGrokBrand,
@@ -717,6 +704,7 @@ import { useGhostStreamingHeal } from "@/hooks/useGhostStreamingHeal";
 import { useAccountQuotaAutoRefresh } from "@/hooks/useAccountQuotaAutoRefresh";
 import { useWorkbenchDisplayPrefs } from "@/hooks/useWorkbenchDisplayPrefs";
 import { useWorkbenchLayout } from "@/hooks/useWorkbenchLayout";
+import { useSettingsNavigation } from "@/hooks/useSettingsNavigation";
 import { useSearchPalette } from "@/hooks/useSearchPalette";
 import { useCompactDialog } from "@/hooks/useCompactDialog";
 import { useQueueEditDialog } from "@/hooks/useQueueEditDialog";
@@ -1400,20 +1388,9 @@ export function AppWorkbench() {
   const [mirrorHostLabel, setMirrorHostLabel] = useState<string | null>(null);
   const [phoneToolsOpen, setPhoneToolsOpen] = useState(false);
   const [phoneAccountOpen, setPhoneAccountOpen] = useState(false);
-  /** Hash route: workbench | settings/:section | automations */
-  const [appView, setAppView] = useState<"workbench" | "settings">("workbench");
-  const settingsNativeCoverReleaseRef = useRef<(() => void) | null>(null);
-  const ensureSettingsNativeCover = useCallback(() => {
-    settingsNativeCoverReleaseRef.current ??= acquireNativeWebviewCover();
-  }, []);
   /** Inside workbench: chat thread vs scheduled tasks vs agent kanban. */
   const [mainPane, setMainPane] = useState<"chat" | "automations" | "kanban">(
     "chat",
-  );
-  const [settingsSection, setSettingsSection] =
-    useState<SettingsSectionId>("general");
-  const [settingsTab, setSettingsTab] = useState<SettingsTabId | null>(
-    "composer",
   );
   /** Prevent overlapping automation runs. */
   const automationRunLock = useRef(false);
@@ -1886,6 +1863,23 @@ export function AppWorkbench() {
   const tr = useMemo(() => createT(locale), [locale, localeCatalogRev]);
   const trRef = useRef(tr);
   trRef.current = tr;
+  const {
+    settingsOpen,
+    settingsSection,
+    settingsTab,
+    settingsFocusAnchor,
+    setSettingsFocusAnchor,
+    prHubHighlightPr,
+    setPrHubHighlightPr,
+    settingsLabels,
+    navigateSettings,
+    closeSettings,
+    openWorkflowsSettings,
+  } = useSettingsNavigation({
+    tr,
+    onWorkbenchPane: setMainPane,
+    onMenuClose: () => setShowUserMenu(false),
+  });
   const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
   const [effort, setEffort] = useState(DEFAULT_EFFORT);
   const [mode, setMode] = useState("agent");
@@ -2114,12 +2108,6 @@ export function AppWorkbench() {
     prUrl: string;
     prNumber: number | null;
   } | null>(null);
-  /** PR hub row highlight from ship deep link / `?pr=`. */
-  const [prHubHighlightPr, setPrHubHighlightPr] = useState<number | null>(null);
-  /** One-shot Settings scroll target (e.g. settings-anchor-prHub). */
-  const [settingsFocusAnchor, setSettingsFocusAnchor] = useState<string | null>(
-    null,
-  );
   /** Host stream-stall prompt (I06); null when dismissed or not stalled. */
   const [streamStall, setStreamStall] = useState<{
     sessionId?: string;
@@ -2463,7 +2451,7 @@ export function AppWorkbench() {
         // Collapse chrome in secondary so the chat is front-and-center.
         if (secondary) {
           collapseChromeEphemeral();
-          setAppView("workbench");
+          closeSettings();
           setMainPane("chat");
         }
       } catch (e) {
@@ -3401,11 +3389,8 @@ export function AppWorkbench() {
     openAsidePaneRef,
     setResourceOpenTarget,
     navigateWorkbench: () => {
-      setAppView("workbench");
+      closeSettings();
       setMainPane("chat");
-      if (typeof window !== "undefined" && window.location.hash) {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      }
     },
     pendingAskUserBySessionRef,
     pendingPermBySessionRef,
@@ -3421,30 +3406,27 @@ export function AppWorkbench() {
   });
 
   const navigateWorkbench = useCallback(() => {
-    setAppView("workbench");
+    closeSettings();
     setMainPane("chat");
-    if (typeof window !== "undefined" && window.location.hash) {
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    }
-  }, []);
+  }, [closeSettings]);
 
   const navigateAutomations = useCallback(() => {
-    setAppView("workbench");
+    closeSettings();
     setMainPane("automations");
     setShowUserMenu(false);
     if (typeof window !== "undefined") {
       window.location.hash = "#/automations";
     }
-  }, []);
+  }, [closeSettings]);
 
   const navigateKanban = useCallback(() => {
-    setAppView("workbench");
+    closeSettings();
     setMainPane("kanban");
     setShowUserMenu(false);
     if (typeof window !== "undefined") {
       window.location.hash = "#/kanban";
     }
-  }, []);
+  }, [closeSettings]);
 
   const persistOpenTarget = useCallback((target: string) => {
     setDefaultOpenTarget(target);
@@ -3455,105 +3437,6 @@ export function AppWorkbench() {
   }, []);
 
   /**
-   * Open Settings at section/tab.
-   * - Omit `section` (generic open: ⌘,, gear, slash /settings, tray Settings…)
-   *   → restore last route when valid, else general.
-   * - Explicit section always wins (palette, deep link, account, errors).
-   * - Persists the resolved route to localStorage for the next generic open.
-   */
-  const navigateSettings = useCallback(
-    (section?: SettingsSectionId | null, tab?: string | null) => {
-      const loc = resolveOpenSettingsLocation({
-        section: section ?? undefined,
-        tab,
-        last: section == null ? loadSettingsLastRoute() : null,
-      });
-      ensureSettingsNativeCover();
-      setSettingsSection(loc.section);
-      setSettingsTab(loc.tab);
-      setAppView("settings");
-      setShowUserMenu(false);
-      saveSettingsLastRoute(loc);
-      if (typeof window !== "undefined") {
-        // Phone: generic settings open lands on the section index (SettingsPage
-        // starts at phonePane=index). Specific sections still set the hash so a
-        // later drill-in / deep-link matches the intended section.
-        const hash = buildSettingsHash({
-          section: loc.section,
-          tab: loc.tab,
-        });
-        // Avoid no-op hash writes (some webviews skip hashchange; state still set above).
-        if (window.location.hash !== hash) {
-          window.location.hash = hash;
-        }
-      }
-    },
-    [ensureSettingsNativeCover],
-  );
-
-  /** Settings → Runtime → Tools, scrolled to the workflows card. */
-  const openWorkflowsSettings = useCallback(() => {
-    navigateSettings("runtime", "tools");
-    setSettingsFocusAnchor("settings-anchor-workflows");
-  }, [navigateSettings]);
-
-  // Hash route: #/settings[/section[/tab]][?pr=N] | #/automations | #/kanban | #/workbench
-  // Explicit #/settings/{section}… deep links always win; bare #/settings uses last.
-  useEffect(() => {
-    const syncFromHash = () => {
-      const fullHash = window.location.hash || "";
-      const raw = fullHash.replace(/^#\/?/, "");
-      if (raw.startsWith("settings")) {
-        ensureSettingsNativeCover();
-        setShowUserMenu(false);
-        const parts = raw.split("/").filter(Boolean);
-        // parts[0] === "settings"; parts[1] may be section (ignore ?query)
-        const sectionPart = (parts[1] ?? "").split("?")[0];
-        const hasExplicitSection = isSettingsSectionId(sectionPart);
-        if (hasExplicitSection) {
-          const loc = parseSettingsHash(raw);
-          if (loc) {
-            setSettingsSection(loc.section);
-            setSettingsTab(loc.tab ?? null);
-            saveSettingsLastRoute(loc);
-          }
-          // PR hub deep link with explicit ?pr=N: highlight row + scroll to hub.
-          // Bare runtime/tools (no query) must not steal focus to the PR hub card.
-          const prHub = parsePrHubDeepLink(fullHash);
-          if (prHub && prHub.prNumber != null) {
-            setPrHubHighlightPr(prHub.prNumber);
-            setSettingsFocusAnchor(PR_HUB_ANCHOR_ID);
-          }
-        } else {
-          // Bare #/settings or unknown first segment → last route if valid.
-          const last = loadSettingsLastRoute();
-          const loc = resolveOpenSettingsLocation({ last });
-          setSettingsSection(loc.section);
-          setSettingsTab(loc.tab);
-          saveSettingsLastRoute(loc);
-          const hash = buildSettingsHash(loc);
-          if (window.location.hash !== hash) {
-            window.location.hash = hash;
-          }
-        }
-        setAppView("settings");
-      } else if (raw === "automations" || raw.startsWith("automations")) {
-        setAppView("workbench");
-        setMainPane("automations");
-      } else if (raw === "kanban" || raw.startsWith("kanban")) {
-        setAppView("workbench");
-        setMainPane("kanban");
-      } else if (raw === "" || raw === "workbench" || raw === "home") {
-        setAppView("workbench");
-        setMainPane("chat");
-      }
-    };
-    syncFromHash();
-    window.addEventListener("hashchange", syncFromHash);
-    return () => window.removeEventListener("hashchange", syncFromHash);
-  }, [ensureSettingsNativeCover]);
-
-  /**
    * Composition root for session open: other domains' verbs, mutated in place
    * so `useSessionNavigation` never captures a stale host object.
    */
@@ -3561,7 +3444,7 @@ export function AppWorkbench() {
     const host = sessionNavHostRef.current;
     host.chrome.goToChat = () => {
       setMainPane("chat");
-      setAppView("workbench");
+      closeSettings();
       if (typeof window !== "undefined" && window.location.hash) {
         window.history.replaceState(
           null,
@@ -4287,7 +4170,7 @@ export function AppWorkbench() {
           return false;
         }
         setMainPane("chat");
-        setAppView("workbench");
+        closeSettings();
         setActiveProject(proj);
         if (proj) {
           setExpandedProjects((e) => ({ ...e, [proj.id]: true }));
@@ -11559,7 +11442,7 @@ export function AppWorkbench() {
   const openOpsDestination = useCallback(
     (id: OpsEntryDestinationId) => {
       setOpsEntryOpen(false);
-      setAppView("workbench");
+      closeSettings();
       switch (id) {
         case "tasks":
           setMainPane("chat");
@@ -11816,7 +11699,7 @@ export function AppWorkbench() {
         break;
       case "open-ops":
         // Ops hub: pick tasks / dashboard / board / batch (not a silent dashboard alias).
-        setAppView("workbench");
+        closeSettings();
         setOpsEntryOpen(true);
         if (
           typeof window !== "undefined" &&
@@ -11826,7 +11709,7 @@ export function AppWorkbench() {
         }
         break;
       case "open-tasks":
-        setAppView("workbench");
+        closeSettings();
         setMainPane("chat");
         setTasksPanelOpen(true);
         if (
@@ -11837,7 +11720,7 @@ export function AppWorkbench() {
         }
         break;
       case "open-agent-dashboard":
-        setAppView("workbench");
+        closeSettings();
         setAgentDashboardOpen(true);
         if (
           typeof window !== "undefined" &&
@@ -11847,7 +11730,7 @@ export function AppWorkbench() {
         }
         break;
       case "open-task-board":
-        setAppView("workbench");
+        closeSettings();
         setTaskBoardOpen(true);
         if (
           typeof window !== "undefined" &&
@@ -13593,11 +13476,11 @@ export function AppWorkbench() {
   }, [refreshAccount, refreshSavedAccounts]);
 
   useEffect(() => {
-    if (appView === "settings" && settingsSection === "account") {
+    if (settingsOpen && settingsSection === "account") {
       void refreshAccount({ refreshBilling: true });
       void refreshSavedAccounts();
     }
-  }, [appView, settingsSection, refreshAccount, refreshSavedAccounts]);
+  }, [settingsOpen, settingsSection, refreshAccount, refreshSavedAccounts]);
 
   useAccountQuotaAutoRefresh({
     enabled: api.isTauri(),
@@ -13611,221 +13494,10 @@ export function AppWorkbench() {
       }),
   });
 
-  const settingsLabels = useMemo(() => {
-    const keys = [
-      "settings.backToApp",
-      "settings.searchPlaceholder",
-      "settings.group.personal",
-      "settings.group.system",
-      "settings.nav.general",
-      "settings.nav.appearance",
-      "settings.nav.account",
-      "settings.nav.archived",
-      "settings.nav.extensions",
-      "settings.nav.runtime",
-      "settings.nav.shortcuts",
-      "settings.nav.about",
-      "settings.shortcuts.title",
-      "settings.shortcuts.desc",
-      "settings.archived.desc",
-      "settings.archived.empty",
-      "settings.archived.restore",
-      "settings.archived.delete",
-      "settings.archived.orphan",
-      "settings.archived.selectAll",
-      "settings.archived.deselectAll",
-      "settings.archived.selectedCount",
-      "settings.archived.totalCount",
-      "settings.archived.archiveOlder",
-      "settings.archived.archiveOlderDesc",
-      "settings.archived.archiveOlderDays",
-      "session.untitled",
-      "settings.section.permissions",
-      "settings.section.composer",
-      "settings.section.general",
-      "settings.language",
-      "settings.languageDesc",
-      "settings.languageSystem",
-      "settings.sessionDataMode",
-      "settings.sessionDataModeDesc",
-      "settings.cliPath",
-      "settings.cliPathDesc",
-      "settings.cliNotFound",
-      "settings.permissionDeep",
-      "settings.permissionDeepDesc",
-      "settings.preferredAgent",
-      "settings.preferredAgentDesc",
-      "settings.preferredAgent.default",
-      "settings.preferredAgent.source.builtin",
-      "settings.preferredAgent.source.bundled",
-      "settings.preferredAgent.source.user",
-      "settings.preferredAgent.source.project",
-      "settings.agentProfilePath",
-      "settings.agentProfilePathDesc",
-      "settings.agentProfilePathBrowse",
-      "settings.agentProfilePathClear",
-      "settings.agentProfilePathPlaceholder",
-      "settings.agentsJson",
-      "settings.agentsJsonDesc",
-      "settings.agentsJsonPlaceholder",
-      "settings.agentsJsonInvalid",
-      "settings.agentsJsonApply",
-      "settings.agentsJsonClear",
-      "settings.prefsScope",
-      "settings.prefsScopeDesc",
-      "settings.prefsScope.global",
-      "settings.prefsScope.project",
-      "settings.prefsScope.session",
-      "settings.availableModels",
-      "settings.availableModelsDesc",
-      "settings.availableModelsEmpty",
-      "settings.theme",
-      "settings.themeDesc",
-      "settings.themeSystem",
-      "settings.themeLight",
-      "settings.themeDark",
-      "settings.doctorDesc",
-      "settings.runDoctor",
-      "settings.aboutApp",
-      "composer.permissionTitle",
-      "policy.ask",
-      "policy.accept_edits",
-      "policy.allow_for_session",
-      "policy.auto",
-      "policy.dont_ask",
-      "policy.always_approve",
-      "settings.modeIndependent",
-      "settings.modeShared",
-      "settings.tabOfficial",
-      "settings.tabProviders",
-      "settings.tabExtras",
-      "settings.tabOfficialHint",
-      "settings.tabProvidersHint",
-      "settings.tabExtrasHint",
-      "settings.openTarget",
-      "settings.openTargetDesc",
-      "settings.openFinder",
-      "settings.sharedConfirm",
-      "doctor.title",
-      "doctor.close",
-      "doctor.rerun",
-      "doctor.copy",
-      "doctor.copied",
-      "doctor.loading",
-      "doctor.error",
-      "doctor.empty",
-      "doctor.summary",
-      "doctor.generatedAt",
-      "doctor.level.ok",
-      "doctor.level.warn",
-      "doctor.level.fail",
-      "doctor.check.cli",
-      "doctor.check.auth",
-      "doctor.check.workspace",
-      "doctor.check.backend",
-      "doctor.check.logs",
-      "common.local",
-      "common.close",
-      "common.cancel",
-      "account.section.profile",
-      "account.section.runtime",
-      "account.signedIn",
-      "account.signedOut",
-      "account.loginOauth",
-      "account.loginDevice",
-      "account.loginBusy",
-      "account.loginCancel",
-      "account.logout",
-      "account.refresh",
-      "account.refreshing",
-      "account.manageUsage",
-      "account.subscribe",
-      "account.channel",
-      "account.channel.oauth",
-      "account.channel.key",
-      "account.channel.relay",
-      "account.channel.none",
-      "account.subscription",
-      "account.weeklyTitle",
-      "account.quota",
-      "account.quotaRemaining",
-      "account.quotaUsed",
-      "account.quotaUnknown",
-      "account.quota.loading",
-      "account.quota.loadingHint",
-      "account.quota.signedOut",
-      "account.quota.signedOutHint",
-      "account.quota.chip.loading",
-      "account.quota.chip.unknown",
-      "account.quota.chip.signedOut",
-      "account.quota.chip.err.network",
-      "account.quota.chip.err.auth",
-      "account.quota.chip.err.host_only",
-      "account.quota.chip.err.other",
-      "account.quota.err.network",
-      "account.quota.err.networkHint",
-      "account.quota.err.auth",
-      "account.quota.err.authHint",
-      "account.quota.err.host_only",
-      "account.quota.err.host_onlyHint",
-      "account.quota.err.other",
-      "account.quota.err.otherHint",
-      "account.period",
-      "account.prepaid",
-      "account.onDemand",
-      "account.resetsAt",
-      "account.fetchedAt",
-      "account.products",
-      "account.heatmap",
-      "account.heatmapHint",
-      "account.heatmap.less",
-      "account.heatmap.more",
-      "account.heatmap.noData",
-      "account.heatmap.aria",
-      "account.heatmap.requests",
-      "account.heatmap.tokens",
-      "account.callLogs",
-      "account.callLogsEmpty",
-      "account.col.session",
-      "account.col.model",
-      "account.col.turns",
-      "account.col.usage",
-      "account.col.tokens",
-      "account.col.duration",
-      "account.col.when",
-      "account.expired",
-      "account.team",
-      "account.billingUnavailable",
-      "account.cliAuthOk",
-      "account.cliAuthMissing",
-      "account.loginHelpTitle",
-      "account.loginHelpBody",
-      "account.loginTryDevice",
-      "account.profiles",
-      "account.profilesHint",
-      "account.profilesEmpty",
-      "account.profileSave",
-      "account.profileSwitch",
-      "account.profileRemove",
-      "account.profileActive",
-      "account.manageAccounts",
-      "account.addAccount",
-      "account.profileSwitch",
-      "account.profileRemove",
-      "account.profileActive",
-      "account.importChat",
-      "account.importChatHint",
-      "account.importChatBtn",
-    ] as const;
-    const out: Record<string, string> = {};
-    for (const k of keys) out[k] = tr(k);
-    return out;
-  }, [tr]);
-
   // Keep Esc→stop gate current for the capture-phase shortcut listener.
   escapeStopLiveRef.current = {
     streamingOrBusy: effectiveCanStop,
-    settingsOpen: appView === "settings",
+    settingsOpen,
     overlayOpen: Boolean(
       appDialog ||
         searchPalette.open ||
@@ -13864,7 +13536,7 @@ export function AppWorkbench() {
   typeToFocusLiveRef.current = {
     enabled:
       appGate === "ready" &&
-      appView === "workbench" &&
+      !settingsOpen &&
       mainPane === "chat" &&
       canType(session.state),
     overlayOpen: Boolean(
@@ -14167,22 +13839,6 @@ export function AppWorkbench() {
     [],
   );
 
-  useLayoutEffect(() => {
-    if (appView === "settings") {
-      ensureSettingsNativeCover();
-      return;
-    }
-    const release = settingsNativeCoverReleaseRef.current;
-    settingsNativeCoverReleaseRef.current = null;
-    release?.();
-  }, [appView, ensureSettingsNativeCover]);
-  useEffect(
-    () => () => {
-      settingsNativeCoverReleaseRef.current?.();
-      settingsNativeCoverReleaseRef.current = null;
-    },
-    [],
-  );
   return (
     <ImageViewerProvider locale={locale}>
     <div
@@ -14322,7 +13978,7 @@ export function AppWorkbench() {
 
       {appGate === "ready" && (
       <>
-      {appView === "settings" ? (
+      {settingsOpen ? (
       <WorkbenchSettingsStage
         account={account}
         accountBusy={accountBusy}
@@ -14555,8 +14211,8 @@ export function AppWorkbench() {
           (sideDockActive ? " workbench--side-dock" : "") +
           paneMotionClass
         }
-        aria-hidden={appView === "settings" || undefined}
-        inert={appView === "settings" || undefined}
+        aria-hidden={settingsOpen || undefined}
+        inert={settingsOpen || undefined}
         style={
           {
             // Free-area left edge for expanded side overlay (px).
@@ -14628,7 +14284,7 @@ export function AppWorkbench() {
           onNavigateRemoteIm={() => navigateSettings("remote_im", "im")}
           showUserMenu={showUserMenu}
           setShowUserMenu={setShowUserMenu}
-          closeImmediately={appView === "settings"}
+          closeImmediately={settingsOpen}
           theme={theme}
           themePreference={themePreference}
           account={account}

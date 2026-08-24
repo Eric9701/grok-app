@@ -20,12 +20,14 @@ See `docs/llm-wiki/release.md`.
 - **账户切换**提示可添加第二个 SuperGrok 登录；同一时间只有一个登录生效。
 
 ### Changed
+- **Settings overlay navigation (#870)**: open/section/tab/hash/last-route live in `useSettingsNavigation`. Pref hydration and session connect stay on the host.
 - **AppWorkbench domain split (#869)**: session tree, sidebar, composer send, settings stage and related chrome live in extracted modules. Settings hydration / connect / live map stay on the host (#870).
 - **Bottom terminal tab chrome**: hover shows the close chip on every tab; a close-all icon sits next to New terminal.
 - **Plan / resources pane enter motion**: desktop in-flow aside interpolates width with the existing pane-split token; overlay and side-expanded stay snap. Bottom terminal height still snaps (no chat virtualizer reflow); chrome/body fade in.
 - **Light wallpaper readability**: light theme uses its own white veil and weaker main mix so text stays ink-dark on mixed wallpaper; no extra cards under chrome.
 
 **中文 · 变更**
+- **设置页导航（#870）**：开合 / 分区 / hash / 上次位置迁到 `useSettingsNavigation`。prefs 水合和会话 connect 仍在 host。
 - **AppWorkbench 拆分（#869）**：会话树、侧栏、发送路径、设置舞台等迁到独立模块。设置 hydrate / connect / live map 仍在 host（#870）。
 - **底部终端标签栏**：鼠标悬停任意标签显示关闭；加号旁增加关闭所有终端。
 - **计划 / 资源侧栏入场**：桌面分栏宽度用现有 pane-split 令牌插值；overlay 与展开覆盖仍一次落位。底部终端高度仍一次到位（避免长对话重排）；顶栏和内容淡入。
