@@ -14,6 +14,7 @@ export const ptBRSidebar = {
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
   "sidebar.remoteOpening": "Opening…",
+  "sidebar.remoteAgentLater": "This remote chat is view-only for now. Sending on the host is not wired yet.",
   "sidebar.collapseAllProjects": "Recolher todos os projetos",
   "sidebar.noProjects": "Ainda não há projetos. Clique em + para adicionar uma pasta.",
   "sidebar.importCliSessions": "Importar do Grok Build",

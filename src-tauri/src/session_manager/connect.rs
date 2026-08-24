@@ -281,6 +281,49 @@ impl SessionManager {
             let _ = store::update_session_meta(&meta);
         }
 
+        // SSH remote project: imported transcript only. Do not spawn local grok
+        // with the remote path as cwd (ENOENT → CLI_NOT_FOUND). Wave 3 later.
+        let ssh_project = meta.project_id.as_deref().and_then(|pid| {
+            store::load_projects()
+                .into_iter()
+                .find(|p| p.id == pid)
+                .filter(|p| crate::ssh_remote::should_skip_local_acp_spawn(p.ssh_alias.as_deref()))
+        });
+        if let Some(p) = ssh_project {
+            let mut cleared_self = false;
+            {
+                let mut guard = self.inner.lock();
+                let drop_self = guard.as_ref().is_some_and(|s| {
+                    s.app_session_id == meta.id && s.acp.as_ref().is_none_or(|c| !c.is_alive())
+                });
+                if drop_self {
+                    let _ = guard.take();
+                    cleared_self = true;
+                }
+            }
+            tracing::info!(
+                target: "session",
+                session = %meta.id,
+                alias = ?p.ssh_alias,
+                "ssh remote project — skip local ACP spawn"
+            );
+            let snap = SessionSnapshot {
+                session_id: Some(meta.id.clone()),
+                agent_session_id: None,
+                state: SessionState::Idle,
+                last_error: None,
+                streaming_message_id: None,
+                backend: Self::backend_name(),
+                model_id: meta.model_id.clone(),
+                project_path: Some(p.path.clone()),
+                title: meta.title.clone(),
+            };
+            if cleared_self {
+                Self::emit_state(&app, &snap);
+            }
+            return Ok(snap);
+        }
+
         // Resolve cwd: explicit path → session's project path → general workspace.
         // Never use process cwd (Dock-launched macOS apps often have cwd `/`).
         let cwd = {

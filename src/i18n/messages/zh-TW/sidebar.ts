@@ -14,6 +14,7 @@ export const zhTWSidebar = {
   "sidebar.remoteLoadMore": "載入更多",
   "sidebar.remoteOpenFailed": "無法開啟：{error}",
   "sidebar.remoteOpening": "正在開啟…",
+  "sidebar.remoteAgentLater": "這條遠端對話目前只能看，還不能在主機上繼續發送。",
   "sidebar.collapseAllProjects": "收合全部專案",
   "sidebar.noProjects": "還沒有專案。點擊 + 新增本機目錄。",
   "sidebar.importCliSessions": "從 Grok Build 匯入",

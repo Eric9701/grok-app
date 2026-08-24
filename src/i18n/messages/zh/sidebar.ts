@@ -14,6 +14,7 @@ export const zhSidebar = {
   "sidebar.remoteLoadMore": "加载更多",
   "sidebar.remoteOpenFailed": "无法打开：{error}",
   "sidebar.remoteOpening": "正在打开…",
+  "sidebar.remoteAgentLater": "这条远程对话目前只能看，还不能在主机上继续发。",
   "sidebar.collapseAllProjects": "收起全部项目",
   "sidebar.noProjects": "还没有项目。点击 + 添加本地目录。",
   "sidebar.importCliSessions": "从 Grok Build 导入",

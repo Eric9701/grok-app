@@ -114,6 +114,33 @@ pub fn is_safe_ssh_alias(alias: &str) -> bool {
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'_' | b'-'))
 }
 
+/// Wave 3 will spawn grok on the host. Until then, a project with `ssh_alias`
+/// must not run local `grok agent stdio` — the remote path is not a local cwd
+/// and spawn ENOENT is mislabeled CLI_NOT_FOUND.
+pub fn should_skip_local_acp_spawn(ssh_alias: Option<&str>) -> bool {
+    ssh_alias
+        .map(str::trim)
+        .is_some_and(|s| !s.is_empty() && is_safe_ssh_alias(s))
+}
+
+/// Same gate as `grok sessions list` / TUI `/resume` for a cwd.
+///
+/// Disk under `~/.grok/sessions` also stores subagent children and empty
+/// shells that only have `chat_history.jsonl`. Those are not resumable
+/// parent chats. Grok's list uses `summary.json` `session_kind` plus the
+/// `updates.jsonl` restore log — not every directory.
+pub fn remote_session_is_listable(
+    session_kind: Option<&str>,
+    title: &str,
+    has_updates: bool,
+) -> bool {
+    let kind = session_kind.unwrap_or("").trim().to_ascii_lowercase();
+    if kind.starts_with("subagent") {
+        return false;
+    }
+    has_updates || !title.trim().is_empty()
+}
+
 pub fn is_pattern_token(tok: &str) -> bool {
     tok.contains('*') || tok.contains('?') || tok.contains('!')
 }
@@ -137,30 +164,33 @@ fn truncate_err(s: &str) -> String {
 
 fn classify_ssh_stderr(stderr: &str) -> (&'static str, String) {
     let l = stderr.to_ascii_lowercase();
-    if l.contains("host key")
-        || l.contains("known_hosts")
-        || l.contains("authenticity of host")
-    {
+    if l.contains("host key") || l.contains("known_hosts") || l.contains("authenticity of host") {
         (
             "host_key",
-            truncate_err(stderr).if_empty(
-                "Host key not in known_hosts. Run ssh <alias> once in a terminal.",
-            ),
+            truncate_err(stderr)
+                .if_empty("Host key not in known_hosts. Run ssh <alias> once in a terminal."),
         )
     } else if l.contains("permission denied") {
         ("auth", truncate_err(stderr).if_empty("Permission denied"))
-    } else if l.contains("timed out")
-        || l.contains("timeout")
-        || l.contains("connection timed out")
+    } else if l.contains("timed out") || l.contains("timeout") || l.contains("connection timed out")
     {
-        ("timeout", truncate_err(stderr).if_empty("Connection timed out"))
+        (
+            "timeout",
+            truncate_err(stderr).if_empty("Connection timed out"),
+        )
     } else if l.contains("could not resolve")
         || l.contains("name or service not known")
         || l.contains("nodename nor servname")
     {
-        ("connect", truncate_err(stderr).if_empty("Could not resolve host"))
+        (
+            "connect",
+            truncate_err(stderr).if_empty("Could not resolve host"),
+        )
     } else if l.contains("connection refused") {
-        ("connect", truncate_err(stderr).if_empty("Connection refused"))
+        (
+            "connect",
+            truncate_err(stderr).if_empty("Connection refused"),
+        )
     } else if l.contains("connection reset") {
         ("connect", truncate_err(stderr).if_empty("Connection reset"))
     } else if stderr.trim().is_empty() {
@@ -196,8 +226,7 @@ pub fn commands_for_alias(alias: &str) -> (String, String, String, String) {
 }
 
 fn empty_probe(alias: &str, code: &str, err: impl Into<String>) -> SshProbeResult {
-    let (install_cmd, login_cmd, install_remote_cmd, login_remote_cmd) =
-        commands_for_alias(alias);
+    let (install_cmd, login_cmd, install_remote_cmd, login_remote_cmd) = commands_for_alias(alias);
     SshProbeResult {
         alias: alias.to_string(),
         ok: false,
@@ -631,8 +660,7 @@ pub async fn ssh_test_host(alias: String) -> Result<SshProbeResult, String> {
         ));
     };
 
-    let (install_cmd, login_cmd, install_remote_cmd, login_remote_cmd) =
-        commands_for_alias(&alias);
+    let (install_cmd, login_cmd, install_remote_cmd, login_remote_cmd) = commands_for_alias(&alias);
 
     let mut cmd = Command::new(&ssh);
     process_util::apply_no_window_tokio(&mut cmd);
@@ -654,11 +682,7 @@ pub async fn ssh_test_host(alias: String) -> Result<SshProbeResult, String> {
         .kill_on_drop(true);
 
     let started = Instant::now();
-    let joined = timeout(
-        Duration::from_secs(SSH_OVERALL_TIMEOUT_SECS),
-        cmd.output(),
-    )
-    .await;
+    let joined = timeout(Duration::from_secs(SSH_OVERALL_TIMEOUT_SECS), cmd.output()).await;
     let latency_ms = started.elapsed().as_millis() as u64;
 
     let output = match joined {
@@ -773,10 +797,9 @@ pub fn percent_decode_path(enc: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(v) = u8::from_str_radix(
-                std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""),
-                16,
-            ) {
+            if let Ok(v) =
+                u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""), 16)
+            {
                 out.push(v);
                 i += 3;
                 continue;
@@ -941,23 +964,31 @@ if os.path.isdir(root):
             d = os.path.join(base, sid)
             if not os.path.isdir(d) or sid.startswith("."):
                 continue
+            sp = os.path.join(d, "summary.json")
+            kind = ""
+            title = ""
+            if os.path.isfile(sp):
+                try:
+                    s = json.load(open(sp))
+                    kind = str(s.get("session_kind") or "").strip().lower()
+                    title = (s.get("generated_title") or s.get("session_summary") or s.get("title") or "").strip()
+                except Exception:
+                    pass
+            if kind.startswith("subagent"):
+                continue
+            up = os.path.join(d, "updates.jsonl")
+            has_up = os.path.isfile(up) and os.path.getsize(up) > 0
+            if not has_up and not title:
+                continue
             try:
                 mt = os.path.getmtime(d)
             except OSError:
                 continue
-            rows.append((mt, sid, enc, d))
+            rows.append((mt, sid, enc, d, title))
 rows.sort(reverse=True)
 print("GROK_APP_SESS")
 print("TOTAL\t%d" % len(rows))
-for mt, sid, enc, d in rows[off:off+lim]:
-    title = ""
-    sp = os.path.join(d, "summary.json")
-    if os.path.isfile(sp):
-        try:
-            s = json.load(open(sp))
-            title = (s.get("generated_title") or s.get("session_summary") or s.get("title") or "").strip()
-        except Exception:
-            title = ""
+for mt, sid, enc, d, title in rows[off:off+lim]:
     if not title:
         hp = os.path.join(d, "chat_history.jsonl")
         if os.path.isfile(hp):
@@ -1016,6 +1047,14 @@ if [ ! -d "$SESS" ]; then
 fi
 tmp=$(mktemp 2>/dev/null || echo /tmp/grok-app-sess.$$)
 find "$SESS" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | while IFS= read -r d; do
+  if [ -f "$d/summary.json" ] && grep -q '"session_kind"[[:space:]]*:[[:space:]]*"subagent' "$d/summary.json" 2>/dev/null; then
+    continue
+  fi
+  if [ ! -s "$d/updates.jsonl" ]; then
+    if [ ! -f "$d/summary.json" ] || ! grep -q '"generated_title"[[:space:]]*:[[:space:]]*"[^"]' "$d/summary.json" 2>/dev/null; then
+      continue
+    fi
+  fi
   mt=$(stat -c %Y "$d" 2>/dev/null || date -r "$d" +%s 2>/dev/null || echo 0)
   printf "%s\t%s\n" "$mt" "$d"
 done | sort -nr > "$tmp"
@@ -1249,12 +1288,9 @@ pub async fn ssh_watch_start(alias: String) -> Result<SshWatchResult, String> {
             let mut check = Command::new(&ssh);
             process_util::apply_no_window_tokio(&mut check);
             check.arg("-O").arg("check");
-            push_ssh_opt(
-                &mut check,
-                "ControlPath",
-                path.to_string_lossy().as_ref(),
-            );
-            check.arg(&alias)
+            push_ssh_opt(&mut check, "ControlPath", path.to_string_lossy().as_ref());
+            check
+                .arg(&alias)
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null());
@@ -1343,7 +1379,14 @@ pub async fn ssh_list_dir(alias: String, path: Option<String>) -> Result<SshList
             error: Some("invalid path".into()),
         });
     }
-    match run_ssh(&alias, &remote_ls_script(&dir), true, SSH_OVERALL_TIMEOUT_SECS).await {
+    match run_ssh(
+        &alias,
+        &remote_ls_script(&dir),
+        true,
+        SSH_OVERALL_TIMEOUT_SECS,
+    )
+    .await
+    {
         Err(SshRunErr::Missing) => Ok(SshListDirResult {
             ok: false,
             alias,
@@ -1583,10 +1626,7 @@ fn save_import_index(map: &HashMap<String, String>) -> Result<(), String> {
     std::fs::write(import_index_path(), raw).map_err(|e| e.to_string())
 }
 
-fn persist_imported_journal(
-    app_id: &str,
-    pairs: Vec<(String, String)>,
-) -> Result<(), String> {
+fn persist_imported_journal(app_id: &str, pairs: Vec<(String, String)>) -> Result<(), String> {
     let now = chrono::Utc::now();
     let msgs: Vec<crate::store::ChatMessageStored> = pairs
         .into_iter()
@@ -1616,12 +1656,15 @@ fn pairs_from_hist(hist: &RemoteHist) -> Vec<(String, String)> {
         }
         return crate::cli_sessions::parse_chat_history_text(&hist.body).unwrap_or_default();
     }
-    crate::cli_sessions::parse_chat_history_text(&hist.body).unwrap_or_else(|_| {
-        crate::cli_sessions::parse_acp_updates_text(&hist.body)
-    })
+    crate::cli_sessions::parse_chat_history_text(&hist.body)
+        .unwrap_or_else(|_| crate::cli_sessions::parse_acp_updates_text(&hist.body))
 }
 
-fn open_fail(alias: String, remote_session_id: String, error: impl Into<String>) -> SshOpenSessionResult {
+fn open_fail(
+    alias: String,
+    remote_session_id: String,
+    error: impl Into<String>,
+) -> SshOpenSessionResult {
     SshOpenSessionResult {
         ok: false,
         alias,
@@ -1667,7 +1710,11 @@ pub async fn ssh_open_session(
         Ok(run) => parse_hist_stdout(&run.stdout),
     };
     let Some(hist) = hist else {
-        return Ok(open_fail(alias, session_id, "could not read remote session"));
+        return Ok(open_fail(
+            alias,
+            session_id,
+            "could not read remote session",
+        ));
     };
     if hist.kind == "missing" {
         return Ok(open_fail(alias, session_id, "remote session not found"));
@@ -1701,14 +1748,11 @@ pub async fn ssh_open_session(
 
     let key = format!("{alias}:{session_id}");
     let mut index = load_import_index();
-    let existing = index
-        .get(&key)
-        .cloned()
-        .filter(|id| {
-            crate::store::load_sessions_index()
-                .iter()
-                .any(|s| s.id == *id)
-        });
+    let existing = index.get(&key).cloned().filter(|id| {
+        crate::store::load_sessions_index()
+            .iter()
+            .any(|s| s.id == *id)
+    });
 
     let meta = if let Some(app_id) = existing {
         persist_imported_journal(&app_id, pairs.clone())?;
@@ -1783,6 +1827,45 @@ mod tests {
     }
 
     #[test]
+    fn skip_local_acp_only_for_real_ssh_aliases() {
+        assert!(should_skip_local_acp_spawn(Some("uts")));
+        assert!(should_skip_local_acp_spawn(Some("  gw-01  ")));
+        assert!(!should_skip_local_acp_spawn(None));
+        assert!(!should_skip_local_acp_spawn(Some("")));
+        assert!(!should_skip_local_acp_spawn(Some("   ")));
+        assert!(!should_skip_local_acp_spawn(Some("*")));
+        assert!(!should_skip_local_acp_spawn(Some("host;rm")));
+    }
+
+    #[test]
+    fn listable_matches_grok_resume_not_raw_dirs() {
+        assert!(remote_session_is_listable(
+            None,
+            "R-Lens幻觉读出RRQ资格审查与初筛证伪",
+            true
+        ));
+        assert!(remote_session_is_listable(Some(""), "数学题", true));
+        assert!(remote_session_is_listable(None, "", true));
+        assert!(!remote_session_is_listable(None, "", false));
+        assert!(!remote_session_is_listable(Some("subagent"), "Freeze Qwen", true));
+        assert!(!remote_session_is_listable(
+            Some("subagent_resume"),
+            "overnight inspect",
+            true
+        ));
+        assert!(!remote_session_is_listable(Some("SUBAGENT"), "", true));
+    }
+
+    #[test]
+    fn remote_sess_script_skips_subagent_and_empty_shells() {
+        let s = remote_sess_script(0, 20);
+        assert!(s.contains("session_kind"));
+        assert!(s.contains("startswith(\"subagent\")"));
+        assert!(s.contains("updates.jsonl"));
+        assert!(s.contains("not has_up and not title"));
+    }
+
+    #[test]
     fn skips_glob_only_hosts() {
         let hosts = parse(
             r#"
@@ -1814,10 +1897,7 @@ Host *
         assert_eq!(hosts[0].hostname.as_deref(), Some("10.0.0.8"));
         assert_eq!(hosts[0].user.as_deref(), Some("deploy"));
         assert_eq!(hosts[0].port, Some(2222));
-        assert_eq!(
-            hosts[0].identity_file.as_deref(),
-            Some("~/.ssh/id_ed25519")
-        );
+        assert_eq!(hosts[0].identity_file.as_deref(), Some("~/.ssh/id_ed25519"));
     }
 
     #[test]
@@ -1893,7 +1973,8 @@ Host "build-server"
 
     #[test]
     fn probe_stdout_ok() {
-        let raw = "noise\nGROK_APP_PROBE\nCLI_OK\nAUTH_OK\n/home/u/.grok/bin/grok\ngrok 1.0.5 (abc)\n";
+        let raw =
+            "noise\nGROK_APP_PROBE\nCLI_OK\nAUTH_OK\n/home/u/.grok/bin/grok\ngrok 1.0.5 (abc)\n";
         let p = parse_probe_stdout(raw).unwrap();
         assert_eq!(p.cli, "ok");
         assert_eq!(p.auth, "ok");
@@ -1919,7 +2000,10 @@ Host "build-server"
     #[test]
     fn commands_quote_alias_as_argv_word() {
         let (install, login, ir, lr) = commands_for_alias("devbox");
-        assert_eq!(install, "ssh devbox 'curl -fsSL https://x.ai/cli/install.sh | bash'");
+        assert_eq!(
+            install,
+            "ssh devbox 'curl -fsSL https://x.ai/cli/install.sh | bash'"
+        );
         assert_eq!(login, "ssh -t devbox 'grok login --device-auth'");
         assert_eq!(ir, INSTALL_REMOTE);
         assert_eq!(lr, LOGIN_REMOTE);
@@ -1927,9 +2011,7 @@ Host "build-server"
 
     #[test]
     fn classify_host_key() {
-        let (code, _) = classify_ssh_stderr(
-            "Host key verification failed.\n",
-        );
+        let (code, _) = classify_ssh_stderr("Host key verification failed.\n");
         assert_eq!(code, "host_key");
     }
 
@@ -1978,13 +2060,16 @@ Host "build-server"
 
     #[test]
     fn looks_like_agent_uuid_matches_grok_ids() {
-        assert!(looks_like_agent_uuid("01a01907-adf3-7e00-a7a8-aee1082b0556"));
+        assert!(looks_like_agent_uuid(
+            "01a01907-adf3-7e00-a7a8-aee1082b0556"
+        ));
         assert!(!looks_like_agent_uuid("帮我看一下 hallucination"));
     }
 
     #[test]
     fn parse_remote_sessions() {
-        let raw = "noise\nGROK_APP_SESS\nTOTAL\t35\nid1\t%2Fwork\t171000\tFix bug\nid2\t%2Ftmp\t0\t\n";
+        let raw =
+            "noise\nGROK_APP_SESS\nTOTAL\t35\nid1\t%2Fwork\t171000\tFix bug\nid2\t%2Ftmp\t0\t\n";
         let (total, s) = parse_sess_stdout(raw).unwrap();
         assert_eq!(total, 35);
         assert_eq!(s.len(), 2);

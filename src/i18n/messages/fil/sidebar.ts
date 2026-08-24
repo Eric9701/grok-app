@@ -14,6 +14,7 @@ export const filSidebar = {
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
   "sidebar.remoteOpening": "Opening…",
+  "sidebar.remoteAgentLater": "This remote chat is view-only for now. Sending on the host is not wired yet.",
   "sidebar.collapseAllProjects": "Ikipot lahat ng proyekto",
   "sidebar.noProjects": "Wala pang proyekto. I-click ang + para magdagdag ng folder.",
   "sidebar.importCliSessions": "I-import mula sa Grok Build",

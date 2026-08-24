@@ -1154,13 +1154,13 @@ pub fn parse_acp_updates_text(raw: &str) -> Vec<(String, String)> {
             Ok(v) => v,
             Err(_) => continue,
         };
-        let Some(up) = v
-            .pointer("/params/update")
-            .or_else(|| v.get("update"))
-        else {
+        let Some(up) = v.pointer("/params/update").or_else(|| v.get("update")) else {
             continue;
         };
-        let kind = up.get("sessionUpdate").and_then(|x| x.as_str()).unwrap_or("");
+        let kind = up
+            .get("sessionUpdate")
+            .and_then(|x| x.as_str())
+            .unwrap_or("");
         let role = match kind {
             "user_message_chunk" => "user",
             "agent_message_chunk" => "assistant",
@@ -2101,10 +2101,13 @@ mod tests {
 {"method":"session/update","params":{"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"world."}}}}
 "#;
         let pairs = parse_acp_updates_text(raw);
-        assert_eq!(pairs, vec![
-            ("user".into(), "Hi".into()),
-            ("assistant".into(), "Hello world.".into()),
-        ]);
+        assert_eq!(
+            pairs,
+            vec![
+                ("user".into(), "Hi".into()),
+                ("assistant".into(), "Hello world.".into()),
+            ]
+        );
     }
 
     #[test]

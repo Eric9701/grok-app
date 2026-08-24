@@ -516,7 +516,11 @@ import {
   canOfferResumeWithCodeRestore,
   canRestoreCodeOnResume,
 } from "@/lib/sessionResumeRestore";
-import { isProjectPathMissing } from "@/lib/projectPath";
+import {
+  isProjectPathMissing,
+  isProjectWarmable,
+  isSshRemoteProject,
+} from "@/lib/projectPath";
 import {
   normalizeProjectColor,
   type ProjectColorToken,
@@ -3519,8 +3523,7 @@ export function AppWorkbench() {
     host.connect.release = (sessionId) =>
       releaseSessionConnection([queueSessionKey(sessionId)]);
     host.connect.workspacePath = () => generalWorkspacePath || undefined;
-    host.connect.isProjectWarmable = (project) =>
-      !project || (project.trusted && !isProjectPathMissing(project.pathOk));
+    host.connect.isProjectWarmable = (project) => isProjectWarmable(project);
   }
 
   const searchPaletteHostRef = useRef({
@@ -11821,7 +11824,42 @@ export function AppWorkbench() {
     };
   }, [closeSideTabOrWindow]);
 
-  const error = session.lastError;
+  const error =
+    isSshRemoteProject(activeProject) && session.lastError?.code === "CLI_NOT_FOUND"
+      ? null
+      : session.lastError;
+  // Imported SSH transcripts used to spawn local grok with the remote path as
+  // cwd (ENOENT → CLI_NOT_FOUND). Drop that leftover on the viewed remote chat.
+  useEffect(() => {
+    if (!isSshRemoteProject(activeProject)) return;
+    if (session.lastError?.code !== "CLI_NOT_FOUND") return;
+    setSession((prev) => {
+      if (prev.lastError?.code !== "CLI_NOT_FOUND") return prev;
+      return {
+        ...prev,
+        lastError: null,
+        state: prev.state === "disconnected" ? "idle" : prev.state,
+      };
+    });
+    setLocalError(null);
+    const live = liveHostRef.current;
+    if (
+      live.sessionId === session.sessionId &&
+      live.lastError?.code === "CLI_NOT_FOUND"
+    ) {
+      setLiveHost({
+        ...live,
+        lastError: null,
+        state: live.state === "disconnected" ? "idle" : live.state,
+      });
+    }
+  }, [
+    activeProject,
+    session.lastError?.code,
+    session.sessionId,
+    setLiveHost,
+    setSession,
+  ]);
   const errorBanner = useMemo(
     () =>
       presentErrorBanner(error, localError, locale, {

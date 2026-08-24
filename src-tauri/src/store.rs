@@ -1287,9 +1287,10 @@ pub fn add_ssh_project(alias: &str, path: String, trust: bool) -> Result<Project
         .unwrap_or_else(|| path.clone());
     let label = format!("{alias}:{name}");
     let mut list = load_projects();
-    if let Some(existing) = list.iter_mut().find(|p| {
-        p.ssh_alias.as_deref() == Some(alias) && p.path == path
-    }) {
+    if let Some(existing) = list
+        .iter_mut()
+        .find(|p| p.ssh_alias.as_deref() == Some(alias) && p.path == path)
+    {
         existing.trusted = trust || existing.trusted;
         existing.last_opened_at = Utc::now();
         existing.path_ok = true;

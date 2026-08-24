@@ -14,6 +14,7 @@ export const koSidebar = {
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
   "sidebar.remoteOpening": "Opening…",
+  "sidebar.remoteAgentLater": "This remote chat is view-only for now. Sending on the host is not wired yet.",
   "sidebar.collapseAllProjects": "모든 프로젝트 접기",
   "sidebar.noProjects": "프로젝트가 없습니다. +를 눌러 폴더를 추가하세요.",
   "sidebar.importCliSessions": "Grok Build에서 가져오기",

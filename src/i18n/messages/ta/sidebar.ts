@@ -14,6 +14,7 @@ export const taSidebar = {
   "sidebar.remoteLoadMore": "Load more",
   "sidebar.remoteOpenFailed": "Could not open: {error}",
   "sidebar.remoteOpening": "Opening…",
+  "sidebar.remoteAgentLater": "This remote chat is view-only for now. Sending on the host is not wired yet.",
   "sidebar.collapseAllProjects": "அனைத்துத் திட்டங்களையும் சுருக்கு",
   "sidebar.noProjects": "இன்னும் திட்டங்கள் இல்லை. கோப்புறையைச் சேர்க்க + ஐ அழுத்தவும்.",
   "sidebar.importCliSessions": "Grok Build இலிருந்து இறக்குமதி செய்",
