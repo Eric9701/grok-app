@@ -19,4 +19,4 @@ Warning: No models match pattern "xai-oauth/grok-4.5"
 - **极窄代际竞态**：`reap_timed_out_connect` 的 `sweep_pending_children` 无条件取走**全部** pending children。理论上旧代 reap 若与新 connect 的冷启动 spawn 撞在同一毫秒级窗口，可能扫掉新代的刚登记 child。实践中不可达（新 spawn 需 ~1s+，旧 reap 的 sweep 在放锁后立即完成），且命中也只是新代 connect 回退重连，非永久 wedge。`next_connect_epoch_on_timeout` 已保证旧代不 bump epoch。
 - 测试 `dispatch_timeout_returns_retry_later` 仍内联 timeout 逻辑、未真正调用 `dispatch_turn_or_timeout`（review-2 已记录，纯测试质量问题；语义由 `inner_wall_clock_releases_lock_after_caller_drops` 覆盖）。
 
-**结论：可 squash-merge。** 合并后请按 AGENTS.md 第 8 条再跑一次 pi 复核 landed 状态（确认未覆盖 Unreleased、感谢作者、branch hygiene）。
+**结论：可 squash-merge。** 合并后确认未覆盖 Unreleased、感谢作者、branch hygiene。

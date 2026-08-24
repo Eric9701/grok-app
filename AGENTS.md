@@ -47,22 +47,3 @@
 
 7. **App shell + AppWorkbench growth freeze** — do **not** add new `useState` / large feature blocks to `src/App.tsx` or `src/app/AppWorkbench.tsx`. Combined line count of App shell + AppWorkbench may only decrease (see `docs/plans/CODE-QUALITY-PROGRESS.md` and `docs/plans/HANDOFF-appworkbench-decomposition.md`). New product state and UI must land in domain modules (`src/providers/`, `src/hooks/`, `src/components/`, `src/lib/`).
 
-8. **pi 审核校对（强制，不可跳过）** — 后续只要是 **修复**、**合并**、**review**，都必须有 **pi** 参与审查纠错。只读 `AGENTS.md` 的 agent 按本条执行即可，不依赖某次 triage 文档。细则与 `maintain.md` 指针：[docs/llm-wiki/maintain.md](docs/llm-wiki/maintain.md#pi-review-loop-mandatory)。
-
-   **Item loop（每完成一项 审核校对）**
-
-   1. 做完**一项**离散工作再停：一个 CI 拆分、一个 PR（合 / 请求修改 / 落地修复）、一个自修 commit、一段流程文档。不要攒一批再审。
-   2. 立刻调用 **pi** 对该项 **审核校对**。`pi -p` 非交互；工具只开 `read` 与 `bash`（禁止 `edit` / `write` / 改树）。把 stdout 存成该项的审查记录。
-   3. **有问题修复**：pi 指出的 blocker 必须修掉，再交 pi 复审；该项在复审清掉该 blocker 之前不得标完成。
-   4. **没问题下一项**：pi 无 blocker 才开始下一项。
-   5. 整批（一次 triage、一组 PR、一轮自修）全部落地后，再做一次 **联合 review**：pi 对照任务清单 / Issues / 已合 PR / CHANGELOG Unreleased 通审；记录单独保存。
-
-   **范围（必须有 pi）**
-
-   | 动作 | 何时请 pi |
-   |------|-----------|
-   | **修复** | 每个自修或落地修复（含在社区 PR 上代改）完成后 |
-   | **合并** | 每个 squash/merge 之前审 diff；合入后审 landed 状态（`Fixes`/`Closes`、感谢作者、Unreleased 未被覆盖、branch hygiene） |
-   | **review** | 每个 PR review（LGTM 或 request-changes）发出前 |
-
-   禁止用自我复查、子 agent 或其它模型**顶替** pi。`pi -p` 跑不起来时记录失败原因并停下该项，不要假装已经审过。

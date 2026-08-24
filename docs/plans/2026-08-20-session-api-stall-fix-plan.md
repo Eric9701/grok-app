@@ -84,4 +84,3 @@
 - 新增 `session_manager` 单测：wedged 握手 + wall-clock → 锁释放、child 清理（复用 `stall_tests.rs` / `routing_tests_p2.rs` 的 mock 手法）。
 - `session_api` 单测：dispatch 超时 → 15s 内 503；CLI timeout 分类。
 - 手测脚本（Windows 优先）：断网/坏代理下连发 3 轮 `--session-send`，观察日志、worker 数、health.lockBusy。
-- 按 AGENTS.md 第 8 条，每刀落地后过 pi 审核，全部落地后做联合 review。

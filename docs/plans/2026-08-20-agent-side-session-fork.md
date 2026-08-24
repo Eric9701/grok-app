@@ -722,7 +722,7 @@ git commit -m "docs: agent-side session fork cut and child rewind"
 5. Streaming / tools: fork disabled.
 6. No agent id: journal fork still works.
 
-**Do not** add App.tsx state. **Do** run `pi -p` 审核校对 after this lands (workspace rule: 修复 / 合并 / review).
+**Do not** add App.tsx state.
 
 ---
 

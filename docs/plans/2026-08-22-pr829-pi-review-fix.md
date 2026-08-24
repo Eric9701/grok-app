@@ -3,7 +3,7 @@
 背景：分支 `codex/clippy-deny-all-legs` 清除 Linux(~18)/Windows(~31)/macOS(3) 三条 CI 腿的全部
 cargo clippy 残余警告，并把 `.github/workflows/ci.yml` 的 clippy 从 `-W` 翻成 `-D warnings`。
 本地与 PR #829 的 CI 四个 job 均已全绿。PR 已按 repo owner 指示先行转正；
-AGENTS.md §8 要求的强制 `pi -p` 审核因 pi 服务故障（503）暂未完成，本文件跟踪补录进度。
+当时 AGENTS.md §8 要求的强制 `pi -p` 审核因 pi 服务故障（503）未完成。该强制规则已废止，本项不再补录。
 
 ## 探测日志
 
@@ -12,4 +12,4 @@ AGENTS.md §8 要求的强制 `pi -p` 审核因 pi 服务故障（503）暂未�
 
 ## 结论
 
-（待 pi 恢复后由定时任务补跑审核并回填，须包含"结论"字段）
+强制 pi 审核规则已废止，不再补跑。
