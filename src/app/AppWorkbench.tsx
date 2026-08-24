@@ -4128,6 +4128,7 @@ export function AppWorkbench() {
           projectPath: proj?.path || generalWorkspacePath || undefined,
           sessionId: sessionId ?? undefined,
           mode: "agent",
+          sshAlias: proj?.sshAlias ?? null,
         });
         setLiveHost(snap);
         liveHostRef.current = snap;
@@ -11171,6 +11172,7 @@ export function AppWorkbench() {
             projectPath: proj.path || undefined,
             sessionId: createdId,
             mode: "agent",
+            sshAlias: proj.sshAlias ?? null,
           });
           if (
             snap.lastError ||

@@ -388,7 +388,13 @@ async fn run_one(
 
     let project_path = proj.map(|p| p.path.clone());
     let snap = mgr
-        .connect(app.clone(), project_path, Some(session_id.clone()), None)
+        .connect(
+            app.clone(),
+            project_path,
+            Some(session_id.clone()),
+            None,
+            None,
+        )
         .await
         .map_err(|e| {
             // Drop empty shell so sidebar stays clean.

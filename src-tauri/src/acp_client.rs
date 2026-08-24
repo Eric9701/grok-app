@@ -1590,7 +1590,7 @@ impl AcpClient {
                 cwd.to_string_lossy().as_ref(),
                 &grok_args,
             )
-            .map_err(|e| AgentError::new(AgentErrorCode::CliNotFound, e))?;
+            .map_err(|e| AgentError::new(AgentErrorCode::ConnectFailed, e))?;
         }
         if ssh_alias.is_none() && wsl_launch.is_none() {
             cmd.current_dir(&cwd);
@@ -1665,10 +1665,12 @@ impl AcpClient {
         );
 
         let mut child = cmd.spawn().map_err(|e| {
-            AgentError::new(
-                AgentErrorCode::CliNotFound,
-                format!("failed to spawn grok agent stdio: {e}"),
-            )
+            let code = if ssh_alias.is_some() {
+                AgentErrorCode::ConnectFailed
+            } else {
+                AgentErrorCode::CliNotFound
+            };
+            AgentError::new(code, format!("failed to spawn grok agent stdio: {e}"))
         })?;
 
         let stdin = child

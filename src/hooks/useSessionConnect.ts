@@ -325,6 +325,7 @@ export function useSessionConnect(opts: {
             connectProject?.path || h.generalWorkspacePath || undefined,
           sessionId: sessionId ?? undefined,
           mode: h.mode,
+          sshAlias: connectProject?.sshAlias ?? null,
         });
         h.setLiveHost(snap);
         h.liveHostRef.current = snap;

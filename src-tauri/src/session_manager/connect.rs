@@ -61,6 +61,7 @@ impl SessionManager {
         project_path: Option<String>,
         app_session_id: Option<String>,
         mock_mode: Option<String>,
+        ssh_alias: Option<String>,
     ) -> Result<SessionSnapshot, String> {
         // Enqueue is logged before `connect_lock` so a stuck holder still
         // leaves a trail. The 90s timer runs *inside* the sibling so dropping
@@ -97,8 +98,14 @@ impl SessionManager {
                         connect_gave_up_reason(false)
                     ));
                 }
-                mgr.connect_inner(app_task.clone(), project_path, sid.clone(), mock_mode)
-                    .await
+                mgr.connect_inner(
+                    app_task.clone(),
+                    project_path,
+                    sid.clone(),
+                    mock_mode,
+                    ssh_alias,
+                )
+                .await
             })
             .await
             {
@@ -244,6 +251,7 @@ impl SessionManager {
         project_path: Option<String>,
         app_session_id: Option<String>,
         mock_mode: Option<String>,
+        ssh_alias_explicit: Option<String>,
     ) -> Result<SessionSnapshot, String> {
         let settings = store::load_settings();
         let max_concurrent = normalize_max_concurrent(settings.max_concurrent_agents);
@@ -281,16 +289,28 @@ impl SessionManager {
             let _ = store::update_session_meta(&meta);
         }
 
-        // SSH remote project: grok runs on the host (wave 3). Keep the alias
-        // for spawn wrap; do not treat the remote path as a local cwd.
-        let ssh_alias = meta.project_id.as_deref().and_then(|pid| {
-            store::load_projects()
-                .into_iter()
+        let projects = store::load_projects();
+        let bound_alias = meta.project_id.as_deref().and_then(|pid| {
+            projects
+                .iter()
                 .find(|p| p.id == pid)
-                .filter(|p| crate::ssh_remote::should_skip_local_acp_spawn(p.ssh_alias.as_deref()))
-                .and_then(|p| p.ssh_alias)
-                .map(|s| s.trim().to_string())
+                .and_then(|p| p.ssh_alias.as_deref())
         });
+        let path_hint = project_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        let path_alias = path_hint.and_then(|path| {
+            projects
+                .iter()
+                .find(|p| p.path == path)
+                .and_then(|p| p.ssh_alias.as_deref())
+        });
+        let ssh_alias = crate::ssh_remote::pick_ssh_alias(
+            ssh_alias_explicit.as_deref(),
+            bound_alias,
+            path_alias,
+        );
 
         // Resolve cwd: explicit path → session's project path → general workspace.
         // Never use process cwd (Dock-launched macOS apps often have cwd `/`).
@@ -304,10 +324,10 @@ impl SessionManager {
                 if pid == store::GENERAL_PROJECT_ID {
                     return None;
                 }
-                store::load_projects()
-                    .into_iter()
+                projects
+                    .iter()
                     .find(|p| p.id == pid)
-                    .map(|p| std::path::PathBuf::from(p.path))
+                    .map(|p| std::path::PathBuf::from(&p.path))
             });
             from_arg.or(from_meta).unwrap_or_else(|| {
                 let _ = store::ensure_general_workspace_dir();
@@ -315,6 +335,16 @@ impl SessionManager {
             })
         };
         let project_path = Some(cwd.to_string_lossy().to_string());
+        if meta.project_id.is_none() {
+            if let Some(alias) = ssh_alias.as_deref() {
+                if let Some(p) = projects.iter().find(|p| {
+                    p.ssh_alias.as_deref() == Some(alias) && p.path == cwd.to_string_lossy()
+                }) {
+                    meta.project_id = Some(p.id.clone());
+                    let _ = store::update_session_meta(&meta);
+                }
+            }
+        }
 
         tracing::info!(
             target: "session",
@@ -1016,6 +1046,24 @@ impl SessionManager {
         // Real ACP cold spawn (one process per App session — no cross-session rebind).
         // WSL backend probes inside the distro (a WSL-only install has no native grok.exe).
         // SSH: grok lives on the host — do not require a local binary.
+        // A remote path that is not a local directory must never hit local spawn
+        // (ENOENT was mislabeled CLI_NOT_FOUND).
+        if ssh_alias.is_none()
+            && !crate::ssh_remote::local_acp_cwd_ok(None, cwd.to_string_lossy().as_ref())
+        {
+            {
+                let mut guard = self.inner.lock();
+                if let Some(s) = guard.as_mut() {
+                    let _ = s.fsm.connect_failed(AgentError::new(
+                        AgentErrorCode::ConnectFailed,
+                        "This folder is not on this computer. Open it from the SSH host list.",
+                    ));
+                }
+            }
+            let snap = self.snapshot();
+            Self::emit_state(&app, &snap);
+            return Ok(snap);
+        }
         let cli_path = if ssh_alias.is_some() {
             std::path::PathBuf::from("grok")
         } else {

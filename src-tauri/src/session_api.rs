@@ -936,7 +936,7 @@ pub async fn dispatch_turn(
         return enqueue_while_busy(app, &sid, &req.prompt);
     }
     if let Err(e) = mgr
-        .connect(app.clone(), req.project_path, Some(sid.clone()), None)
+        .connect(app.clone(), req.project_path, Some(sid.clone()), None, None)
         .await
     {
         return TurnResult::fail(TurnStatus::Error, sid, format!("connect failed: {e}"));

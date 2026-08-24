@@ -126,6 +126,31 @@ pub fn should_skip_local_acp_spawn(ssh_alias: Option<&str>) -> bool {
         .is_some_and(|s| !s.is_empty() && is_safe_ssh_alias(s))
 }
 
+/// First safe alias wins: explicit connect arg, bound project, path match.
+pub fn pick_ssh_alias(
+    explicit: Option<&str>,
+    bound_project_alias: Option<&str>,
+    path_project_alias: Option<&str>,
+) -> Option<String> {
+    for raw in [explicit, bound_project_alias, path_project_alias] {
+        if let Some(a) = raw.map(str::trim).filter(|s| is_safe_ssh_alias(s)) {
+            return Some(a.to_string());
+        }
+    }
+    None
+}
+
+/// Local `grok agent stdio` needs a real directory on this machine.
+/// SSH aliases and missing paths must not go through local spawn (ENOENT
+/// used to be mislabeled `CLI_NOT_FOUND`).
+pub fn local_acp_cwd_ok(ssh_alias: Option<&str>, cwd: &str) -> bool {
+    if should_skip_local_acp_spawn(ssh_alias) {
+        return false;
+    }
+    let t = cwd.trim();
+    !t.is_empty() && std::path::Path::new(t).is_dir()
+}
+
 /// Same gate as `grok sessions list` / TUI `/resume` for a cwd.
 ///
 /// Disk under `~/.grok/sessions` also stores subagent children and empty
@@ -2212,10 +2237,17 @@ pub async fn ssh_open_session(
     let meta = if let Some(app_id) = existing {
         persist_imported_journal(&app_id, pairs.clone())?;
         let _ = crate::store::rename_session(&app_id, &title);
-        crate::store::load_sessions_index()
+        let mut meta = crate::store::load_sessions_index()
             .into_iter()
             .find(|s| s.id == app_id)
-            .ok_or_else(|| "imported session missing after write".to_string())?
+            .ok_or_else(|| "imported session missing after write".to_string())?;
+        if let Some(pid) = project_id.clone() {
+            if meta.project_id.as_deref() != Some(pid.as_str()) {
+                meta.project_id = Some(pid);
+                crate::store::update_session_meta(&meta)?;
+            }
+        }
+        meta
     } else {
         let meta = crate::store::create_session(project_id.clone(), Some(title.clone()), false)?;
         persist_imported_journal(&meta.id, pairs)?;
@@ -2847,6 +2879,33 @@ mod tests {
         assert!(!should_skip_local_acp_spawn(Some("   ")));
         assert!(!should_skip_local_acp_spawn(Some("*")));
         assert!(!should_skip_local_acp_spawn(Some("host;rm")));
+    }
+
+    #[test]
+    fn pick_ssh_alias_prefers_explicit_then_bound_then_path() {
+        assert_eq!(
+            pick_ssh_alias(Some("UTS"), Some("other"), Some("path")),
+            Some("UTS".into())
+        );
+        assert_eq!(
+            pick_ssh_alias(Some("  "), Some("gw-01"), Some("UTS")),
+            Some("gw-01".into())
+        );
+        assert_eq!(pick_ssh_alias(None, None, Some("UTS")), Some("UTS".into()));
+        assert_eq!(pick_ssh_alias(Some("*"), Some("host;rm"), None), None);
+        assert_eq!(pick_ssh_alias(None, None, None), None);
+    }
+
+    #[test]
+    fn local_acp_cwd_ok_rejects_ssh_and_missing_dirs() {
+        assert!(!local_acp_cwd_ok(Some("UTS"), "/tmp"));
+        assert!(!local_acp_cwd_ok(
+            None,
+            "/this/path/does/not/exist/grok-app-ssh"
+        ));
+        assert!(!local_acp_cwd_ok(None, ""));
+        let here = std::env::temp_dir();
+        assert!(local_acp_cwd_ok(None, here.to_string_lossy().as_ref()));
     }
 
     #[test]

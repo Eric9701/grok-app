@@ -1227,7 +1227,7 @@ impl SessionManager {
                 None => (None, None),
             }
         };
-        self.connect(app, project, sid, None).await
+        self.connect(app, project, sid, None, None).await
     }
 }
 

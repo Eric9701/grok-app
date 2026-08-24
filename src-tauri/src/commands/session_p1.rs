@@ -33,8 +33,10 @@ pub async fn session_connect(
     project_path: Option<String>,
     session_id: Option<String>,
     mode: Option<String>,
+    ssh_alias: Option<String>,
 ) -> Result<SessionSnapshot, String> {
-    mgr.connect(app, project_path, session_id, mode).await
+    mgr.connect(app, project_path, session_id, mode, ssh_alias)
+        .await
 }
 
 /// Fire-and-forget prewarm: spawn + initialize + auth a CLI process while the

@@ -23,14 +23,17 @@ export async function sessionConnect(opts?: {
   projectPath?: string;
   sessionId?: string;
   mode?: string;
+  sshAlias?: string | null;
 }): Promise<SessionSnapshot> {
+  const payload = {
+    projectPath: opts?.projectPath ?? null,
+    sessionId: opts?.sessionId ?? null,
+    mode: opts?.mode ?? null,
+    sshAlias: opts?.sshAlias?.trim() || null,
+  };
   if (isMirrorClient()) {
     return withDeadline(
-      invoke("session_connect", {
-        projectPath: opts?.projectPath ?? null,
-        sessionId: opts?.sessionId ?? null,
-        mode: opts?.mode ?? null,
-      }),
+      invoke("session_connect", payload),
       SESSION_CONNECT_CLIENT_TIMEOUT_MS,
       () => sessionConnectTimeoutError(),
     );
@@ -45,11 +48,7 @@ export async function sessionConnect(opts?: {
     };
   }
   return withDeadline(
-    invoke("session_connect", {
-      projectPath: opts?.projectPath ?? null,
-      sessionId: opts?.sessionId ?? null,
-      mode: opts?.mode ?? null,
-    }),
+    invoke("session_connect", payload),
     SESSION_CONNECT_CLIENT_TIMEOUT_MS,
     () => sessionConnectTimeoutError(),
   );
