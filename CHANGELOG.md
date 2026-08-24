@@ -21,11 +21,16 @@ See `docs/llm-wiki/release.md`.
 
 ### Changed
 - **Bottom terminal tab chrome**: hover shows the close chip on every tab; a close-all icon sits next to New terminal.
+- **Plan / resources pane enter motion**: desktop in-flow aside interpolates width with the existing pane-split token; overlay and side-expanded stay snap. Bottom terminal height still snaps (no chat virtualizer reflow); chrome/body fade in.
+- **Light wallpaper readability**: light theme uses its own white veil and weaker main mix so text stays ink-dark on mixed wallpaper; no extra cards under chrome.
 
 **中文 · 变更**
 - **底部终端标签栏**：鼠标悬停任意标签显示关闭；加号旁增加关闭所有终端。
+- **计划 / 资源侧栏入场**：桌面分栏宽度用现有 pane-split 令牌插值；overlay 与展开覆盖仍一次落位。底部终端高度仍一次到位（避免长对话重排）；顶栏和内容淡入。
+- **浅色壁纸可读性**：浅色主题用独立白色 veil、主区更通透；文字保持深色描边，不额外加承载卡片。
 
 ### Fixed
+- **Expanded SideWorkbench vs macOS traffic lights**: when the sidebar is hidden or overlayed, the shared pane chrome pads with `--titlebar-safe-left`.
 - **WeCom webhook replay window**: signed callbacks whose `timestamp` is outside ±300 seconds are rejected with 401.
 - **WeCom webhook loopback hint**: webhook mode bound to 127.0.0.1 now surfaces that public callbacks need `allow_external` (runtime last_error code + Settings health copy).
 - **CLI session project import**: auto-add uses home-relative depth ≥ 2, so Linux `/home/name/projects` and Windows `C:\Users\name\Documents` are not treated as projects. Missing home refuses.
@@ -52,6 +57,7 @@ See `docs/llm-wiki/release.md`.
 - **Official-aux X/Imagine on packaged custom mains**: `/Applications/Grok.app` never bundled `scripts/official-aux-mcp.mjs`, so ACP injected `mcpServers count=0` while ChatCut still auto-loaded from independent `agent-home/config.toml`. Host now writes the MCP script into `agent-home-official`, disables user MCP `enabled` flags during solo inject, ships official-aux `--rules` on prewarm, and tells the model to call `official-aux__x_keyword_search` directly instead of `search_tool` (which was resolving to ChatCut).
 
 **中文 · 修复**
+- **展开侧栏避开 macOS 交通灯**：侧栏隐藏或 overlay 时，共享顶栏使用 `--titlebar-safe-left` 内边距。
 - **企微 webhook 重放窗口**：`timestamp` 超出 ±300 秒的已签名回调返回 401。
 - **企微 webhook loopback 提示**：未开启 `allow_external` 且绑在 127.0.0.1 时，运行状态与设置页提示「公网回调需开启 allow_external」。
 - **CLI 会话导入项目路径**：按相对 home 深度 ≥ 2 判断，不再把 Linux `/home/name/projects` 或 Windows `C:\Users\name\Documents` 当成项目；取不到 home 则拒绝。
