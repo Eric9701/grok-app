@@ -662,20 +662,6 @@
   opacity: 0;
 }
 
-/* When left sidebar fully closed, reserve mac traffic-light inset on main */
-.platform-mac .main--sidebar-hidden .main__top {
-  padding-left: var(--titlebar-safe-left, 96px);
-}
-
-.workbench--sidebar-motion .main__top {
-  transition: padding-left var(--motion-pane) var(--motion-pane-ease);
-}
-
-.main__pane-toggle.is-on {
-  color: var(--text-primary);
-  background: var(--bg-active);
-}
-
 /* ===== Composer model / access menus (Codex-style sheet) ===== */
 .cmm {
   position: relative;

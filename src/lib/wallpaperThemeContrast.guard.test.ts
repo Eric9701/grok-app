@@ -119,6 +119,12 @@ describe("wallpaper theme contrast CSS", () => {
       /html\[data-font-shadow="1"\] \.settings-page\s*\{[^}]*text-shadow:\s*none/s,
     );
     expect(css).toMatch(
+      /html\[data-theme="dark"\]\[data-wallpaper="1"\] \.pane-toggle--pinned\s*\{[^}]*color:\s*var\(--text-primary\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-font-shadow="1"\][\s\S]*\.pane-toggle--pinned/s,
+    );
+    expect(css).toMatch(
       /html\[data-theme="light"\]\[data-wallpaper="1"\]\s+\.sidebar\s+\.user-avatar--logo\s+\.grok-logo\s+svg\s*\{[^}]*color:\s*var\(--text-inverse\)[^}]*filter:\s*none/s,
     );
     expect(css).toMatch(

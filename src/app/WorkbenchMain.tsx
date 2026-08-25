@@ -8,14 +8,13 @@ import { Tip } from "@/components/ui/tooltip";
 import { OpenLocationButton } from "@/components/OpenLocationButton";
 import { EnvInfoButton } from "@/components/side-workbench/EnvInfoButton";
 import { BottomTerminalToggle } from "@/components/bottom-terminal/BottomTerminalToggle";
+import { PaneToggleButton } from "@/components/PaneToggleButton";
 import {
   IconAttach,
   IconClock,
   IconList,
   IconMenu,
   IconMore,
-  IconPanel,
-  IconPanelRight,
   IconScheduled,
   IconUser,
 } from "@/components/icons";
@@ -71,6 +70,7 @@ export type WorkbenchMainProps = {
   openPhoneDrawer: () => void;
   closePhoneDrawer: () => void;
   openSidebarPane: () => void;
+  sidebarToggleUnread: boolean;
   openSessionMenu: (e: MouseEvent, s: SessionRow) => void;
   onOpenPhoneAccount: () => void;
   bottomTerminalOpen: boolean;
@@ -91,7 +91,6 @@ export type WorkbenchMainProps = {
   sideWorkbench: SideWorkbenchState;
   setSideWorkbench: Dispatch<SetStateAction<SideWorkbenchState>>;
   openAsidePane: () => void;
-  closeAsidePane: () => void;
   showToast: (text: string, ms?: number) => void;
 };
 
@@ -115,6 +114,7 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
     openPhoneDrawer,
     closePhoneDrawer,
     openSidebarPane,
+    sidebarToggleUnread,
     openSessionMenu,
     onOpenPhoneAccount,
     bottomTerminalOpen,
@@ -135,7 +135,6 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
     sideWorkbench,
     setSideWorkbench,
     openAsidePane,
-    closeAsidePane,
     showToast,
   } = props;
 
@@ -150,7 +149,23 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
     );
 
   return (
-    <main
+    <>
+      {!phoneLayout ? (
+        <PaneToggleButton
+          side="left"
+          open={!layout.sidebarCollapsed}
+          unread={sidebarToggleUnread}
+          label={tr(
+            layout.sidebarCollapsed ? "main.leftPaneShow" : "main.leftPaneHide",
+          )}
+          unreadLabel={tr("main.paneUnread")}
+          controlsId="workbench-sidebar"
+          onToggle={
+            layout.sidebarCollapsed ? openSidebarPane : closePhoneDrawer
+          }
+        />
+      ) : null}
+      <main
       className={
         "main" +
         (layout.sidebarCollapsed ? " main--sidebar-hidden" : "") +
@@ -194,32 +209,21 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
       >
         <div className="main__title-row" data-tauri-drag-region={dragRegion}>
           {phoneLayout ? (
-            <button
-              type="button"
-              className="chrome-btn main__phone-menu"
-              aria-label={tr("phone.menu")}
-              aria-expanded={!layout.sidebarCollapsed}
-              onClick={() => {
-                if (layout.sidebarCollapsed) openPhoneDrawer();
-                else closePhoneDrawer();
-              }}
-            >
-              <IconMenu size={20} />
-            </button>
-          ) : (
-            layout.sidebarCollapsed && (
-              <Tip label={tr("main.leftPaneShow")}>
-                <button
-                  type="button"
-                  className="chrome-btn chrome-btn--traffic main__pane-toggle"
-                  aria-label={tr("main.leftPaneShow")}
-                  onClick={() => openSidebarPane()}
-                >
-                  <IconPanel size={16} />
-                </button>
-              </Tip>
-            )
-          )}
+            <PaneToggleButton
+              side="left"
+              pinned={false}
+              open={!layout.sidebarCollapsed}
+              unread={sidebarToggleUnread}
+              label={tr("phone.menu")}
+              unreadLabel={tr("main.paneUnread")}
+              icon={<IconMenu size={20} />}
+              className="main__phone-menu"
+              controlsId="workbench-sidebar"
+              onToggle={
+                layout.sidebarCollapsed ? openPhoneDrawer : closePhoneDrawer
+              }
+            />
+          ) : null}
           {mainPane === "automations" ? (
             <>
               {!phoneLayout ? (
@@ -427,38 +431,12 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
                 open={bottomTerminalOpen}
                 onToggle={onToggleBottomTerminal}
               />
-              {layout.asideCollapsed ? (
-                <Tip label={tr("main.rightPaneShow")}>
-                  <button
-                    type="button"
-                    className="chrome-btn main__pane-toggle"
-                    aria-label={tr("main.rightPaneShow")}
-                    aria-pressed={false}
-                    data-testid="main-side-toggle"
-                    onClick={() => openAsidePane()}
-                  >
-                    <IconPanelRight size={16} />
-                  </button>
-                </Tip>
-              ) : (
-                <Tip label={tr("main.rightPaneHide")}>
-                  <button
-                    type="button"
-                    className="chrome-btn main__pane-toggle is-on"
-                    aria-label={tr("main.rightPaneHide")}
-                    aria-pressed
-                    data-testid="main-side-toggle"
-                    onClick={() => closeAsidePane()}
-                  >
-                    <IconPanelRight size={16} />
-                  </button>
-                </Tip>
-              )}
             </>
           )}
         </div>
       </div>
       {children}
-    </main>
+      </main>
+    </>
   );
 }

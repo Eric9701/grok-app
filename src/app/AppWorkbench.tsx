@@ -13833,7 +13833,7 @@ export function AppWorkbench() {
             }}
           />
         ) : null}
-        {/* LEFT — fully hideable (not icon-rail); open via top-bar icon when closed */}
+        {/* LEFT — fully hideable (not icon-rail); fixed toggle reopens it */}
         <WorkbenchSidebar
           tr={tr}
           locale={locale}
@@ -13845,7 +13845,6 @@ export function AppWorkbench() {
           sidebarOpenW={sidebarOpenW}
           sidebarPaint={sidebarPaint}
           beginSidebarResize={beginSidebarResize}
-          closeSidebarPane={closeSidebarPane}
           dragRegion={dragRegion}
           titlebarMax={titlebarMax}
           replaceProviderBrandLogo={replaceProviderBrandLogo}
@@ -13964,6 +13963,7 @@ export function AppWorkbench() {
           openPhoneDrawer={openPhoneDrawer}
           closePhoneDrawer={closePhoneDrawer}
           openSidebarPane={openSidebarPane}
+          sidebarToggleUnread={unreadSessionIds.size > 0}
           openSessionMenu={openSessionMenu}
           onOpenPhoneAccount={() => setPhoneAccountOpen(true)}
           bottomTerminalOpen={bottomTerminal.state.open}
@@ -13984,7 +13984,6 @@ export function AppWorkbench() {
           sideWorkbench={sideWorkbench}
           setSideWorkbench={setSideWorkbench}
           openAsidePane={openAsidePane}
-          closeAsidePane={closeAsidePane}
           showToast={showToast}
         >
           {mainPane === "kanban" ? (
@@ -14503,6 +14502,7 @@ export function AppWorkbench() {
           sessionChanges={
             sessionChangesById[session.sessionId || ""] ?? []
           }
+          sessionId={session.sessionId}
           plan={plan}
           planFocusKey={planFocusKey}
           composerMode={mode}
@@ -14519,7 +14519,7 @@ export function AppWorkbench() {
           onCloseActiveRequestConsumed={() =>
             setCloseActiveSideRequest(null)
           }
-          onCloseSide={closeAsidePane}
+          onToggleSide={layout.asideCollapsed ? openAsidePane : closeAsidePane}
           onExpandedChange={(expanded) => {
             if (phoneLayout) return;
             if (!expanded) setSideDockComposer(false);

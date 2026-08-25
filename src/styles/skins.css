@@ -155,6 +155,10 @@ html[data-wallpaper="1"] .sidebar.sidebar--phone-drawer {
     saturate(1.25);
 }
 
+html[data-theme="dark"][data-wallpaper="1"] .pane-toggle--pinned {
+  color: var(--text-primary);
+}
+
 html[data-theme="dark"][data-wallpaper="1"] .lobe-chat-assistant-timeline {
   --chat-text: var(--text-primary);
   --chat-text-2: color-mix(in srgb, var(--text-primary) 84%, transparent);
@@ -424,6 +428,7 @@ html[data-font-shadow="1"]
     .lobe-chat-assistant-timeline,
     .lobe-chat-empty,
     .main__stage > .conn-bar,
+    .pane-toggle--pinned,
     .auto-page :is(.auto-page__title, .auto-page__subtitle),
     .agent-kanban-page :is(.auto-page__title, .auto-page__subtitle)
   ) {
@@ -435,7 +440,8 @@ html[data-font-shadow="1"]
     .sidebar,
     .main__top,
     .composer-welcome-mark,
-    .lobe-chat-assistant-timeline
+    .lobe-chat-assistant-timeline,
+    .pane-toggle--pinned
   )
   svg {
   filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.45));
