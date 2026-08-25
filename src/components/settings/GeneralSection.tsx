@@ -282,7 +282,6 @@ export function GeneralSection() {
             />
             {activeTab === "composer" && (
             <>
-            <h2 className="settings-page__h2">{t("settings.section.composer")}</h2>
             <div className="settings-card" id="settings-anchor-composer">
               {onPrefsScope && (
                 <div
@@ -463,7 +462,6 @@ export function GeneralSection() {
 
             {activeTab === "permissions" && (
             <>
-            <h2 className="settings-page__h2">{t("settings.section.permissions")}</h2>
             <div className="settings-card" id="settings-anchor-permissionRules">
               <div
                 className={"settings-row settings-row--stack" + rowHighlight("settings-anchor-permissionPolicy")}
@@ -803,7 +801,6 @@ export function GeneralSection() {
 
             {activeTab === "agent" && (
             <>
-            <h2 className="settings-page__h2">{t("settings.section.agent")}</h2>
             <div className="settings-card" id="settings-agent-card">
               {onMaxAgentTurns ? (
                 <div

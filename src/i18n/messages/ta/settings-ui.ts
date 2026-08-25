@@ -194,6 +194,7 @@ export const taSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "இந்த வரம்புகளை விட பழைய பின் இல்லாத உரையாடல்கள் எதுவும் இல்லை.",
   "settings.sessionDataMode": "அமர்வு தரவு முறை",
   "settings.cliSessions": "CLI அமர்வுகள்",
+  "settings.cliSessionsManage": "அமர்வுகளை நிர்வகி",
   "settings.compactionMode": "சுருக்க முறை",
   "settings.compactionMode.summary": "சுருக்கம்",
   "settings.compactionMode.transcript": "டிரான்ஸ்கிரிப்ட் சுட்டிக்காட்டி",

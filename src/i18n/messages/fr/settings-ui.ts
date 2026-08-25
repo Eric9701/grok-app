@@ -194,6 +194,7 @@ export const frSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "Aucune conversation non épinglée plus ancienne que ces seuils pour l’instant.",
   "settings.sessionDataMode": "Mode de données de session",
   "settings.cliSessions": "Sessions CLI",
+  "settings.cliSessionsManage": "Gérer les sessions",
   "settings.compactionMode": "Mode de compactage",
   "settings.compactionMode.summary": "Résumé",
   "settings.compactionMode.transcript": "Pointeur de transcription",

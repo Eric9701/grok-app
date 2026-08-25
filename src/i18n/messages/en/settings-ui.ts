@@ -194,6 +194,7 @@ export const enSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "No unpinned chats older than these thresholds right now.",
   "settings.sessionDataMode": "Session data mode",
   "settings.cliSessions": "CLI sessions",
+  "settings.cliSessionsManage": "Manage sessions",
   "settings.compactionMode": "Compaction mode",
   "settings.compactionMode.summary": "Summary",
   "settings.compactionMode.transcript": "Transcript pointer",

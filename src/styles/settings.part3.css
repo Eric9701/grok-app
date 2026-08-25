@@ -750,30 +750,32 @@ textarea.settings-input.settings-agents-json__textarea {
   outline-offset: -2px;
 }
 
-/* Appearance: skin (left) + wallpaper (right) */
-.settings-appearance-duo {
+/* Appearance: skin (left) + wallpaper (right) inside one card */
+.settings-card > .settings-appearance-duo {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: 14px;
   align-items: stretch;
   width: 100%;
 }
 
-.settings-appearance-duo > .settings-card {
-  margin-top: 0;
+.settings-appearance-duo > .settings-row {
   min-width: 0;
   height: 100%;
+  border-bottom: none;
 }
 
-/* Stacked cards after the theme row still need top gap */
-.settings-page__main > .settings-card + .settings-appearance-duo,
-.settings-page__main > .settings-appearance-duo + .settings-card {
-  margin-top: 14px;
+.settings-appearance-duo > .settings-row + .settings-row {
+  border-left: 1px solid var(--border-subtle);
 }
 
 @media (max-width: 720px) {
-  .settings-appearance-duo {
+  .settings-card > .settings-appearance-duo {
     grid-template-columns: 1fr;
+  }
+
+  .settings-appearance-duo > .settings-row + .settings-row {
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
   }
 }
 

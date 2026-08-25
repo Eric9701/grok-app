@@ -194,6 +194,7 @@ export const jaSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "いまこれらのしきい値より古く、ピン留めされていないチャットはありません。",
   "settings.sessionDataMode": "セッションデータのモード",
   "settings.cliSessions": "CLI セッション",
+  "settings.cliSessionsManage": "セッションを管理",
   "settings.compactionMode": "圧縮モード",
   "settings.compactionMode.summary": "要約",
   "settings.compactionMode.transcript": "Transcript ポインタ",

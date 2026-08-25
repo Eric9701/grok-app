@@ -194,6 +194,7 @@ export const idSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "Tidak ada obrolan tidak tersemat yang lebih lama dari ambang ini saat ini.",
   "settings.sessionDataMode": "Mode data sesi",
   "settings.cliSessions": "Sesi CLI",
+  "settings.cliSessionsManage": "Kelola sesi",
   "settings.compactionMode": "Mode pemadatan",
   "settings.compactionMode.summary": "Ringkasan",
   "settings.compactionMode.transcript": "Penunjuk transkrip",

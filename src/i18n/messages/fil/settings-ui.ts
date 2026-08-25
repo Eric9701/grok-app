@@ -194,6 +194,7 @@ export const filSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "Walang hindi naka-pin na chat na mas luma sa mga threshold na ito ngayon.",
   "settings.sessionDataMode": "Session data mode",
   "settings.cliSessions": "Mga session ng CLI",
+  "settings.cliSessionsManage": "Pamahalaan ang mga session",
   "settings.compactionMode": "Compaction mode",
   "settings.compactionMode.summary": "Buod",
   "settings.compactionMode.transcript": "Pointer ng transcript",

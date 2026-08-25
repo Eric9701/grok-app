@@ -194,6 +194,7 @@ export const esSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "No hay chats sin fijar más antiguos que estos umbrales ahora.",
   "settings.sessionDataMode": "Modo de datos de sesión",
   "settings.cliSessions": "Sesiones CLI",
+  "settings.cliSessionsManage": "Administrar sesiones",
   "settings.compactionMode": "Modo de compactación",
   "settings.compactionMode.summary": "Resumen",
   "settings.compactionMode.transcript": "Puntero de transcripción",

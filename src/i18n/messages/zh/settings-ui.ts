@@ -194,6 +194,7 @@ export const zhSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "当前没有超过这些阈值且未置顶的会话。",
   "settings.sessionDataMode": "会话数据模式",
   "settings.cliSessions": "CLI 会话",
+  "settings.cliSessionsManage": "管理会话",
   "settings.compactionMode": "压缩模式",
   "settings.compactionMode.summary": "摘要",
   "settings.compactionMode.transcript": "Transcript 指针",

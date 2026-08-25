@@ -194,6 +194,7 @@ export const koSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "지금 이 임계값보다 오래된 고정되지 않은 대화가 없습니다.",
   "settings.sessionDataMode": "세션 데이터 모드",
   "settings.cliSessions": "CLI 세션",
+  "settings.cliSessionsManage": "세션 관리",
   "settings.compactionMode": "압축 모드",
   "settings.compactionMode.summary": "요약",
   "settings.compactionMode.transcript": "트랜스크립트 포인터",

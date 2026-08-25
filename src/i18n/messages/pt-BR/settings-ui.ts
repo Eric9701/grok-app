@@ -194,6 +194,7 @@ export const ptBRSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "Nenhum chat não fixado mais antigo que estes limiares agora.",
   "settings.sessionDataMode": "Modo de dados da sessão",
   "settings.cliSessions": "Sessões da CLI",
+  "settings.cliSessionsManage": "Gerenciar sessões",
   "settings.compactionMode": "Modo de compactação",
   "settings.compactionMode.summary": "Resumo",
   "settings.compactionMode.transcript": "Ponteiro da transcrição",

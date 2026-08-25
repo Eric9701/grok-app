@@ -194,6 +194,7 @@ export const ruSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "Сейчас нет незакреплённых чатов старше этих порогов.",
   "settings.sessionDataMode": "Режим данных сессий",
   "settings.cliSessions": "Сессии CLI",
+  "settings.cliSessionsManage": "Управление сессиями",
   "settings.compactionMode": "Режим сжатия контекста",
   "settings.compactionMode.summary": "Сводка",
   "settings.compactionMode.transcript": "Указатель транскрипта",

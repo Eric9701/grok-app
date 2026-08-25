@@ -839,6 +839,21 @@ button.settings-wallpaper__preview:hover:not(:disabled) {
   margin-top: 4px;
 }
 
+.modal.settings-cli-sessions-modal {
+  width: min(720px, 100%);
+  max-height: min(85vh, 760px);
+}
+
+.settings-cli-sessions--modal {
+  margin-top: 0;
+  min-height: 0;
+}
+
+.settings-cli-sessions--modal .settings-cli-sessions__list {
+  max-height: min(48vh, 420px);
+  overflow: auto;
+}
+
 .settings-cli-sessions__note {
   font-size: 12px;
   line-height: 1.45;

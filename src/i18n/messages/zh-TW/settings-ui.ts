@@ -194,6 +194,7 @@ export const zhTWSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "目前沒有超過這些閾值且未置頂的對話。",
   "settings.sessionDataMode": "對話資料模式",
   "settings.cliSessions": "CLI 工作階段",
+  "settings.cliSessionsManage": "管理工作階段",
   "settings.compactionMode": "壓縮模式",
   "settings.compactionMode.summary": "摘要",
   "settings.compactionMode.transcript": "Transcript 指標",

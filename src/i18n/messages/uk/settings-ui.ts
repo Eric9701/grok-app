@@ -194,6 +194,7 @@ export const ukSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "Зараз немає незакріплених чатів, старших за ці порогові значення.",
   "settings.sessionDataMode": "Режим даних сесії",
   "settings.cliSessions": "Сесії CLI",
+  "settings.cliSessionsManage": "Керувати сесіями",
   "settings.compactionMode": "Режим стиснення",
   "settings.compactionMode.summary": "Підсумок",
   "settings.compactionMode.transcript": "Вказівник транскрипту",

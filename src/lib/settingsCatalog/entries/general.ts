@@ -1090,6 +1090,7 @@ export const GENERAL_ENTRIES: readonly SettingsEntry[] = [
     labelKey: "settings.cliSessions",
     descKeys: [
       "settings.cliSessionsDesc",
+      "settings.cliSessionsManage",
       "settings.cliSessionsIndependentNote",
       "settings.cliSessionsImportOpen",
       "settings.cliSessionsDelete",
@@ -1105,6 +1106,7 @@ export const GENERAL_ENTRIES: readonly SettingsEntry[] = [
     keywords: [
       "cli sessions",
       "import session",
+      "manage sessions",
       "agent session id",
       "resume",
       "delete session",
@@ -1115,6 +1117,7 @@ export const GENERAL_ENTRIES: readonly SettingsEntry[] = [
       "clear filters",
       "cli missing",
       "CLI 会话",
+      "管理会话",
       "导入会话",
       "删除会话",
       "搜索会话",

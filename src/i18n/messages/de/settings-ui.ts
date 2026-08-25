@@ -194,6 +194,7 @@ export const deSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "Gerade keine nicht angepinnten Chats älter als diese Schwellen.",
   "settings.sessionDataMode": "Sitzungsdatenmodus",
   "settings.cliSessions": "CLI-Sitzungen",
+  "settings.cliSessionsManage": "Sitzungen verwalten",
   "settings.compactionMode": "Verdichtungsmodus",
   "settings.compactionMode.summary": "Zusammenfassung",
   "settings.compactionMode.transcript": "Transkript-Zeiger",

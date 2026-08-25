@@ -194,6 +194,7 @@ export const itSettingsUi = {
   "settings.archived.archiveOlderNoneHint": "Nessuna chat non fissata più vecchia di queste soglie in questo momento.",
   "settings.sessionDataMode": "Modalità dati sessione",
   "settings.cliSessions": "Sessioni CLI",
+  "settings.cliSessionsManage": "Gestisci sessioni",
   "settings.compactionMode": "Modalità di compattazione",
   "settings.compactionMode.summary": "Summary",
   "settings.compactionMode.transcript": "Puntatore transcript",

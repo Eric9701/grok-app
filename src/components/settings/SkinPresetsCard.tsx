@@ -185,7 +185,7 @@ export function SkinPresetsCard() {
 
   return (
     <div
-      className="settings-card settings-card--appearance-col"
+      className="settings-card"
       id="settings-anchor-skin-presets"
     >
       <div className="settings-row settings-row--stack">
