@@ -127,7 +127,10 @@ describe("floating pop CSS", () => {
 
   it("keeps mac workbench sidebar frost; settings nav is solid", () => {
     expect(workbenchCss).toMatch(
-      /\.platform-mac \.sidebar\s*\{[^}]*backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)/,
+      /\.platform-mac \.sidebar:not\(\.sidebar--overlay\):not\(\.sidebar--phone-drawer\)::before\s*\{[^}]*backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)/,
+    );
+    expect(workbenchCss).toMatch(
+      /\.platform-mac \.sidebar\.sidebar--overlay,\s*\.platform-mac \.sidebar\.sidebar--phone-drawer\s*\{[^}]*backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)/s,
     );
     expect(workbenchCss).toMatch(
       /\.platform-mac \.settings-page__nav\s*\{[^}]*background:\s*var\(--bg-sidebar-solid[^}]*backdrop-filter:\s*none/,
