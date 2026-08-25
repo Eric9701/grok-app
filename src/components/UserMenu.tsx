@@ -201,6 +201,10 @@ export function UserMenu({
     if (!open) setThemeSubOpen(false);
   }, [open]);
 
+  useEffect(() => {
+    if (closeImmediately && open) onClose();
+  }, [closeImmediately, onClose, open]);
+
   const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current != null) {
       window.clearTimeout(closeTimerRef.current);
@@ -266,9 +270,9 @@ export function UserMenu({
     roots: [rootRef, themeFlyoutRef],
     onClose,
     placement: "up",
-    fitContent: true,
+    width: 0,
+    fitContent: false,
     matchTriggerWidth: true,
-    minWidth: 220,
     estHeight: savedAccounts.length > 1 ? 360 : 260,
     gap: 6,
     // CSS owns transform (rise from the footer). Do not apply placeAbove -100%.

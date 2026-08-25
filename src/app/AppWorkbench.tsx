@@ -13859,7 +13859,7 @@ export function AppWorkbench() {
           onNavigateRemoteIm={() => navigateSettings("remote_im", "im")}
           showUserMenu={showUserMenu}
           setShowUserMenu={setShowUserMenu}
-          closeImmediately={settingsOpen}
+          closeImmediately={settingsOpen || layout.sidebarCollapsed}
           theme={theme}
           themePreference={themePreference}
           account={account}
