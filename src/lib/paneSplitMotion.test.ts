@@ -262,6 +262,19 @@ describe("desktop hidden CSS must not force width 0", () => {
     );
   });
 
+  it("replays a window resize clamp after pane motion settles", () => {
+    const layoutHook = readFileSync(
+      resolve(__dirname, "../hooks/useWorkbenchLayout.ts"),
+      "utf8",
+    );
+    expect(layoutHook).toMatch(
+      /const applyResizeClamp = \(\) => \{[\s\S]*?runAfterPaneSplitMotion\(applyResizeClamp\)[\s\S]*?clampAsideWidth/,
+    );
+    expect(layoutHook).not.toMatch(
+      /const onResize = \(\) => \{\s*if \(isWindowFitSuppressed\(\) \|\| isPaneSplitMotionActive\(\)\) return;/,
+    );
+  });
+
   it("mac sidebar seam is not a 1px layout border on vibrancy", () => {
     const sidebar = readFileSync(
       resolve(__dirname, "../styles/sidebar.part1.css"),
