@@ -10,7 +10,6 @@ import {
 import {
   busySessionIds,
   type SessionLiveMap,
-  type SessionLiveSnapshot,
 } from "@/lib/sessionLiveStore";
 
 /** Full live map — use in panels that need every session row. */
@@ -44,16 +43,6 @@ export function useLiveMapWhen(enabled: boolean): SessionLiveMap {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/** Single-session snapshot without forcing a full-map subscription when idle. */
-export function useLiveSessionSnapshotWhen(
-  sessionId: string | null | undefined,
-  enabled: boolean,
-): SessionLiveSnapshot | null {
-  const map = useLiveMapWhen(enabled && !!sessionId);
-  if (!sessionId || !enabled) return null;
-  return map[sessionId] ?? null;
-}
-
 /** Busy membership only — sidebar chrome / tray badge. */
 export function useLiveMapBusyMeta(): LiveMapBusyMeta {
   return useSyncExternalStore(
@@ -71,12 +60,6 @@ export function useLiveMapBusyIds(): Set<string> {
   }, [meta.busyKey]);
 }
 
-export function useLiveSessionSnapshot(
-  sessionId: string | null | undefined,
-): SessionLiveSnapshot | null {
-  return useLiveSessionSnapshotWhen(sessionId, true);
-}
-
 export function useLiveMapActions() {
   const setLiveMap = useCallback(
     (next: SessionLiveMap | ((prev: SessionLiveMap) => SessionLiveMap)) => {
@@ -90,19 +73,4 @@ export function useLiveMapActions() {
 /** Stable busy id set from a one-shot map read (event handlers). */
 export function peekBusySessionIds(): Set<string> {
   return busySessionIds(sessionLiveMapStore.getMap());
-}
-
-/**
- * Whether a single session id is busy (streaming / permission).
- * Subscribes to busy membership only — not full liveMap tool-title ticks.
- */
-export function useIsSessionBusy(sessionId: string | null | undefined): boolean {
-  const meta = useLiveMapBusyMeta();
-  return useMemo(() => {
-    if (!sessionId) return false;
-    if (!meta.busyKey) return false;
-    // busyKey is sorted ids joined by \0
-    if (meta.busyKey === sessionId) return true;
-    return meta.busyKey.split("\0").includes(sessionId);
-  }, [meta.busyKey, sessionId]);
 }

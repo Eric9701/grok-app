@@ -646,18 +646,3 @@ html[data-theme="dark"][data-wallpaper="1"]
   :is(.auto-page__title, .auto-page__subtitle) {
   color: var(--text-primary);
 }
-/* --- merged --- */
-
-.settings-agents-personas {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-}
-
-.settings-agents-personas__tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  width: 100%;
-}
