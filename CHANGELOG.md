@@ -11,6 +11,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Added
+- **SSH remote hosts**: Settings → Runtime → SSH lists `~/.ssh/config` Host aliases. Test connection, then watch a host to list remote Grok sessions in the sidebar, open/resume them, start a new chat in a remote folder, and run `grok agent stdio` on the host via OpenSSH (`BatchMode`, ControlMaster). Side Workbench files, Terminal, Skills, and localhost Browser use the same SSH session. Persistence is `grok agent leader`, not tmux. Remote paths are never treated as local disk.
+
+**中文 · 新增**
+- **SSH 远端主机**：设置 → 运行时 → SSH 读取 `~/.ssh/config` 的 Host。测通后 Watch，侧栏列出远端 Grok 会话，可打开/续跑、在远端文件夹开新对话，并通过 OpenSSH 在主机上跑 `grok agent stdio`。文件、终端、Skills、localhost 浏览器走同一条 SSH。断线续跑用 `grok agent leader`，不是 tmux。远端路径不当本地磁盘。
+
 ## [0.2.26] - 2026-08-24
 
 > **Highlight:** Import Grok Build CLI sessions from Account; phone mirror on the same Wi-Fi; Windows permission/rewind clicks; long chats stay scrollable.
