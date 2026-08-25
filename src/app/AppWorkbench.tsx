@@ -749,6 +749,7 @@ export function AppWorkbench() {
     wallpaperRecord,
     wallpaperUrl,
     wallpaperScrim,
+    wallpaperBlur,
     applyThemeChoice,
     applyThemeScheduleChoice,
     applySkinChoice,
@@ -756,6 +757,7 @@ export function AppWorkbench() {
     applyWallpaperAdjustChoice,
     applyWallpaperMediaSize,
     applyWallpaperScrimChoice,
+    applyWallpaperBlurChoice,
   } = useThemeShell();
   const {
     showMessageTimestamps,
@@ -13590,6 +13592,7 @@ export function AppWorkbench() {
         applyWallpaperChoice={applyWallpaperChoice}
         applyWallpaperMediaSize={applyWallpaperMediaSize}
         applyWallpaperScrimChoice={applyWallpaperScrimChoice}
+        applyWallpaperBlurChoice={applyWallpaperBlurChoice}
         archivedGroups={archivedGroups}
         askUserTimeoutSec={askUserTimeoutSec}
         auditLedgerRetentionDays={auditLedgerRetentionDays}
@@ -13782,6 +13785,7 @@ export function AppWorkbench() {
         voiceKeepAgentsOnEnd={voiceKeepAgentsOnEnd}
         wallpaperRecord={wallpaperRecord}
         wallpaperScrim={wallpaperScrim}
+        wallpaperBlur={wallpaperBlur}
         wallpaperUrl={wallpaperUrl}
         winTaskbarOverlay={winTaskbarOverlay}
         windowAlwaysOnTop={windowAlwaysOnTop}

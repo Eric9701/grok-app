@@ -24,9 +24,11 @@ import {
 } from "./lib/themeSchedule";
 import {
   applySkinToDocument,
+  applyWallpaperBlurToDocument,
   applyWallpaperFlag,
   applyWallpaperScrimToDocument,
   loadSkin,
+  loadWallpaperBlur,
   loadWallpaperMeta,
   loadWallpaperScrim,
 } from "./lib/themeSkin";
@@ -100,6 +102,7 @@ applyComposerMinRows(loadComposerMinRows(localStorage));
 // the IndexedDB blob is loaded — no synchronous access to IDB is possible.
 applyWallpaperFlag(loadWallpaperMeta(localStorage) !== null);
 applyWallpaperScrimToDocument(loadWallpaperScrim(localStorage));
+applyWallpaperBlurToDocument(loadWallpaperBlur(localStorage));
 applyAppearanceChrome(loadAppearanceChrome(localStorage));
 // macOS: null = follow OS (live matchMedia). Windows: lock to the resolved
 // theme — WebView2 matchMedia does not track Personalization flips.

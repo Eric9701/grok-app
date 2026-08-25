@@ -84,6 +84,8 @@ export interface SettingsPageProps {
   onWallpaperMediaSize?: (size: { w: number; h: number }) => void;
   wallpaperScrim?: number;
   onWallpaperScrim?: (value: number) => void;
+  wallpaperBlur?: number;
+  onWallpaperBlur?: (value: number) => void;
   sessionDataMode: string;
   onSessionDataMode: (v: string) => void;
   onCliSessionsImported?: () => void;

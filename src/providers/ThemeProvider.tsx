@@ -51,14 +51,17 @@ import {
 import {
   applySkinToDocument,
   applyWallpaperFlag,
+  applyWallpaperBlurToDocument,
   applyWallpaperScrimToDocument,
   clearWallpaper,
   loadSkin,
+  loadWallpaperBlur,
   loadWallpaperRecord,
   loadWallpaperScrim,
   saveSkin,
   saveWallpaper,
   saveWallpaperAdjust,
+  saveWallpaperBlur,
   saveWallpaperMediaSize,
   saveWallpaperScrim,
   skinPreferredTheme,
@@ -88,6 +91,8 @@ export type ThemeShellValue = {
   wallpaperUrlRef: React.MutableRefObject<string | null>;
   wallpaperScrim: number;
   setWallpaperScrim: (v: number) => void;
+  wallpaperBlur: number;
+  setWallpaperBlur: (v: number) => void;
   textColor: string | null;
   fontShadow: boolean;
   applyThemeChoice: (next: ThemePreference) => void;
@@ -107,6 +112,7 @@ export type ThemeShellValue = {
   }) => void;
   applyWallpaperMediaSize: (size: { w: number; h: number }) => void;
   applyWallpaperScrimChoice: (value: number) => void;
+  applyWallpaperBlurChoice: (value: number) => void;
   applyTextColorChoice: (value: string | null) => void;
   applyFontShadowChoice: (value: boolean) => void;
   resetAppearanceChromeChoice: () => void;
@@ -158,6 +164,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const wallpaperUrlRef = useRef<string | null>(null);
   const [wallpaperScrim, setWallpaperScrim] = useState(() =>
     loadWallpaperScrim(localStorage),
+  );
+  const [wallpaperBlur, setWallpaperBlur] = useState(() =>
+    loadWallpaperBlur(localStorage),
   );
   const [textColor, setTextColor] = useState<string | null>(
     () => loadAppearanceChrome(localStorage).textColor,
@@ -262,6 +271,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyWallpaperScrimToDocument(wallpaperScrim);
   }, [wallpaperScrim]);
+
+  useEffect(() => {
+    applyWallpaperBlurToDocument(wallpaperBlur);
+  }, [wallpaperBlur]);
 
   useEffect(() => {
     applyAppearanceChrome({ textColor, fontShadow });
@@ -473,6 +486,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setWallpaperScrim(value);
   }, []);
 
+  const applyWallpaperBlurChoice = useCallback((value: number) => {
+    saveWallpaperBlur(localStorage, value);
+    applyWallpaperBlurToDocument(value);
+    setWallpaperBlur(value);
+  }, []);
+
   const applyTextColorChoice = useCallback((value: string | null) => {
     const next = parseTextColor(value);
     saveTextColor(next, localStorage);
@@ -517,6 +536,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       wallpaperUrlRef,
       wallpaperScrim,
       setWallpaperScrim,
+      wallpaperBlur,
+      setWallpaperBlur,
       textColor,
       fontShadow,
       applyThemeChoice,
@@ -526,6 +547,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyWallpaperAdjustChoice,
       applyWallpaperMediaSize,
       applyWallpaperScrimChoice,
+      applyWallpaperBlurChoice,
       applyTextColorChoice,
       applyFontShadowChoice,
       resetAppearanceChromeChoice,
@@ -541,6 +563,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       wallpaperRecord,
       wallpaperUrl,
       wallpaperScrim,
+      wallpaperBlur,
       textColor,
       fontShadow,
       applyThemeChoice,
@@ -550,6 +573,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyWallpaperAdjustChoice,
       applyWallpaperMediaSize,
       applyWallpaperScrimChoice,
+      applyWallpaperBlurChoice,
       applyTextColorChoice,
       applyFontShadowChoice,
       resetAppearanceChromeChoice,

@@ -42,7 +42,7 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
     account, accountBusy, accountHeatmapError, accountLoading, accountProbeError, acpServerAddr,
     activeAccountId, activeProject, agentCatalog, agentIdleMinutes, agentProfilePath, agentsJson,
     allowUnverifiedCliInstall, allowedTools, applyComposerPrefs, applyGlobalSandboxProfile, applyPermissionPolicy, applySkinChoice,
-    applyThemeChoice, applyThemeScheduleChoice, applyWallpaperAdjustChoice, applyWallpaperChoice, applyWallpaperMediaSize, applyWallpaperScrimChoice,
+    applyThemeChoice, applyThemeScheduleChoice, applyWallpaperAdjustChoice, applyWallpaperChoice, applyWallpaperMediaSize, applyWallpaperScrimChoice, applyWallpaperBlurChoice,
     archivedGroups, askUserTimeoutSec, auditLedgerRetentionDays, autoWakeEnabled, availableModels, backgroundWaitPolicy,
     backgroundWaitTimeoutSec, cancelAccountLogin, cliAgentSkewRepairing, cliInfo, closeToTray, compactionDetail,
     compactionMode, confirmArchiveOlderThan, defaultOpenTarget, deleteSessionsConfirm, disableWebSearch, disallowedTools,
@@ -74,7 +74,7 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
     sttCustomLanguage, sttCustomModel, sttEngine, sttZhScript, subagentWorktreeSnapshotEnabled, subagentsEnabled,
     submitAccountLoginCode, theme, themePreference, themeSchedule, todoGateEnabled, todoGateMaxFiresPerPrompt,
     tr, trayBusyBadge, trayHandlersRef, twoPassCompactionEnabled, unreadSessionIds, useLeader,
-    voiceDictationAutoSend, voiceId, voiceKeepAgentsOnEnd, wallpaperRecord, wallpaperScrim, wallpaperUrl,
+    voiceDictationAutoSend, voiceId, voiceKeepAgentsOnEnd, wallpaperRecord, wallpaperScrim, wallpaperBlur, wallpaperUrl,
     winTaskbarOverlay, windowAlwaysOnTop, workflowsEnabled, zenMode,
     welcomeMotionEnabled, setWelcomeMotionEnabled,
   } = p;
@@ -171,6 +171,8 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
           onWallpaperMediaSize={applyWallpaperMediaSize}
           wallpaperScrim={wallpaperScrim}
           onWallpaperScrim={applyWallpaperScrimChoice}
+          wallpaperBlur={wallpaperBlur}
+          onWallpaperBlur={applyWallpaperBlurChoice}
           sessionDataMode={sessionDataMode}
           onCliSessionsImported={() => {
           void refreshSessions();

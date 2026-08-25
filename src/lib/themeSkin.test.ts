@@ -2,28 +2,34 @@ import { describe, expect, it } from "vitest";
 import {
   applySkinToDocument,
   applyWallpaperFlag,
+  applyWallpaperBlurToDocument,
   applyWallpaperScrimToDocument,
   clearWallpaper,
   DEFAULT_SKIN,
+  DEFAULT_WALLPAPER_BLUR,
   DEFAULT_WALLPAPER_SCRIM,
   getThemeSkinMeta,
   isThemeSkinId,
   loadSkin,
+  loadWallpaperBlur,
   loadWallpaperMeta,
   loadWallpaperRecord,
   loadWallpaperScrim,
   memoryWallpaperBlobStorage,
   parseThemeSkin,
+  parseWallpaperBlur,
   parseWallpaperScrim,
   prepareWallpaperFromFile,
   saveSkin,
   saveWallpaper,
   saveWallpaperAdjust,
+  saveWallpaperBlur,
   saveWallpaperFocus,
   saveWallpaperScrim,
   SKIN_STORAGE_KEY,
   skinPreferredTheme,
   THEME_SKINS,
+  WALLPAPER_BLUR_STORAGE_KEY,
   WALLPAPER_MAX_VIDEO_BYTES,
   WALLPAPER_SCRIM_STORAGE_KEY,
   WALLPAPER_STORAGE_KEY,
@@ -304,7 +310,7 @@ describe("wallpaper scrim", () => {
     expect(loadWallpaperScrim(storage)).toBe(42);
   });
 
-  it("applyWallpaperScrimToDocument sets opacity + derived mix tokens", () => {
+  it("applyWallpaperScrimToDocument sets opacity + derived mix tokens only", () => {
     const props = new Map<string, string>();
     const attrs = new Map<string, string>();
     const el = {
@@ -334,9 +340,9 @@ describe("wallpaper scrim", () => {
     expect(props.get("--wallpaper-light-mix-main")).toBe("6%");
     expect(props.get("--wallpaper-light-mix-aside")).toBe("8%");
     expect(props.get("--wallpaper-light-mix-settings")).toBe("18%");
-    expect(props.get("--wallpaper-sidebar-blur")).toBe("5.5px");
-    expect(props.get("--wallpaper-settings-blur")).toBe("3.5px");
     expect(props.get("--wallpaper-sidebar-shadow-alpha")).toBe("0.420");
+    expect(props.has("--wallpaper-sidebar-blur")).toBe(false);
+    expect(props.has("--wallpaper-settings-blur")).toBe(false);
 
     applyWallpaperScrimToDocument(0, el);
     expect(attrs.get("data-wallpaper-clear")).toBe("1");
@@ -349,8 +355,6 @@ describe("wallpaper scrim", () => {
     expect(props.get("--wallpaper-light-mix-main")).toBe("0%");
     expect(props.get("--wallpaper-light-mix-aside")).toBe("0%");
     expect(props.get("--wallpaper-light-mix-settings")).toBe("0%");
-    expect(props.get("--wallpaper-sidebar-blur")).toBe("0.0px");
-    expect(props.get("--wallpaper-settings-blur")).toBe("0.0px");
     expect(props.get("--wallpaper-sidebar-shadow-alpha")).toBe("0.560");
 
     applyWallpaperScrimToDocument(100, el);
@@ -364,10 +368,45 @@ describe("wallpaper scrim", () => {
     expect(props.get("--wallpaper-light-mix-main")).toBe("24%");
     expect(props.get("--wallpaper-light-mix-aside")).toBe("32%");
     expect(props.get("--wallpaper-light-mix-settings")).toBe("72%");
-    expect(props.get("--wallpaper-sidebar-blur")).toBe("22.0px");
-    expect(props.get("--wallpaper-settings-blur")).toBe("14.0px");
     expect(props.get("--wallpaper-sidebar-shadow-alpha")).toBe("0.000");
     expect(props.has("--wallpaper-light-foreground-shadow-alpha")).toBe(false);
+  });
+
+  it("wallpaper blur is independent of scrim and migrates from scrim when unset", () => {
+    expect(DEFAULT_WALLPAPER_BLUR).toBe(100);
+    expect(parseWallpaperBlur(null)).toBe(100);
+    expect(parseWallpaperBlur(-5)).toBe(0);
+    expect(parseWallpaperBlur(140)).toBe(100);
+
+    const storage = memoryStorage();
+    saveWallpaperScrim(storage, 40);
+    expect(loadWallpaperBlur(storage)).toBe(40); // migrate from scrim
+    saveWallpaperBlur(storage, 70);
+    expect(storage.data[WALLPAPER_BLUR_STORAGE_KEY]).toBe("70");
+    expect(loadWallpaperBlur(storage)).toBe(70);
+
+    const props = new Map<string, string>();
+    const el = {
+      setAttribute() {},
+      removeAttribute() {},
+      style: {
+        setProperty(name: string, value: string) {
+          props.set(name, value);
+        },
+        removeProperty(name: string) {
+          props.delete(name);
+        },
+      },
+    };
+    applyWallpaperBlurToDocument(25, el);
+    expect(props.get("--wallpaper-sidebar-blur")).toBe("5.5px");
+    expect(props.get("--wallpaper-settings-blur")).toBe("3.5px");
+    applyWallpaperBlurToDocument(0, el);
+    expect(props.get("--wallpaper-sidebar-blur")).toBe("0.0px");
+    expect(props.get("--wallpaper-settings-blur")).toBe("0.0px");
+    applyWallpaperBlurToDocument(100, el);
+    expect(props.get("--wallpaper-sidebar-blur")).toBe("22.0px");
+    expect(props.get("--wallpaper-settings-blur")).toBe("14.0px");
   });
 });
 

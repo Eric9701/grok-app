@@ -103,6 +103,7 @@ export function AppearanceSection() {
     onWallpaperFile,
     onWallpaperMediaSize,
     onWallpaperScrim,
+    onWallpaperBlur,
     onZenMode,
     openWallpaperSource,
     rowHighlight,
@@ -142,6 +143,7 @@ export function AppearanceSection() {
     wallpaperKind,
     wallpaperMediaSize,
     wallpaperScrim = 100,
+    wallpaperBlur = 100,
     wallpaperSourceOpen,
     wallpaperSourceTab,
     wallpaperUrl,
@@ -588,6 +590,58 @@ export function AppearanceSection() {
                             aria-label={t("settings.wallpaperScrim")}
                             onChange={(e) => {
                               onWallpaperScrim(Number(e.target.value));
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                      {wallpaperUrl && onWallpaperBlur ? (
+                        <div className="settings-wallpaper__scrim">
+                          <div className="settings-wallpaper__scrim-head">
+                            <label
+                              className="settings-wallpaper__scrim-label"
+                              htmlFor="settings-wallpaper-blur"
+                            >
+                              <span>{t("settings.wallpaperBlur")}</span>
+                              <Tip
+                                label={t("settings.wallpaperBlurDesc")}
+                                placement="top"
+                                className="ui-tip--wrap"
+                                delayMs={280}
+                              >
+                                <button
+                                  type="button"
+                                  className="settings-label-help"
+                                  aria-label={t("settings.wallpaperBlurDesc")}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                >
+                                  <IconHelp size={14} stroke={1.75} />
+                                </button>
+                              </Tip>
+                            </label>
+                            <span
+                              className="settings-wallpaper__scrim-value"
+                              aria-hidden
+                            >
+                              {Math.round(wallpaperBlur)}%
+                            </span>
+                          </div>
+                          <input
+                            id="settings-wallpaper-blur"
+                            type="range"
+                            className="settings-wallpaper__scrim-range"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={wallpaperBlur}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={Math.round(wallpaperBlur)}
+                            aria-label={t("settings.wallpaperBlur")}
+                            onChange={(e) => {
+                              onWallpaperBlur(Number(e.target.value));
                             }}
                           />
                         </div>

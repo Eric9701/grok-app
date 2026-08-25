@@ -68,10 +68,14 @@ export interface ThemeSkinMeta {
 
 export const SKIN_STORAGE_KEY = "grok-app.skin";
 export const WALLPAPER_STORAGE_KEY = "grok-app.wallpaper";
-/** Scrim strength over wallpaper only (0 = clear wallpaper, 100 = full dim). */
+/** Scrim opacity over wallpaper only (0 = clear veil, 100 = full dim). */
 export const WALLPAPER_SCRIM_STORAGE_KEY = "grok-app.wallpaper-scrim";
+/** Wallpaper media / overlay blur (0 = sharp, 100 = full built-in blur). */
+export const WALLPAPER_BLUR_STORAGE_KEY = "grok-app.wallpaper-blur";
 /** Default matches the built-in gradient at full opacity. */
 export const DEFAULT_WALLPAPER_SCRIM = 100;
+/** Default matches previous full-scrim blur (22px / 14px). */
+export const DEFAULT_WALLPAPER_BLUR = 100;
 export const DEFAULT_SKIN: ThemeSkinId = "default";
 
 /** Accept common image types + short-loop video for wallpaper upload. */
@@ -236,12 +240,12 @@ export function saveWallpaperScrim(
 }
 
 /**
- * Apply scrim strength as CSS vars on the root.
- * Scales theme-specific full-window veils, pane/settings fills, and background
- * blurs. Light keeps a weaker veil and clearer main pane than dark so a white
+ * Apply scrim opacity as CSS vars on the root (veil + pane tint only).
+ * Blur is independent — see {@link applyWallpaperBlurToDocument}.
+ * Light keeps a weaker veil and clearer main pane than dark so a white
  * scrim does not wash the wallpaper gray.
  *
- * Derived mix/%/px vars avoid flaky `calc(% * var)` inside `color-mix`
+ * Derived mix/% vars avoid flaky `calc(% * var)` inside `color-mix`
  * in some WebViews. At 0, also sets `data-wallpaper-clear` so CSS can force
  * fully transparent pane fills (some engines leave a residual from 0% mix).
  */
@@ -289,16 +293,63 @@ export function applyWallpaperScrimToDocument(
     `${Math.round(72 * t)}%`,
   );
   root.style.setProperty(
+    "--wallpaper-sidebar-shadow-alpha",
+    `${(0.56 * (1 - t)).toFixed(3)}`,
+  );
+}
+
+/** Clamp wallpaper blur strength to 0–100 (integer). */
+export function parseWallpaperBlur(raw: unknown): number {
+  const n =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+        ? Number(raw)
+        : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_WALLPAPER_BLUR;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+export function loadWallpaperBlur(
+  storage: SkinStorage = localStorage,
+): number {
+  try {
+    const raw = storage.getItem(WALLPAPER_BLUR_STORAGE_KEY);
+    if (raw == null || raw === "") {
+      // Migrate: blur used to track scrim 1:1 before the split.
+      return loadWallpaperScrim(storage);
+    }
+    return parseWallpaperBlur(raw);
+  } catch {
+    return DEFAULT_WALLPAPER_BLUR;
+  }
+}
+
+export function saveWallpaperBlur(
+  storage: SkinStorage,
+  value: number,
+): void {
+  storage.setItem(WALLPAPER_BLUR_STORAGE_KEY, String(parseWallpaperBlur(value)));
+}
+
+/**
+ * Apply wallpaper blur as CSS px vars (media frost + overlay-drawer blur).
+ * Independent of scrim opacity.
+ */
+export function applyWallpaperBlurToDocument(
+  value: number,
+  root: SkinRoot = document.documentElement,
+): void {
+  const next = parseWallpaperBlur(value);
+  const t = next / 100;
+  if (!root.style?.setProperty) return;
+  root.style.setProperty(
     "--wallpaper-sidebar-blur",
     `${(22 * t).toFixed(1)}px`,
   );
   root.style.setProperty(
     "--wallpaper-settings-blur",
     `${(14 * t).toFixed(1)}px`,
-  );
-  root.style.setProperty(
-    "--wallpaper-sidebar-shadow-alpha",
-    `${(0.56 * (1 - t)).toFixed(3)}`,
   );
 }
 
