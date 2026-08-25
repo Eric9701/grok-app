@@ -7,6 +7,14 @@ const workbenchCss = readFileSync(
   join(__dirname, "../styles/workbench.part1b.css"),
   "utf8",
 );
+const sideWorkbenchCss = ["part1", "part2"]
+  .map((part) =>
+    readFileSync(
+      join(__dirname, `../styles/side-workbench.${part}.css`),
+      "utf8",
+    ),
+  )
+  .join("\n");
 
 describe("wallpaper theme contrast CSS", () => {
   it("maps light wallpaper to its own white veil and pane curves", () => {
@@ -144,6 +152,24 @@ describe("wallpaper theme contrast CSS", () => {
   it("does not paint a light fade beneath the floating wallpaper composer", () => {
     expect(css).toMatch(
       /html\[data-theme="light"\]\[data-wallpaper="1"\] \.composer-wrap--float\s*\{[^}]*background:\s*transparent/s,
+    );
+  });
+
+  it("keeps an expanded wallpaper side pane frosted without exposing chat", () => {
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\]\s+:is\(\.sidebar, \.aside\)\s*\{[^}]*backdrop-filter:\s*blur\(var\(--wallpaper-sidebar-blur, 22px\)\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-stream-perf="1"\]\[data-wallpaper="1"\] \.aside,/,
+    );
+    expect(sideWorkbenchCss).toMatch(
+      /\.workbench--side-expanded \.main\s*\{[^}]*visibility:\s*hidden/s,
+    );
+    expect(sideWorkbenchCss).toMatch(
+      /html:not\(\[data-wallpaper="1"\]\)\s+\.workbench--side-expanded\s+\.aside:not\(\.aside--hidden\)\s*\{[^}]*background:\s*var\(--bg-aside\)/s,
+    );
+    expect(sideWorkbenchCss).toMatch(
+      /html\[data-wallpaper="1"\]\s+\.workbench--side-expanded\s+\.aside\s+:is\([^)]*\.rp-chrome[^)]*\.sw__empty[^)]*\)\s*\{[^}]*background:\s*transparent/s,
     );
   });
 });
