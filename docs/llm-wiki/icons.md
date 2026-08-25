@@ -4,13 +4,14 @@ Two **separate** pipelines — never mix them.
 
 | Surface | Source | Outputs |
 |--------|--------|---------|
-| Dock / taskbar / `.app` / Windows `.exe` | `src-tauri/icons/icon (1).png` (copied as `icon-source.png`) | `icon.png`, `32x32.png`, `64x64.png`, `128x128.png`, `128x128@2x.png`, `icon.icns`, `icon.ico` |
+| Dock / taskbar / `.app` / Windows `.exe` | `src-tauri/icons/AppIcon.appiconset` (black, authored 16–1024) | `icon.png`, `32x32.png`, `64x64.png`, `128x128.png`, `128x128@2x.png`, `icon.icns`, `icon.ico` |
+| Grok Dev dock (`pnpm dev`) | `src-tauri/icons/dev/AppIcon.appiconset` (white, authored 16–1024) | `icons/dev/icon.png` … `icons/dev/icon.icns` |
 | macOS menu bar | `docs/svg/logo.svg` | `tray-icon.png` (**36×36**, @2x for 18pt bar), `tray-16` / `tray-32`, `tray-source.png` |
 | Windows system tray | `docs/svg/logo.svg` → `tray-32.png` | `tray-win-light.png` (black tile, white glyph), `tray-win-dark.png` (white glyph on transparency, no fill tile). Host picks by **taskbar** theme (`SystemUsesLightTheme`) and swaps live. |
 
 ## Rules
 
-1. **App / dock** uses the full-color artwork from `icon (1).png` only. Listed in `tauri.conf.json` → `bundle.icon`.
+1. **App / dock** uses the authored `AppIcon.appiconset` rasters only (black production, white `icons/dev`). Pack with `scripts/pack_appiconset.py` — **never** `sips -z` / LANCZOS. Listed in `tauri.conf.json` → `bundle.icon`.
 2. **Tray / status bar** uses marks from `logo.svg` only. Embedded in `src-tauri/src/tray.rs` via `include_bytes!`. **macOS**: monochrome template + `icon_as_template(true)` (the bar inverts it). **Windows**: contrast badges (`tray-win-light.png` / `tray-win-dark.png`) — there is no template invert, so a black glyph vanishes on a dark taskbar. Light taskbars keep the black tile; dark taskbars use a **white glyph on transparency** (not a white rounded tile, and not black-on-transparent). Do not follow the in-app theme; follow the taskbar (`SystemUsesLightTheme`).
 3. Do not point the tray at `icon.png` or the dock at `tray-*.png`.
 4. Menu-bar icons must stay **padded** (~14% margin) and **retina-sized** (36px for 18pt display). Tiny unpadded rasters look like a blob on Retina.
@@ -40,7 +41,10 @@ Do **not** rely on Overlay / traffic lights on Windows — they are mac-only.
 
 ```bash
 ./scripts/generate-icons.sh
-# Windows badges only (no sips / ImageMagick):
+# Dock ICNS / ICO only (no resample; skips tray):
+python3 scripts/pack_appiconset.py src-tauri/icons/AppIcon.appiconset --dest src-tauri/icons --ico src-tauri/icons/icon.ico
+python3 scripts/pack_appiconset.py src-tauri/icons/dev/AppIcon.appiconset --dest src-tauri/icons/dev
+# Windows tray badges only:
 python3 scripts/tray_win_badge.py src-tauri/icons/tray-32.png src-tauri/icons
 ```
 
