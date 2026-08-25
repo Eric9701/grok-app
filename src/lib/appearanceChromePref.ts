@@ -1,7 +1,10 @@
 /**
  * Custom appearance chrome (text color + font shadow).
- * localStorage-only — same pattern as UI font. Default follows the
- * light/dark theme tokens; a stored hex overrides `--text-primary`.
+ * localStorage-only — same pattern as UI font.
+ *
+ * Text color overrides only exposed chrome (sidebar, title bar, welcome
+ * mark) via `--appearance-chrome-ink`. It must NOT replace global
+ * `--text-primary`, or solid panels / settings / menus go unreadable.
  */
 
 export const TEXT_COLOR_STORAGE_KEY = "grok-app.text-color";
@@ -140,6 +143,8 @@ export function applyTextColor(
   if (!root) return;
   const color = parseTextColor(value);
   if (!color) {
+    root.style.removeProperty("--appearance-chrome-ink");
+    // Legacy cleanup: older builds wrote these on <html>.
     root.style.removeProperty("--text-primary");
     root.style.removeProperty("--text-secondary");
     root.style.removeProperty("--text-tertiary");
@@ -147,16 +152,13 @@ export function applyTextColor(
     root.removeAttribute("data-text-color");
     return;
   }
-  root.style.setProperty("--text-primary", color);
-  root.style.setProperty(
-    "--text-secondary",
-    `color-mix(in srgb, ${color} 62%, transparent)`,
-  );
-  root.style.setProperty(
-    "--text-tertiary",
-    `color-mix(in srgb, ${color} 40%, transparent)`,
-  );
-  root.style.setProperty("--wallpaper-chrome-foreground", color);
+  root.style.setProperty("--appearance-chrome-ink", color);
+  // Do not override theme --text-primary on <html> — solid surfaces
+  // (settings, menus, cards) must keep light/dark defaults.
+  root.style.removeProperty("--text-primary");
+  root.style.removeProperty("--text-secondary");
+  root.style.removeProperty("--text-tertiary");
+  root.style.removeProperty("--wallpaper-chrome-foreground");
   root.setAttribute("data-text-color", "custom");
 }
 

@@ -104,16 +104,19 @@ describe("load / save / apply", () => {
     expect(storage.data.has(FONT_SHADOW_STORAGE_KEY)).toBe(false);
   });
 
-  it("applyTextColor writes tokens and data-text-color", () => {
+  it("applyTextColor writes scoped chrome ink, not global --text-primary", () => {
     const root = fakeRoot();
+    // Simulate a stale global override from an older build.
+    root.style.setProperty("--text-primary", "#ff0000");
     applyTextColor("#abc", root);
     expect(root.attrs.get("data-text-color")).toBe("custom");
-    expect(root.props.get("--text-primary")).toBe("#aabbcc");
-    expect(root.props.get("--text-secondary")).toContain("#aabbcc");
-    expect(root.props.get("--wallpaper-chrome-foreground")).toBe("#aabbcc");
+    expect(root.props.get("--appearance-chrome-ink")).toBe("#aabbcc");
+    expect(root.props.has("--text-primary")).toBe(false);
+    expect(root.props.has("--text-secondary")).toBe(false);
+    expect(root.props.has("--wallpaper-chrome-foreground")).toBe(false);
     applyTextColor(null, root);
     expect(root.attrs.has("data-text-color")).toBe(false);
-    expect(root.props.has("--text-primary")).toBe(false);
+    expect(root.props.has("--appearance-chrome-ink")).toBe(false);
   });
 
   it("applyFontShadow toggles data-font-shadow", () => {

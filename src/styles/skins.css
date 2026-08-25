@@ -352,8 +352,36 @@ html[data-wallpaper="1"][data-wallpaper-clear="1"] .app-wallpaper-media {
   transform: none;
 }
 
+/*
+ * Custom text color (Settings → Appearance): only exposed chrome that sits
+ * on wallpaper / empty home — never settings, menus, or filled panels.
+ * Theme --text-primary on <html> stays the light/dark default.
+ */
+html[data-text-color="custom"]
+  :is(.sidebar, .main__top, .composer-welcome-mark, .pane-toggle--pinned) {
+  --text-primary: var(--appearance-chrome-ink);
+  --text-secondary: color-mix(
+    in srgb,
+    var(--appearance-chrome-ink) 80%,
+    transparent
+  );
+  --text-tertiary: color-mix(
+    in srgb,
+    var(--appearance-chrome-ink) 62%,
+    transparent
+  );
+  color: var(--text-primary);
+}
+
+html[data-text-color="custom"]
+  .composer-welcome-mark
+  :is(.deepseek-full-mark__ink, .opencode-wordmark, .supergrok-mark) {
+  color: var(--appearance-chrome-ink);
+  fill: var(--appearance-chrome-ink);
+}
+
 /* Wallpaper luminance is unknowable. Light/dark layouts stay structurally
- * identical; ink follows theme tokens (or a custom --text-primary). Optional
+ * identical; ink follows theme tokens (or scoped appearance chrome). Optional
  * text shadow is html[data-font-shadow="1"]. */
 html[data-wallpaper="1"] .aside :is(.rp-chrome, .rp__empty-state) {
   --text-secondary: color-mix(in srgb, var(--text-primary) 80%, transparent);
