@@ -139,8 +139,6 @@ describe("evaluateSessionMove", () => {
       projects: [
         {
           id: "ssh",
-          name: "UTS:work",
-          path: "/data/work",
           trusted: true,
           pathOk: false,
           sshAlias: "UTS",

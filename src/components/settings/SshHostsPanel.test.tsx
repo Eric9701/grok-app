@@ -40,7 +40,7 @@ beforeEach(() => {
   vi.spyOn(api, "isTauri").mockReturnValue(true);
   vi.spyOn(api, "settingsGet").mockResolvedValue({
     sshWatchAliases: [],
-  } as api.AppSettings);
+  } as unknown as api.AppSettings);
   vi.spyOn(api, "sshListHosts").mockResolvedValue({
     hosts: [HOST],
     configPath: "/Users/me/.ssh/config",
