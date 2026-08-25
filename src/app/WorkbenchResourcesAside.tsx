@@ -25,7 +25,7 @@ export type WorkbenchResourcesAsideProps = {
   locale: Locale;
   layout: { asideCollapsed: boolean; asideWidth: number };
   phoneLayout: boolean;
-  hideChatForSideExpand: boolean;
+  sidePaneCoversMain: boolean;
   asideOverlay: boolean;
   resizingAside: boolean;
   asideOpenW: number;
@@ -67,7 +67,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
     locale,
     layout,
     phoneLayout,
-    hideChatForSideExpand,
+    sidePaneCoversMain,
     asideOverlay,
     resizingAside,
     asideOpenW,
@@ -111,15 +111,15 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
         (layout.asideCollapsed ? "aside aside--hidden" : "aside") +
         (resizingAside ? " is-resizing" : "") +
         (phoneLayout ? " aside--phone-overlay" : "") +
-        (hideChatForSideExpand ? " aside--side-expanded" : "") +
+        (sidePaneCoversMain ? " aside--side-expanded" : "") +
         (asideOverlay ? " aside--overlay" : "")
       }
       aria-label={tr("a11y.resourcesPane")}
       aria-hidden={layout.asideCollapsed}
       style={
-        phoneLayout
+        phoneLayout || (asideOverlay && !layout.asideCollapsed)
           ? undefined
-          : hideChatForSideExpand
+          : sidePaneCoversMain
             ? ({
                 width: "calc(100% - var(--sw-sidebar-occupied, 0px))",
                 minWidth: "calc(100% - var(--sw-sidebar-occupied, 0px))",
@@ -144,7 +144,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
                 } as CSSProperties)
       }
     >
-      {!layout.asideCollapsed && !hideChatForSideExpand && !asideOverlay && (
+      {!layout.asideCollapsed && !sidePaneCoversMain && !asideOverlay && (
         <div
           className="aside-resizer"
           role="separator"
