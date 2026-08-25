@@ -239,7 +239,7 @@ import {
 import {
   mapPermissionButtons,
 } from "@/lib/permissionOptions";
-import { dropAskUserClocks } from "@/components/AskUserModal";
+import { dropAskUserClocks } from "@/lib/askUserClocks";
 import { type PaletteActionDef } from "@/lib/paletteActions";
 import {
   canOfferContinueCwd,
@@ -14356,8 +14356,12 @@ export function AppWorkbench() {
             openSideSkillsPanel={openSideSkillsPanel}
             openWorktreeCreate={openWorktreeCreate}
             openWorktreeGc={openWorktreeGc}
+            askUser={askUser}
+            askUserTimeoutSec={askUserTimeoutSec}
+            clearPendingGates={clearPendingGates}
             perm={perm}
             permBarRef={permBarRef}
+            setAskUser={setAskUser}
             permCountdownStartedAt={permCountdownStartedAt}
             permissionTimeoutSec={permissionTimeoutSec}
             phoneLayout={phoneLayout}
@@ -14844,10 +14848,7 @@ export function AppWorkbench() {
         account={account}
         agentDashboardOpen={agentDashboardOpen}
         agentDashboardRows={agentDashboardRows}
-        askUser={askUser}
-        askUserTimeoutSec={askUserTimeoutSec}
         batchAgentsOpen={batchAgentsOpen}
-        clearPendingGates={clearPendingGates}
         clearSessionMaxTurnsModal={clearSessionMaxTurnsModal}
         clearSessionRulesModal={clearSessionRulesModal}
         clearSessionSysPromptModal={clearSessionSysPromptModal}
@@ -14941,7 +14942,6 @@ export function AppWorkbench() {
         sessionTaskBoard={sessionTaskBoard}
         sessions={sessions}
         setAgentDashboardOpen={setAgentDashboardOpen}
-        setAskUser={setAskUser}
         setBatchAgentsOpen={setBatchAgentsOpen}
         setForkCliSession={setForkCliSession}
         setForkConfirm={setForkConfirm}

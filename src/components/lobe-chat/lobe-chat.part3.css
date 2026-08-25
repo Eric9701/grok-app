@@ -592,7 +592,8 @@ html[data-chat-density="comfortable"] .lobe-chat,
 /*
  * Chat reading width (Settings → Appearance).
  * Hoist --chat-width-max onto html so the floating composer / perm-bar /
- * composer-stack share the same cap as .lobe-chat__inner (not a hard 42rem).
+ * ask-user-bar / composer-stack share the same cap as .lobe-chat__inner
+ * (not a hard 42rem).
  * Element-level .lobe-chat[data-chat-width] kept for local override.
  * narrow ~640 · medium ~800 · wide ~1000 · full = none
  */

@@ -37,7 +37,7 @@ Client must handle server→client RPC: `session/request_permission` (allow/deny
 Agent reverse-request when the `ask_user_question` tool needs answers. Wire method is `_x.ai/ask_user_question` (leading `_` on the wire).
 
 - **Params (flat):** `{ sessionId, toolCallId?, questions: [{ question, options, multiSelect? }] }` — also accepts a single flat `{ question, options|choices }` form.
-- **Host:** parse → `AcpEvent::AskUserQuestion` → emit `session://ask_user` → App GlassModal.
+- **Host:** parse → `AcpEvent::AskUserQuestion` → emit `session://ask_user` → App composer gate (`AskUserBar`).
 - **Reply (`session_resolve_ask_user`):**
   - Accepted: `{ "outcome": "accepted", "answers": { "<question>": "<answer>" }, "partial_answers": {} }`
   - Dismiss: `{ "outcome": "cancelled" }`

@@ -1,10 +1,11 @@
 /**
- * Composer column: welcome mark, permission bar, context chips, portal wrap.
+ * Composer column: welcome mark, ask-user / permission bars, context chips, portal wrap.
  * Draft/queue chrome lives in WorkbenchComposerShell.
  */
 import * as api from "@/lib/api";
 import { ComposerProjectMenu } from "@/components/ComposerProjectMenu";
 import { ComposerWorktreeMenu } from "@/components/ComposerWorktreeMenu";
+import { AskUserBar } from "@/components/AskUserBar";
 import { PermissionCountdown } from "@/components/PermissionCountdown";
 import { SuperGrokMark } from "@/components/SuperGrokMark";
 import { IconFileDiff, IconGitBranch } from "@/components/icons";
@@ -16,7 +17,11 @@ import {
   formatPermissionSummary,
   mapPermissionButtons,
 } from "@/lib/permissionOptions";
-import { type CSSProperties, useEffect, useState } from "react";
+import {
+  canClaimAskUserSettle,
+  settleAskUserDecision,
+} from "@/lib/askUserSettle";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { WorkbenchComposerShell } from "@/app/WorkbenchComposerShell";
 
@@ -47,10 +52,14 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
     openShipFlow,
     openWorktreeCreate,
     openWorktreeGc,
+    askUser,
+    askUserTimeoutSec,
+    clearPendingGates,
     perm,
     permBarRef,
     permCountdownStartedAt,
     permissionTimeoutSec,
+    setAskUser,
     phoneLayout,
     projects,
     refreshCliWorktrees,
@@ -76,6 +85,9 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
   } = p;
   const [permBusy, setPermBusy] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
+  const askUserSettlingRpcRef = useRef<number | null>(null);
+  const askUserLiveRef = useRef(askUser);
+  askUserLiveRef.current = askUser;
   const previewText = displayPermissionPreview(perm?.preview);
   useEffect(() => {
     setPermBusy(false);
@@ -140,6 +152,80 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
                   {welcomePrompt}
                 </div>
               </div>
+            ) : null}
+            {askUser ? (
+              <AskUserBar
+                payload={askUser}
+                timeoutSec={askUserTimeoutSec}
+                labels={{
+                  title: tr("askUser.title"),
+                  submit: tr("askUser.submit"),
+                  cancel: tr("askUser.cancel"),
+                  otherPlaceholder: tr("askUser.otherPlaceholder"),
+                  freeTextHint: tr("askUser.freeTextHint"),
+                  multiHint: tr("askUser.multiHint"),
+                  minimize: tr("askUser.minimize"),
+                  restore: tr("askUser.restore"),
+                  pendingChip: tr("askUser.pendingChip"),
+                  autoCancelCountdown: tr("askUser.autoCancelCountdown"),
+                }}
+                onSubmit={async (answers) => {
+                  if (!askUser) return;
+                  if (
+                    !canClaimAskUserSettle(
+                      askUserSettlingRpcRef.current,
+                      askUser.rpcId,
+                    )
+                  ) {
+                    return;
+                  }
+                  const payload = askUser;
+                  askUserSettlingRpcRef.current = payload.rpcId;
+                  setAskUser(null);
+                  const settled = await settleAskUserDecision({
+                    payload,
+                    decision: "accepted",
+                    answers,
+                    viewingSessionId: () => session.sessionId,
+                    currentRpcId: () => askUserLiveRef.current?.rpcId ?? null,
+                    resolve: (args) => api.sessionResolveAskUser(args),
+                  });
+                  if (settled.kind === "restore") {
+                    setAskUser(payload);
+                    showToast(String(settled.error), 4500);
+                  } else {
+                    clearPendingGates(payload.sessionId);
+                  }
+                  if (askUserSettlingRpcRef.current === payload.rpcId) {
+                    askUserSettlingRpcRef.current = null;
+                  }
+                }}
+                onCancel={async () => {
+                  if (!askUser) return;
+                  if (
+                    !canClaimAskUserSettle(
+                      askUserSettlingRpcRef.current,
+                      askUser.rpcId,
+                    )
+                  ) {
+                    return;
+                  }
+                  const payload = askUser;
+                  askUserSettlingRpcRef.current = payload.rpcId;
+                  setAskUser(null);
+                  await settleAskUserDecision({
+                    payload,
+                    decision: "cancelled",
+                    viewingSessionId: () => session.sessionId,
+                    currentRpcId: () => askUserLiveRef.current?.rpcId ?? null,
+                    resolve: (args) => api.sessionResolveAskUser(args),
+                  });
+                  clearPendingGates(payload.sessionId);
+                  if (askUserSettlingRpcRef.current === payload.rpcId) {
+                    askUserSettlingRpcRef.current = null;
+                  }
+                }}
+              />
             ) : null}
             {perm ? (
               <div

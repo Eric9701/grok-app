@@ -1,7 +1,7 @@
 /**
  * Esc → stop generation / leave Settings.
  *
- * Overlays, permission, ask-user, find, menus, and voice own Escape first.
+ * Overlays, permission, ask-user gate, find, menus, and voice own Escape first.
  * Settings is a full-page view: Esc leaves it instead of stopping a
  * background turn. Nested GlassModal / Select layers still own Escape.
  */
@@ -13,7 +13,7 @@ export type EscapeStopOpts = {
   overlayOpen: boolean;
   /** Permission bar owns Esc → deny. */
   permOpen: boolean;
-  /** Ask-user questionnaire modal. */
+  /** Ask-user questionnaire composer gate. */
   askUserOpen: boolean;
   /** In-chat find bar. */
   chatFindOpen: boolean;

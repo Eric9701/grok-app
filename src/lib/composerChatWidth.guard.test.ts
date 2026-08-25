@@ -52,6 +52,11 @@ describe("composer tracks chat reading width", () => {
     expect(perm?.[0]).toMatch(/pointer-events:\s*auto/);
     expect(perm?.[0]).toMatch(/-webkit-app-region:\s*no-drag/);
 
+    const ask = part1.match(/(?:^|\n)\.ask-user-bar\s*\{[^}]*\}/);
+    expect(ask?.[0]).toMatch(/max-width:\s*var\(--chat-width-max/);
+    expect(ask?.[0]).toMatch(/pointer-events:\s*auto/);
+    expect(ask?.[0]).toMatch(/-webkit-app-region:\s*no-drag/);
+
     // Prefer the standalone .composer rule (not .composer-stack .composer).
     const composer = [...part2.matchAll(/(?:^|\n)\.composer\s*\{[^}]*\}/g)].map(
       (m) => m[0],
