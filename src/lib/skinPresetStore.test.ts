@@ -109,8 +109,12 @@ describe("currentLookManifest", () => {
       skin: "ocean",
       scrim: 42,
       wallpaper: video,
+      textColor: "#F00",
+      fontShadow: true,
       viewAspect: 1.6,
     });
+    expect(man.textColor).toBe("#ff0000");
+    expect(man.fontShadow).toBe(true);
     expect(man.wallpaper).toMatchObject({
       kind: "video",
       file: "assets/wallpaper.mp4",

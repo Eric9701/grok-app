@@ -189,6 +189,8 @@ export function SkinShareProvider({ children }: { children: ReactNode }) {
               skin: theme.skin,
               wallpaperRecord: theme.wallpaperRecord,
               wallpaperScrim: theme.wallpaperScrim,
+              textColor: theme.textColor,
+              fontShadow: theme.fontShadow,
             }),
             snapshotBeforeLastApply: async () => {
               setProgress({ sent: 0, total: 1 });
@@ -197,6 +199,8 @@ export function SkinShareProvider({ children }: { children: ReactNode }) {
                 skin: theme.skin,
                 scrim: theme.wallpaperScrim,
                 wallpaper: theme.wallpaperRecord,
+                textColor: theme.textColor,
+                fontShadow: theme.fontShadow,
                 onProgress: (sent, total) => setProgress({ sent, total }),
                 signal: cancelRef.current,
               });
@@ -209,6 +213,8 @@ export function SkinShareProvider({ children }: { children: ReactNode }) {
             applyWallpaperAdjustChoice: theme.applyWallpaperAdjustChoice,
             applySkinChoice: theme.applySkinChoice,
             applyWallpaperScrimChoice: theme.applyWallpaperScrimChoice,
+            applyTextColorChoice: theme.applyTextColorChoice,
+            applyFontShadowChoice: theme.applyFontShadowChoice,
             saveFromInspect: async (inspectId) => {
               const entry = await skinPresetSaveFromInspect(inspectId);
               savedId = entry.id;

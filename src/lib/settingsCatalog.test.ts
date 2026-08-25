@@ -311,6 +311,18 @@ describe("settingsCatalog", () => {
     expect(wallpaperHits.some((h) => h.entry.id === "appearance.wallpaper")).toBe(
       true,
     );
+    const textColor = searchSettingsEntries("文字颜色", tZh, tEn);
+    expect(textColor.some((h) => h.entry.id === "appearance.textColor")).toBe(
+      true,
+    );
+    const fontShadow = searchSettingsEntries("text shadow", tZh, tEn);
+    expect(fontShadow.some((h) => h.entry.id === "appearance.fontShadow")).toBe(
+      true,
+    );
+    const chromeReset = searchSettingsEntries("恢复默认", tZh, tEn);
+    expect(
+      chromeReset.some((h) => h.entry.id === "appearance.chromeReset"),
+    ).toBe(true);
     const schedule = searchSettingsEntries("schedule", tZh, tEn);
     expect(
       schedule.some((h) => h.entry.id === "appearance.themeSchedule"),

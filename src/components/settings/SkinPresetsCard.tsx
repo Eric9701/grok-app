@@ -96,6 +96,8 @@ export function SkinPresetsCard() {
           skin: theme.skin,
           scrim: theme.wallpaperScrim,
           wallpaper: theme.wallpaperRecord,
+          textColor: theme.textColor,
+          fontShadow: theme.fontShadow,
         });
         let stagingId: string | null = null;
         if (theme.wallpaperRecord?.blob) {
@@ -115,6 +117,8 @@ export function SkinPresetsCard() {
           skin: theme.skin,
           scrim: theme.wallpaperScrim,
           wallpaper: theme.wallpaperRecord,
+          textColor: theme.textColor,
+          fontShadow: theme.fontShadow,
         });
         let stagingId: string | null = null;
         if (theme.wallpaperRecord?.blob) {
@@ -152,6 +156,8 @@ export function SkinPresetsCard() {
         skin: theme.skin,
         scrim: theme.wallpaperScrim,
         wallpaper: theme.wallpaperRecord,
+        textColor: theme.textColor,
+        fontShadow: theme.fontShadow,
       });
       let stagingId = "";
       if (theme.wallpaperRecord?.blob) {

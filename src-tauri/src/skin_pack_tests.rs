@@ -311,6 +311,8 @@ fn round_trip_export_inspect() {
         "name": "Harbor dusk",
         "skin": "ocean",
         "scrim": 42,
+        "textColor": "#F0A",
+        "fontShadow": true,
         "themePreference": "dark",
         "wallpaper": {
             "focus": { "cx": 0.46, "cy": 0.38, "zoom": 1.25 }
@@ -320,6 +322,8 @@ fn round_trip_export_inspect() {
     let p = inspect_pack(&dest, "file").expect("inspect");
     assert_eq!(p.skin, "ocean");
     assert_eq!(p.scrim, 42);
+    assert_eq!(p.text_color.as_deref(), Some("#ff00aa"));
+    assert!(p.font_shadow);
     assert_eq!(p.name, "Harbor dusk");
     assert!(p.theme_preference.is_none());
     let w = p.wallpaper.as_ref().expect("wallpaper");

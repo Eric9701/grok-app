@@ -12,7 +12,7 @@ preview.jpg              # 可选
 
 允许的顶层名（规范化后小写）：`manifest.json`、`preview.jpg`、`assets/`、`assets/wallpaper.{jpg,jpeg,png,webp,gif,mp4,webm}`。未知顶层名 fail-closed（`invalid_pack`）。忽略 `__macosx/**`、`.ds_store`、`._*`。只接受 Stored / Deflated。
 
-字段：内置 `skin`、`scrim`、`wallpaper`（含 `focus` / `clip` / `sha256`）。`tokens` / `style` / `css` 或 `schemaVersion !== 1` → `unsupported_schema`。未知 `skin` **不**整包失败：回落 `default` + `warnings: ["unknown_skin"]`。`wallpaper == null` 默认清除接收方壁纸（`will_clear_wallpaper`）。
+字段：内置 `skin`、`scrim`、`wallpaper`（含 `focus` / `clip` / `sha256`）、可选 `textColor`（`#rgb` / `#rrggbb`，缺省或非法 = 跟随浅深色主题）、可选 `fontShadow`（bool，缺省 `false`）。`tokens` / `style` / `css` 或 `schemaVersion !== 1` → `unsupported_schema`。未知 `skin` **不**整包失败：回落 `default` + `warnings: ["unknown_skin"]`。`wallpaper == null` 默认清除接收方壁纸（`will_clear_wallpaper`）。设置页本身始终实色，不进皮肤包。
 
 **壁纸导出 bake：** 用户导出 / 分享时，按**当前应用窗口里实际看到的那一块**裁进包里（`.app-wallpaper-media` 宽高比 + 当前 `focus`；缺 focus 当默认 cover）。即使没手动拉焦点，窗口比例和素材不一致时也会裁掉 cover 多出来的边。裁后 `focus` 复位默认（cx=0.5, cy=0.5, zoom=1），接收方 cover-fill 与导出时看起来一致，包体积最小。当前窗口正好等于素材比例且无缩放时不重编码。本地预设库与 undo 快照仍保留原片 + 参数（套用预设可再编辑）；只有用户面向的 export 才 bake。
 

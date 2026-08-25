@@ -22,7 +22,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | Section | Tabs |
 |---------|------|
 | general | `composer` · `permissions` · `agent`（含 experimental memory、memory browser、**memory embedding 0.2.117**） · `app` |
-| appearance | `theme`（主题：浅深色 / 皮肤 / 背景）· `interface`（界面：聊天展示） |
+| appearance | `theme`（主题：浅深色 / 皮肤 / 背景 / 文字色与阴影）· `interface`（界面：聊天展示） |
 | account | `official` · `providers` · `extras`（「拓展」：官方工具注入开关） |
 | extensions | `plugins` · `mcp` · `skills`（含 **探测 Claude/Cursor 技能** 开关，`#/settings/extensions/skills` → `settings-anchor-ext-skills-discover`）· `agents` · `hooks`（**无** `market` / `apps`；`#/settings/extensions/market` → `plugins` 可安装目录锚点） |
 | runtime | `cli` · `connection` · `network` · `pool` · `tools` · `privacy` |

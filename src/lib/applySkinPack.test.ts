@@ -15,6 +15,8 @@ function preview(over: Partial<SkinPackPreview> = {}): SkinPackPreview {
     skin: "ocean",
     requestedSkin: "ocean",
     scrim: 42,
+    textColor: null,
+    fontShadow: false,
     themePreference: "dark",
     wallpaper: null,
     previewPath: null,
@@ -61,6 +63,12 @@ function deps(over: Partial<ApplySkinPackDeps> = {}): ApplySkinPackDeps & {
     applyWallpaperScrimChoice: (v) => {
       calls.push(`scrim:${v}`);
     },
+    applyTextColorChoice: (v) => {
+      calls.push(`textColor:${v ?? "default"}`);
+    },
+    applyFontShadowChoice: (v) => {
+      calls.push(`fontShadow:${v ? "1" : "0"}`);
+    },
     applyThemeChoice: () => {
       calls.push("theme");
     },
@@ -94,7 +102,21 @@ describe("applySkinPack", () => {
     expect(r.appearanceWriteCompleted).toBe(true);
     expect(r.applySkinOpts).toEqual({ applyPreferredTheme: false });
     expect(d.calls).toContain("skin:false");
+    expect(d.calls).toContain("textColor:default");
+    expect(d.calls).toContain("fontShadow:0");
     expect(d.calls).not.toContain("theme");
+  });
+
+  it("applies pack text color and font shadow", async () => {
+    const d = deps();
+    const r = await applySkinPack(
+      preview({ textColor: "#ff00aa", fontShadow: true }),
+      { keepWallpaper: false, saveToLibrary: false, skipUndoSnapshot: true },
+      d,
+    );
+    expect(r.appearanceWriteCompleted).toBe(true);
+    expect(d.calls).toContain("textColor:#ff00aa");
+    expect(d.calls).toContain("fontShadow:1");
   });
 
   it("skips undo snapshot on empty default look", async () => {

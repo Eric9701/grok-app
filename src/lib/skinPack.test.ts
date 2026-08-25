@@ -40,6 +40,48 @@ describe("validateSkinManifest", () => {
     expect(r.warnings).toContain("will_clear_wallpaper");
   });
 
+  it("reads custom text color and font shadow; missing fields stay factory", () => {
+    const withChrome = validateSkinManifest({
+      ...base,
+      wallpaper: null,
+      textColor: "#F0A",
+      fontShadow: true,
+    });
+    expect(withChrome.ok).toBe(true);
+    if (!withChrome.ok) return;
+    expect(withChrome.textColor).toBe("#ff00aa");
+    expect(withChrome.fontShadow).toBe(true);
+    expect(withChrome.manifest.textColor).toBe("#ff00aa");
+    expect(withChrome.manifest.fontShadow).toBe(true);
+
+    const missing = validateSkinManifest({ ...base, wallpaper: null });
+    expect(missing.ok).toBe(true);
+    if (!missing.ok) return;
+    expect(missing.textColor).toBeNull();
+    expect(missing.fontShadow).toBe(false);
+
+    const junk = validateSkinManifest({
+      ...base,
+      wallpaper: null,
+      textColor: "red",
+      fontShadow: "nope",
+    });
+    expect(junk.ok).toBe(true);
+    if (!junk.ok) return;
+    expect(junk.textColor).toBeNull();
+    expect(junk.fontShadow).toBe(false);
+
+    const exported = buildExportManifest({
+      name: "x",
+      skin: "ocean",
+      scrim: 10,
+      textColor: "#abc",
+      fontShadow: true,
+    });
+    expect(exported.textColor).toBe("#aabbcc");
+    expect(exported.fontShadow).toBe(true);
+  });
+
   it("ignores themePreference and does not copy it into export manifests", () => {
     const r = validateSkinManifest({
       ...base,
@@ -118,7 +160,7 @@ describe("validateSkinManifest", () => {
 });
 
 describe("isEmptyDefaultLook", () => {
-  it("is true only for default skin, no wallpaper, default scrim", () => {
+  it("is true only for default skin, no wallpaper, default scrim, factory chrome", () => {
     expect(
       isEmptyDefaultLook({
         skin: "default",
@@ -126,6 +168,22 @@ describe("isEmptyDefaultLook", () => {
         wallpaperScrim: DEFAULT_WALLPAPER_SCRIM,
       }),
     ).toBe(true);
+    expect(
+      isEmptyDefaultLook({
+        skin: "default",
+        wallpaperRecord: null,
+        wallpaperScrim: DEFAULT_WALLPAPER_SCRIM,
+        textColor: "#ffffff",
+      }),
+    ).toBe(false);
+    expect(
+      isEmptyDefaultLook({
+        skin: "default",
+        wallpaperRecord: null,
+        wallpaperScrim: DEFAULT_WALLPAPER_SCRIM,
+        fontShadow: true,
+      }),
+    ).toBe(false);
     expect(
       isEmptyDefaultLook({
         skin: "ocean" as ThemeSkinId,

@@ -395,10 +395,11 @@
   display: flex;
   min-width: 0;
   min-height: 0;
+  background: var(--bg-main);
 }
 
 .app-settings-stage .settings-page {
-  background: transparent;
+  background: var(--bg-main);
 }
 
 /* ===== Settings full page (ChatGPT-desktop style) ===== */
@@ -440,11 +441,10 @@
   flex-shrink: 0;
   border-right: 1px solid var(--border-subtle);
   /*
-   * Same token as workbench .sidebar. On mac, parent .settings-page is
-   * transparent so glass samples vibrancy. Win keeps solid shell + this fill.
-   * overflow lives on __nav-inner — hidden here clips backdrop-filter.
+   * Settings chrome is always solid so theme / wallpaper glass never
+   * shows through forms. overflow lives on __nav-inner.
    */
-  background: var(--bg-sidebar);
+  background: var(--bg-sidebar-solid, var(--bg-sidebar));
   display: flex;
   flex-direction: column;
   overflow: visible;

@@ -39,6 +39,16 @@ import {
   type ThemeScheduleConfig,
 } from "@/lib/themeSchedule";
 import {
+  applyAppearanceChrome,
+  applyFontShadow,
+  applyTextColor,
+  loadAppearanceChrome,
+  parseFontShadow,
+  parseTextColor,
+  saveFontShadow,
+  saveTextColor,
+} from "@/lib/appearanceChromePref";
+import {
   applySkinToDocument,
   applyWallpaperFlag,
   applyWallpaperScrimToDocument,
@@ -78,6 +88,8 @@ export type ThemeShellValue = {
   wallpaperUrlRef: React.MutableRefObject<string | null>;
   wallpaperScrim: number;
   setWallpaperScrim: (v: number) => void;
+  textColor: string | null;
+  fontShadow: boolean;
   applyThemeChoice: (next: ThemePreference) => void;
   applyThemeScheduleChoice: (next: ThemeScheduleConfig) => void;
   applySkinChoice: (
@@ -95,6 +107,9 @@ export type ThemeShellValue = {
   }) => void;
   applyWallpaperMediaSize: (size: { w: number; h: number }) => void;
   applyWallpaperScrimChoice: (value: number) => void;
+  applyTextColorChoice: (value: string | null) => void;
+  applyFontShadowChoice: (value: boolean) => void;
+  resetAppearanceChromeChoice: () => void;
 };
 
 const ThemeShellContext = createContext<ThemeShellValue | null>(null);
@@ -143,6 +158,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const wallpaperUrlRef = useRef<string | null>(null);
   const [wallpaperScrim, setWallpaperScrim] = useState(() =>
     loadWallpaperScrim(localStorage),
+  );
+  const [textColor, setTextColor] = useState<string | null>(
+    () => loadAppearanceChrome(localStorage).textColor,
+  );
+  const [fontShadow, setFontShadow] = useState(
+    () => loadAppearanceChrome(localStorage).fontShadow,
   );
 
   useEffect(() => {
@@ -241,6 +262,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyWallpaperScrimToDocument(wallpaperScrim);
   }, [wallpaperScrim]);
+
+  useEffect(() => {
+    applyAppearanceChrome({ textColor, fontShadow });
+  }, [textColor, fontShadow]);
 
   const applyThemeChoice = useCallback(
     (next: ThemePreference) => {
@@ -448,6 +473,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setWallpaperScrim(value);
   }, []);
 
+  const applyTextColorChoice = useCallback((value: string | null) => {
+    const next = parseTextColor(value);
+    saveTextColor(next, localStorage);
+    applyTextColor(next);
+    setTextColor(next);
+  }, []);
+
+  const applyFontShadowChoice = useCallback((value: boolean) => {
+    const next = parseFontShadow(value);
+    saveFontShadow(next, localStorage);
+    applyFontShadow(next);
+    setFontShadow(next);
+  }, []);
+
+  const resetAppearanceChromeChoice = useCallback(() => {
+    saveTextColor(null, localStorage);
+    saveFontShadow(false, localStorage);
+    applyTextColor(null);
+    applyFontShadow(false);
+    setTextColor(null);
+    setFontShadow(false);
+  }, []);
+
   const value = useMemo<ThemeShellValue>(
     () => ({
       theme,
@@ -469,6 +517,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       wallpaperUrlRef,
       wallpaperScrim,
       setWallpaperScrim,
+      textColor,
+      fontShadow,
       applyThemeChoice,
       applyThemeScheduleChoice,
       applySkinChoice,
@@ -476,6 +526,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyWallpaperAdjustChoice,
       applyWallpaperMediaSize,
       applyWallpaperScrimChoice,
+      applyTextColorChoice,
+      applyFontShadowChoice,
+      resetAppearanceChromeChoice,
     }),
     [
       theme,
@@ -488,6 +541,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       wallpaperRecord,
       wallpaperUrl,
       wallpaperScrim,
+      textColor,
+      fontShadow,
       applyThemeChoice,
       applyThemeScheduleChoice,
       applySkinChoice,
@@ -495,6 +550,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyWallpaperAdjustChoice,
       applyWallpaperMediaSize,
       applyWallpaperScrimChoice,
+      applyTextColorChoice,
+      applyFontShadowChoice,
+      resetAppearanceChromeChoice,
     ],
   );
 

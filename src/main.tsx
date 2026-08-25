@@ -40,6 +40,10 @@ import {
 } from "./lib/codeFontScalePref";
 import { applyUiFontFamily, loadUiFontFamily } from "./lib/uiFontPref";
 import {
+  applyAppearanceChrome,
+  loadAppearanceChrome,
+} from "./lib/appearanceChromePref";
+import {
   applyChatDensity,
   loadChatDensity,
 } from "./lib/chatDensity";
@@ -96,6 +100,7 @@ applyComposerMinRows(loadComposerMinRows(localStorage));
 // the IndexedDB blob is loaded — no synchronous access to IDB is possible.
 applyWallpaperFlag(loadWallpaperMeta(localStorage) !== null);
 applyWallpaperScrimToDocument(loadWallpaperScrim(localStorage));
+applyAppearanceChrome(loadAppearanceChrome(localStorage));
 // macOS: null = follow OS (live matchMedia). Windows: lock to the resolved
 // theme — WebView2 matchMedia does not track Personalization flips.
 void applyNativeWindowTheme(

@@ -125,16 +125,13 @@ describe("floating pop CSS", () => {
     expect(settings).not.toMatch(/settings-stage-(?:enter|leave)/);
   });
 
-  it("uses the same CSS frost on workbench sidebar and settings nav", () => {
-    const blur =
-      /backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)\s*saturate\(var\(--sidebar-saturate\)\)/;
+  it("keeps mac workbench sidebar frost; settings nav is solid", () => {
     expect(workbenchCss).toMatch(
       /\.platform-mac \.sidebar\s*\{[^}]*backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)/,
     );
     expect(workbenchCss).toMatch(
-      /\.platform-mac \.settings-page__nav\s*\{[^}]*backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)/,
+      /\.platform-mac \.settings-page__nav\s*\{[^}]*background:\s*var\(--bg-sidebar-solid[^}]*backdrop-filter:\s*none/,
     );
-    expect(workbenchCss).toMatch(blur);
   });
 
   it("keeps the workbench fully painted behind the direct settings swap", () => {

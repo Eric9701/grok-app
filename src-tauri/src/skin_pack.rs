@@ -58,6 +58,10 @@ pub struct SkinPackPreviewDto {
     pub skin: String,
     pub requested_skin: String,
     pub scrim: i32,
+    #[serde(default)]
+    pub text_color: Option<String>,
+    #[serde(default)]
+    pub font_shadow: bool,
     pub theme_preference: Option<String>,
     pub wallpaper: Option<SkinPackWallpaperDto>,
     pub preview_path: Option<String>,
@@ -84,6 +88,10 @@ pub struct SkinPackExportManifest {
     pub skin: String,
     #[serde(default)]
     pub scrim: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_color: Option<String>,
+    #[serde(default)]
+    pub font_shadow: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wallpaper: Option<serde_json::Value>,
 }
@@ -197,6 +205,42 @@ fn parse_scrim(v: &serde_json::Value) -> i32 {
     }
 }
 
+/// `#rgb` / `#rrggbb` → lowercase `#rrggbb`. Anything else is follow-theme.
+fn parse_text_color(v: &serde_json::Value) -> Option<String> {
+    let s = v.as_str()?.trim();
+    if s.is_empty() {
+        return None;
+    }
+    let lower = s.to_ascii_lowercase();
+    if lower == "default" || lower == "theme" {
+        return None;
+    }
+    let hex = lower.strip_prefix('#')?;
+    let expanded = if hex.len() == 3 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        let b = hex.as_bytes();
+        format!(
+            "#{0}{0}{1}{1}{2}{2}",
+            b[0] as char, b[1] as char, b[2] as char
+        )
+    } else if hex.len() == 6 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        format!("#{hex}")
+    } else {
+        return None;
+    };
+    Some(expanded)
+}
+
+fn parse_font_shadow(v: &serde_json::Value) -> bool {
+    match v {
+        serde_json::Value::Bool(b) => *b,
+        serde_json::Value::Number(n) => n.as_i64() == Some(1),
+        serde_json::Value::String(s) => {
+            matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "on" | "yes")
+        }
+        _ => false,
+    }
+}
+
 fn validate_manifest_value(
     v: &serde_json::Value,
     wallpaper_present: bool,
@@ -232,6 +276,11 @@ fn validate_manifest_value(
         "default".into()
     };
     let scrim = obj.get("scrim").map(parse_scrim).unwrap_or(DEFAULT_SCRIM);
+    let text_color = obj.get("textColor").and_then(parse_text_color);
+    let font_shadow = obj
+        .get("fontShadow")
+        .map(parse_font_shadow)
+        .unwrap_or(false);
     let description = obj
         .get("description")
         .and_then(|x| x.as_str())
@@ -341,6 +390,8 @@ fn validate_manifest_value(
             skin,
             requested_skin: requested,
             scrim,
+            text_color,
+            font_shadow,
             theme_preference: None,
             wallpaper,
             preview_path: None,

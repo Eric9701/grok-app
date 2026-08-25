@@ -65,6 +65,8 @@ export function currentLookManifest(input: {
   skin: ThemeSkinId;
   scrim: number;
   wallpaper: WallpaperRecord | null;
+  textColor?: string | null;
+  fontShadow?: boolean;
   /** Exporter window aspect; wallpaper bake uses this to match the editor crop. */
   viewAspect?: number;
 }): ReturnType<typeof buildExportManifest> {
@@ -78,6 +80,8 @@ export function currentLookManifest(input: {
     name: input.name,
     skin: input.skin,
     scrim: input.scrim,
+    textColor: input.textColor,
+    fontShadow: input.fontShadow,
     wallpaper: input.wallpaper
       ? {
           file: `assets/wallpaper.${ext}`,
@@ -140,6 +144,8 @@ export async function snapshotBeforeLastApply(
     skin: ThemeSkinId;
     scrim: number;
     wallpaper: WallpaperRecord | null;
+    textColor?: string | null;
+    fontShadow?: boolean;
     onProgress?: (sent: number, total: number) => void;
     signal?: { cancelled: boolean };
   },
@@ -170,6 +176,8 @@ export async function snapshotBeforeLastApply(
       skin: opts.skin,
       scrim: opts.scrim,
       wallpaper: opts.wallpaper,
+      textColor: opts.textColor,
+      fontShadow: opts.fontShadow,
     });
     await io.commit(id, manifest);
     if (isCancelled(opts.signal)) {

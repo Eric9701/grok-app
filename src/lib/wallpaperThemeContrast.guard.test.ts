@@ -19,6 +19,15 @@ const composerLayoutCss = readFileSync(
   join(__dirname, "../styles/chat.part1.css"),
   "utf8",
 );
+const settingsCss = ["part1", "part2"]
+  .map((part) =>
+    readFileSync(join(__dirname, `../styles/settings.${part}.css`), "utf8"),
+  )
+  .join("\n");
+const sidebarCss = readFileSync(
+  join(__dirname, "../styles/sidebar.part1.css"),
+  "utf8",
+);
 
 describe("wallpaper theme contrast CSS", () => {
   it("maps light wallpaper to its own white veil and pane curves", () => {
@@ -68,17 +77,46 @@ describe("wallpaper theme contrast CSS", () => {
     );
   });
 
-  it("uses a dark edge on exposed light wallpaper chrome", () => {
+  it("keeps settings chrome solid over wallpaper and mac glass", () => {
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.app-settings-stage\s*\{[^}]*background:\s*var\(--bg-main\)[^}]*backdrop-filter:\s*none/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.settings-page__nav,[^}]*background:\s*var\(--bg-sidebar-solid[^}]*backdrop-filter:\s*none !important/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.settings-page__content,[^}]*background:\s*var\(--bg-main\) !important/s,
+    );
+    expect(css).not.toMatch(
+      /html\[data-wallpaper="1"\]\[data-wallpaper-clear="1"\] \.settings-page__content[^}]*background:\s*transparent/s,
+    );
+    expect(settingsCss).toMatch(
+      /\.app-settings-stage\s*\{[^}]*background:\s*var\(--bg-main\)/s,
+    );
+    expect(settingsCss).toMatch(
+      /\.settings-page__nav\s*\{[^}]*background:\s*var\(--bg-sidebar-solid/s,
+    );
+    expect(sidebarCss).toMatch(
+      /\.platform-mac \.settings-page__nav\s*\{[^}]*background:\s*var\(--bg-sidebar-solid[^}]*backdrop-filter:\s*none/s,
+    );
+  });
+
+  it("does not force wallpaper chrome ink; text shadow is opt-in", () => {
     const lightRoot = css.match(
       /html\[data-theme="light"\]\[data-wallpaper="1"\]\s*\{[^}]*\}/s,
     )?.[0];
     expect(lightRoot).toContain("--wallpaper-chrome-foreground");
-    expect(lightRoot).toContain("--wallpaper-chrome-shadow-color");
-    expect(css).toMatch(
+    expect(css).not.toMatch(
+      /html\[data-theme="light"\]\[data-wallpaper="1"\] \.sidebar\s*\{[^}]*--text-primary:\s*var\(--wallpaper-chrome-foreground\)/s,
+    );
+    expect(css).not.toMatch(
       /html\[data-theme="dark"\]\[data-wallpaper="1"\] \.sidebar\s*\{[^}]*text-shadow:/s,
     );
     expect(css).toMatch(
-      /html\[data-theme="light"\]\[data-wallpaper="1"\] \.sidebar\s*\{[^}]*--text-primary:\s*var\(--wallpaper-chrome-foreground\)[^}]*text-shadow:\s*0 1px 2px var\(--wallpaper-chrome-shadow-color\)/s,
+      /html\[data-font-shadow="1"\][\s\S]*text-shadow:\s*0 1px 2px rgb\(0 0 0 \/ 0\.55\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-font-shadow="1"\] \.settings-page\s*\{[^}]*text-shadow:\s*none/s,
     );
     expect(css).toMatch(
       /html\[data-theme="light"\]\[data-wallpaper="1"\]\s+\.sidebar\s+\.user-avatar--logo\s+\.grok-logo\s+svg\s*\{[^}]*color:\s*var\(--text-inverse\)[^}]*filter:\s*none/s,
@@ -89,28 +127,15 @@ describe("wallpaper theme contrast CSS", () => {
     expect(css).toMatch(
       /html\[data-theme="light"\]\[data-wallpaper="1"\]\s+\.sidebar\s+\.user-avatar--logo\s+:is\(\.provider-brand-icon--amux,\s*\.provider-brand-icon--opencode-go\)\s*\{[^}]*color:\s*var\(--text-inverse\)/s,
     );
-    expect(css).toMatch(
-      /html\[data-theme="light"\]\[data-wallpaper="1"\][^{]*:is\(\.main__title,[^)]*\.main__title-row \.chrome-btn,[^)]*\.main__top-actions \.chrome-btn[^)]*\)\s*\{[^}]*color:\s*var\(--wallpaper-chrome-foreground\)[^}]*text-shadow:/s,
-    );
-    expect(css).toMatch(
-      /html\[data-theme="light"\]\[data-wallpaper="1"\] \.composer-welcome-mark\s*\{[^}]*--text-primary:\s*var\(--wallpaper-chrome-foreground\)[^}]*text-shadow:/s,
-    );
   });
 
-  it("protects light wallpaper assistant ink while preserving carried surfaces", () => {
+  it("keeps assistant timeline on theme tokens and carried surfaces unshadowed", () => {
     const timeline = css.match(
-      /html\[data-theme="light"\]\[data-wallpaper="1"\] \.lobe-chat-assistant-timeline\s*\{[^}]*\}/s,
+      /html\[data-theme="dark"\]\[data-wallpaper="1"\] \.lobe-chat-assistant-timeline\s*\{[^}]*\}/s,
     )?.[0];
-    expect(timeline).toContain(
-      "--chat-text: var(--wallpaper-chrome-foreground)",
-    );
-    expect(timeline).toContain(
-      "text-shadow: 0 1px 2px var(--wallpaper-chrome-shadow-color)",
-    );
-    expect(timeline).not.toMatch(/(?:background|border|box-shadow):/);
-    expect(css).toMatch(
-      /html\[data-theme="light"\]\[data-wallpaper="1"\] \.lobe-chat-assistant-timeline svg\s*\{[^}]*filter:\s*drop-shadow\(0 1px 1px var\(--wallpaper-chrome-shadow-color\)\)/s,
-    );
+    expect(timeline).toContain("--chat-text: var(--text-primary)");
+    expect(timeline).toContain("var(--text-primary) 84%");
+    expect(timeline).not.toMatch(/text-shadow:/);
 
     const carriedSurface = css.match(
       /\.lobe-chat-assistant-timeline\s+:is\([^{]*\.lobe-timeline-tool__output,[^{]*\.lobe-chat-plan,[^{]*\.struct-json,[^{]*\.att-card,[^{]*\.file-path-card[^)]*\)\s*\{[^}]*\}/s,
@@ -122,35 +147,12 @@ describe("wallpaper theme contrast CSS", () => {
     expect(css).toMatch(
       /html\[data-wallpaper="1"\]\s+\.lobe-chat\s+\.lobe-chat-assistant-timeline\s+:is\([^{]*\.lobe-chat-plan,[^{]*\.struct-json,[^{]*\.att-card,[^{]*\.file-path-card[^)]*\)\s+svg\s*\{[^}]*filter:\s*none/s,
     );
-  });
-
-  it("extends wallpaper contrast only to exposed main-page text", () => {
-    const darkTimeline = css.match(
-      /html\[data-theme="dark"\]\[data-wallpaper="1"\] \.lobe-chat-assistant-timeline\s*\{[^}]*\}/s,
-    )?.[0];
-    expect(darkTimeline).toContain("--chat-text: var(--text-primary)");
-    expect(darkTimeline).toContain("var(--text-primary) 84%");
-    expect(darkTimeline).toContain("var(--text-primary) 72%");
-
-    const lightExposed = css.match(
-      /html\[data-theme="light"\]\[data-wallpaper="1"\]\s+:is\(\.lobe-chat-empty, \.main__stage > \.conn-bar\)\s*\{[^}]*color:\s*var\(--wallpaper-chrome-foreground\)[^}]*text-shadow:\s*0 1px 2px var\(--wallpaper-chrome-shadow-color\)[^}]*\}/s,
-    )?.[0];
-    const darkExposed = css.match(
-      /html\[data-theme="dark"\]\[data-wallpaper="1"\]\s+:is\(\.lobe-chat-empty, \.main__stage > \.conn-bar\)\s*\{[^}]*color:\s*var\(--text-primary\)[^}]*text-shadow:\s*0 1px 2px var\(--wallpaper-foreground-shadow-color\)[^}]*\}/s,
-    )?.[0];
-    expect(lightExposed).toBeTruthy();
-    expect(darkExposed).toBeTruthy();
     expect(workbenchCss).toMatch(
-      /html\[data-theme="light"\]\[data-wallpaper="1"\]\s+\.auto-page\s+:is\(\.auto-page__title, \.auto-page__subtitle\)\s*\{/s,
+      /html\[data-theme="light"\]\[data-wallpaper="1"\]\s+\.auto-page\s+:is\(\.auto-page__title, \.auto-page__subtitle\)/s,
     );
     expect(workbenchCss).toMatch(
-      /html\[data-theme="dark"\]\[data-wallpaper="1"\]\s+\.auto-page\s+:is\(\.auto-page__title, \.auto-page__subtitle\)\s*\{/s,
+      /html\[data-theme="dark"\]\[data-wallpaper="1"\]\s+\.auto-page\s+:is\(\.auto-page__title, \.auto-page__subtitle\)/s,
     );
-    for (const exposed of [lightExposed, darkExposed]) {
-      expect(exposed).not.toMatch(
-        /(?:\.lobe-chat-bubble|\.composer|\.chat-code|\.att-card)/,
-      );
-    }
   });
 
   it("keeps the floating composer free of theme-specific fades", () => {

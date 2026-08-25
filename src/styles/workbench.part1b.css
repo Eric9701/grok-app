@@ -634,30 +634,17 @@ html[data-stream-perf="1"][data-wallpaper="1"]
 
 html[data-theme="light"][data-wallpaper="1"]
   .agent-kanban-page
-  :is(.auto-page__title, .auto-page__subtitle) {
-  color: var(--wallpaper-chrome-foreground);
-  text-shadow: 0 1px 2px var(--wallpaper-chrome-shadow-color);
-}
-
+  :is(.auto-page__title, .auto-page__subtitle),
 html[data-theme="dark"][data-wallpaper="1"]
   .agent-kanban-page
-  :is(.auto-page__title, .auto-page__subtitle) {
-  color: var(--text-primary);
-  text-shadow: 0 1px 2px var(--wallpaper-foreground-shadow-color);
-}
-
+  :is(.auto-page__title, .auto-page__subtitle),
 html[data-theme="light"][data-wallpaper="1"]
   .auto-page
-  :is(.auto-page__title, .auto-page__subtitle) {
-  color: var(--wallpaper-chrome-foreground);
-  text-shadow: 0 1px 2px var(--wallpaper-chrome-shadow-color);
-}
-
+  :is(.auto-page__title, .auto-page__subtitle),
 html[data-theme="dark"][data-wallpaper="1"]
   .auto-page
   :is(.auto-page__title, .auto-page__subtitle) {
   color: var(--text-primary);
-  text-shadow: 0 1px 2px var(--wallpaper-foreground-shadow-color);
 }
 /* --- merged --- */
 

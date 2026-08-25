@@ -47,6 +47,7 @@ import { MESSAGE_TIME_FORMATS } from "@/lib/messageTimeFormatPref";
 import { normalizeHHmm } from "@/lib/notifyQuietHours";
 import { SettingsTabStrip, SettingsLabelWithTip, UiCheck } from "./shared";
 import { SkinPresetsCard } from "./SkinPresetsCard";
+import { AppearanceChromeCard } from "./AppearanceChromeCard";
 
 export function AppearanceSection() {
   const s = useSettingsModel() as SettingsViewModel & Record<string, any>;
@@ -630,6 +631,7 @@ export function AppearanceSection() {
                     ) : null}
                   </div>
                 ) : null}
+                <AppearanceChromeCard />
                 <SkinPresetsCard />
               </>
             )}

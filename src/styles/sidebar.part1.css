@@ -169,7 +169,8 @@ button:disabled {
 
 /* Keyboard focus for permission / ask-user (no global outline, but visible here) */
 .perm-bar__btn:focus-visible,
-.ask-user__opt:focus-visible,
+.ask-user-bar--collapsed:focus-visible,
+.ask-user-bar__minimize:focus-visible,
 .modal-actions .btn:focus-visible,
 .modal-close:focus-visible {
   outline: 2px solid var(--border-focus, #6b8cff);
@@ -228,6 +229,7 @@ select,
 .composer-wrap,
 .composer,
 .perm-bar,
+.ask-user-bar,
 .overlay,
 .modal,
 .lobe-chat,
@@ -589,21 +591,19 @@ html.platform-mac[data-theme="light"] .aside {
 }
 
 /*
- * Settings page chrome must match workbench:
- * transparent page → glass nav samples native vibrancy (same as .sidebar).
- * Solid white parent under nav would make glass look opaque/dirty.
+ * Settings page chrome is always solid (no theme/wallpaper glass).
+ * Forms stay readable over a wallpaper; nav matches the solid sidebar plate.
  */
 .platform-mac .settings-page {
-  background: transparent;
+  background: var(--bg-main);
 }
 
 .platform-mac .settings-page__nav {
-  background: var(--bg-sidebar);
-  -webkit-backdrop-filter: blur(var(--sidebar-blur)) saturate(var(--sidebar-saturate));
-  backdrop-filter: blur(var(--sidebar-blur)) saturate(var(--sidebar-saturate));
+  background: var(--bg-sidebar-solid, var(--bg-sidebar));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   border-right: none;
   box-shadow: var(--sidebar-edge-shadow);
-  /* overflow on the blur element kills backdrop sampling in WKWebView */
   overflow: visible;
 }
 
@@ -618,6 +618,7 @@ html.platform-mac[data-theme="light"] .settings-page__nav {
   box-shadow: var(--sidebar-edge-shadow);
 }
 
+html.platform-mac[data-theme="light"] .settings-page,
 html.platform-mac[data-theme="light"] .settings-page__content {
   background: #ffffff;
   box-shadow: var(--sidebar-seam);
