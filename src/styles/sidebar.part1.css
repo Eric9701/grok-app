@@ -632,9 +632,7 @@ html.platform-mac[data-theme="light"] .settings-page__content {
 }
 
 /* Fully closed left pane (no icon rail) — reopen from main top icons.
- * Width stays on the inline style. !important:0 here is a hard cut.
- * overflow:hidden keeps the max-width frost plate from contributing to
- * flex/scrollable overflow while the box is at 0. */
+ * Width stays on the inline style. !important:0 here is a hard cut. */
 .sidebar--hidden,
 .sidebar--collapsed {
   padding: 0 !important;
