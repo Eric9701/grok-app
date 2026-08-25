@@ -49,9 +49,6 @@ export type LivingMoodInput = {
   idleBurstUntil?: number;
 };
 
-/** Hover dwell before curious → attentive (listening). */
-export const PET_HOVER_LISTEN_MS = 1800;
-
 export function resolveLivingMood(input: LivingMoodInput): string {
   const session = verbToMarkState(input.sessionVerb);
   if (input.dragging) return "dragging";
@@ -64,9 +61,9 @@ export function resolveLivingMood(input: LivingMoodInput): string {
   }
   if (session === "idle") {
     if (input.hovering) {
-      return (input.hoverMs ?? 0) >= PET_HOVER_LISTEN_MS
-        ? "listening"
-        : "curious";
+      // Local hover faces the viewer immediately. Curious-first held an
+      // uneven pair until a long dwell elapsed.
+      return "listening";
     }
     if (input.idleBurstMood && (input.idleBurstUntil ?? 0) > input.now) {
       return verbToMarkState(input.idleBurstMood);

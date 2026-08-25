@@ -3,6 +3,7 @@
  * The morph catalogue stays in `./bloub`; this file is the product mapping.
  */
 import {
+  BotEngine,
   DEFAULT_EXPRESSION,
   DEFAULT_SHAPE,
   EXPRESSION_BY_ID,
@@ -13,6 +14,7 @@ import {
   type ShapeId,
   type StateId,
 } from "./bloub";
+import { PET_LOOK_NEAR_SCALE } from "./petMarkPaint";
 
 export const BLOUB_PICKER_SHAPES = [
   "blob",
@@ -148,24 +150,48 @@ export function bloubShouldLoop(_id: StateId): boolean {
   return false;
 }
 
-const YAW_MAX = 16;
-const PITCH_MAX = 13;
-const REST_PITCH = 10;
+/** 3/4 rest → frontal hover: same curve and duration as the expression morph. */
+export const BLOUB_LOOK_LOCAL_ENTER_MORPH = BotEngine.SHAPE_MORPH;
 
-/** Look at the pointer from the mark centre. No settings-panel left-turn. */
+/** Full look budget by the outer face, not only at the body silhouette. */
+const FACE_R = 0.62;
+const YAW_MAX = 18;
+const PITCH_MAX = 14;
+const REST_PITCH = 8;
+
+/**
+ * Local hover look: face the camera, then add spherical perspective from the
+ * offset on the mark. `nx`/`ny` are in mark-radius units (1 = body edge).
+ *
+ * Entering the hover ring (r = PET_LOOK_NEAR_SCALE) stays frontal; travel and
+ * foreshortening grow across the face and reach the look budget before the
+ * silhouette edge, so a pointer on an eye actually turns the pair.
+ */
 export function bloubLookAtPointer(
   nx: number,
   ny: number,
   pointer: boolean,
 ): Look {
-  const x = Math.max(-1, Math.min(1, nx));
-  const y = Math.max(-1, Math.min(1, ny));
+  if (!pointer) {
+    return { yaw: 0, pitch: REST_PITCH, mix: 0, spin: 0, wander: 1 };
+  }
+  const r = Math.hypot(nx, ny);
+  let x = nx;
+  let y = ny;
+  if (r > 1) {
+    const ring = Math.max(PET_LOOK_NEAR_SCALE, 1.0001);
+    const s = r >= ring ? 0 : 1 - (r - 1) / (ring - 1);
+    x *= s;
+    y *= s;
+  }
+  x = Math.max(-1, Math.min(1, x / FACE_R));
+  y = Math.max(-1, Math.min(1, y / FACE_R));
   return {
     yaw: x * YAW_MAX,
     pitch: REST_PITCH - y * PITCH_MAX,
-    mix: pointer ? 1 : 0,
+    mix: 1,
     spin: 0,
-    wander: pointer ? 0 : 1,
+    wander: 0,
   };
 }
 

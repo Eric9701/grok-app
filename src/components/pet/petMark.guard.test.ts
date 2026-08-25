@@ -16,6 +16,12 @@ describe("PetMark long-run paint", () => {
     expect(src).toContain("pet://cursor");
   });
 
+  it("eases onto a frontal local-hover look and paints morphs at full cadence", () => {
+    expect(src).toContain("petLocalLookAxes");
+    expect(src).toContain("BLOUB_LOOK_LOCAL_ENTER_MORPH");
+    expect(src).toContain("isMorphing");
+  });
+
   it("mirrors the face from Host overlay position, not window.screenX", () => {
     expect(src).toContain("petReadOverlayFrame");
     expect(src).toContain("petShouldMirrorFromOverlay");

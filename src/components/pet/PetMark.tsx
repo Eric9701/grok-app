@@ -20,6 +20,7 @@ import {
   type BotFrame,
 } from "@/lib/pet/bloub";
 import {
+  BLOUB_LOOK_LOCAL_ENTER_MORPH,
   bloubExpressionOf,
   bloubLookAtPointer,
   bloubNotifFill,
@@ -30,7 +31,7 @@ import {
   resolveBloubPlay,
 } from "@/lib/pet/bloubPlay";
 import { pickRestEmote, resolveLivingMood } from "@/lib/pet/petMood";
-import { petLookIsNear, petPaintMinMs } from "@/lib/pet/petMarkPaint";
+import { petLocalLookAxes, petPaintMinMs } from "@/lib/pet/petMarkPaint";
 import {
   petMarkScreenCenter,
   petNormXOnWorkArea,
@@ -278,6 +279,8 @@ export function PetMark({
     const look = { dx: 0, dy: 0, localR: 48, at: 0, fromScreen: false };
     let unlistenCursor: (() => void) | undefined;
     let aiming = false;
+    let lastLookNx = NaN;
+    let lastLookNy = NaN;
     let mirrored = false;
     let markBox: DOMRect | null = null;
     let markBoxAt = 0;
@@ -298,6 +301,18 @@ export function PetMark({
         markBoxAt = now;
       }
       return markBox;
+    };
+    const readLocalLook = (nowMs: number) => {
+      if (restOnlyRef.current) return null;
+      return petLocalLookAxes({
+        fromScreen: look.fromScreen,
+        at: look.at,
+        now: nowMs,
+        dx: look.dx,
+        dy: look.dy,
+        localR: look.localR || 64,
+        box: look.fromScreen ? null : measureMark(),
+      });
     };
     const syncFaceMirror = () => {
       const svg = svgRef.current;
@@ -414,14 +429,7 @@ export function PetMark({
       if (restOnlyRef.current) {
         return resolveBloubPlay(session, restRef.current);
       }
-      const nearMark = petLookIsNear({
-        fromScreen: look.fromScreen,
-        at: look.at,
-        now: nowMs,
-        dx: look.dx,
-        dy: look.dy,
-        localR: look.localR || 64,
-      });
+      const nearMark = !!readLocalLook(nowMs);
       const trackingLook =
         nearMark &&
         session !== "sleeping" &&
@@ -485,36 +493,32 @@ export function PetMark({
       syncFaceMirror();
       const baseFace =
         play.state === "idle" || play.state === "swirl";
-      const fresh = petLookIsNear({
-        fromScreen: look.fromScreen,
-        at: look.at,
-        now: nowMs,
-        dx: look.dx,
-        dy: look.dy,
-        localR: look.localR || 64,
-      });
-      if (!baseFace || !fresh || restOnlyRef.current) {
+      const axes = baseFace ? readLocalLook(nowMs) : null;
+      if (!axes) {
         if (aiming) {
-          engine.setLook(null, clock);
+          engine.setLook(null, clock, BLOUB_LOOK_LOCAL_ENTER_MORPH);
           aiming = false;
+          lastLookNx = NaN;
+          lastLookNy = NaN;
         }
       } else {
-        const box = measureMark();
-        let nx = 0;
-        let ny = 0;
-        if (look.fromScreen) {
-          const r = look.localR || 64;
-          nx = look.dx / Math.max(1, r);
-          ny = look.dy / Math.max(1, r);
-        } else if (box && box.width > 0 && box.height > 0) {
-          nx = (look.dx - (box.left + box.width / 2)) / Math.max(1, box.width);
-          ny = (look.dy - (box.top + box.height / 2)) / Math.max(1, box.height);
-        }
+        const nx = mirrored ? -axes.nx : axes.nx;
+        const ny = axes.ny;
         if (Number.isFinite(nx) && Number.isFinite(ny)) {
-          engine.setLook(
-            bloubLookAtPointer(mirrored ? -nx : nx, ny, true),
-            clock,
-          );
+          const enter = !aiming;
+          if (
+            enter ||
+            Math.abs(nx - lastLookNx) > 0.02 ||
+            Math.abs(ny - lastLookNy) > 0.02
+          ) {
+            engine.setLook(
+              bloubLookAtPointer(nx, ny, true),
+              clock,
+              enter ? BLOUB_LOOK_LOCAL_ENTER_MORPH : undefined,
+            );
+            lastLookNx = nx;
+            lastLookNy = ny;
+          }
           aiming = true;
         }
       }
@@ -575,17 +579,10 @@ export function PetMark({
     let idleSince = performance.now();
     const tick = (ms: number) => {
       const nowMs = performance.now();
-      const trackingLook = petLookIsNear({
-        fromScreen: look.fromScreen,
-        at: look.at,
-        now: nowMs,
-        dx: look.dx,
-        dy: look.dy,
-        localR: look.localR || 64,
-      });
+      const trackingLook = !!readLocalLook(nowMs);
       const morphing =
         wantSpinRef.current !== playedSpinRef.current ||
-        clockRef.current - stateSince < 1.2;
+        engine.isMorphing(clockRef.current);
       if (trackingLook || spin || morphing || draggingRef.current) {
         idleSince = nowMs;
       }
