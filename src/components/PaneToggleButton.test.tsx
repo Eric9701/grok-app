@@ -69,7 +69,7 @@ describe("pinned pane-toggle CSS contract", () => {
 
   it("keeps desktop buttons outside pane layout at fixed corners", () => {
     expect(css).toMatch(
-      /\.pane-toggle--pinned\s*\{[^}]*position:\s*absolute[^}]*z-index:\s*45/s,
+      /\.pane-toggle--pinned\s*\{[^}]*position:\s*absolute\s*!important[^}]*z-index:\s*45/s,
     );
     expect(css).toMatch(
       /\.platform-mac \.pane-toggle--left\.pane-toggle--pinned\s*\{[^}]*left:\s*var\(--titlebar-safe-left, 96px\)/s,

@@ -362,7 +362,8 @@ describe("desktop hidden CSS must not force width 0", () => {
     /**
      * Resizing a blur-owning box flashes (toggle end, live drag, or a
      * paused drag). In-flow frost is the rail max so its layer never
-     * changes size; extra sits under .main.
+     * changes size; overflow:hidden clips the plate so it cannot expand
+     * the flex item into the chat column.
      */
     const sidebar = readFileSync(
       resolve(__dirname, "../styles/sidebar.part1.css"),
@@ -378,7 +379,7 @@ describe("desktop hidden CSS must not force width 0", () => {
       ".platform-mac .sidebar:not(.sidebar--overlay):not(.sidebar--phone-drawer) {",
     );
     expect(inFlow).toMatch(/backdrop-filter:\s*none/);
-    expect(inFlow).not.toMatch(/overflow:\s*hidden/);
+    expect(inFlow).toMatch(/overflow:\s*hidden/);
     expect(sidebar).toMatch(
       /\.platform-mac \.sidebar:not\(\.sidebar--overlay\):not\(\.sidebar--phone-drawer\)::before\s*\{[^}]*width:\s*var\(--sidebar-width-max[^}]*backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)/s,
     );
@@ -408,7 +409,7 @@ describe("desktop hidden CSS must not force width 0", () => {
     expect(css).not.toMatch(
       /\.workbench--pane-motion \.sidebar\s*\{[^}]*overflow:\s*hidden/s,
     );
-    expect(ruleBody(sidebar, "\n.sidebar--hidden,")).not.toMatch(
+    expect(ruleBody(sidebar, "\n.sidebar--hidden,")).toMatch(
       /overflow:\s*hidden/,
     );
     expect(ruleBody(sidebar, "\n.sidebar__clip {")).toMatch(

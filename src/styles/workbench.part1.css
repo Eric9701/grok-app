@@ -76,7 +76,9 @@
 }
 
 .pane-toggle--pinned {
-  position: absolute;
+  /* Win over .chrome-btn relative positioning so workbench-level
+   * toggles stay out of the sidebar/main/aside flex track. */
+  position: absolute !important;
   top: calc((var(--titlebar-height, 40px) - 28px) / 2);
   z-index: 45;
   -webkit-app-region: no-drag;
