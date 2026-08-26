@@ -444,6 +444,8 @@ export const ruWorkspace = {
   "side.toggle": "Показать/скрыть боковую панель",
   "side.env": "Окружение",
   "side.envTitle": "Окружение",
+  "side.env.pin": "Закрепить",
+  "side.env.unpin": "Открепить",
   "side.envSoon": "Здесь появятся сведения об окружении и состоянии git.",
   "side.placeholder.file": "Панель файлов",
   "side.placeholder.browser": "Вкладка браузера",

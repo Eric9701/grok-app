@@ -446,6 +446,8 @@ export const zhWorkspace = {
   "side.toggle": "显示/隐藏侧边栏",
   "side.env": "环境",
   "side.envTitle": "环境信息",
+  "side.env.pin": "固定",
+  "side.env.unpin": "取消固定",
   "side.envSoon": "环境详情与 git 状态将显示在这里。",
   "side.placeholder.file": "文件工作台",
   "side.placeholder.browser": "浏览器标签",

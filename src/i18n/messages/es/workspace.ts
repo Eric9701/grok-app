@@ -444,6 +444,8 @@ export const esWorkspace = {
   "side.toggle": "Mostrar/ocultar barra lateral",
   "side.env": "Entorno",
   "side.envTitle": "Entorno",
+  "side.env.pin": "Fijar",
+  "side.env.unpin": "Desfijar",
   "side.envSoon": "Los detalles del entorno y el estado de git aparecerán aquí.",
   "side.placeholder.file": "Banco de trabajo de archivos",
   "side.placeholder.browser": "Pestaña del navegador",

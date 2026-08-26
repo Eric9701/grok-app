@@ -444,6 +444,8 @@ export const frWorkspace = {
   "side.toggle": "Afficher/masquer le panneau",
   "side.env": "Environnement",
   "side.envTitle": "Environnement",
+  "side.env.pin": "Épingler",
+  "side.env.unpin": "Détacher",
   "side.envSoon": "Les détails d’environnement et l’état git apparaîtront ici.",
   "side.placeholder.file": "Établi Fichiers",
   "side.placeholder.browser": "Onglet navigateur",

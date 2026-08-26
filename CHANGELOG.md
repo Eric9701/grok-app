@@ -20,6 +20,7 @@ See `docs/llm-wiki/release.md`.
 - **自定义外观**：设置 → 外观 → 主题可改文字颜色（默认跟随浅/深色近黑/近白）和字体阴影（默认关）。「恢复默认」需二次确认，会把这两项恢复出厂。这两项会随 `.grokskin` 导入导出。
 
 ### Changed
+- **Environment info can pin to a dock**: the panel stays a dropdown by default. A pin control in the header switches to the chat-column card (316px stage gutter; parks when the right rail opens). Unpinning restores the dropdown.
 - **Titlebar chips (#924)**: disconnected status and Open Location match the 28px flat chrome-btn / chip language (no stroke, transparent rest, hover wash).
 - **Plan bar overlay (#925)**: the plan/goal card floats over the transcript (42rem) instead of reserving a full-width strip; list padding follows measured height. Stream-perf drops the blur.
 - **Inline code on wallpaper (#926)**: chat `code` chips use a deeper well so tokens stay readable on wallpaper.
@@ -32,6 +33,7 @@ See `docs/llm-wiki/release.md`.
 - **Unused AI Elements widgets (#907)**: drop seven unreachable UI files (`button`, `collapsible`, `marker`, `message`, `message-response`, `reasoning`, `shimmer`) and their exclusive deps (`streamdown`, `@radix-ui/react-collapsible`, `@radix-ui/react-slot`, `class-variance-authority`). The `mermaid` pnpm override went with `streamdown`. Chat still uses `MarkdownBody` / Lobe thread.
 
 **中文 · 变更**
+- **环境信息可固定为钉板**：默认仍是下拉。标题栏固定按钮切到对话列卡片（主列让出 316px；打开右侧栏会 park）。取消固定后回到下拉。
 - **标题栏芯片（#924）**：「已断开」和「打开位置」对齐 28px 无描边 chip / chrome-btn，hover 只洗一层。
 - **计划顶框浮层（#925）**：计划/目标卡片浮在对话上（42rem），不再占整行；列表按实测高度让位。流式输出关掉 blur。
 - **壁纸上行内代码（#926）**：对话 `code` 加深底板，壁纸上仍能看出是代码。

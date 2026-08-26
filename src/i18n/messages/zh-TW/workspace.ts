@@ -446,6 +446,8 @@ export const zhTWWorkspace = {
   "side.toggle": "顯示/隱藏側邊欄",
   "side.env": "環境",
   "side.envTitle": "環境資訊",
+  "side.env.pin": "固定",
+  "side.env.unpin": "取消固定",
   "side.envSoon": "環境詳情與 git 狀態將顯示在這裡。",
   "side.placeholder.file": "檔案工作台",
   "side.placeholder.browser": "瀏覽器分頁",

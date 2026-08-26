@@ -444,6 +444,8 @@ export const jaWorkspace = {
   "side.toggle": "サイドバーの表示 / 非表示",
   "side.env": "環境",
   "side.envTitle": "環境",
+  "side.env.pin": "ピン留め",
+  "side.env.unpin": "ピン留めを解除",
   "side.envSoon": "環境の詳細と git 状態がここに表示されます。",
   "side.placeholder.file": "ファイルワークベンチ",
   "side.placeholder.browser": "ブラウザタブ",

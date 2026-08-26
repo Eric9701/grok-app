@@ -446,6 +446,8 @@ export const enWorkspace = {
   "side.toggle": "Show/hide sidebar",
   "side.env": "Environment",
   "side.envTitle": "Environment",
+  "side.env.pin": "Pin",
+  "side.env.unpin": "Unpin",
   "side.envSoon": "Environment details and git status will appear here.",
   "side.placeholder.file": "Files workbench",
   "side.placeholder.browser": "Browser tab",

@@ -38,7 +38,7 @@
    - Composer `+` 菜单（`.composer-plus`）与侧栏 `+` 菜单（`.sw-plus-menu`）走实心 `--menu-context-bg`，不要玻璃。
 
 3. **区域专用已验收面板**  
-   - 若既有模块已为 `.menu-panel.xxx` 写了完整 surface（如 `.sw-plus-menu`、`.sw-env-menu`），**复用该 class**，不要另起透明壳。
+   - 若既有模块已为 `.menu-panel.xxx` 写了完整 surface（如 `.sw-plus-menu`、`.sw-env-menu` 下拉态），**复用该 class**，不要另起透明壳。环境信息钉住后是 `.sw-env-dock .sw-env-menu`，不是 dropdown `menu-panel`。
 
 ### 禁止写法
 

@@ -64,6 +64,10 @@ describe("floating pop CSS", () => {
     resolve(__dirname, "../styles/side-workbench.part2.css"),
     "utf8",
   );
+  const envDock = readFileSync(
+    resolve(__dirname, "../styles/sw-env-dock.css"),
+    "utf8",
+  );
   const settings = readFileSync(
     resolve(__dirname, "../styles/settings.part1.css"),
     "utf8",
@@ -104,8 +108,12 @@ describe("floating pop CSS", () => {
     expect(sidebar).toMatch(/translateY\(16px\) scaleY\(0\.92\)/);
     expect(sidebar).toMatch(/\.user-menu__flyout\.is-open/);
     expect(env).toMatch(/\.sw-env-menu\.menu-panel\.is-open/);
+    expect(envDock).toMatch(/\.sw-env-dock \.sw-env-menu\.is-open:not\(\.is-parked\)/);
+    expect(envDock).toMatch(/translateX\(100%\) scale\(0\.8\) rotateY\(-22deg\)/);
+    expect(envDock).not.toMatch(/\.menu-panel/);
     expect(sidebar).toMatch(/var\(--motion-normal\) var\(--motion-pane-ease\)/);
     expect(env).toMatch(/var\(--motion-normal\) var\(--motion-pane-ease\)/);
+    expect(envDock).toMatch(/var\(--motion-pane\) var\(--motion-pane-ease\)/);
   });
 
   it("switches settings atomically without a presence or paint gap", () => {

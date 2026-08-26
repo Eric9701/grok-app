@@ -130,11 +130,26 @@ html[data-wallpaper="1"]
   justify-content: space-between;
   margin-bottom: 6px;
   padding: 2px 8px 4px;
+  gap: 8px;
 }
 
 .sw-env-menu__title {
   font-size: 13px;
   font-weight: 600;
+}
+
+.sw-env-menu__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sw-env-menu__pin,
+.sw-env-menu__close {
+  width: 24px;
+  height: 24px;
 }
 
 .sw-env-menu__body {
