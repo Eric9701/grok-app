@@ -417,9 +417,19 @@ impl SessionManager {
                 };
                 // Sessions that only got opened to look at (no prompt sent this
                 // visit) are NOT kept warm — close the connection instead of
-                // parking. Busy turns never reach here (demoted to background),
-                // so submitted-and-running chats are untouched.
+                // parking. Exception: a just-opened chat may still have a send
+                // waiting on the connect lock; killing it is how first prompts
+                // vanished until the user nudged with a second message.
                 if !s.sent_prompt_this_visit {
+                    let recent_open = s.last_activity.elapsed()
+                        < std::time::Duration::from_secs(180);
+                    if recent_open {
+                        tracing::info!(
+                            "acp park unsubmitted recent session={} (send may still be in flight)",
+                            s.app_session_id
+                        );
+                        // Fall through to the warm-park path below.
+                    } else {
                     let sid = s.app_session_id.clone();
                     let pid = s.process_id.clone();
                     let agent_sid = s.meta.agent_session_id.clone();
@@ -475,6 +485,7 @@ impl SessionManager {
                         }
                     }
                     return Ok(());
+                    }
                 }
                 let sandbox_profile = acp.sandbox_profile();
                 let parked = ParkedAgent {
