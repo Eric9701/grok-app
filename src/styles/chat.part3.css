@@ -819,24 +819,9 @@ html[data-composer-min-rows="8"] .composer__input {
   color: var(--text-secondary);
   max-width: 140px;
   flex-shrink: 0;
-  isolation: isolate;
-  transition: color 120ms ease;
-}
-
-.chip::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--text-primary);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.chip > * {
-  position: relative;
-  z-index: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .chip__label {
@@ -846,12 +831,8 @@ html[data-composer-min-rows="8"] .composer__input {
 }
 
 .chip:hover:not(:disabled) {
-  background: transparent;
+  background: var(--bg-hover);
   color: var(--text-primary);
-}
-
-.chip:hover:not(:disabled)::after {
-  opacity: 0.06;
 }
 
 .chip--ask {

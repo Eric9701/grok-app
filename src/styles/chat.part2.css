@@ -95,23 +95,9 @@
   cursor: default;
   flex-shrink: 1;
   min-width: 0;
-  isolation: isolate;
-}
-
-.composer__context-item::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--text-primary);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.composer__context-item > * {
-  position: relative;
-  z-index: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button.composer__context-item {
@@ -120,13 +106,8 @@ button.composer__context-item {
 
 .composer__context-item:hover:not(:disabled),
 .composer__context-item.is-open {
-  background: transparent;
+  background: var(--bg-hover);
   color: var(--text-primary);
-}
-
-.composer__context-item:hover:not(:disabled)::after,
-.composer__context-item.is-open::after {
-  opacity: 0.06;
 }
 
 .composer__context-item:disabled {

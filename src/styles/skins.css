@@ -48,14 +48,42 @@ html[data-wallpaper="1"] .app-shell::after {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: var(--wallpaper-theme-scrim-opacity);
-  /* Left-weighted scrim so chrome stays readable (Dream Skin safe-area left). */
+  /*
+   * Do not use the opacity property. A window-sized opacity layer in
+   * WKWebView misses damage rects when portaled tips / hover layers
+   * come and go (leftover squares). Slider 0% had no layer so no bug.
+   * Bake the slider into the gradient; this box stays opacity 1.
+   */
   background: linear-gradient(
     105deg,
-    color-mix(in srgb, var(--wallpaper-theme-scrim-color) 88%, transparent) 0%,
-    color-mix(in srgb, var(--wallpaper-theme-scrim-color) 62%, transparent) 42%,
-    color-mix(in srgb, var(--wallpaper-theme-scrim-color) 28%, transparent) 78%,
-    color-mix(in srgb, var(--wallpaper-theme-scrim-color) 12%, transparent) 100%
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
+          calc(88% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      0%,
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
+          calc(62% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      42%,
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
+          calc(28% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      78%,
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
+          calc(12% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      100%
   );
 }
 
@@ -68,10 +96,12 @@ html[data-wallpaper="1"] .app-shell::after {
   pointer-events: none;
 }
 
-/* One static frost behind both rails — not on the interpolating pane boxes. */
+/* One static frost behind both rails — not on the interpolating pane boxes.
+ * Grow with inset instead of scale(): filter+transform on the same box
+ * tiles in WKWebView and paints a black cross/grid while dragging blur. */
 html[data-wallpaper="1"] .app-wallpaper-media {
   filter: blur(var(--wallpaper-sidebar-blur, 22px));
-  transform: scale(1.06);
+  inset: calc(-2 * var(--wallpaper-sidebar-blur, 22px));
 }
 
 .app-wallpaper-media__el {
@@ -241,6 +271,22 @@ html[data-theme="light"][data-wallpaper="1"] .composer-wrap {
   --bg-active: rgba(0, 0, 0, 0.06);
 }
 
+/*
+ * Top-bar 28px tiles inherit .main's opaque color-mix --bg-hover.
+ * Same WKWebView leftover as composer hover; pin them to rgba.
+ */
+html[data-wallpaper="1"] .main :is(.chrome-btn, .main__pane-toggle) {
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="light"][data-wallpaper="1"]
+  .main
+  :is(.chrome-btn, .main__pane-toggle) {
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+}
+
 html[data-wallpaper="1"] .main {
   background: color-mix(
     in srgb,
@@ -310,6 +356,7 @@ html[data-stream-perf="1"][data-wallpaper="1"] .platform-mac .settings-page__nav
 html[data-stream-perf="1"][data-wallpaper="1"] .app-wallpaper-media {
   filter: none;
   transform: none;
+  inset: 0;
 }
 
 html[data-wallpaper="1"] .settings-page__content,
@@ -356,6 +403,13 @@ html[data-wallpaper="1"]
   box-shadow: none;
 }
 
+/* clip-path wipe leaves a white inner halo on light wallpaper in WKWebView. */
+html[data-wallpaper="1"]
+  .composer-welcome-mark.is-entering
+  .composer-welcome-prompt {
+  animation: none;
+}
+
 
 
 /*
@@ -390,6 +444,7 @@ html[data-wallpaper="1"][data-wallpaper-clear="1"].platform-mac[data-theme="ligh
 html[data-wallpaper="1"][data-wallpaper-clear="1"] .app-wallpaper-media {
   filter: none;
   transform: none;
+  inset: 0;
 }
 
 /*

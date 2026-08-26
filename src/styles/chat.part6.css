@@ -676,10 +676,7 @@
   flex-shrink: 0;
 }
 
-/* Flat control (no capsule border) — hover wash only, Codex-style.
- * Wash lives on ::after inside isolation (not transform, not z-index:-1):
- * WKWebView ghosts color-mix/background transitions, and translateZ(0)
- * mis-paints the composer caret (bug 19058). */
+/* Flat control (no capsule border) — hover wash matches .chrome-btn. */
 .cmm__trigger {
   display: inline-flex;
   align-items: center;
@@ -693,26 +690,11 @@
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
   /* Custom provider model ids are long; allow more room before ellipsis. */
   max-width: min(320px, 42vw);
-  isolation: isolate;
-  transition: color 120ms ease;
-}
-
-.cmm__trigger::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--text-primary);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.cmm__trigger > * {
-  position: relative;
-  z-index: 1;
 }
 
 /* Model menu: room for long request model ids (e.g. deepseek-v4-flash). */
@@ -722,13 +704,8 @@
 
 .cmm__trigger:hover,
 .cmm.is-open .cmm__trigger {
-  background: transparent;
+  background: var(--bg-hover);
   color: var(--text-primary);
-}
-
-.cmm__trigger:hover::after,
-.cmm.is-open .cmm__trigger::after {
-  opacity: 0.06;
 }
 
 .cmm--danger .cmm__trigger {
@@ -737,19 +714,10 @@
   background: transparent;
 }
 
-.cmm--danger .cmm__trigger::after {
-  background: var(--danger, #e07040);
-}
-
 .cmm--danger .cmm__trigger:hover,
 .cmm--danger.is-open .cmm__trigger {
-  background: transparent;
+  background: var(--danger-muted);
   color: var(--danger, #e07040);
-}
-
-.cmm--danger .cmm__trigger:hover::after,
-.cmm--danger.is-open .cmm__trigger::after {
-  opacity: 0.12;
 }
 
 .cmm--danger .cmm__icon {

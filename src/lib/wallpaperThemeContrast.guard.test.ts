@@ -32,6 +32,10 @@ const sidebarCss = readFileSync(
   join(__dirname, "../styles/sidebar.part1.css"),
   "utf8",
 );
+const sidebarTreeCss = readFileSync(
+  join(__dirname, "../styles/sidebar.part2.css"),
+  "utf8",
+);
 const statusPillCss = readFileSync(
   join(__dirname, "../styles/chat.part5.css"),
   "utf8",
@@ -44,6 +48,8 @@ const composerBtnCss = readFileSync(
   join(__dirname, "../styles/chat.part4.css"),
   "utf8",
 );
+const chipCss = readFileSync(join(__dirname, "../styles/chat.part3.css"), "utf8");
+const cmmCss = readFileSync(join(__dirname, "../styles/chat.part6.css"), "utf8");
 const menuSurfaceCss = readFileSync(
   join(__dirname, "../styles/sidebar.part3.css"),
   "utf8",
@@ -79,6 +85,15 @@ describe("wallpaper theme contrast CSS", () => {
     );
   });
 
+  it("bakes wallpaper scrim into the gradient instead of a window opacity layer", () => {
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.app-shell::after\s*\{[^}]*calc\(88% \* var\(--wallpaper-theme-scrim-opacity/s,
+    );
+    expect(css).not.toMatch(
+      /html\[data-wallpaper="1"\] \.app-shell::after\s*\{[^}]*opacity:\s*var\(--wallpaper-theme-scrim-opacity/s,
+    );
+  });
+
   it("keeps wallpaper chrome washes opaque so they do not sample the scrim", () => {
     expect(css).toMatch(
       /html\[data-wallpaper="1"\] \.main\s*\{[^}]*--bg-hover:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 90%,\s*var\(--text-primary\) 10%\s*\)/s,
@@ -92,6 +107,12 @@ describe("wallpaper theme contrast CSS", () => {
     expect(css).toMatch(
       /html\[data-theme="light"\]\[data-wallpaper="1"\] \.composer-wrap\s*\{[^}]*--bg-hover:\s*rgba\(0, 0, 0, 0\.04\)/s,
     );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.main :is\(\.chrome-btn, \.main__pane-toggle\)\s*\{[^}]*--bg-hover:\s*rgba\(255, 255, 255, 0\.05\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-theme="light"\]\[data-wallpaper="1"\][\s\S]*\.main[\s\S]*:is\(\.chrome-btn, \.main__pane-toggle\)\s*\{[^}]*--bg-hover:\s*rgba\(0, 0, 0, 0\.04\)/s,
+    );
     expect(css).not.toMatch(
       /html\[data-wallpaper="1"\] \.composer__context-bar\s*\{[^}]*background:\s*transparent/s,
     );
@@ -100,6 +121,9 @@ describe("wallpaper theme contrast CSS", () => {
     );
     expect(css).toMatch(
       /html\[data-wallpaper="1"\][\s\S]*\.composer-welcome-prompt\s*\{[^}]*background:\s*none/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\][\s\S]*\.composer-welcome-mark\.is-entering[\s\S]*\.composer-welcome-prompt\s*\{[^}]*animation:\s*none/s,
     );
   });
 
@@ -118,16 +142,76 @@ describe("wallpaper theme contrast CSS", () => {
     );
   });
 
-  it("washes composer icon hover on an isolated ::after, not a background layer", () => {
+  it("washes composer hover like chrome-btn, without isolation layers", () => {
     expect(composerBtnCss).toMatch(
-      /\.composer \.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\)\s*\{[^}]*background:\s*transparent/s,
-    );
-    expect(composerBtnCss).toMatch(
-      /\.composer \.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\)::after\s*\{[^}]*opacity:\s*0/s,
+      /\.composer\s+\.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\):hover:not\(\s*:disabled\s*\)[\s\S]{0,160}background:\s*var\(--bg-hover\)/s,
     );
     expect(composerBtnCss).not.toMatch(
-      /\.composer \.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\)::before/s,
+      /\.composer \.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\)::after/s,
     );
+    expect(composerBtnCss).not.toMatch(
+      /\.composer \.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\)\s*\{[^}]*isolation:\s*isolate/s,
+    );
+    expect(composerBtnCss).toMatch(
+      /\.composer \.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\)\s*\{[^}]*-webkit-appearance:\s*none/s,
+    );
+    expect(composerChromeCss).toMatch(
+      /\.composer__context-item:hover:not\(:disabled\),\s*\.composer__context-item\.is-open\s*\{[^}]*background:\s*var\(--bg-hover\)/s,
+    );
+    expect(chipCss).toMatch(
+      /\.chip:hover:not\(:disabled\)\s*\{[^}]*background:\s*var\(--bg-hover\)/s,
+    );
+    expect(cmmCss).toMatch(
+      /\.cmm__trigger:hover,\s*\.cmm\.is-open \.cmm__trigger\s*\{[^}]*background:\s*var\(--bg-hover\)/s,
+    );
+    expect(cmmCss).toMatch(
+      /\.cmm__trigger\s*\{[^}]*-webkit-appearance:\s*none/s,
+    );
+    expect(cmmCss).not.toMatch(/\.cmm__trigger::after/);
+    expect(composerChromeCss).toMatch(
+      /\.composer__context-item\s*\{[^}]*-webkit-appearance:\s*none/s,
+    );
+    expect(chipCss).toMatch(
+      /\.chip\s*\{[^}]*-webkit-appearance:\s*none/s,
+    );
+  });
+
+  it("strips native button chrome so wallpaper does not show leftover tiles", () => {
+    expect(sidebarCss).toMatch(
+      /button\s*\{[^}]*-webkit-appearance:\s*none/s,
+    );
+    expect(sidebarCss).toMatch(
+      /\.chrome-btn\s*\{[^}]*-webkit-appearance:\s*none/s,
+    );
+    expect(sidebarCss).toMatch(
+      /\.chrome-btn\s*\{[^}]*background:\s*transparent/s,
+    );
+    expect(sidebarCss).not.toMatch(
+      /\.chrome-btn\s*\{[^}]*isolation:\s*isolate/s,
+    );
+    expect(sidebarTreeCss).toMatch(
+      /\.tree-icon-btn\s*\{[^}]*-webkit-appearance:\s*none/s,
+    );
+  });
+
+  it("keeps tips as an opaque pill without a 0.5px square stroke", () => {
+    expect(sidebarCss).toMatch(
+      /\.ui-tip\s*\{[^}]*background:\s*var\(--bg-elevated\)/s,
+    );
+    expect(sidebarCss).toMatch(
+      /\.ui-tip\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--glass-border\)/s,
+    );
+    expect(sidebarCss).not.toMatch(
+      /\.ui-tip\s*\{[^}]*border:\s*0\.5px/s,
+    );
+    expect(sidebarCss).not.toMatch(
+      /\.ui-tip\s*\{[^}]*--glass-surface-solid/s,
+    );
+    expect(sidebarCss).not.toMatch(
+      /\.ui-tip\s*\{[^}]*backdrop-filter:/s,
+    );
+    expect(sidebarCss).not.toMatch(/@keyframes ui-tip-in/);
+    expect(sidebarCss).not.toMatch(/\.ui-tip--closing/);
   });
 
   it("keeps the composer + menu a solid context plate, not glass", () => {
@@ -285,7 +369,10 @@ describe("wallpaper theme contrast CSS", () => {
 
   it("keeps an expanded wallpaper side pane frosted without exposing chat", () => {
     expect(css).toMatch(
-      /html\[data-wallpaper="1"\] \.app-wallpaper-media\s*\{[^}]*filter:\s*blur\(var\(--wallpaper-sidebar-blur, 22px\)\)/s,
+      /html\[data-wallpaper="1"\] \.app-wallpaper-media\s*\{[^}]*filter:\s*blur\(var\(--wallpaper-sidebar-blur, 22px\)\)[^}]*inset:\s*calc\(-2 \* var\(--wallpaper-sidebar-blur, 22px\)\)/s,
+    );
+    expect(css).not.toMatch(
+      /html\[data-wallpaper="1"\] \.app-wallpaper-media\s*\{[^}]*transform:\s*scale/s,
     );
     expect(css).toMatch(
       /html\[data-wallpaper="1"\] \.sidebar\.sidebar--overlay,\s*html\[data-wallpaper="1"\] \.sidebar\.sidebar--phone-drawer\s*\{[^}]*backdrop-filter:\s*blur\(var\(--wallpaper-sidebar-blur, 22px\)\)/s,

@@ -288,44 +288,21 @@
 }
 
 /*
- * Rest: no disc on the glass plate. Hover wash is ::after + isolation
- * (not background, not translateZ — those ghost or mis-paint the caret).
+ * Rest: no disc on the glass plate (same as .chrome-btn). Hover uses the
+ * composer-wrap --bg-hover token (rgba on wallpaper, not color-mix).
  */
 .composer .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger) {
-  position: relative;
   background: transparent;
-  isolation: isolate;
-}
-
-.composer .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger)::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--text-primary);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.composer .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger) > * {
-  position: relative;
-  z-index: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .composer
   .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger):hover:not(:disabled),
 .composer .icon-btn--plus.is-open {
-  background: transparent;
+  background: var(--bg-hover);
   color: var(--text-primary);
-}
-
-.composer
-  .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger):hover:not(
-    :disabled
-  )::after,
-.composer .icon-btn--plus.is-open::after {
-  opacity: 0.06;
 }
 
 /* Fixed solid colors — never use transparent --bg-app (icons were disappearing) */
