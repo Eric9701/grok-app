@@ -20,6 +20,9 @@ See `docs/llm-wiki/release.md`.
 - **自定义外观**：设置 → 外观 → 主题可改文字颜色（默认跟随浅/深色近黑/近白）和字体阴影（默认关）。「恢复默认」需二次确认，会把这两项恢复出厂。这两项会随 `.grokskin` 导入导出。
 
 ### Changed
+- **Titlebar chips (#924)**: disconnected status and Open Location match the 28px flat chrome-btn / chip language (no stroke, transparent rest, hover wash).
+- **Plan bar overlay (#925)**: the plan/goal card floats over the transcript (42rem) instead of reserving a full-width strip; list padding follows measured height. Stream-perf drops the blur.
+- **Inline code on wallpaper (#926)**: chat `code` chips use a deeper well so tokens stay readable on wallpaper.
 - **Conversation progress rail**: growing ticks on the left (or right) of the transcript; arrows show on hover and hide when the side gutter is under 48px.
 - **Agent question no longer covers the transcript (#891)**: `_x.ai/ask_user_question` sits above the composer like the permission bar. Chat stays scrollable. Collapse to a chip (not Dismiss) keeps the draft. The question is the title; options sit on the left with Dismiss / Submit on the right (Submit pinned to the bottom of the card). Short chips stay in a row. Selection uses the theme accent fill; Enter submits except while an IME is committing a candidate.
 - **Dock icons from authored black / white appiconsets**: production `icon.icns` / `icon.ico` pack the black 16–1024 rasters; `pnpm dev` packs the white set into `icons/dev`. Pixel sizes are not resampled (`scripts/pack_appiconset.py`).
@@ -29,6 +32,9 @@ See `docs/llm-wiki/release.md`.
 - **Unused AI Elements widgets (#907)**: drop seven unreachable UI files (`button`, `collapsible`, `marker`, `message`, `message-response`, `reasoning`, `shimmer`) and their exclusive deps (`streamdown`, `@radix-ui/react-collapsible`, `@radix-ui/react-slot`, `class-variance-authority`). The `mermaid` pnpm override went with `streamdown`. Chat still uses `MarkdownBody` / Lobe thread.
 
 **中文 · 变更**
+- **标题栏芯片（#924）**：「已断开」和「打开位置」对齐 28px 无描边 chip / chrome-btn，hover 只洗一层。
+- **计划顶框浮层（#925）**：计划/目标卡片浮在对话上（42rem），不再占整行；列表按实测高度让位。流式输出关掉 blur。
+- **壁纸上行内代码（#926）**：对话 `code` 加深底板，壁纸上仍能看出是代码。
 - **对话进度条**：刻度默认在左侧（可改右侧）；箭头悬停才显示；侧边空位不足 48px 时隐藏。
 - **Agent 提问不再挡住会话（#891）**：`_x.ai/ask_user_question` 放到输入框上方，和权限条一样。会话可滚动。收成一条不算忽略，草稿还在。问题当标题；选项在左、忽略/提交在右（提交贴容器底）。短芯片横排。选中用主题色填充；回车提交，中文输入法选词回车不提交。
 - **Dock 图标改用已调好的黑 / 白 appiconset**：正式版 `icon.icns` / `icon.ico` 打黑色 16–1024；`pnpm dev` 打白色到 `icons/dev`。按原像素封装，不再缩放（`scripts/pack_appiconset.py`）。
