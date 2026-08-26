@@ -46,13 +46,16 @@ import { resolveFilesWorkbenchSplitLayout } from "@/lib/resourceTabs";
 import {
   RESOURCE_TREE_ROW_HEIGHT_PX,
   RESOURCE_TREE_VIRTUALIZE_THRESHOLD,
+  expandKeysForResourcePath,
   expandKeysForResourceTreeFilter,
   filterResourceTreeNodes,
   flattenVisibleResourceTree,
   loadTreeExpanded,
   mergeTreeExpandedForFilter,
+  replaceResourceTreeChildren,
   saveTreeExpanded,
 } from "@/lib/resourceTree";
+import { sshChatRelative } from "@/lib/sshChatPath";
 import { isResourceDraftDirty } from "@/lib/resourceEdit";
 import { pathBaseName } from "@/lib/sessionChanges";
 import { joinRemoteRelative } from "@/lib/sshRemoteSessionDisplay";
@@ -254,7 +257,7 @@ export function FilesWorkspace({
   }, [expanded, projectPath]);
 
   // Focus/open when Side Workbench active file path changes.
-  // Directories (project root / folder tab) stay on empty preview — never "not a file".
+  // Directories stay on empty preview; always expand the tree to that path.
   useEffect(() => {
     if (!paneActive || !activePath?.trim()) return;
     const p = activePath.trim();
@@ -264,28 +267,61 @@ export function FilesWorkspace({
         .replace(/[/\\]+$/, "")
         .replace(/\\/g, "/");
       const norm = p.replace(/[/\\]+$/, "").replace(/\\/g, "/");
-      // Bound project folder itself → tree only, no preview tab.
       if (root && (norm === root || norm === "")) return;
 
-      // Skip dir-check IPC when path has a clear file extension (chat cards).
-      // Full classify only for extension-less names that might be folders.
+      const rel = root
+        ? sshChatRelative(root, norm) ||
+          (norm.startsWith(`${root}/`) ? norm.slice(root.length + 1) : norm)
+        : norm;
+      {
+        const top = await loadDir("");
+        if (cancelled) return;
+        setRoot(top);
+      }
+
       const base = norm.split("/").pop() || norm;
       const looksLikeFile = base.includes(".") && !base.endsWith(".");
-      if (!looksLikeFile && api.isTauri() && !sshAlias) {
-        try {
-          const classified = await api.pathsClassify([p]);
-          if (cancelled) return;
-          const entry = classified?.[0];
-          if (entry?.exists && entry.isDir) {
-            // Folder targets: leave preview empty ("请选择文件"); expand tree later if needed.
-            return;
+      let isDir = false;
+      if (!looksLikeFile && api.isTauri()) {
+        if (sshAlias) {
+          try {
+            const listing = await api.sshListDir(sshAlias, norm);
+            if (cancelled) return;
+            isDir = !!listing.ok;
+          } catch {
+            /* try as file */
           }
-        } catch {
-          /* classify soft-fail → try open as file */
+        } else {
+          try {
+            const classified = await api.pathsClassify([p]);
+            if (cancelled) return;
+            const entry = classified?.[0];
+            if (entry?.exists && entry.isDir) isDir = true;
+          } catch {
+            /* classify soft-fail → try open as file */
+          }
         }
       }
-      if (cancelled) return;
-      // Prefer absolute open (handles chat paths); falls back internally.
+
+      const dirKeys = expandKeysForResourcePath(rel, { includeSelfIfDir: isDir });
+      if (dirKeys.length) {
+        setExpanded((e) => {
+          const next = { ...e };
+          for (const k of dirKeys) next[k] = true;
+          return next;
+        });
+        let loadedRel = "";
+        for (const key of dirKeys) {
+          if (cancelled) return;
+          const kids = await loadDir(key);
+          if (cancelled) return;
+          setRoot((r) => replaceResourceTreeChildren(r, key, kids));
+          loadedRel = key;
+        }
+        void loadedRel;
+      }
+
+      if (cancelled || isDir) return;
       void openAbsoluteFile(p, undefined, {
         line: activeLine,
         column: activeColumn,
@@ -294,7 +330,7 @@ export function FilesWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [activePath, activeLine, activeColumn, paneActive, projectPath]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activePath, activeLine, activeColumn, paneActive, projectPath, sshAlias]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleDir = useCallback(
     async (node: TreeNode) => {

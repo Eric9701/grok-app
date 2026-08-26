@@ -236,6 +236,7 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
   streaming,
   locale,
   projectPath,
+  sshAlias,
   /** Session-level token→abs map (tool-touched files + unique tails). */
   sessionPathMap,
   onOpenResource,
@@ -256,6 +257,7 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
   streaming?: boolean;
   locale: Locale;
   projectPath?: string | null;
+  sshAlias?: string | null;
   sessionPathMap?: Record<string, string>;
   onOpenResource?: (target: ResourceOpenTarget) => void;
   onOpenError?: (message: string) => void;
@@ -333,6 +335,7 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
       streaming={!!streaming}
       imagePathMap={pathMapProp}
       projectPath={projectPath}
+      sshAlias={sshAlias}
       onOpenResource={onOpenResource}
       onOpenError={onOpenError}
       onOpenExternalLink={onOpenExternalLink}
@@ -646,6 +649,7 @@ export interface ConversationThreadProps {
   sessionState: SessionState;
   sessionKey?: string;
   projectPath?: string | null;
+  sshAlias?: string | null;
   /** When true, suppress generic empty copy (brand mark lives above composer). */
   suppressEmptyCopy?: boolean;
   /** Selected session journal is still loading — not a fresh draft. */
@@ -807,6 +811,7 @@ type TranscriptMessageRowProps = {
   locale: Locale;
   tr: ReturnType<typeof createT>;
   projectPath?: string | null;
+  sshAlias?: string | null;
   sessionPathMap?: Record<string, string>;
   sessionId?: string | null;
   showToolChrome: boolean;
@@ -880,6 +885,7 @@ function transcriptRowPropsEqual(
   if (a.virtualized !== b.virtualized) return false;
   if (a.locale !== b.locale) return false;
   if (a.projectPath !== b.projectPath) return false;
+  if (a.sshAlias !== b.sshAlias) return false;
   if (a.sessionPathMap !== b.sessionPathMap) return false;
   if (a.sessionId !== b.sessionId) return false;
   if (a.showToolChrome !== b.showToolChrome) return false;
@@ -930,6 +936,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   locale,
   tr,
   projectPath,
+  sshAlias,
   sessionPathMap,
   sessionId = null,
   showToolChrome,
@@ -1612,6 +1619,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                   streaming={unit.streaming}
                   locale={locale}
                   projectPath={projectPath}
+                  sshAlias={sshAlias}
                   sessionPathMap={sessionPathMap}
                   onOpenResource={onOpenResource}
                   onOpenError={onOpenError}
@@ -1658,6 +1666,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
               streaming={!!m.streaming}
               locale={locale}
               projectPath={projectPath}
+              sshAlias={sshAlias}
               sessionPathMap={sessionPathMap}
               onOpenResource={onOpenResource}
               onOpenError={onOpenError}
@@ -1802,6 +1811,7 @@ export function ConversationThread({
   sessionState,
   sessionKey,
   projectPath,
+  sshAlias = null,
   suppressEmptyCopy = false,
   journalLoading = false,
   hasExistingSession = false,
@@ -2840,6 +2850,7 @@ export function ConversationThread({
               locale={locale}
               tr={tr}
               projectPath={projectPath}
+              sshAlias={sshAlias}
               sessionPathMap={sessionPathMap}
               sessionId={sessionId}
               showToolChrome={showToolChrome}
