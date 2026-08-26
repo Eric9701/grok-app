@@ -300,6 +300,18 @@ html[data-theme="light"][data-wallpaper="1"]
   --bg-active: rgba(0, 0, 0, 0.06);
 }
 
+html[data-wallpaper="1"] .main :is(.status-pill, .open-loc) {
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="light"][data-wallpaper="1"]
+  .main
+  :is(.status-pill, .open-loc) {
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+}
+
 html[data-wallpaper="1"] .main {
   background: color-mix(
     in srgb,
@@ -397,6 +409,19 @@ html[data-wallpaper="1"] :is(.composer, .composer__context-bar) {
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+html[data-theme="light"][data-wallpaper="1"] .plan-bar {
+  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
+}
+
+html[data-theme="dark"][data-wallpaper="1"] .plan-bar {
+  background: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
+}
+
+html[data-stream-perf="1"] .plan-bar {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 html[data-wallpaper="1"] .main__top .status-pill,

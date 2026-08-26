@@ -127,12 +127,14 @@ describe("wallpaper theme contrast CSS", () => {
     );
   });
 
-  it("keeps status pill and account avatar on card opacity mix", () => {
+  it("keeps status pill as a flat chip and avatar on card opacity mix", () => {
+    expect(statusPillCss).toMatch(/\.status-pill\s*\{[^}]*height:\s*28px/s);
     expect(statusPillCss).toMatch(
-      /\.status-pill::before\s*\{[^}]*var\(--ui-opacity-mix, 100%\)/s,
+      /\.status-pill\s*\{[^}]*background:\s*transparent/s,
     );
-    expect(statusPillCss).not.toMatch(
-      /\.status-pill--action:hover::before/s,
+    expect(statusPillCss).not.toMatch(/\.status-pill::before/);
+    expect(statusPillCss).toMatch(
+      /\.status-pill--action:hover\s*\{[^}]*background:\s*var\(--bg-hover\)/s,
     );
     expect(userAvatarCss).toMatch(
       /\.user-avatar::before\s*\{[^}]*var\(--ui-opacity-mix, 100%\)/s,
