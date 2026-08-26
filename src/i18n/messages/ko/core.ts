@@ -11,6 +11,7 @@ export const koCore = {
   "user.theme": "테마",
   "user.themeLight": "라이트로 전환",
   "user.themeDark": "다크로 전환",
+  "user.themeEditor": "테마 편집기",
   "media.loadError": "앱 미리보기에서 이 미디어를 불러오지 못했습니다.",
   "media.openExternal": "시스템 플레이어로 열기",
   "media.loading": "미디어 불러오는 중…",

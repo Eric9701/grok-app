@@ -11,6 +11,7 @@ export const ruCore = {
   "user.theme": "Тема",
   "user.themeLight": "Переключить на светлую тему",
   "user.themeDark": "Переключить на тёмную тему",
+  "user.themeEditor": "Редактор темы",
   "media.loadError": "Не удалось загрузить это медиа в предпросмотре приложения.",
   "media.openExternal": "Открыть системным проигрывателем",
   "media.loading": "Загрузка медиа…",

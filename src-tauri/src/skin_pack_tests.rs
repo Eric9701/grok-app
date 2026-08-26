@@ -322,6 +322,8 @@ fn round_trip_export_inspect() {
     let p = inspect_pack(&dest, "file").expect("inspect");
     assert_eq!(p.skin, "ocean");
     assert_eq!(p.scrim, 42);
+    assert_eq!(p.composer_opacity, 100);
+    assert_eq!(p.ui_opacity, 100);
     assert_eq!(p.text_color.as_deref(), Some("#ff00aa"));
     assert!(p.font_shadow);
     assert_eq!(p.name, "Harbor dusk");

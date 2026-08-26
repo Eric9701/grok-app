@@ -307,6 +307,7 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  background: var(--rp-surface, transparent);
 }
 .sw-skills__head {
   flex: 0 0 auto;

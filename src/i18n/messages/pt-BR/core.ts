@@ -11,6 +11,7 @@ export const ptBRCore = {
   "user.theme": "Tema",
   "user.themeLight": "Mudar para claro",
   "user.themeDark": "Mudar para escuro",
+  "user.themeEditor": "Editor de tema",
   "media.loadError": "Não foi possível carregar esta mídia na pré-visualização do app.",
   "media.openExternal": "Abrir com o player do sistema",
   "media.loading": "Carregando mídia…",

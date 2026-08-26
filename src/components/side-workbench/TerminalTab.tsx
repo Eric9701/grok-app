@@ -162,7 +162,7 @@ export function TerminalTab({
       letterSpacing: 0,
       scrollback: 5000,
       convertEol: false,
-      // 50% opacity surface — need transparency so aside/wallpaper shows through.
+      // Transparent canvas so the aside plate (and wallpaper mix) shows through.
       allowTransparency: true,
       theme: buildSideTerminalTheme(el),
     });

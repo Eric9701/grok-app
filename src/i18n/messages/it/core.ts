@@ -11,6 +11,7 @@ export const itCore = {
   "user.theme": "Tema",
   "user.themeLight": "Passa al tema chiaro",
   "user.themeDark": "Passa al tema scuro",
+  "user.themeEditor": "Editor tema",
   "media.loadError": "Impossibile caricare questo contenuto nell’anteprima dell’app.",
   "media.openExternal": "Apri con il lettore di sistema",
   "media.loading": "Caricamento del contenuto…",

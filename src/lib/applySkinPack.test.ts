@@ -15,6 +15,8 @@ function preview(over: Partial<SkinPackPreview> = {}): SkinPackPreview {
     skin: "ocean",
     requestedSkin: "ocean",
     scrim: 42,
+    composerOpacity: 100,
+    uiOpacity: 100,
     textColor: null,
     fontShadow: false,
     themePreference: "dark",
@@ -63,6 +65,12 @@ function deps(over: Partial<ApplySkinPackDeps> = {}): ApplySkinPackDeps & {
     applyWallpaperScrimChoice: (v) => {
       calls.push(`scrim:${v}`);
     },
+    applyComposerOpacityChoice: (v) => {
+      calls.push(`composerOpacity:${v}`);
+    },
+    applyUiOpacityChoice: (v) => {
+      calls.push(`uiOpacity:${v}`);
+    },
     applyTextColorChoice: (v) => {
       calls.push(`textColor:${v ?? "default"}`);
     },
@@ -102,6 +110,8 @@ describe("applySkinPack", () => {
     expect(r.appearanceWriteCompleted).toBe(true);
     expect(r.applySkinOpts).toEqual({ applyPreferredTheme: false });
     expect(d.calls).toContain("skin:false");
+    expect(d.calls).toContain("composerOpacity:100");
+    expect(d.calls).toContain("uiOpacity:100");
     expect(d.calls).toContain("textColor:default");
     expect(d.calls).toContain("fontShadow:0");
     expect(d.calls).not.toContain("theme");

@@ -16,7 +16,11 @@ import {
   DEFAULT_SKIN,
   DEFAULT_WALLPAPER_SCRIM,
   isThemeSkinId,
+  parseComposerOpacity,
+  parseUiOpacity,
   parseWallpaperScrim,
+  DEFAULT_COMPOSER_OPACITY,
+  DEFAULT_UI_OPACITY,
   type ThemeSkinId,
   type WallpaperClip,
   type WallpaperFocus,
@@ -78,6 +82,10 @@ export type SkinPackPreview = {
   skin: ThemeSkinId;
   requestedSkin: string;
   scrim: number;
+  /** Chat composer opacity 0–100. Missing packs default to 100. */
+  composerOpacity: number;
+  /** File-card / code / bubble opacity 0–100. Missing packs default to 100. */
+  uiOpacity: number;
   /** Custom UI ink. `null` = follow light/dark theme. */
   textColor: string | null;
   /** Drop shadow on exposed chrome. Default off. */
@@ -117,6 +125,8 @@ export type SkinPackManifest = {
   createdAt?: number;
   skin: string;
   scrim?: number;
+  composerOpacity?: number;
+  uiOpacity?: number;
   /** Custom UI ink (`#rgb` / `#rrggbb`). Omit / null = follow theme. */
   textColor?: string | null;
   /** Drop shadow on exposed chrome. Omit = off. */
@@ -132,6 +142,8 @@ export type ValidateManifestOk = {
   skin: ThemeSkinId;
   requestedSkin: string;
   scrim: number;
+  composerOpacity: number;
+  uiOpacity: number;
   textColor: string | null;
   fontShadow: boolean;
   warnings: SkinPackWarningCode[];
@@ -214,6 +226,8 @@ export function isEmptyDefaultLook(s: {
   skin: ThemeSkinId;
   wallpaperRecord: WallpaperRecord | null;
   wallpaperScrim: number;
+  composerOpacity?: number;
+  uiOpacity?: number;
   textColor?: string | null;
   fontShadow?: boolean;
 }): boolean {
@@ -221,6 +235,8 @@ export function isEmptyDefaultLook(s: {
     s.skin === DEFAULT_SKIN &&
     s.wallpaperRecord == null &&
     parseWallpaperScrim(s.wallpaperScrim) === DEFAULT_WALLPAPER_SCRIM &&
+    parseComposerOpacity(s.composerOpacity) === DEFAULT_COMPOSER_OPACITY &&
+    parseUiOpacity(s.uiOpacity) === DEFAULT_UI_OPACITY &&
     isDefaultAppearanceChrome({
       textColor: s.textColor,
       fontShadow: s.fontShadow,
@@ -291,6 +307,12 @@ export function validateSkinManifest(raw: unknown): ValidateManifestOk | Validat
   }
 
   const scrim = parseWallpaperScrim(raw.scrim);
+  const composerOpacity =
+    raw.composerOpacity == null
+      ? DEFAULT_COMPOSER_OPACITY
+      : parseComposerOpacity(raw.composerOpacity);
+  const uiOpacity =
+    raw.uiOpacity == null ? DEFAULT_UI_OPACITY : parseUiOpacity(raw.uiOpacity);
   const textColor =
     raw.textColor == null ? DEFAULT_TEXT_COLOR : parseTextColor(raw.textColor);
   const fontShadow =
@@ -376,6 +398,8 @@ export function validateSkinManifest(raw: unknown): ValidateManifestOk | Validat
       createdAt,
       skin: requestedSkin || skin,
       scrim,
+      composerOpacity,
+      uiOpacity,
       textColor,
       fontShadow,
       wallpaper,
@@ -383,6 +407,8 @@ export function validateSkinManifest(raw: unknown): ValidateManifestOk | Validat
     skin,
     requestedSkin: requestedSkin || skin,
     scrim,
+    composerOpacity,
+    uiOpacity,
     textColor,
     fontShadow,
     warnings,
@@ -396,6 +422,8 @@ export function buildExportManifest(input: {
   author?: string;
   skin: ThemeSkinId;
   scrim: number;
+  composerOpacity?: number;
+  uiOpacity?: number;
   textColor?: string | null;
   fontShadow?: boolean;
   wallpaper?: SkinPackWallpaperManifest | null;
@@ -409,6 +437,8 @@ export function buildExportManifest(input: {
     name,
     skin: input.skin,
     scrim: parseWallpaperScrim(input.scrim),
+    composerOpacity: parseComposerOpacity(input.composerOpacity),
+    uiOpacity: parseUiOpacity(input.uiOpacity),
     textColor,
     fontShadow,
   };

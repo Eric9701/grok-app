@@ -48,6 +48,7 @@ import { normalizeHHmm } from "@/lib/notifyQuietHours";
 import { SettingsTabStrip, SettingsLabelWithTip, UiCheck } from "./shared";
 import { SkinPresetsCard } from "./SkinPresetsCard";
 import { AppearanceChromeCard } from "./AppearanceChromeCard";
+import { AppearanceOpacityCard } from "./AppearanceOpacityCard";
 
 export function AppearanceSection() {
   const s = useSettingsModel() as SettingsViewModel & Record<string, any>;
@@ -670,13 +671,14 @@ export function AppearanceSection() {
             </div>
           ) : null}
 
+          <AppearanceOpacityCard />
           <AppearanceChromeCard />
           </div>
         </div>
       )}
 
       {activeTab === "interface" && (
-        <>
+        <div className="settings-appearance-interface">
           {/* Layout: zen / welcome / density / width / sidebar */}
           <div className="settings-card" id="settings-anchor-zenMode">
             {onZenMode ? (
@@ -1483,7 +1485,7 @@ export function AppearanceSection() {
               ) : null}
             </div>
           ) : null}
-        </>
+        </div>
       )}
     </div>
   );

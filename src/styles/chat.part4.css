@@ -287,6 +287,47 @@
   transform: rotate(45deg);
 }
 
+/*
+ * Rest: no disc on the glass plate. Hover wash is ::after + isolation
+ * (not background, not translateZ — those ghost or mis-paint the caret).
+ */
+.composer .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger) {
+  position: relative;
+  background: transparent;
+  isolation: isolate;
+}
+
+.composer .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--text-primary);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.composer .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger) > * {
+  position: relative;
+  z-index: 1;
+}
+
+.composer
+  .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger):hover:not(:disabled),
+.composer .icon-btn--plus.is-open {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.composer
+  .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger):hover:not(
+    :disabled
+  )::after,
+.composer .icon-btn--plus.is-open::after {
+  opacity: 0.06;
+}
+
 /* Fixed solid colors — never use transparent --bg-app (icons were disappearing) */
 .icon-btn--primary {
   background: var(--text-primary);
@@ -495,7 +536,7 @@
   cursor: pointer;
   box-sizing: border-box;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .composer-plus__item:hover:not(:disabled):not(.composer-plus__item--muted),

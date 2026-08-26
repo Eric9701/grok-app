@@ -91,6 +91,8 @@
   --bg-code: #0a0a0a;
   --bg-card: #1a1a1a;
   --bg-user-bubble: #2a2a2e;
+  --composer-opacity-mix: 100%;
+  --ui-opacity-mix: 100%;
 
   /*
    * Unified frosted glass (modals, menus, floating panels).

@@ -13,11 +13,17 @@ import {
 import type { createT } from "@/i18n";
 import { acquireNativeWebviewCover } from "@/lib/nativeWebviewCover";
 import { PR_HUB_ANCHOR_ID } from "@/lib/prHubDeepLink";
+import { listen } from "@/lib/api/host";
 import {
   buildSettingsHash,
+  isSettingsSectionId,
   type SettingsSectionId,
   type SettingsTabId,
 } from "@/lib/settingsCatalog";
+import {
+  OPEN_SETTINGS_FROM_EDITOR_EVENT,
+  type OpenSettingsFromEditorPayload,
+} from "@/lib/themeEditorShell";
 import { buildSettingsLabels } from "@/lib/settingsLabels";
 import {
   loadSettingsLastRoute,
@@ -150,6 +156,21 @@ export function useSettingsNavigation(opts: {
     window.addEventListener("hashchange", syncFromHash);
     return () => window.removeEventListener("hashchange", syncFromHash);
   }, [ensureSettingsNativeCover]);
+
+  useEffect(() => {
+    let stop: (() => void) | undefined;
+    void listen<OpenSettingsFromEditorPayload>(
+      OPEN_SETTINGS_FROM_EDITOR_EVENT,
+      (payload) => {
+        const section = payload?.section;
+        if (!isSettingsSectionId(section)) return;
+        navigateSettings(section, payload.tab);
+      },
+    ).then((un) => {
+      stop = un;
+    });
+    return () => stop?.();
+  }, [navigateSettings]);
 
   useLayoutEffect(() => {
     if (settingsOpen) {

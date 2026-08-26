@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { expect, it, vi } from "vitest";
 import { UserMenu } from "./UserMenu";
@@ -61,6 +61,38 @@ function Harness({ collapsed }: { collapsed: boolean }) {
     </>
   );
 }
+
+it("opens the theme editor from the theme submenu footer group", async () => {
+  const onThemeEditor = vi.fn();
+  const view = render(
+    <UserMenu
+      open
+      onClose={() => undefined}
+      theme="dark"
+      themePreference="dark"
+      locale="en"
+      labels={{ ...labels, themeEditor: "Theme editor" }}
+      account={null}
+      activeProvider={null}
+      accountBusy={false}
+      onSettings={() => undefined}
+      onAccountSettings={() => undefined}
+      onTheme={() => undefined}
+      onThemeEditor={onThemeEditor}
+      onLogin={() => undefined}
+      onLogout={() => undefined}
+    >
+      <button type="button">Account</button>
+    </UserMenu>,
+  );
+
+  fireEvent.mouseEnter(screen.getByRole("menuitem", { name: "Theme" }));
+  const editor = await screen.findByRole("menuitem", { name: "Theme editor" });
+  expect(document.querySelector(".user-menu__flyout-sep")).not.toBeNull();
+  fireEvent.click(editor);
+  expect(onThemeEditor).toHaveBeenCalledTimes(1);
+  view.unmount();
+});
 
 it("clears an open account menu when the sidebar collapses", async () => {
   const view = render(<Harness collapsed={false} />);

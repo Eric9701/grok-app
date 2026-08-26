@@ -2,15 +2,18 @@
  * Left workbench rail: chrome, primary nav, session tree slot, user footer.
  * Open/new-chat and settings navigation stay with the host.
  */
-import type {
-  CSSProperties,
-  Dispatch,
-  ReactNode,
-  SetStateAction,
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
 } from "react";
 import { Tip } from "@/components/ui/tooltip";
 import { SidebarBrand } from "@/components/SidebarBrand";
 import { SidebarUpdateButton } from "@/components/SidebarUpdateButton";
+import { ThemeEditorModal } from "@/components/ThemeEditorModal";
 import { UserMenu, remainingPercent } from "@/components/UserMenu";
 import { GrokLogo } from "@/components/GrokLogo";
 import {
@@ -32,6 +35,7 @@ import {
   type CustomProvider,
   type SavedAccount,
 } from "@/lib/api";
+import { openThemeEditorWindow } from "@/lib/api/system";
 import { accountDisplayName, accountInitials } from "@/lib/accountUi";
 import type { SwitcherQuota } from "@/lib/accountSwitcherQuota";
 import {
@@ -115,6 +119,16 @@ export type WorkbenchSidebarProps = {
 };
 
 export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false);
+  useEffect(() => {
+    const onHash = () => {
+      if ((window.location.hash || "").startsWith("#/settings")) {
+        setThemeEditorOpen(false);
+      }
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
   const {
     tr,
     locale,
@@ -369,6 +383,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
             themeSystem: tr("settings.themeSystem"),
             themeLight: tr("settings.themeLight"),
             themeDark: tr("settings.themeDark"),
+            themeEditor: tr("user.themeEditor"),
             local: tr("common.local"),
             signedIn: tr("account.signedIn"),
             signedOut: tr("account.signedOut"),
@@ -390,6 +405,15 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
           onAccountSettings={onAccountSettings}
           onTutorial={onTutorial}
           onTheme={applyThemeChoice}
+          onThemeEditor={() => {
+            if (isDesktopHost()) {
+              void openThemeEditorWindow().catch(() => {
+                setThemeEditorOpen(true);
+              });
+              return;
+            }
+            setThemeEditorOpen(true);
+          }}
           onLogin={onLogin}
           onLogout={onLogout}
           savedAccounts={savedAccounts}
@@ -493,6 +517,13 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
           </Tip>
         </UserMenu>
       </div>
+      {themeEditorOpen ? (
+        <ThemeEditorModal
+          open
+          onClose={() => setThemeEditorOpen(false)}
+          locale={locale}
+        />
+      ) : null}
     </aside>
   );
 }

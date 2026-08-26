@@ -270,8 +270,9 @@ html[data-chat-width="full"] .lobe-chat__inner,
 .lobe-chat-bubble {
   max-width: min(100%, 36rem);
   padding: var(--chat-bubble-pad-y, 10px) var(--chat-bubble-pad-x, 14px);
+  position: relative;
   border-radius: 14px;
-  background: var(--chat-bubble);
+  background: transparent;
   color: var(--chat-text);
   font-size: var(--chat-fs);
   line-height: var(--chat-lh);
@@ -279,6 +280,25 @@ html[data-chat-width="full"] .lobe-chat__inner,
   word-break: break-word;
   border: none;
   box-shadow: none;
+}
+
+.lobe-chat-bubble::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--chat-bubble) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lobe-chat-bubble > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Plain / skill-mixed user body — same newline policy as the composer */
@@ -295,7 +315,16 @@ html[data-chat-width="full"] .lobe-chat__inner,
 
 .lobe-chat-bubble--interjection {
   border: 1px solid color-mix(in srgb, var(--chat-link) 24%, transparent);
-  background: color-mix(in srgb, var(--chat-link) 8%, var(--chat-bubble));
+  background: transparent;
+}
+
+.lobe-chat-bubble--interjection::before {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--chat-link) 8%, var(--chat-bubble))
+      var(--ui-opacity-mix, 100%),
+    transparent
+  );
 }
 
 .lobe-chat-interjection-tag {
@@ -580,13 +609,33 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
 
 /* ── Code / path block (theme-aware chrome) ── */
 .chat-code {
+  position: relative;
   margin: 0.75em 0;
   border-radius: var(--chat-r);
-  background: var(--chat-code-bg);
+  background: transparent;
   border: 1px solid var(--chat-code-border);
   color: var(--chat-code-fg);
   overflow: hidden;
   box-shadow: none;
+}
+
+.chat-code::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--chat-code-bg) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chat-code > * {
+  position: relative;
+  z-index: 1;
 }
 
 .chat-code__bar {
@@ -596,7 +645,11 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   gap: 8px;
   min-height: 32px;
   padding: 4px 10px 0 12px;
-  background: var(--chat-code-bar);
+  background: color-mix(
+    in srgb,
+    var(--chat-code-bar) 35%,
+    transparent
+  );
   border-bottom: 1px solid var(--chat-code-border);
   color: var(--chat-text-2);
 }
@@ -718,6 +771,7 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
  * - Never force columns narrower than their content (nowrap + min-width)
  */
 .chat-md__table-wrap {
+  position: relative;
   display: block;
   width: 100%;
   max-width: 100%;
@@ -727,7 +781,26 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--chat-code-border);
   border-radius: var(--chat-r);
-  background: var(--chat-code-bg);
+  background: transparent;
+}
+
+.chat-md__table-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--chat-code-bg) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chat-md__table-wrap > * {
+  position: relative;
+  z-index: 1;
 }
 
 .chat-md table {

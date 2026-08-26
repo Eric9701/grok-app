@@ -11,6 +11,7 @@ export const idCore = {
   "user.theme": "Tema",
   "user.themeLight": "Beralih ke terang",
   "user.themeDark": "Beralih ke gelap",
+  "user.themeEditor": "Editor tema",
   "media.loadError": "Media ini tidak dapat dimuat pada pratinjau aplikasi.",
   "media.openExternal": "Buka dengan pemutar sistem",
   "media.loading": "Memuat media…",

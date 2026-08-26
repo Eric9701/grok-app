@@ -21,13 +21,12 @@ describe("sideTerminalTheme", () => {
     );
   });
 
-  it("uses CSS veil 50% and transparent xterm canvas (even bottom fill)", () => {
+  it("keeps host and xterm canvas transparent so the aside plate shows through", () => {
     const veil = resolveTerminalSurfaceBg();
+    expect(veil).toBe("#00000000");
     expect([TERM_BG_DARK_50, TERM_BG_LIGHT_50]).toContain(veil);
-    expect(veil.slice(-2).toLowerCase()).toBe("80");
 
     const t = buildSideTerminalTheme();
-    // Canvas must stay fully transparent so FitAddon row-gap matches CSS veil
     expect(t.background).toBe("#00000000");
     expect(t.cyan).toBeTruthy();
     expect(t.green).toBeTruthy();

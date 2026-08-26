@@ -11,6 +11,7 @@ export const zhCore = {
   "user.theme": "主题",
   "user.themeLight": "切换到浅色",
   "user.themeDark": "切换到深色",
+  "user.themeEditor": "主题编辑器",
   "media.loadError": "应用内无法加载此媒体。",
   "media.openExternal": "用系统播放器打开",
   "media.loading": "正在加载媒体…",

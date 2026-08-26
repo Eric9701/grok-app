@@ -1,6 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { isPetShellHash } from "@/lib/pet/petShell";
+import {
+  isThemeEditorDocument,
+  isThemeEditorHash,
+} from "@/lib/themeEditorShell";
 import { UpdaterProvider } from "./hooks/UpdaterProvider";
 import "./styles/tokens.css";
 import "./styles/skins.css";
@@ -23,11 +27,15 @@ import {
   resolveThemeFromSchedule,
 } from "./lib/themeSchedule";
 import {
+  applyComposerOpacityToDocument,
   applySkinToDocument,
+  applyUiOpacityToDocument,
   applyWallpaperBlurToDocument,
   applyWallpaperFlag,
   applyWallpaperScrimToDocument,
+  loadComposerOpacity,
   loadSkin,
+  loadUiOpacity,
   loadWallpaperBlur,
   loadWallpaperMeta,
   loadWallpaperScrim,
@@ -97,12 +105,24 @@ applySidebarDensity(loadSidebarDensity(localStorage), undefined, false);
 applyMessageActionsVisibility(loadMessageActionsVisibility(localStorage));
 // Composer empty min-height (General → Composer) — html[data-composer-min-rows].
 applyComposerMinRows(loadComposerMinRows(localStorage));
-// Only the data-wallpaper flag is set synchronously (so the shell flips to
-// transparent + scrim instantly). The media layer is rendered by App after
-// the IndexedDB blob is loaded — no synchronous access to IDB is possible.
-applyWallpaperFlag(loadWallpaperMeta(localStorage) !== null);
-applyWallpaperScrimToDocument(loadWallpaperScrim(localStorage));
-applyWallpaperBlurToDocument(loadWallpaperBlur(localStorage));
+const petShell =
+  typeof window !== "undefined" && isPetShellHash(window.location.hash);
+const themeEditorShell =
+  typeof window !== "undefined" &&
+  (isThemeEditorHash(window.location.hash) || isThemeEditorDocument());
+
+// Wallpaper scrim / pane mix belongs on the workbench only. The settings
+// editor window stays a solid plate (same rule as `.settings-page`).
+if (!petShell && !themeEditorShell) {
+  // Only the data-wallpaper flag is set synchronously (so the shell flips to
+  // transparent + scrim instantly). The media layer is rendered by App after
+  // the IndexedDB blob is loaded — no synchronous access to IDB is possible.
+  applyWallpaperFlag(loadWallpaperMeta(localStorage) !== null);
+  applyWallpaperScrimToDocument(loadWallpaperScrim(localStorage));
+  applyWallpaperBlurToDocument(loadWallpaperBlur(localStorage));
+  applyComposerOpacityToDocument(loadComposerOpacity(localStorage));
+  applyUiOpacityToDocument(loadUiOpacity(localStorage));
+}
 applyAppearanceChrome(loadAppearanceChrome(localStorage));
 // macOS: null = follow OS (live matchMedia). Windows: lock to the resolved
 // theme — WebView2 matchMedia does not track Personalization flips.
@@ -114,11 +134,11 @@ void applyNativeWindowTheme(
     detectAppPlatform(),
   ),
 );
-const petShell =
-  typeof window !== "undefined" && isPetShellHash(window.location.hash);
-
 if (petShell) {
   document.documentElement.setAttribute("data-pet-shell", "1");
+  document.querySelector(".boot-gate")?.setAttribute("hidden", "");
+} else if (themeEditorShell) {
+  document.documentElement.setAttribute("data-theme-editor-shell", "1");
   document.querySelector(".boot-gate")?.setAttribute("hidden", "");
 } else {
   // Desktop always-on-top (localStorage; fail-closed outside Tauri).
@@ -243,6 +263,14 @@ if (petShell) {
     root.render(
       <StrictMode>
         <PetApp />
+      </StrictMode>,
+    );
+  });
+} else if (themeEditorShell) {
+  void import("./components/ThemeEditorApp").then(({ ThemeEditorApp }) => {
+    root.render(
+      <StrictMode>
+        <ThemeEditorApp />
       </StrictMode>,
     );
   });

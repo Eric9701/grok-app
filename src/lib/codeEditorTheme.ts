@@ -87,7 +87,7 @@ function chrome(mode: "dark" | "light") {
     {
       "&": {
         height: "100%",
-        backgroundColor: dark ? "#21252b" : "#fafafa",
+        backgroundColor: "transparent",
         color: dark ? "#abb2bf" : "#383a42",
         fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
         fontSize: "12.5px",
@@ -110,7 +110,7 @@ function chrome(mode: "dark" | "light") {
         lineHeight: "20px",
       },
       ".cm-gutters": {
-        backgroundColor: dark ? "#21252b" : "#f0f0f0",
+        backgroundColor: "transparent",
         color: dark ? "#5c6370" : "#9d9d9f",
         borderRight: `1px solid ${dark ? "#181a1f" : "#e5e5e6"}`,
         minWidth: "2.75rem",

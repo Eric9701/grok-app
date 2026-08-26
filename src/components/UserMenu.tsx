@@ -74,6 +74,8 @@ export interface UserMenuProps {
     themeSystem: string;
     themeLight: string;
     themeDark: string;
+    /** Opens the floating appearance editor. */
+    themeEditor?: string;
     local: string;
     signedIn: string;
     signedOut: string;
@@ -106,6 +108,8 @@ export interface UserMenuProps {
   /** Open optional in-app product tour */
   onTutorial?: () => void;
   onTheme: (preference: ThemePreference) => void;
+  /** Open the homepage appearance editor (theme + interface tabs). */
+  onThemeEditor?: () => void;
   onLogin: () => void;
   onLogout: () => void;
   savedAccounts?: SavedAccount[];
@@ -123,7 +127,7 @@ export function remainingPercent(account: AccountStatus | null): number | null {
 const THEME_OPTIONS: ThemePreference[] = ["system", "light", "dark"];
 const FLYOUT_GAP = 4;
 const FLYOUT_MIN_W = 148;
-const FLYOUT_EST_H = 120;
+const FLYOUT_EST_H = 172;
 
 function computeThemeFlyoutStyle(
   anchor: DOMRect,
@@ -176,6 +180,7 @@ export function UserMenu({
   onAccountSettings,
   onTutorial,
   onTheme,
+  onThemeEditor,
   onLogin,
   onLogout,
   savedAccounts = [],
@@ -256,7 +261,7 @@ export function UserMenu({
   useLayoutEffect(() => {
     if (!open || !themeSubOpen || !themeFlyoutRef.current) return;
     updateFlyoutPos();
-  }, [open, themeSubOpen, updateFlyoutPos, themePreference]);
+  }, [open, themeSubOpen, updateFlyoutPos, themePreference, labels.themeEditor]);
 
   const panelPresence = useOpenPresence(
     open,
@@ -370,6 +375,26 @@ export function UserMenu({
                 </button>
               );
             })}
+            {labels.themeEditor && onThemeEditor ? (
+              <>
+                <div className="user-menu__flyout-sep" role="separator" />
+                <button
+                  type="button"
+                  className="user-menu__item user-menu__item--flyout"
+                  role="menuitem"
+                  onClick={() => {
+                    onThemeEditor();
+                    setThemeSubOpen(false);
+                    onClose();
+                  }}
+                >
+                  <span className="user-menu__check" aria-hidden />
+                  <span className="user-menu__item-label">
+                    {labels.themeEditor}
+                  </span>
+                </button>
+              </>
+            ) : null}
           </div>,
           document.body,
         )

@@ -7,7 +7,6 @@
  * Context / right-click menus are solid (see block below) — not glass.
  */
 .glass-surface,
-.composer-plus,
 .c-select__menu,
 .user-menu__pop,
 .slash-palette,
@@ -63,13 +62,15 @@
 .auto-page__create-menu,
 .auto-row__menu,
 .project-menu,
+.composer-plus,
 .menu-panel.context-menu,
 .menu-panel.ctx-menu,
 .menu-panel.att-menu,
 .menu-panel.open-loc-menu,
 .menu-panel.rp-open-menu,
 .menu-panel.auto-page__create-menu,
-.menu-panel.auto-row__menu {
+.menu-panel.auto-row__menu,
+.menu-panel.composer-plus {
   background: var(--menu-context-bg);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -86,7 +87,6 @@
   (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
 ) {
   .glass-surface,
-  .composer-plus,
   .c-select__menu,
   .user-menu__pop,
   .slash-palette,
@@ -107,7 +107,8 @@
 .user-menu__item,
 .att-menu__item,
 .rp-open-menu__item,
-.auto-row__menu button {
+.auto-row__menu button,
+.context-menu__item {
   display: flex;
   align-items: center;
   gap: var(--menu-item-gap);
@@ -124,6 +125,7 @@
   cursor: pointer;
   box-sizing: border-box;
   white-space: nowrap;
+  transform: translateZ(0);
 }
 
 .menu-shortcut {
@@ -156,7 +158,7 @@
 }
 
 .context-menu__item.is-danger:hover {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  background: var(--danger-muted);
   color: var(--danger);
 }
 
@@ -238,7 +240,8 @@
 .user-menu__item:hover,
 .att-menu__item:hover,
 .rp-open-menu__item:hover,
-.auto-row__menu button:hover {
+.auto-row__menu button:hover,
+.context-menu__item:hover {
   background: var(--menu-hover);
   color: var(--text-primary);
 }
@@ -257,7 +260,7 @@
 
 .ctx-menu button.is-danger:hover,
 .auto-row__menu button.is-danger:hover {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  background: var(--danger-muted);
   color: var(--danger);
 }
 
@@ -284,7 +287,8 @@
 
 .open-loc-menu__sep,
 .rp-open-menu__sep,
-.context-menu__sep {
+.context-menu__sep,
+.user-menu__flyout-sep {
   height: 1px;
   margin: var(--menu-sep-margin-y) var(--menu-sep-margin-x);
   background: var(--menu-border);
@@ -770,6 +774,7 @@
   text-align: left;
   color: var(--text-secondary);
   font-size: var(--text-sm);
+  transform: translateZ(0);
 }
 
 .session-row:hover {

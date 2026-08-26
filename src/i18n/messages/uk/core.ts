@@ -11,6 +11,7 @@ export const ukCore = {
   "user.theme": "Тема",
   "user.themeLight": "Перейти на світлу",
   "user.themeDark": "Перейти на темну",
+  "user.themeEditor": "Редактор теми",
   "media.loadError": "Не вдалося завантажити це медіа в попередньому перегляді.",
   "media.openExternal": "Відкрити системним плеєром",
   "media.loading": "Завантаження медіа…",

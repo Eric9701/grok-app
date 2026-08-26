@@ -11,6 +11,7 @@ export const filCore = {
   "user.theme": "Tema",
   "user.themeLight": "Lumipat sa maliwanag",
   "user.themeDark": "Lumipat sa madilim",
+  "user.themeEditor": "Editor ng tema",
   "media.loadError": "Hindi ma-load ang media na ito sa preview ng app.",
   "media.openExternal": "Buksan sa system player",
   "media.loading": "Nilo-load ang media…",

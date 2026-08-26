@@ -565,6 +565,7 @@
 
 /* Connection status pill in main chrome */
 .status-pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -574,8 +575,24 @@
   font-size: 11px;
   color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--bg-elevated) 55%, transparent);
+  background: transparent;
   flex-shrink: 0;
+  z-index: 0;
+  transform: translateZ(0);
+}
+
+.status-pill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: -1;
 }
 
 .status-pill__dot {
@@ -609,7 +626,6 @@
 .status-pill--action:hover {
   color: var(--text-primary);
   border-color: var(--border-strong, var(--border-subtle));
-  background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
 }
 
 .status-pill--action:focus-visible {

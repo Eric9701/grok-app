@@ -11,6 +11,7 @@ export const zhTWCore = {
   "user.theme": "主題",
   "user.themeLight": "切換為淺色",
   "user.themeDark": "切換為深色",
+  "user.themeEditor": "主題編輯器",
   "media.loadError": "應用程式內無法載入此媒體。",
   "media.openExternal": "以系統播放器開啟",
   "media.loading": "正在載入媒體…",

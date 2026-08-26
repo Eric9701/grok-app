@@ -24,6 +24,12 @@ pub const WALLPAPER_MAX: u64 = 200 * 1024 * 1024;
 pub const MAX_ENTRIES: usize = 16;
 pub const ZIP_COMMENT: &str = "GROKSKIN/1";
 pub const DEFAULT_SCRIM: i32 = 100;
+pub const DEFAULT_COMPOSER_OPACITY: i32 = 100;
+pub const DEFAULT_UI_OPACITY: i32 = 100;
+
+fn default_pct_100() -> i32 {
+    100
+}
 const KNOWN_SKINS: &[&str] = &["default", "rose", "gothic", "mist", "ocean", "ember"];
 
 static CURRENT_INSPECT: Mutex<Option<String>> = Mutex::new(None);
@@ -58,6 +64,10 @@ pub struct SkinPackPreviewDto {
     pub skin: String,
     pub requested_skin: String,
     pub scrim: i32,
+    #[serde(default = "default_pct_100")]
+    pub composer_opacity: i32,
+    #[serde(default = "default_pct_100")]
+    pub ui_opacity: i32,
     #[serde(default)]
     pub text_color: Option<String>,
     #[serde(default)]
@@ -88,6 +98,10 @@ pub struct SkinPackExportManifest {
     pub skin: String,
     #[serde(default)]
     pub scrim: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composer_opacity: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui_opacity: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_color: Option<String>,
     #[serde(default)]
@@ -279,6 +293,14 @@ fn validate_manifest_value(
         "default".into()
     };
     let scrim = obj.get("scrim").map(parse_scrim).unwrap_or(DEFAULT_SCRIM);
+    let composer_opacity = obj
+        .get("composerOpacity")
+        .map(parse_scrim)
+        .unwrap_or(DEFAULT_COMPOSER_OPACITY);
+    let ui_opacity = obj
+        .get("uiOpacity")
+        .map(parse_scrim)
+        .unwrap_or(DEFAULT_UI_OPACITY);
     let text_color = obj.get("textColor").and_then(parse_text_color);
     let font_shadow = obj
         .get("fontShadow")
@@ -393,6 +415,8 @@ fn validate_manifest_value(
             skin,
             requested_skin: requested,
             scrim,
+            composer_opacity,
+            ui_opacity,
             text_color,
             font_shadow,
             theme_preference: None,

@@ -11,6 +11,7 @@ export const deCore = {
   "user.theme": "Design",
   "user.themeLight": "Zu Hell wechseln",
   "user.themeDark": "Zu Dunkel wechseln",
+  "user.themeEditor": "Theme-Editor",
   "media.loadError": "Diese Medien konnten in der App-Vorschau nicht geladen werden.",
   "media.openExternal": "Mit Systemplayer öffnen",
   "media.loading": "Medien werden geladen…",

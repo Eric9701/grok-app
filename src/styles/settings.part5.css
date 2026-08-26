@@ -500,26 +500,45 @@
    evenly next to pane toggles in main__top-actions and rp-chrome__actions. */
 .open-loc {
   --open-loc-h: 28px;
+  --open-loc-radius: var(--radius-sm, 6px);
   position: relative;
   display: inline-flex;
   align-items: stretch;
   height: var(--open-loc-h);
   box-sizing: border-box;
-  border-radius: var(--radius-sm, 6px); /* same as .chrome-btn */
+  border-radius: var(--open-loc-radius);
   border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated, var(--bg-hover));
+  background: transparent;
   color: var(--text-primary);
   font-size: 12.5px;
   font-weight: 500;
   flex-shrink: 0;
-  overflow: hidden;
-  box-shadow: none; /* avoid extra visual bulk vs flat chrome-btn */
+  overflow: visible;
+  box-shadow: none;
+}
+
+.open-loc::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated, var(--bg-hover)) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
 }
 
 .open-loc:hover,
 .open-loc.is-open {
   border-color: var(--border-strong, var(--border-subtle));
-  background: var(--bg-active, var(--bg-hover));
+}
+
+.open-loc > * {
+  position: relative;
+  z-index: 1;
 }
 
 .open-loc.is-disabled {
@@ -542,6 +561,8 @@
   min-width: 0;
   height: 100%;
   box-sizing: border-box;
+  border-radius: var(--open-loc-radius) 0 0 var(--open-loc-radius);
+  overflow: hidden;
 }
 
 .open-loc__main:hover {
@@ -584,6 +605,8 @@
   color: var(--text-tertiary);
   cursor: pointer;
   box-sizing: border-box;
+  border-radius: 0 var(--open-loc-radius) var(--open-loc-radius) 0;
+  overflow: hidden;
 }
 
 .open-loc__caret:hover {

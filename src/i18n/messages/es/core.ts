@@ -11,6 +11,7 @@ export const esCore = {
   "user.theme": "Tema",
   "user.themeLight": "Cambiar a claro",
   "user.themeDark": "Cambiar a oscuro",
+  "user.themeEditor": "Editor de tema",
   "media.loadError": "No se pudo cargar este medio en la vista previa de la aplicación.",
   "media.openExternal": "Abrir con el reproductor del sistema",
   "media.loading": "Cargando medio…",

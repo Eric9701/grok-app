@@ -80,6 +80,28 @@ describe("validateSkinManifest", () => {
     });
     expect(exported.textColor).toBe("#aabbcc");
     expect(exported.fontShadow).toBe(true);
+
+    expect(missing.composerOpacity).toBe(100);
+    expect(missing.uiOpacity).toBe(100);
+    const withOpac = validateSkinManifest({
+      ...base,
+      wallpaper: null,
+      composerOpacity: 40,
+      uiOpacity: 10,
+    });
+    expect(withOpac.ok).toBe(true);
+    if (!withOpac.ok) return;
+    expect(withOpac.composerOpacity).toBe(40);
+    expect(withOpac.uiOpacity).toBe(10);
+    const exportedOpac = buildExportManifest({
+      name: "x",
+      skin: "ocean",
+      scrim: 10,
+      composerOpacity: 40,
+      uiOpacity: 10,
+    });
+    expect(exportedOpac.composerOpacity).toBe(40);
+    expect(exportedOpac.uiOpacity).toBe(10);
   });
 
   it("ignores themePreference and does not copy it into export manifests", () => {

@@ -638,6 +638,18 @@
   padding: 24px 16px;
 }
 
+/* Wallpaper clicks pass through the wrap onto .lobe-chat (user-select:text).
+ * WKWebView then draws native selection carets on the empty transcript. */
+.main__stage:has(.composer-wrap--welcome) .lobe-chat,
+.main__stage:has(.composer-wrap--welcome) .lobe-chat * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.composer-wrap--float .composer-stack {
+  pointer-events: auto;
+}
+
 .composer-wrap--welcome .composer {
   width: 100%;
 }
@@ -665,7 +677,6 @@
   padding: 4px 8px 8px;
   user-select: none;
   flex-shrink: 0;
-  contain: layout style;
 }
 
 .composer-welcome-brand {
@@ -692,6 +703,7 @@
   border: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  clip-path: none;
 }
 
 .composer-welcome-mark.is-entering .composer-welcome-brand {

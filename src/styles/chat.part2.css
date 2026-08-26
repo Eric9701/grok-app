@@ -22,9 +22,29 @@
   padding: var(--composer-context-pad);
   border-radius: var(--composer-context-radius);
   border: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--bg-main));
+  position: relative;
+  background: transparent;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
   color: var(--text-secondary);
+}
+
+.composer__context-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated) var(--composer-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.composer__context-bar > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Session / workspace change chips live in the context bar (not the input). */
@@ -49,7 +69,7 @@
 }
 
 [data-theme="light"] .composer__context-bar {
-  background: color-mix(in srgb, var(--bg-elevated) 70%, #eef0f3);
+  background: transparent;
   border-color: color-mix(in srgb, var(--border-subtle) 80%, transparent);
 }
 
@@ -60,6 +80,7 @@
   height: 28px;
   max-width: min(200px, 42vw);
   padding: 0 10px;
+  position: relative;
   border: none;
   border-radius: calc(
     var(--composer-context-radius, 12px) - var(--composer-context-pad, 4px)
@@ -74,6 +95,23 @@
   cursor: default;
   flex-shrink: 1;
   min-width: 0;
+  isolation: isolate;
+}
+
+.composer__context-item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--text-primary);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.composer__context-item > * {
+  position: relative;
+  z-index: 1;
 }
 
 button.composer__context-item {
@@ -82,8 +120,13 @@ button.composer__context-item {
 
 .composer__context-item:hover:not(:disabled),
 .composer__context-item.is-open {
-  background: var(--bg-hover);
+  background: transparent;
   color: var(--text-primary);
+}
+
+.composer__context-item:hover:not(:disabled)::after,
+.composer__context-item.is-open::after {
+  opacity: 0.06;
 }
 
 .composer__context-item:disabled {
@@ -415,7 +458,7 @@ button.composer__context-item {
   width: 100%;
   max-width: var(--chat-width-max, 800px);
   border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
+  background: transparent;
   border-radius: var(--menu-radius, 12px);
   padding: 10px 12px 10px;
   display: flex;
@@ -429,6 +472,25 @@ button.composer__context-item {
   /* Size container for compact chips (Codex-style) */
   container-type: inline-size;
   container-name: composer;
+}
+
+.composer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated) var(--composer-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.composer > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Subtle composer focus while main is drop-target (not a second frame) */

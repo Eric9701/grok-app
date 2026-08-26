@@ -3,6 +3,9 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* overlay-scroll defaults to overflow:hidden; that + the rail's
+   * color-mix wallpaper fill composites a rectangular inner edge. */
+  overflow: visible;
 }
 
 .sidebar__scroll-inner,

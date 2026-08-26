@@ -69,6 +69,7 @@ mod side_browser_host;
 mod commands;
 
 mod pet_window;
+mod theme_editor_window;
 
 mod editors;
 
@@ -1108,6 +1109,8 @@ pub fn run() {
             commands::session_create,
 
             commands::open_session_window,
+
+            theme_editor_window::open_theme_editor_window,
 
             commands::focus_main_window,
 

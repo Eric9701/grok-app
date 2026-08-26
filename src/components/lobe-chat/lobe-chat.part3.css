@@ -250,8 +250,28 @@
   padding: 10px 12px;
   border-radius: var(--chat-r-lg);
   border: 1px solid var(--chat-code-border);
-  background: var(--chat-bubble);
+  position: relative;
+  background: transparent;
   box-sizing: border-box;
+}
+
+.lobe-inline-edit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--chat-bubble) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lobe-inline-edit > * {
+  position: relative;
+  z-index: 1;
 }
 .lobe-inline-edit__atts {
   display: flex;
@@ -378,10 +398,18 @@
   min-height: var(--attach-h);
   border-radius: 8px;
   border: 1px solid var(--chat-card-border);
-  background: var(--chat-card);
+  background: transparent;
   box-shadow: none;
   overflow: hidden;
   box-sizing: border-box;
+}
+
+.lobe-chat .att-card::before {
+  background: color-mix(
+    in srgb,
+    var(--chat-card) var(--ui-opacity-mix, 100%),
+    transparent
+  );
 }
 
 .lobe-chat .att-card--image {
@@ -403,7 +431,7 @@
   height: var(--attach-h);
   min-height: var(--attach-h);
   border-radius: 8px;
-  background: var(--chat-card);
+  background: transparent;
   box-shadow: none;
   overflow: hidden;
 }
@@ -471,7 +499,7 @@
   justify-content: center;
   cursor: pointer;
   color: var(--chat-text);
-  background: var(--chat-card);
+  background: transparent;
   border: 1px solid var(--chat-card-border);
   border-radius: 8px;
   font: inherit;

@@ -102,11 +102,11 @@
 
 .rp-code--dark,
 .rp-code--dark .rp-code__scroll {
-  background: #282c34;
+  background: var(--rp-surface, transparent);
 }
 
 .rp-code--dark .rp-code__ln {
-  background: #21252b;
+  background: var(--rp-surface, transparent);
   color: #5c6370;
   border-right-color: #181a1f;
 }
@@ -191,11 +191,11 @@
 
 .rp-code--light,
 .rp-code--light .rp-code__scroll {
-  background: #fafafa;
+  background: var(--rp-surface, transparent);
 }
 
 .rp-code--light .rp-code__ln {
-  background: #f0f0f0;
+  background: var(--rp-surface, transparent);
   color: #9d9d9f;
   border-right-color: #e5e5e6;
 }

@@ -11,6 +11,7 @@ export const jaCore = {
   "user.theme": "テーマ",
   "user.themeLight": "ライトに切り替え",
   "user.themeDark": "ダークに切り替え",
+  "user.themeEditor": "テーマエディター",
   "media.loadError": "アプリのプレビューでこのメディアを読み込めませんでした。",
   "media.openExternal": "システムのプレーヤーで開く",
   "media.loading": "メディアを読み込み中…",

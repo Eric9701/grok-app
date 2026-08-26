@@ -11,6 +11,7 @@ export const enCore = {
   "user.theme": "Theme",
   "user.themeLight": "Switch to light",
   "user.themeDark": "Switch to dark",
+  "user.themeEditor": "Theme editor",
   "media.loadError": "Could not load this media in the app preview.",
   "media.openExternal": "Open with system player",
   "media.loading": "Loading media…",

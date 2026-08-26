@@ -208,6 +208,7 @@ html[data-sidebar-density="compact"] .tree-date-group__head {
   font-size: 13px;
   cursor: pointer;
   text-align: left;
+  transform: translateZ(0);
   /* Offscreen rows skip paint work in long virtualized lists. */
   content-visibility: auto;
   contain-intrinsic-size: auto 36px;

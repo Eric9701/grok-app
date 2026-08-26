@@ -16,8 +16,9 @@ html[data-wallpaper="1"] {
   --wallpaper-theme-scrim-opacity: var(--wallpaper-scrim-opacity, 1);
   --wallpaper-theme-mix-sidebar: var(--wallpaper-mix-sidebar, 58%);
   --wallpaper-theme-mix-main: var(--wallpaper-mix-main, 70%);
-  --wallpaper-theme-mix-aside: var(--wallpaper-mix-aside, 70%);
+  --wallpaper-theme-mix-aside: var(--wallpaper-theme-mix-sidebar);
   --wallpaper-theme-mix-settings: var(--wallpaper-mix-settings, 78%);
+  --wallpaper-theme-mix-card: var(--wallpaper-mix-card, 100%);
   --wallpaper-foreground-shadow-color: rgb(
     0 0 0 / var(--wallpaper-sidebar-shadow-alpha, 0)
   );
@@ -31,13 +32,8 @@ html[data-theme="light"][data-wallpaper="1"] {
   );
   --wallpaper-theme-mix-sidebar: var(--wallpaper-light-mix-sidebar, 72%);
   --wallpaper-theme-mix-main: var(--wallpaper-light-mix-main, 24%);
-  --wallpaper-theme-mix-aside: var(--wallpaper-light-mix-aside, 32%);
+  --wallpaper-theme-mix-aside: var(--wallpaper-theme-mix-sidebar);
   --wallpaper-theme-mix-settings: var(--wallpaper-light-mix-settings, 72%);
-  --wallpaper-light-elevated-surface: color-mix(
-    in srgb,
-    var(--bg-elevated) 74%,
-    transparent
-  );
   --wallpaper-chrome-foreground: rgb(255 255 255 / 0.96);
   --wallpaper-chrome-shadow-color: rgb(0 0 0 / 0.68);
 }
@@ -108,6 +104,37 @@ html[data-wallpaper="1"] .app-settings-stage {
   background: var(--bg-main);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+/*
+ * Standalone appearance window is a settings plate — never wallpaper glass,
+ * scrim, or pane mix. Sliders still write prefs for the workbench.
+ */
+html[data-theme-editor-shell],
+html[data-theme-editor-shell][data-wallpaper="1"] {
+  --composer-opacity-mix: 100%;
+  --ui-opacity-mix: 100%;
+  --wallpaper-theme-scrim-opacity: 0;
+}
+
+html[data-theme-editor-shell] .app-shell,
+html[data-theme-editor-shell][data-wallpaper="1"] .app-shell,
+html[data-theme-editor-shell] .theme-editor-shell,
+html[data-theme-editor-shell][data-wallpaper="1"] .theme-editor-shell {
+  background: var(--bg-main) !important;
+}
+
+html[data-theme-editor-shell] .app-shell::after,
+html[data-theme-editor-shell][data-wallpaper="1"] .app-shell::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  opacity: 0 !important;
+}
+
+html[data-theme-editor-shell] .app-wallpaper-media,
+html[data-theme-editor-shell][data-wallpaper="1"] .app-wallpaper-media {
+  display: none !important;
 }
 
 /* Pane fills scale with scrim: 0% = fully clear wallpaper under chrome.
@@ -185,8 +212,7 @@ html[data-wallpaper="1"]
   filter: none;
 }
 
-html[data-wallpaper="1"] .main,
-html[data-wallpaper="1"] .composer-wrap {
+html[data-wallpaper="1"] .main {
   /* Opaque chrome washes — 4% --bg-hover samples the scrim gradient. */
   --bg-hover: color-mix(
     in srgb,
@@ -200,6 +226,21 @@ html[data-wallpaper="1"] .composer-wrap {
   );
 }
 
+/*
+ * Composer sits on its own plate. Keep hover as theme rgba (not wallpaper
+ * color-mix): WKWebView leaves a rectangular ghost after :hover if the wash
+ * is a composited mix / ::before layer (software-path damage-rect miss).
+ */
+html[data-wallpaper="1"] .composer-wrap {
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="light"][data-wallpaper="1"] .composer-wrap {
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+}
+
 html[data-wallpaper="1"] .main {
   background: color-mix(
     in srgb,
@@ -210,10 +251,12 @@ html[data-wallpaper="1"] .main {
   box-shadow: none !important;
 }
 
+/* Right rail uses the same solid + mix as the left sidebar. */
 html[data-wallpaper="1"] .aside {
   background: color-mix(
     in srgb,
-    var(--bg-aside) var(--wallpaper-theme-mix-aside),
+    var(--bg-sidebar-solid, var(--bg-sidebar))
+      var(--wallpaper-theme-mix-sidebar),
     transparent
   ) !important;
 }
@@ -289,47 +332,18 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"] .main {
   ) !important;
 }
 
-html[data-wallpaper="1"].platform-mac[data-theme="light"] .aside {
-  background: color-mix(
-    in srgb,
-    #ffffff var(--wallpaper-theme-mix-aside),
-    transparent
-  ) !important;
+/* Composer + workspace bar: independent slider, never merged with scrim. */
+html[data-wallpaper="1"] :is(.composer, .composer__context-bar) {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
-/* Composer + the workspace bar above it share one lifted plate. Icon
- * buttons / welcome copy stay opaque — translucent hover used to sample
- * the window scrim and read as a gradient fill. */
-html[data-theme="light"][data-wallpaper="1"]
-  :is(.composer, .composer__context-bar) {
-  background: var(--wallpaper-light-elevated-surface);
-}
-
-html[data-theme="dark"][data-wallpaper="1"]
-  :is(.composer, .composer__context-bar) {
-  background: color-mix(
-    in srgb,
-    var(--bg-elevated) 68%,
-    transparent
-  );
-  backdrop-filter: blur(var(--wallpaper-settings-blur, 14px))
-    saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--wallpaper-settings-blur, 14px))
-    saturate(var(--glass-saturate));
-}
-
-html[data-stream-perf="1"][data-wallpaper="1"]
-  :is(.composer, .composer__context-bar) {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-html[data-wallpaper="1"] .main__top .status-pill {
-  background: var(--bg-elevated);
-}
-
-html[data-wallpaper="1"] .main__top .status-pill--action:hover {
-  background: var(--bg-hover);
+html[data-wallpaper="1"] .main__top .status-pill,
+html[data-wallpaper="1"] .main__top .status-pill--action:hover,
+html[data-wallpaper="1"] .user-avatar,
+html[data-wallpaper="1"] .user-avatar--logo {
+  background: transparent;
 }
 
 html[data-wallpaper="1"]
@@ -342,20 +356,7 @@ html[data-wallpaper="1"]
   box-shadow: none;
 }
 
-html[data-wallpaper="1"]
-  .composer
-  .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger) {
-  background: var(--bg-hover);
-}
 
-html[data-wallpaper="1"]
-  .composer
-  .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger):hover:not(:disabled),
-html[data-wallpaper="1"]
-  .composer
-  .icon-btn--plus.is-open {
-  background: var(--bg-active);
-}
 
 /*
  * Hard clear at 0% scrim — clear the canvas and pane curves completely.
@@ -520,6 +521,14 @@ html[data-font-shadow="1"] .settings-page {
 }
 
 html[data-font-shadow="1"] .settings-page svg {
+  filter: none;
+}
+
+html[data-font-shadow="1"] .theme-editor-shell {
+  text-shadow: none;
+}
+
+html[data-font-shadow="1"] .theme-editor-shell svg {
   filter: none;
 }
 

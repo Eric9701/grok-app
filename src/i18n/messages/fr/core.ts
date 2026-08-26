@@ -11,6 +11,7 @@ export const frCore = {
   "user.theme": "Thème",
   "user.themeLight": "Passer en clair",
   "user.themeDark": "Passer en sombre",
+  "user.themeEditor": "Éditeur de thème",
   "media.loadError": "Impossible de charger ce média dans l’aperçu de l’application.",
   "media.openExternal": "Ouvrir avec le lecteur système",
   "media.loading": "Chargement du média…",

@@ -45,6 +45,16 @@ describe("settings overlay fills the window with wallpaper on", () => {
     );
   });
 
+  it("keeps the standalone appearance window solid over wallpaper", () => {
+    const css = readFileSync(join(STYLES, "skins.css"), "utf8");
+    expect(css).toMatch(
+      /html\[data-theme-editor-shell\]\[data-wallpaper="1"\] \.app-shell::after\s*\{[^}]*content:\s*none\s*!important/s,
+    );
+    expect(css).toMatch(
+      /html\[data-theme-editor-shell\]\[data-wallpaper="1"\] \.theme-editor-shell\s*\{[^}]*background:\s*var\(--bg-main\)\s*!important/s,
+    );
+  });
+
   it("does not force the settings stage to position:relative", () => {
     const css = readFileSync(join(STYLES, "skins.css"), "utf8").replace(
       /\/\*[\s\S]*?\*\//g,

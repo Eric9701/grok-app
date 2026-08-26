@@ -49,16 +49,22 @@ import {
   saveTextColor,
 } from "@/lib/appearanceChromePref";
 import {
+  applyComposerOpacityToDocument,
   applySkinToDocument,
+  applyUiOpacityToDocument,
   applyWallpaperFlag,
   applyWallpaperBlurToDocument,
   applyWallpaperScrimToDocument,
   clearWallpaper,
+  loadComposerOpacity,
   loadSkin,
+  loadUiOpacity,
   loadWallpaperBlur,
   loadWallpaperRecord,
   loadWallpaperScrim,
+  saveComposerOpacity,
   saveSkin,
+  saveUiOpacity,
   saveWallpaper,
   saveWallpaperAdjust,
   saveWallpaperBlur,
@@ -70,6 +76,13 @@ import {
   type WallpaperFocus,
   type WallpaperRecord,
 } from "@/lib/themeSkin";
+import {
+  appearanceWindowOrigin,
+  hydrateDocumentAppearancePrefs,
+  notifyAppearanceChanged,
+  subscribeAppearanceChanged,
+} from "@/lib/appearanceLiveSync";
+import { isThemeEditorDocument } from "@/lib/themeEditorShell";
 
 export type ThemeShellValue = {
   theme: Theme;
@@ -93,6 +106,8 @@ export type ThemeShellValue = {
   setWallpaperScrim: (v: number) => void;
   wallpaperBlur: number;
   setWallpaperBlur: (v: number) => void;
+  composerOpacity: number;
+  uiOpacity: number;
   textColor: string | null;
   fontShadow: boolean;
   applyThemeChoice: (next: ThemePreference) => void;
@@ -113,6 +128,8 @@ export type ThemeShellValue = {
   applyWallpaperMediaSize: (size: { w: number; h: number }) => void;
   applyWallpaperScrimChoice: (value: number) => void;
   applyWallpaperBlurChoice: (value: number) => void;
+  applyComposerOpacityChoice: (value: number) => void;
+  applyUiOpacityChoice: (value: number) => void;
   applyTextColorChoice: (value: string | null) => void;
   applyFontShadowChoice: (value: boolean) => void;
   resetAppearanceChromeChoice: () => void;
@@ -168,6 +185,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [wallpaperBlur, setWallpaperBlur] = useState(() =>
     loadWallpaperBlur(localStorage),
   );
+  const [composerOpacity, setComposerOpacity] = useState(() =>
+    loadComposerOpacity(localStorage),
+  );
+  const [uiOpacity, setUiOpacity] = useState(() => loadUiOpacity(localStorage));
   const [textColor, setTextColor] = useState<string | null>(
     () => loadAppearanceChrome(localStorage).textColor,
   );
@@ -265,16 +286,81 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let myOrigin = "web";
+    void appearanceWindowOrigin().then((o) => {
+      myOrigin = o;
+    });
+    let timer: number | null = null;
+    const reload = () => {
+      if (timer != null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        setThemePreference(loadThemePreference(localStorage));
+        setThemeSchedule(loadThemeSchedule(localStorage));
+        setSkin(loadSkin(localStorage));
+        setWallpaperScrim(loadWallpaperScrim(localStorage));
+        setWallpaperBlur(loadWallpaperBlur(localStorage));
+        setComposerOpacity(loadComposerOpacity(localStorage));
+        setUiOpacity(loadUiOpacity(localStorage));
+        const chrome = loadAppearanceChrome(localStorage);
+        setTextColor(chrome.textColor);
+        setFontShadow(chrome.fontShadow);
+        hydrateDocumentAppearancePrefs();
+        void (async () => {
+          const rec = await loadWallpaperRecord();
+          if (wallpaperUrlRef.current) {
+            URL.revokeObjectURL(wallpaperUrlRef.current);
+            wallpaperUrlRef.current = null;
+          }
+          if (!rec) {
+            setWallpaperRecord(null);
+            setWallpaperUrl(null);
+            return;
+          }
+          const url = URL.createObjectURL(rec.blob);
+          wallpaperUrlRef.current = url;
+          setWallpaperRecord(rec);
+          setWallpaperUrl(url);
+        })();
+      }, 24);
+    };
+    const stop = subscribeAppearanceChanged((payload) => {
+      if (payload.origin === myOrigin) return;
+      reload();
+    });
+    return () => {
+      stop();
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isThemeEditorDocument()) {
+      applyWallpaperFlag(false);
+      return;
+    }
     applyWallpaperFlag(wallpaperUrl !== null);
   }, [wallpaperUrl]);
 
   useEffect(() => {
+    if (isThemeEditorDocument()) return;
     applyWallpaperScrimToDocument(wallpaperScrim);
   }, [wallpaperScrim]);
 
   useEffect(() => {
+    if (isThemeEditorDocument()) return;
     applyWallpaperBlurToDocument(wallpaperBlur);
   }, [wallpaperBlur]);
+
+  useEffect(() => {
+    if (isThemeEditorDocument()) return;
+    applyComposerOpacityToDocument(composerOpacity);
+  }, [composerOpacity]);
+
+  useEffect(() => {
+    if (isThemeEditorDocument()) return;
+    applyUiOpacityToDocument(uiOpacity);
+  }, [uiOpacity]);
 
   useEffect(() => {
     applyAppearanceChrome({ textColor, fontShadow });
@@ -283,6 +369,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const applyThemeChoice = useCallback(
     (next: ThemePreference) => {
       saveThemePreference(localStorage, next);
+      notifyAppearanceChanged();
       // Dual-write Host settings so the next cold start can paint the boot
       // shell + native chrome before React loads (see resolve_boot_theme).
       void persistThemeToHostSettings(next);
@@ -359,6 +446,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const applyThemeScheduleChoice = useCallback(
     (next: ThemeScheduleConfig) => {
       saveThemeSchedule(next, localStorage);
+      notifyAppearanceChanged();
       setThemeSchedule(next);
       setScheduleClock(new Date());
       const resolved = resolveThemeWithSchedule(
@@ -388,6 +476,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       saveSkin(localStorage, next);
       applySkinToDocument(next);
       setSkin(next);
+      notifyAppearanceChanged();
       if (opts?.applyPreferredTheme === false) return;
       const preferred = skinPreferredTheme(next);
       if (preferred && preferred !== theme) {
@@ -415,6 +504,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         }
         setWallpaperRecord(null);
         setWallpaperUrl(null);
+        notifyAppearanceChanged();
         return;
       }
       const toSave: WallpaperRecord = {
@@ -432,6 +522,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       wallpaperUrlRef.current = url;
       setWallpaperRecord(toSave);
       setWallpaperUrl(url);
+      notifyAppearanceChanged();
     },
     [],
   );
@@ -459,6 +550,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (!meta.clip) delete next.clip;
         return next;
       });
+      notifyAppearanceChanged();
     },
     [],
   );
@@ -476,6 +568,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           height: meta.height,
         };
       });
+      notifyAppearanceChanged();
     },
     [],
   );
@@ -484,12 +577,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     saveWallpaperScrim(localStorage, value);
     applyWallpaperScrimToDocument(value);
     setWallpaperScrim(value);
+    notifyAppearanceChanged();
   }, []);
 
   const applyWallpaperBlurChoice = useCallback((value: number) => {
     saveWallpaperBlur(localStorage, value);
     applyWallpaperBlurToDocument(value);
     setWallpaperBlur(value);
+    notifyAppearanceChanged();
+  }, []);
+
+  const applyComposerOpacityChoice = useCallback((value: number) => {
+    saveComposerOpacity(localStorage, value);
+    applyComposerOpacityToDocument(value);
+    setComposerOpacity(value);
+    notifyAppearanceChanged();
+  }, []);
+
+  const applyUiOpacityChoice = useCallback((value: number) => {
+    saveUiOpacity(localStorage, value);
+    applyUiOpacityToDocument(value);
+    setUiOpacity(value);
+    notifyAppearanceChanged();
   }, []);
 
   const applyTextColorChoice = useCallback((value: string | null) => {
@@ -497,6 +606,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     saveTextColor(next, localStorage);
     applyTextColor(next);
     setTextColor(next);
+    notifyAppearanceChanged();
   }, []);
 
   const applyFontShadowChoice = useCallback((value: boolean) => {
@@ -504,6 +614,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     saveFontShadow(next, localStorage);
     applyFontShadow(next);
     setFontShadow(next);
+    notifyAppearanceChanged();
   }, []);
 
   const resetAppearanceChromeChoice = useCallback(() => {
@@ -513,6 +624,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyFontShadow(false);
     setTextColor(null);
     setFontShadow(false);
+    saveComposerOpacity(localStorage, 100);
+    applyComposerOpacityToDocument(100);
+    setComposerOpacity(100);
+    saveUiOpacity(localStorage, 100);
+    applyUiOpacityToDocument(100);
+    setUiOpacity(100);
+    notifyAppearanceChanged();
   }, []);
 
   const value = useMemo<ThemeShellValue>(
@@ -538,6 +656,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setWallpaperScrim,
       wallpaperBlur,
       setWallpaperBlur,
+      composerOpacity,
+      uiOpacity,
       textColor,
       fontShadow,
       applyThemeChoice,
@@ -548,6 +668,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyWallpaperMediaSize,
       applyWallpaperScrimChoice,
       applyWallpaperBlurChoice,
+      applyComposerOpacityChoice,
+      applyUiOpacityChoice,
       applyTextColorChoice,
       applyFontShadowChoice,
       resetAppearanceChromeChoice,
@@ -564,6 +686,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       wallpaperUrl,
       wallpaperScrim,
       wallpaperBlur,
+      composerOpacity,
+      uiOpacity,
       textColor,
       fontShadow,
       applyThemeChoice,
@@ -574,6 +698,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyWallpaperMediaSize,
       applyWallpaperScrimChoice,
       applyWallpaperBlurChoice,
+      applyComposerOpacityChoice,
+      applyUiOpacityChoice,
       applyTextColorChoice,
       applyFontShadowChoice,
       resetAppearanceChromeChoice,

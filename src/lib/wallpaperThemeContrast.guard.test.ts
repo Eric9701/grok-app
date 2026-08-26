@@ -7,7 +7,7 @@ const workbenchCss = readFileSync(
   join(__dirname, "../styles/workbench.part1b.css"),
   "utf8",
 );
-const sideWorkbenchCss = ["part1", "part2"]
+const sideWorkbenchCss = ["part1", "part2", "part3"]
   .map((part) =>
     readFileSync(
       join(__dirname, `../styles/side-workbench.${part}.css`),
@@ -32,6 +32,22 @@ const sidebarCss = readFileSync(
   join(__dirname, "../styles/sidebar.part1.css"),
   "utf8",
 );
+const statusPillCss = readFileSync(
+  join(__dirname, "../styles/chat.part5.css"),
+  "utf8",
+);
+const userAvatarCss = readFileSync(
+  join(__dirname, "../styles/sidebar.part4.css"),
+  "utf8",
+);
+const composerBtnCss = readFileSync(
+  join(__dirname, "../styles/chat.part4.css"),
+  "utf8",
+);
+const menuSurfaceCss = readFileSync(
+  join(__dirname, "../styles/sidebar.part3.css"),
+  "utf8",
+);
 
 describe("wallpaper theme contrast CSS", () => {
   it("maps light wallpaper to its own white veil and pane curves", () => {
@@ -44,19 +60,10 @@ describe("wallpaper theme contrast CSS", () => {
   });
 
   it("keeps light controls readable without adding structural surfaces", () => {
-    const material = css.match(
-      /html\[data-theme="light"\]\[data-wallpaper="1"\][^{]*:is\(\.composer, \.composer__context-bar\)\s*\{[^}]*\}/s,
-    )?.[0];
-    expect(material).toContain(
-      "background: var(--wallpaper-light-elevated-surface)",
-    );
-    expect(material).not.toContain("backdrop-filter");
     expect(css).not.toMatch(
       /html\[data-theme="light"\]\[data-wallpaper="1"\][^{]*:is\([^)]*, \.status-pill\)\s*\{/s,
     );
-    expect(css).toMatch(
-      /--wallpaper-light-elevated-surface:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 74%,\s*transparent/s,
-    );
+    expect(css).not.toContain("--wallpaper-light-elevated-surface");
     expect(css).not.toContain("--wallpaper-light-surface-border");
     expect(css).not.toMatch(
       /html\[data-theme="light"\]\[data-wallpaper="1"\] \.sidebar\s*\{[^}]*background:\s*var\(--wallpaper-light-elevated-surface\)/s,
@@ -74,28 +81,89 @@ describe("wallpaper theme contrast CSS", () => {
 
   it("keeps wallpaper chrome washes opaque so they do not sample the scrim", () => {
     expect(css).toMatch(
-      /html\[data-wallpaper="1"\] \.main,\s*html\[data-wallpaper="1"\] \.composer-wrap\s*\{[^}]*--bg-hover:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 90%,\s*var\(--text-primary\) 10%\s*\)/s,
+      /html\[data-wallpaper="1"\] \.main\s*\{[^}]*--bg-hover:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 90%,\s*var\(--text-primary\) 10%\s*\)/s,
     );
     expect(css).toMatch(
-      /html\[data-wallpaper="1"\] \.main,\s*html\[data-wallpaper="1"\] \.composer-wrap\s*\{[^}]*--bg-active:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 82%,\s*var\(--text-primary\) 18%\s*\)/s,
+      /html\[data-wallpaper="1"\] \.main\s*\{[^}]*--bg-active:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 82%,\s*var\(--text-primary\) 18%\s*\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.composer-wrap\s*\{[^}]*--bg-hover:\s*rgba\(255, 255, 255, 0\.05\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-theme="light"\]\[data-wallpaper="1"\] \.composer-wrap\s*\{[^}]*--bg-hover:\s*rgba\(0, 0, 0, 0\.04\)/s,
     );
     expect(css).not.toMatch(
       /html\[data-wallpaper="1"\] \.composer__context-bar\s*\{[^}]*background:\s*transparent/s,
     );
     expect(css).toMatch(
-      /html\[data-wallpaper="1"\] \.main__top \.status-pill\s*\{[^}]*background:\s*var\(--bg-elevated\)/s,
+      /html\[data-wallpaper="1"\] \.main__top \.status-pill,[^}]*\.user-avatar--logo\s*\{[^}]*background:\s*transparent/s,
     );
     expect(css).toMatch(
       /html\[data-wallpaper="1"\][\s\S]*\.composer-welcome-prompt\s*\{[^}]*background:\s*none/s,
     );
   });
 
-  it("gives dark wallpaper composers a translucent blurred surface", () => {
-    expect(css).toMatch(
-      /html\[data-theme="dark"\]\[data-wallpaper="1"\][^{]*:is\(\.composer, \.composer__context-bar\)\s*\{[^}]*background:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 68%,\s*transparent\s*\)[^}]*backdrop-filter:\s*blur\(var\(--wallpaper-settings-blur, 14px\)\)/s,
+  it("keeps status pill and account avatar on card opacity mix", () => {
+    expect(statusPillCss).toMatch(
+      /\.status-pill::before\s*\{[^}]*var\(--ui-opacity-mix, 100%\)/s,
     );
+    expect(statusPillCss).not.toMatch(
+      /\.status-pill--action:hover::before/s,
+    );
+    expect(userAvatarCss).toMatch(
+      /\.user-avatar::before\s*\{[^}]*var\(--ui-opacity-mix, 100%\)/s,
+    );
+    expect(userAvatarCss).toMatch(
+      /\.user-avatar--logo::before\s*\{[^}]*var\(--ui-opacity-mix, 100%\)/s,
+    );
+  });
+
+  it("washes composer icon hover on an isolated ::after, not a background layer", () => {
+    expect(composerBtnCss).toMatch(
+      /\.composer \.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\)\s*\{[^}]*background:\s*transparent/s,
+    );
+    expect(composerBtnCss).toMatch(
+      /\.composer \.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\)::after\s*\{[^}]*opacity:\s*0/s,
+    );
+    expect(composerBtnCss).not.toMatch(
+      /\.composer \.icon-btn:not\(\.icon-btn--primary\):not\(\.icon-btn--danger\)::before/s,
+    );
+  });
+
+  it("keeps the composer + menu a solid context plate, not glass", () => {
+    expect(menuSurfaceCss).not.toMatch(/\.glass-surface,\s*\.composer-plus,/);
+    expect(menuSurfaceCss).toMatch(
+      /\.composer-plus,[\s\S]*?background:\s*var\(--menu-context-bg\)/s,
+    );
+    expect(composerBtnCss).not.toMatch(
+      /\.composer-plus__item::before\s*\{/s,
+    );
+    expect(composerBtnCss).not.toMatch(
+      /\.composer-plus__item\s*\{[^}]*overflow:\s*hidden/s,
+    );
+  });
+
+  it("does not leave a clip-path layer on the idle welcome prompt", () => {
+    expect(composerLayoutCss).toMatch(
+      /\.composer-welcome-prompt\s*\{[^}]*clip-path:\s*none/s,
+    );
+    expect(composerLayoutCss).not.toMatch(
+      /\.composer-welcome-mark\s*\{[^}]*contain:\s*layout style/s,
+    );
+    expect(composerLayoutCss).toMatch(
+      /\.main__stage:has\(\.composer-wrap--welcome\) \.lobe-chat,[\s\S]*user-select:\s*none/s,
+    );
+  });
+
+  it("keeps the composer on an independent opacity mix, not wallpaper scrim", () => {
     expect(css).toMatch(
-      /html\[data-stream-perf="1"\]\[data-wallpaper="1"\][^{]*:is\(\.composer, \.composer__context-bar\)\s*\{[^}]*backdrop-filter:\s*none !important/s,
+      /html\[data-wallpaper="1"\] :is\(\.composer, \.composer__context-bar\)\s*\{[^}]*background:\s*transparent[^}]*backdrop-filter:\s*none/s,
+    );
+    expect(composerChromeCss).toMatch(
+      /\.composer__context-bar::before\s*\{[^}]*var\(--composer-opacity-mix, 100%\)/s,
+    );
+    expect(composerChromeCss).toMatch(
+      /\.composer::before\s*\{[^}]*var\(--composer-opacity-mix, 100%\)/s,
     );
   });
 
@@ -235,16 +303,37 @@ describe("wallpaper theme contrast CSS", () => {
       /html:not\(\[data-wallpaper="1"\]\)\s+\.workbench--side-expanded\s+\.aside:not\(\.aside--hidden\)\s*\{[^}]*background:\s*var\(--bg-aside\)/s,
     );
     expect(sideWorkbenchCss).toMatch(
-      /html\[data-wallpaper="1"\]\s+\.workbench--side-expanded\s+\.aside\s+:is\([^)]*\.rp-chrome[^)]*\.sw__empty[^)]*\)\s*\{[^}]*background:\s*transparent/s,
+      /html\[data-wallpaper="1"\]\s+\.aside\s+:is\([^)]*\.rp-chrome[^)]*\.sw__empty[^)]*\)\s*\{[^}]*background:\s*var\(--rp-surface/s,
+    );
+  });
+
+  it("paints the right rail with the same wallpaper mix as the left sidebar", () => {
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.sidebar\s*\{[^}]*var\(--bg-sidebar-solid, var\(--bg-sidebar\)\)\s*var\(--wallpaper-theme-mix-sidebar\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.aside\s*\{[^}]*var\(--bg-sidebar-solid, var\(--bg-sidebar\)\)\s*var\(--wallpaper-theme-mix-sidebar\)/s,
+    );
+    expect(css).toMatch(
+      /--wallpaper-theme-mix-aside:\s*var\(--wallpaper-theme-mix-sidebar\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\]\[data-wallpaper-clear="1"\] \.aside[^{]*\{[^}]*background:\s*transparent/s,
     );
   });
 
   it("uses one right-pane chrome material in rail and full-cover modes", () => {
     expect(sideWorkbenchCss).toMatch(
-      /html:not\(\[data-wallpaper="1"\]\) \.aside \.rp-chrome\s*\{[^}]*background:\s*var\(--bg-card\) !important[^}]*backdrop-filter:\s*none !important/s,
+      /html:not\(\[data-wallpaper="1"\]\) \.aside \.rp-chrome\s*\{[^}]*background:\s*var\(--rp-surface, transparent\) !important[^}]*backdrop-filter:\s*none !important/s,
     );
     expect(sideWorkbenchCss).toMatch(
-      /html\[data-wallpaper="1"\] \.aside \.rp-chrome\s*\{[^}]*background:\s*transparent !important/s,
+      /html\[data-wallpaper="1"\] \.aside \.rp-chrome\s*\{[^}]*background:\s*var\(--rp-surface, transparent\) !important/s,
+    );
+    expect(sideWorkbenchCss).toMatch(
+      /\.sw-terminal--pty\s*\{[^}]*--sw-term-veil:\s*var\(--rp-surface, transparent\)/s,
+    );
+    expect(sideWorkbenchCss).toMatch(
+      /\.sw-skills\s*\{[^}]*background:\s*var\(--rp-surface, transparent\)/s,
     );
   });
 });

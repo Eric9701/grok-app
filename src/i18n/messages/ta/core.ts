@@ -11,6 +11,7 @@ export const taCore = {
   "user.theme": "தோற்றம்",
   "user.themeLight": "ஒளி தோற்றத்திற்கு மாறு",
   "user.themeDark": "இருள் தோற்றத்திற்கு மாறு",
+  "user.themeEditor": "தீம் திருத்தி",
   "media.loadError": "செயலியின் முன்னோட்டத்தில் இந்த ஊடகத்தை ஏற்ற முடியவில்லை.",
   "media.openExternal": "கணினி இயக்கியில் திற",
   "media.loading": "ஊடகம் ஏற்றப்படுகிறது…",
