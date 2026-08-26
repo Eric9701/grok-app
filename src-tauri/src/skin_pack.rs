@@ -414,6 +414,122 @@ fn abort_old_inspect() {
     }
 }
 
+/// Inspect an already-unpacked pack directory (library preset / undo slot).
+///
+/// Unlike [`inspect_pack`], this does **not** zip+extract. Wallpaper paths point
+/// at the library files in place. A lightweight marker inspect id is registered
+/// so cancel/abort lifecycle still works; `save_from_inspect` is not used for
+/// `source == "preset"` apply flows.
+///
+/// `trust_hash`: when true, accept the manifest `sha256` without re-reading the
+/// wallpaper bytes (library entries were validated on save). Use for large
+/// video presets so Apply preview opens immediately.
+pub fn inspect_unpacked_dir(
+    src_dir: &Path,
+    source: &str,
+    trust_hash: bool,
+) -> Result<SkinPackPreviewDto, String> {
+    if !src_dir.is_dir() {
+        return Err(err("not_found", "pack directory"));
+    }
+    let man_path = src_dir.join("manifest.json");
+    let manifest_bytes = fs::read(&man_path).map_err(|e| err("not_found", e))?;
+    if manifest_bytes.len() as u64 > MANIFEST_MAX {
+        return Err(err("too_large", "manifest.json too large"));
+    }
+    let manifest_json: serde_json::Value = serde_json::from_slice(&manifest_bytes)
+        .map_err(|e| err("invalid_pack", format!("manifest json: {e}")))?;
+
+    let mut wallpaper_file: Option<(String, PathBuf)> = None;
+    let assets = src_dir.join("assets");
+    if assets.is_dir() {
+        let rd = fs::read_dir(&assets).map_err(|e| err("invalid_pack", e))?;
+        for ent in rd.flatten() {
+            let name = ent.file_name().to_string_lossy().to_ascii_lowercase();
+            let norm = format!("assets/{name}");
+            if wallpaper_ext(&norm).is_some() {
+                if wallpaper_file.is_some() {
+                    return Err(err("invalid_pack", "multiple wallpaper assets"));
+                }
+                wallpaper_file = Some((norm, ent.path()));
+            }
+        }
+    }
+
+    let (wall_hash, wall_bytes_len) = if let Some((_, ref path)) = wallpaper_file {
+        let meta = fs::metadata(path).map_err(|e| err("not_found", e))?;
+        if meta.len() > WALLPAPER_MAX {
+            return Err(err("too_large", "wallpaper too large"));
+        }
+        let hash = if trust_hash {
+            manifest_json
+                .get("wallpaper")
+                .and_then(|w| w.get("sha256"))
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_ascii_lowercase())
+                .filter(|s| s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit()))
+                .ok_or_else(|| err("invalid_pack", "wallpaper.sha256"))?
+        } else {
+            sha256_file(path)?
+        };
+        (Some(hash), meta.len())
+    } else {
+        (None, 0)
+    };
+
+    let wall_name = wallpaper_file.as_ref().map(|(n, _)| n.as_str());
+    let (mut preview, _) = validate_manifest_value(
+        &manifest_json,
+        wallpaper_file.is_some(),
+        wall_name,
+        wall_hash.as_deref(),
+    )?;
+
+    abort_old_inspect();
+    let inspect_id = Uuid::new_v4().to_string();
+    let dest = paths::skin_staging_inspect_dir().join(&inspect_id);
+    // Marker only — do not copy large wallpapers into staging.
+    fs::create_dir_all(&dest).map_err(|e| err("invalid_pack", e))?;
+    let _ = fs::write(
+        dest.join(".library-ref"),
+        src_dir.to_string_lossy().as_bytes(),
+    );
+    if let Ok(mut g) = CURRENT_INSPECT.lock() {
+        *g = Some(inspect_id.clone());
+    }
+
+    preview.id = inspect_id;
+    preview.source = source.to_string();
+    if let Some((_, path)) = wallpaper_file {
+        if let Some(w) = preview.wallpaper.as_mut() {
+            w.path = path.display().to_string();
+            w.bytes = wall_bytes_len;
+        }
+    }
+    let preview_jpg = src_dir.join("preview.jpg");
+    if preview_jpg.is_file() {
+        if fs::metadata(&preview_jpg).map(|m| m.len()).unwrap_or(0) > PREVIEW_MAX {
+            return Err(err("too_large", "preview.jpg too large"));
+        }
+        preview.preview_path = Some(preview_jpg.display().to_string());
+    }
+    Ok(preview)
+}
+
+fn sha256_file(path: &Path) -> Result<String, String> {
+    let mut file = File::open(path).map_err(|e| err("not_found", e))?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = file.read(&mut buf).map_err(|e| err("invalid_pack", e))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
 /// Inspect a `.grokskin` / selected `.zip` into `.staging/inspect/{id}/`.
 pub fn inspect_pack(zip_path: &Path, source: &str) -> Result<SkinPackPreviewDto, String> {
     inspect_pack_into(zip_path, &paths::skin_staging_inspect_dir(), source)
@@ -625,8 +741,10 @@ pub fn export_pack(
     export_pack_inner(dest_path, manifest, wallpaper_path, true)
 }
 
-/// Zip a library dir without re-encoding video. Used to preview/apply a
-/// saved look so the original file + focus/clip stay intact.
+/// Zip a library dir without re-encoding video (keeps original file + focus/clip).
+/// Apply/preview uses [`inspect_unpacked_dir`] instead; this remains for unbaked
+/// share/export tooling and tests.
+#[allow(dead_code)]
 pub fn export_dir_unbaked(src_dir: &Path, dest_path: &Path) -> Result<SkinExportResult, String> {
     export_dir_inner(src_dir, dest_path, false)
 }

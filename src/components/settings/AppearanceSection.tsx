@@ -152,7 +152,7 @@ export function AppearanceSection() {
   } = s;
 
   return (
-    <>
+    <div className="settings-appearance-root">
       <SettingsTabStrip
         tabs={sectionNav?.tabs ?? []}
         active={activeTab}
@@ -162,7 +162,11 @@ export function AppearanceSection() {
       />
 
       {(activeTab === "theme" || activeTab == null) && (
-        <>
+        <div className="settings-appearance-theme-layout">
+          <aside className="settings-appearance-theme-layout__rail">
+            <SkinPresetsCard />
+          </aside>
+          <div className="settings-appearance-theme-layout__main">
           {/* Light / dark / schedule */}
           <div
             className={
@@ -292,77 +296,74 @@ export function AppearanceSection() {
             ) : null}
           </div>
 
-          {/* Skin + wallpaper — one card, side-by-side on wide screens */}
-          {onSkin || onWallpaper ? (
-            <div className="settings-card">
-              <div className="settings-appearance-duo">
-                {onSkin ? (
-                  <div
-                    className={
-                      "settings-row settings-row--stack" +
-                      rowHighlight("settings-anchor-skin")
-                    }
-                    id="settings-anchor-skin"
-                  >
-                    <div className="settings-row__text">
-                      <SettingsLabelWithTip
-                        label={t("settings.skin")}
-                        tip={t("settings.skinDesc")}
-                      />
-                    </div>
-                    <div
-                      className="settings-skin-grid"
-                      role="listbox"
-                      aria-label={t("settings.skin")}
-                    >
-                      {THEME_SKINS.map((pack) => {
-                        const selected = skin === pack.id;
-                        const label = t(
-                          `settings.skin.${pack.id}` as "settings.skin.default",
-                        );
-                        return (
-                          <button
-                            key={pack.id}
-                            type="button"
-                            role="option"
-                            aria-selected={selected}
-                            className={
-                              "settings-skin-card" +
-                              (selected ? " is-on" : "")
-                            }
-                            onClick={() => onSkin(pack.id)}
-                          >
-                            <span
-                              className="settings-skin-card__swatch"
-                              style={{
-                                background: `linear-gradient(135deg, ${pack.swatch} 0%, ${pack.swatchAlt} 100%)`,
-                              }}
-                              aria-hidden
-                            />
-                            <span className="settings-skin-card__name">
-                              {label}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-                {onWallpaper ? (
-                  <div
-                    className={
-                      "settings-row settings-row--stack" +
-                      rowHighlight("settings-anchor-wallpaper")
-                    }
-                    id="settings-anchor-wallpaper"
-                  >
+          {onSkin ? (
+            <div
+              className={
+                "settings-card" + rowHighlight("settings-anchor-skin")
+              }
+              id="settings-anchor-skin"
+            >
+              <div className="settings-row settings-row--stack">
+                <div className="settings-row__text">
+                  <SettingsLabelWithTip
+                    label={t("settings.skin")}
+                    tip={t("settings.skinDesc")}
+                  />
+                </div>
+                <div
+                  className="settings-skin-grid"
+                  role="listbox"
+                  aria-label={t("settings.skin")}
+                >
+                  {THEME_SKINS.map((pack) => {
+                    const selected = skin === pack.id;
+                    const label = t(
+                      `settings.skin.${pack.id}` as "settings.skin.default",
+                    );
+                    return (
+                      <button
+                        key={pack.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={
+                          "settings-skin-card" + (selected ? " is-on" : "")
+                        }
+                        onClick={() => onSkin(pack.id)}
+                      >
+                        <span
+                          className="settings-skin-card__swatch"
+                          style={{
+                            background: `linear-gradient(135deg, ${pack.swatch} 0%, ${pack.swatchAlt} 100%)`,
+                          }}
+                          aria-hidden
+                        />
+                        <span className="settings-skin-card__name">
+                          {label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {onWallpaper ? (
+            <div
+              className={
+                "settings-card" + rowHighlight("settings-anchor-wallpaper")
+              }
+              id="settings-anchor-wallpaper"
+            >
+                  <div className="settings-row settings-row--stack">
                     <div className="settings-row__text">
                       <SettingsLabelWithTip
                         label={t("settings.wallpaper")}
                         tip={t("settings.wallpaperDesc")}
                       />
                     </div>
-                    <div className="settings-wallpaper">
+                    <div className="settings-wallpaper settings-wallpaper--split">
                       <input
                         ref={wallpaperInputRef}
                         type="file"
@@ -469,6 +470,7 @@ export function AppearanceSection() {
                           </button>
                         )}
                       </div>
+                      <div className="settings-wallpaper__side">
                       <div className="settings-wallpaper__actions">
                         <button
                           type="button"
@@ -504,6 +506,127 @@ export function AppearanceSection() {
                         >
                           {t("settings.wallpaperLibrary")}
                         </button>
+                      </div>
+                      {wallpaperUrl && (onWallpaperScrim || onWallpaperBlur) ? (
+                        <div className="settings-wallpaper__sliders">
+                          {onWallpaperScrim ? (
+                            <div className="settings-wallpaper__scrim">
+                              <div className="settings-wallpaper__scrim-head">
+                                <label
+                                  className="settings-wallpaper__scrim-label"
+                                  htmlFor="settings-wallpaper-scrim"
+                                >
+                                  <span>{t("settings.wallpaperScrim")}</span>
+                                  <Tip
+                                    label={t("settings.wallpaperScrimDesc")}
+                                    placement="top"
+                                    className="ui-tip--wrap"
+                                    delayMs={280}
+                                  >
+                                    <button
+                                      type="button"
+                                      className="settings-label-help"
+                                      aria-label={t(
+                                        "settings.wallpaperScrimDesc",
+                                      )}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      <IconHelp size={14} stroke={1.75} />
+                                    </button>
+                                  </Tip>
+                                </label>
+                                <span
+                                  className="settings-wallpaper__scrim-value"
+                                  aria-hidden
+                                >
+                                  {Math.round(wallpaperScrim)}%
+                                </span>
+                              </div>
+                              <input
+                                id="settings-wallpaper-scrim"
+                                type="range"
+                                className="settings-wallpaper__scrim-range"
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={wallpaperScrim}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={Math.round(wallpaperScrim)}
+                                aria-label={t("settings.wallpaperScrim")}
+                                onChange={(e) => {
+                                  onWallpaperScrim(Number(e.target.value));
+                                }}
+                              />
+                            </div>
+                          ) : null}
+                          {onWallpaperBlur ? (
+                            <div className="settings-wallpaper__scrim">
+                              <div className="settings-wallpaper__scrim-head">
+                                <label
+                                  className="settings-wallpaper__scrim-label"
+                                  htmlFor="settings-wallpaper-blur"
+                                >
+                                  <span>{t("settings.wallpaperBlur")}</span>
+                                  <Tip
+                                    label={t("settings.wallpaperBlurDesc")}
+                                    placement="top"
+                                    className="ui-tip--wrap"
+                                    delayMs={280}
+                                  >
+                                    <button
+                                      type="button"
+                                      className="settings-label-help"
+                                      aria-label={t(
+                                        "settings.wallpaperBlurDesc",
+                                      )}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      <IconHelp size={14} stroke={1.75} />
+                                    </button>
+                                  </Tip>
+                                </label>
+                                <span
+                                  className="settings-wallpaper__scrim-value"
+                                  aria-hidden
+                                >
+                                  {Math.round(wallpaperBlur)}%
+                                </span>
+                              </div>
+                              <input
+                                id="settings-wallpaper-blur"
+                                type="range"
+                                className="settings-wallpaper__scrim-range"
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={wallpaperBlur}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={Math.round(wallpaperBlur)}
+                                aria-label={t("settings.wallpaperBlur")}
+                                onChange={(e) => {
+                                  onWallpaperBlur(Number(e.target.value));
+                                }}
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {wallpaperError ? (
+                        <p
+                          className="settings-wallpaper__error"
+                          role="alert"
+                        >
+                          {wallpaperError}
+                        </p>
+                      ) : null}
                       </div>
                       <WallpaperSourceModal
                         open={wallpaperSourceOpen}
@@ -542,128 +665,14 @@ export function AppearanceSection() {
                           }}
                         />
                       ) : null}
-                      {wallpaperUrl && onWallpaperScrim ? (
-                        <div className="settings-wallpaper__scrim">
-                          <div className="settings-wallpaper__scrim-head">
-                            <label
-                              className="settings-wallpaper__scrim-label"
-                              htmlFor="settings-wallpaper-scrim"
-                            >
-                              <span>{t("settings.wallpaperScrim")}</span>
-                              <Tip
-                                label={t("settings.wallpaperScrimDesc")}
-                                placement="top"
-                                className="ui-tip--wrap"
-                                delayMs={280}
-                              >
-                                <button
-                                  type="button"
-                                  className="settings-label-help"
-                                  aria-label={t("settings.wallpaperScrimDesc")}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                  }}
-                                >
-                                  <IconHelp size={14} stroke={1.75} />
-                                </button>
-                              </Tip>
-                            </label>
-                            <span
-                              className="settings-wallpaper__scrim-value"
-                              aria-hidden
-                            >
-                              {Math.round(wallpaperScrim)}%
-                            </span>
-                          </div>
-                          <input
-                            id="settings-wallpaper-scrim"
-                            type="range"
-                            className="settings-wallpaper__scrim-range"
-                            min={0}
-                            max={100}
-                            step={1}
-                            value={wallpaperScrim}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-valuenow={Math.round(wallpaperScrim)}
-                            aria-label={t("settings.wallpaperScrim")}
-                            onChange={(e) => {
-                              onWallpaperScrim(Number(e.target.value));
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                      {wallpaperUrl && onWallpaperBlur ? (
-                        <div className="settings-wallpaper__scrim">
-                          <div className="settings-wallpaper__scrim-head">
-                            <label
-                              className="settings-wallpaper__scrim-label"
-                              htmlFor="settings-wallpaper-blur"
-                            >
-                              <span>{t("settings.wallpaperBlur")}</span>
-                              <Tip
-                                label={t("settings.wallpaperBlurDesc")}
-                                placement="top"
-                                className="ui-tip--wrap"
-                                delayMs={280}
-                              >
-                                <button
-                                  type="button"
-                                  className="settings-label-help"
-                                  aria-label={t("settings.wallpaperBlurDesc")}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                  }}
-                                >
-                                  <IconHelp size={14} stroke={1.75} />
-                                </button>
-                              </Tip>
-                            </label>
-                            <span
-                              className="settings-wallpaper__scrim-value"
-                              aria-hidden
-                            >
-                              {Math.round(wallpaperBlur)}%
-                            </span>
-                          </div>
-                          <input
-                            id="settings-wallpaper-blur"
-                            type="range"
-                            className="settings-wallpaper__scrim-range"
-                            min={0}
-                            max={100}
-                            step={1}
-                            value={wallpaperBlur}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-valuenow={Math.round(wallpaperBlur)}
-                            aria-label={t("settings.wallpaperBlur")}
-                            onChange={(e) => {
-                              onWallpaperBlur(Number(e.target.value));
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                      {wallpaperError ? (
-                        <p
-                          className="settings-wallpaper__error"
-                          role="alert"
-                        >
-                          {wallpaperError}
-                        </p>
-                      ) : null}
                     </div>
                   </div>
-                ) : null}
-              </div>
             </div>
           ) : null}
 
           <AppearanceChromeCard />
-          <SkinPresetsCard />
-        </>
+          </div>
+        </div>
       )}
 
       {activeTab === "interface" && (
@@ -1476,6 +1485,6 @@ export function AppearanceSection() {
           ) : null}
         </>
       )}
-    </>
+    </div>
   );
 }

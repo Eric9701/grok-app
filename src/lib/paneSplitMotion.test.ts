@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { MAIN_CHAT_MIN_WIDTH } from "@/lib/layout";
 import {
   beginPaneSplitMotion,
   bumpPaneSplitMotion,
@@ -280,7 +281,7 @@ describe("desktop hidden CSS must not force width 0", () => {
     );
   });
 
-  it("promotes an open aside overlay to the existing full-cover mode", () => {
+  it("keeps a tight-window aside overlay from hiding the chat column", () => {
     const app = readFileSync(
       resolve(__dirname, "../app/AppWorkbench.tsx"),
       "utf8",
@@ -297,9 +298,16 @@ describe("desktop hidden CSS must not force width 0", () => {
       resolve(__dirname, "../styles/chat.part6.css"),
       "utf8",
     );
+    const chat = readFileSync(
+      resolve(__dirname, "../styles/chat.part1.css"),
+      "utf8",
+    );
 
     expect(app).toMatch(
-      /const sidePaneCoversMain =\s*hideChatForSideExpand \|\|\s*\(asideOverlay && !layout\.asideCollapsed\)/,
+      /const sidePaneCoversMain =\s*hideChatForSideExpand;/,
+    );
+    expect(app).not.toMatch(
+      /sidePaneCoversMain =\s*hideChatForSideExpand \|\|/,
     );
     expect(app).toContain(
       'sidePaneCoversMain ? " workbench--side-expanded" : ""',
@@ -308,12 +316,31 @@ describe("desktop hidden CSS must not force width 0", () => {
       /!phoneLayout && sidebarOverlay && !layout\.sidebarCollapsed \? \(\s*<button[\s\S]*?className="workbench-pane-scrim"/,
     );
     expect(app).toContain("sidePaneCoversMain={sidePaneCoversMain}");
+    expect(app).toMatch(
+      /\[("--sw-aside-occupied")\]:[\s\S]*?!phoneLayout &&[\s\S]*?asideOverlay &&[\s\S]*?!layout\.asideCollapsed &&[\s\S]*?!sidePaneCoversMain/,
+    );
     expect(main).toContain("inert={sidePaneCoversMain ? true : undefined}");
     expect(resources).toContain(
       'sidePaneCoversMain ? " aside--side-expanded" : ""',
     );
+    expect(resources).not.toContain(
+      "phoneLayout || (asideOverlay && !layout.asideCollapsed)",
+    );
     expect(aside).toMatch(
       /\.aside\.aside--overlay\s*\{[^}]*top:\s*0;/s,
+    );
+    const composerFloor = String(MAIN_CHAT_MIN_WIDTH);
+    expect(chat).toMatch(
+      new RegExp(
+        String.raw`\.composer-wrap--float\s*\{[^}]*right:\s*min\(\s*var\(--sw-aside-occupied, 0px\),\s*max\(0px, calc\(100% - ${composerFloor}px\)\)`,
+        "s",
+      ),
+    );
+    expect(chat).toMatch(
+      new RegExp(
+        String.raw`\.composer-wrap--welcome\s*\{[^}]*right:\s*min\(\s*var\(--sw-aside-occupied, 0px\),\s*max\(0px, calc\(100% - ${composerFloor}px\)\)`,
+        "s",
+      ),
     );
   });
 

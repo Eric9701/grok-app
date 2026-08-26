@@ -93,6 +93,11 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
     setPermBusy(false);
     setPermError(null);
   }, [perm?.rpcId, perm?.sessionId]);
+  useEffect(() => {
+    if (!welcomeMotionEnabled || !welcomeIntroActive) return;
+    const id = window.setTimeout(() => setWelcomeIntroActive(false), 1300);
+    return () => window.clearTimeout(id);
+  }, [welcomeMotionEnabled, welcomeIntroActive, setWelcomeIntroActive]);
   return (() => {
             const composerNode = (
           <div

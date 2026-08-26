@@ -2247,8 +2247,8 @@ export function AppWorkbench() {
       asideOpen: true,
       asideWidth: asideOpenW,
     }).asideOverlay;
-  const sidePaneCoversMain =
-    hideChatForSideExpand || (asideOverlay && !layout.asideCollapsed);
+  // Overlay floats the aside over chat; only explicit expand hides the column.
+  const sidePaneCoversMain = hideChatForSideExpand;
   const { paneMotionClass } = usePaneSplitMotion({
     sidebarCollapsed: layout.sidebarCollapsed,
     asideCollapsed: layout.asideCollapsed,
@@ -13810,6 +13810,13 @@ export function AppWorkbench() {
               phoneLayout || layout.sidebarCollapsed || sidebarOverlay
                 ? "0px"
                 : `${layout.sidebarWidth}px`,
+            ["--sw-aside-occupied"]:
+              !phoneLayout &&
+              asideOverlay &&
+              !layout.asideCollapsed &&
+              !sidePaneCoversMain
+                ? `${asideOpenW}px`
+                : "0px",
             // Bottom strip reserved only while dock toggle is on.
             // Floor avoids first-frame cover before ResizeObserver measures.
             ["--sw-dock-composer-h"]: sideDockActive

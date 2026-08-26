@@ -6,16 +6,21 @@
   max-width: none;
 }
 
-/* Desktop composer: project / default workspace / branch bar above input */
+/* Desktop composer: project / default workspace / branch bar above input.
+ * Rounded rect, not a stadium: shell radius stays below half the bar
+ * height and matches --menu-radius (dropdown). Inner chip = shell − pad
+ * so hover fill is concentric with the outer corner. */
 .composer__context-bar {
+  --composer-context-pad: 4px;
+  --composer-context-radius: var(--menu-radius, 12px);
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--composer-context-pad);
   flex-wrap: wrap;
-  min-height: 36px;
-  padding: 4px 10px;
-  border-radius: 16px;
+  min-height: calc(28px + 2 * var(--composer-context-pad));
+  padding: var(--composer-context-pad);
+  border-radius: var(--composer-context-radius);
   border: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--bg-elevated) 88%, var(--bg-main));
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
@@ -54,9 +59,11 @@
   gap: 6px;
   height: 28px;
   max-width: min(200px, 42vw);
-  padding: 0 8px;
+  padding: 0 10px;
   border: none;
-  border-radius: 8px;
+  border-radius: calc(
+    var(--composer-context-radius, 12px) - var(--composer-context-pad, 4px)
+  );
   background: transparent;
   color: inherit;
   font: inherit;
@@ -409,7 +416,7 @@ button.composer__context-item {
   max-width: var(--chat-width-max, 800px);
   border: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
-  border-radius: 18px;
+  border-radius: var(--menu-radius, 12px);
   padding: 10px 12px 10px;
   display: flex;
   flex-direction: column;

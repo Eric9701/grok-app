@@ -157,7 +157,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
       aria-label={tr("a11y.resourcesPane")}
       aria-hidden={layout.asideCollapsed}
       style={
-        phoneLayout || (asideOverlay && !layout.asideCollapsed)
+        phoneLayout
           ? undefined
           : sidePaneCoversMain
             ? ({

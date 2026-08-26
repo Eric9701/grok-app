@@ -1,6 +1,9 @@
 /**
  * When a pane plus the chat floor would not fit, overlay it instead of
  * interpolating flex width (and growing the OS window).
+ *
+ * Overlay is not full-cover: the chat column stays painted. Only the
+ * user-toggled side-workbench expand hides `.main`.
  */
 
 import { MAIN_CHAT_MIN_WIDTH } from "@/lib/layout";

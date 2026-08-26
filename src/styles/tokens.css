@@ -7,6 +7,12 @@
   initial-value: 0px;
 }
 
+@property --sw-aside-occupied {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 :root,
 [data-theme="dark"] {
   /* color-scheme is set on [data-theme] only — :root alone would force dark

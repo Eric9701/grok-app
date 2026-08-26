@@ -736,7 +736,8 @@
   flex-shrink: 0;
 }
 
-.settings-page__main--pane-fill > .prov-panel {
+.settings-page__main--pane-fill > .prov-panel,
+.settings-page__main--pane-fill > .settings-appearance-root {
   flex: 1 1 auto;
   min-height: 0;
 }

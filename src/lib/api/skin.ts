@@ -19,6 +19,10 @@ export type SkinPresetListItem = {
   kind?: string;
   bytes: number;
   previewRel?: string;
+  /** Absolute local path to preview.jpg, still wallpaper, or video poster JPEG. */
+  thumbPath?: string;
+  /** Absolute local wallpaper asset path (image or video) when the preset has one. */
+  wallpaperPath?: string;
 };
 
 export type SkinPresetListResult = {

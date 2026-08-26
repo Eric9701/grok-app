@@ -52,7 +52,7 @@ export function AppearanceChromeCard() {
               tip={t("settings.textColorDesc")}
             />
           </div>
-          <div className="settings-row__controls settings-row__controls--grow">
+          <div className="settings-row__controls settings-row__controls--grow settings-appearance-chrome-controls">
             <label className="settings-color-picker">
               <span className="settings-color-picker__swatch">
                 <input
@@ -86,6 +86,23 @@ export function AppearanceChromeCard() {
                 }}
               />
             </label>
+            <div
+              className={
+                "settings-appearance-chrome-shadow" +
+                rowHighlight("settings-anchor-fontShadow")
+              }
+              id="settings-anchor-fontShadow"
+            >
+              <SettingsLabelWithTip
+                label={t("settings.fontShadow")}
+                tip={t("settings.fontShadowDesc")}
+              />
+              <UiCheck
+                checked={theme.fontShadow}
+                onChange={(next) => theme.applyFontShadowChoice(next)}
+                ariaLabel={t("settings.fontShadow")}
+              />
+            </div>
             <button
               type="button"
               className="btn ghost sm"
@@ -95,24 +112,6 @@ export function AppearanceChromeCard() {
               {t("settings.appearanceReset")}
             </button>
           </div>
-        </div>
-        <div
-          className={
-            "settings-row" + rowHighlight("settings-anchor-fontShadow")
-          }
-          id="settings-anchor-fontShadow"
-        >
-          <div className="settings-row__text">
-            <SettingsLabelWithTip
-              label={t("settings.fontShadow")}
-              tip={t("settings.fontShadowDesc")}
-            />
-          </div>
-          <UiCheck
-            checked={theme.fontShadow}
-            onChange={(next) => theme.applyFontShadowChoice(next)}
-            ariaLabel={t("settings.fontShadow")}
-          />
         </div>
       </div>
 

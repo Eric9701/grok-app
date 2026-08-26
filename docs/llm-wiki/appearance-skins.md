@@ -25,6 +25,8 @@ preview.jpg              # 可选
 
 当前生效壁纸仍只活在 IndexedDB。预设在 `{app_data}/skin-presets/`（入库目录名总是新 UUID）。磁盘合计上限 4 GiB（含 undo + staging + catalog cache；不含 IDB 当前壁纸与 `{app_data}/wallpapers/`）。
 
+**预设预览 / Apply：** `skin_preset_materialize` 直接检视库目录（`inspect_unpacked_dir`），不再 zip→解压。壁纸路径指向库内原片；大视频信任入库时已校验的 `sha256`，弹窗可即时打开。预设卡片背景：静图 / `preview.jpg` / 动图 gif 直接作 CSS 背景；`.mp4`/`.webm` 用 `video_poster` 缓存 JPEG（CSS 无法画视频）。
+
 ## K19 官方 origin allowlist
 
 `OFFICIAL_SKIN_CATALOG_URL` 保持 `""` 直至日后填入。官方浏览按钮在 URL 为空时隐藏（卡片上仍保留 `settings-anchor-skin-catalog` 占位）。`repo=official` → `official_unconfigured`，**绝不**回落用户源。

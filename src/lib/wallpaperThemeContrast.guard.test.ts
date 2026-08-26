@@ -19,6 +19,10 @@ const composerLayoutCss = readFileSync(
   join(__dirname, "../styles/chat.part1.css"),
   "utf8",
 );
+const composerChromeCss = readFileSync(
+  join(__dirname, "../styles/chat.part2.css"),
+  "utf8",
+);
 const settingsCss = ["part1", "part2"]
   .map((part) =>
     readFileSync(join(__dirname, `../styles/settings.${part}.css`), "utf8"),
@@ -41,7 +45,7 @@ describe("wallpaper theme contrast CSS", () => {
 
   it("keeps light controls readable without adding structural surfaces", () => {
     const material = css.match(
-      /html\[data-theme="light"\]\[data-wallpaper="1"\][^{]*:is\(\.composer, \.composer__context-bar, \.main__top \.status-pill\)\s*\{[^}]*\}/s,
+      /html\[data-theme="light"\]\[data-wallpaper="1"\][^{]*:is\(\.composer, \.composer__context-bar\)\s*\{[^}]*\}/s,
     )?.[0];
     expect(material).toContain(
       "background: var(--wallpaper-light-elevated-surface)",
@@ -65,6 +69,24 @@ describe("wallpaper theme contrast CSS", () => {
     );
     expect(css).toMatch(
       /\.lobe-chat-assistant-timeline\s+:is\(\s*pre,\s*code,\s*\.chat-code,\s*\.chat-md__table-wrap,[^)]*\.lobe-timeline-tool__output,[^)]*\.lobe-chat-plan,[^)]*\.struct-json,[^)]*\.att-card[^)]*\)\s*\{[^}]*text-shadow:\s*none/s,
+    );
+  });
+
+  it("keeps wallpaper chrome washes opaque so they do not sample the scrim", () => {
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.main,\s*html\[data-wallpaper="1"\] \.composer-wrap\s*\{[^}]*--bg-hover:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 90%,\s*var\(--text-primary\) 10%\s*\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.main,\s*html\[data-wallpaper="1"\] \.composer-wrap\s*\{[^}]*--bg-active:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 82%,\s*var\(--text-primary\) 18%\s*\)/s,
+    );
+    expect(css).not.toMatch(
+      /html\[data-wallpaper="1"\] \.composer__context-bar\s*\{[^}]*background:\s*transparent/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.main__top \.status-pill\s*\{[^}]*background:\s*var\(--bg-elevated\)/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\][\s\S]*\.composer-welcome-prompt\s*\{[^}]*background:\s*none/s,
     );
   });
 
@@ -175,6 +197,21 @@ describe("wallpaper theme contrast CSS", () => {
     expect(floatingComposer).not.toMatch(/\bbackground(?:-image)?:/);
     expect(css).not.toMatch(
       /data-theme="(?:light|dark)"[^}]*\.composer-wrap--float/,
+    );
+  });
+
+  it("nests the workspace chip as a rounded rect inside a uniform inset", () => {
+    expect(composerChromeCss).toMatch(
+      /\.composer__context-bar\s*\{[^}]*--composer-context-pad:\s*4px;[^}]*--composer-context-radius:\s*var\(--menu-radius, 12px\);[^}]*padding:\s*var\(--composer-context-pad\);[^}]*border-radius:\s*var\(--composer-context-radius\)/s,
+    );
+    expect(composerChromeCss).not.toMatch(
+      /\.composer__context-bar\s*\{[^}]*padding:\s*4px 10px/s,
+    );
+    expect(composerChromeCss).toMatch(
+      /\.composer__context-item\s*\{[^}]*border-radius:\s*calc\(\s*var\(--composer-context-radius, 12px\)\s*-\s*var\(--composer-context-pad, 4px\)\s*\)/s,
+    );
+    expect(composerChromeCss).toMatch(
+      /\.composer\s*\{[^}]*border-radius:\s*var\(--menu-radius, 12px\)/s,
     );
   });
 

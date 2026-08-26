@@ -750,39 +750,110 @@ textarea.settings-input.settings-agents-json__textarea {
   outline-offset: -2px;
 }
 
-/* Appearance: skin (left) + wallpaper (right) inside one card */
-.settings-card > .settings-appearance-duo {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  align-items: stretch;
+/*
+ * Appearance · Theme: presets rail (left) + stacked look cards (right).
+ * Parent uses pane-fill so the page itself does not scroll — each column does.
+ */
+.settings-appearance-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
   width: 100%;
 }
 
-.settings-appearance-duo > .settings-row {
+.settings-page__main--pane-fill > .settings-appearance-root {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.settings-appearance-root > .settings-page__tabs {
+  flex-shrink: 0;
+}
+
+.settings-appearance-theme-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+  gap: 14px;
+  /* Columns fill the pane as scrollports; content inside keeps natural height. */
+  align-items: stretch;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.settings-appearance-theme-layout__rail,
+.settings-appearance-theme-layout__main {
   min-width: 0;
-  height: 100%;
-  border-bottom: none;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-content: start;
 }
 
-.settings-appearance-duo > .settings-row + .settings-row {
-  border-left: 1px solid var(--border-subtle);
+.settings-appearance-theme-layout__rail > .settings-card {
+  margin-bottom: 0;
+  /* Card grows with presets — column scrolls, do not compress. */
+  flex-shrink: 0;
+  height: auto;
+  min-height: auto;
 }
 
-@media (max-width: 720px) {
-  .settings-card > .settings-appearance-duo {
+.settings-appearance-theme-layout__main {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 12px;
+  padding-bottom: 24px;
+}
+
+.settings-appearance-theme-layout__main > .settings-card {
+  /* Natural content height — never shrink to fit the viewport. */
+  flex: 0 0 auto;
+  margin: 0;
+  min-height: auto;
+  height: auto;
+  overflow: visible;
+}
+
+.settings-appearance-chrome-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.settings-appearance-chrome-shadow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* No desktop presets host → single column (SkinPresetsCard returns null). */
+.settings-appearance-theme-layout:not(:has(#settings-anchor-skin-presets)) {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 820px) {
+  .settings-appearance-theme-layout {
     grid-template-columns: 1fr;
+    overflow: auto;
   }
 
-  .settings-appearance-duo > .settings-row + .settings-row {
-    border-left: none;
-    border-top: 1px solid var(--border-subtle);
+  .settings-appearance-theme-layout__rail,
+  .settings-appearance-theme-layout__main {
+    overflow: visible;
   }
 }
 
-/* Color skin packs (Appearance) — Dream Skin–style swatch grid */
+/* Color skin packs — compact swatches */
 .settings-skin-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
   gap: 8px;
   width: 100%;
   margin-top: 4px;
@@ -792,8 +863,8 @@ textarea.settings-input.settings-agents-json__textarea {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
-  padding: 8px;
+  gap: 6px;
+  padding: 6px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--bg-hover);
@@ -820,16 +891,19 @@ textarea.settings-input.settings-agents-json__textarea {
 
 .settings-skin-card__swatch {
   display: block;
-  height: 36px;
+  height: 28px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
 }
 
 .settings-skin-card__name {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 560;
   line-height: 1.2;
-  padding: 0 2px 2px;
+  padding: 0 1px 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Custom wallpaper upload (Appearance) */

@@ -51,11 +51,15 @@ describe("new-chat welcome intro", () => {
       /\.composer-welcome-mark\s*\{[\s\S]*?flex-direction: column;[\s\S]*?gap: 12px;/,
     );
     expect(css).toMatch(
-      /\.composer-welcome-prompt\s*\{[\s\S]*?max-width: calc\(100% - 32px\);[\s\S]*?overflow-wrap: anywhere;/,
+      /\.composer-welcome-prompt\s*\{[\s\S]*?max-width: calc\(100% - 32px\);[\s\S]*?overflow-wrap: anywhere;[\s\S]*?background: none;/,
     );
     expect(css).not.toMatch(
       /\.composer-welcome-prompt\s*\{[^}]*position:\s*absolute/s,
     );
+    expect(css).not.toMatch(
+      /\.composer-welcome-mark\.is-entering \.composer-welcome-prompt\s*\{[^}]*will-change:\s*clip-path/s,
+    );
+    expect(app).toContain("window.setTimeout(() => setWelcomeIntroActive(false), 1300)");
     expect(phoneCss).toMatch(
       /\.app-shell--phone \.composer-wrap--welcome \.composer-welcome-mark\s*\{[\s\S]*?align-self: stretch;[\s\S]*?width: auto;[\s\S]*?max-width: none;/,
     );

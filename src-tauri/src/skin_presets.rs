@@ -179,6 +179,72 @@ pub fn list_presets() -> Result<Vec<PresetIndexEntry>, String> {
     }
 }
 
+/// Absolute path of the wallpaper asset under a preset (if any).
+pub fn preset_wallpaper_path(id: &str) -> Option<PathBuf> {
+    if id.is_empty() || id.starts_with('.') {
+        return None;
+    }
+    let assets = paths::skin_presets_dir().join(id).join("assets");
+    let Ok(rd) = fs::read_dir(&assets) else {
+        return None;
+    };
+    for ent in rd.flatten() {
+        let name = ent.file_name().to_string_lossy().to_ascii_lowercase();
+        if name.starts_with("wallpaper.") {
+            return Some(ent.path());
+        }
+    }
+    None
+}
+
+/// Absolute path for a preset card thumb: `preview.jpg`, else still wallpaper,
+/// else a cached video poster JPEG. Never returns raw `.mp4`/`.webm` — CSS
+/// `background-image` cannot paint video.
+pub fn preset_thumb_path(id: &str) -> Option<PathBuf> {
+    if id.is_empty() || id.starts_with('.') {
+        return None;
+    }
+    let dir = paths::skin_presets_dir().join(id);
+    let preview = dir.join("preview.jpg");
+    if preview.is_file() {
+        return Some(preview);
+    }
+    let assets = dir.join("assets");
+    let Ok(rd) = fs::read_dir(&assets) else {
+        return None;
+    };
+    let mut video: Option<PathBuf> = None;
+    let mut gif: Option<PathBuf> = None;
+    for ent in rd.flatten() {
+        let name = ent.file_name().to_string_lossy().to_ascii_lowercase();
+        if !name.starts_with("wallpaper.") {
+            continue;
+        }
+        if name.ends_with(".mp4") || name.ends_with(".webm") {
+            if video.is_none() {
+                video = Some(ent.path());
+            }
+            continue;
+        }
+        // Animated gif works as CSS background; keep as last still-like fallback.
+        if name.ends_with(".gif") {
+            if gif.is_none() {
+                gif = Some(ent.path());
+            }
+            continue;
+        }
+        return Some(ent.path());
+    }
+    if let Some(g) = gif {
+        return Some(g);
+    }
+    let video = video?;
+    match crate::video_poster::ensure_video_poster(&video.to_string_lossy()) {
+        Ok(poster) => Some(PathBuf::from(poster.poster_path)),
+        Err(_) => None,
+    }
+}
+
 fn copy_dir(src: &Path, dest: &Path) -> Result<u64, String> {
     fs::create_dir_all(dest).map_err(|e| format!("invalid_pack: {e}"))?;
     let mut bytes = 0u64;
@@ -235,6 +301,11 @@ pub fn save_from_inspect(inspect_id: &str) -> Result<PresetIndexEntry, String> {
     let src = skin_staging::inspect_dir(inspect_id);
     if !src.is_dir() {
         return Err("not_found: inspect staging".into());
+    }
+    // Library-backed materialize only writes a `.library-ref` marker (no copy).
+    // Refuse saving that as a new preset — Apply already points at the library.
+    if src.join(".library-ref").is_file() && !src.join("manifest.json").is_file() {
+        return Err("invalid_pack: library-backed inspect cannot be saved".into());
     }
     let entry = save_from_dir(&src, None)?;
     let _ = fs::remove_dir_all(&src);
@@ -370,13 +441,10 @@ pub fn materialize(id: &str) -> Result<SkinPackPreviewDto, String> {
     if !dir.is_dir() {
         return Err("not_found: preset".into());
     }
-    let dest = paths::skin_presets_dir().join(format!(".export-{}.grokskin", Uuid::new_v4()));
-    // Apply/preview must keep the original video + focus/clip. Bake only
-    // happens on user-facing export/share.
-    skin_pack::export_dir_unbaked(&dir, &dest)?;
-    let preview = skin_pack::inspect_pack(&dest, "preset");
-    let _ = fs::remove_file(&dest);
-    preview
+    // Library presets are already on disk — inspect in place (no zip roundtrip).
+    // Trust stored wallpaper hashes so large video packs open the Apply modal
+    // without re-hashing hundreds of MiB.
+    skin_pack::inspect_unpacked_dir(&dir, "preset", true)
 }
 
 pub fn delete_preset(id: &str) -> Result<(), String> {
@@ -615,6 +683,70 @@ mod tests {
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, saved.id);
         assert_eq!(listed[0].name, "New");
+        let _ = fs::remove_dir_all(&home_dir);
+        std::env::remove_var("GROK_APP_HOME");
+    }
+
+    #[test]
+    fn materialize_inspects_library_dir_without_zip() {
+        let (_g, home_dir) = home();
+        let src = home_dir.join("pack");
+        fs::create_dir_all(src.join("assets")).unwrap();
+        // Tiny fake "image" bytes + matching sha for trust_hash path.
+        let bytes = b"fake-wallpaper-bytes";
+        let hash = {
+            use sha2::{Digest, Sha256};
+            hex::encode(Sha256::digest(bytes))
+        };
+        fs::write(src.join("assets").join("wallpaper.png"), bytes).unwrap();
+        let man = format!(
+            r#"{{"schemaVersion":1,"name":"Lib","skin":"ocean","scrim":12,"wallpaper":{{"file":"assets/wallpaper.png","kind":"image","mime":"image/png","name":"w.png","sha256":"{hash}"}}}}"#
+        );
+        fs::write(src.join("manifest.json"), man).unwrap();
+        let saved = save_from_dir(&src, None).unwrap();
+
+        let preview = materialize(&saved.id).unwrap();
+        assert_eq!(preview.source, "preset");
+        assert_eq!(preview.name, "Lib");
+        assert_eq!(preview.skin, "ocean");
+        assert_eq!(preview.scrim, 12);
+        let wall = preview.wallpaper.expect("wallpaper");
+        assert!(
+            wall.path.contains("wallpaper.png"),
+            "expected library path, got {}",
+            wall.path
+        );
+        // No leftover export zip from the old materialize path.
+        let leftover: Vec<_> = fs::read_dir(paths::skin_presets_dir())
+            .unwrap()
+            .flatten()
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with(".export-")
+            })
+            .collect();
+        assert!(leftover.is_empty(), "unexpected export zips: {leftover:?}");
+        let _ = fs::remove_dir_all(&home_dir);
+        std::env::remove_var("GROK_APP_HOME");
+    }
+
+    #[test]
+    fn preset_thumb_path_skips_raw_video() {
+        let (_g, home_dir) = home();
+        let id = "vid-preset";
+        let dir = paths::skin_presets_dir().join(id);
+        fs::create_dir_all(dir.join("assets")).unwrap();
+        fs::write(dir.join("assets").join("wallpaper.mp4"), b"not-really-mp4").unwrap();
+        // Without ffmpeg / valid video, poster extraction fails → no thumb.
+        let thumb = preset_thumb_path(id);
+        assert!(
+            thumb.as_ref().map(|p| {
+                let s = p.to_string_lossy().to_ascii_lowercase();
+                !s.ends_with(".mp4") && !s.ends_with(".webm")
+            }).unwrap_or(true),
+            "must not return raw video path: {thumb:?}"
+        );
         let _ = fs::remove_dir_all(&home_dir);
         std::env::remove_var("GROK_APP_HOME");
     }

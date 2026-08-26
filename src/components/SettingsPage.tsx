@@ -1339,6 +1339,11 @@ export function SettingsPage({
   /** Providers dual-pane: fill viewport; rail + detail scroll, page does not. */
   const providersPaneFill =
     section === "account" && activeTab === "providers";
+  /** Appearance theme: left presets + right stack scroll independently. */
+  const appearanceThemePaneFill =
+    section === "appearance" &&
+    (activeTab === "theme" || activeTab == null || activeTab === undefined);
+  const dualPaneFill = providersPaneFill || appearanceThemePaneFill;
   const pageClass =
     "settings-page" +
     (phoneIndex ? " settings-page--phone-index" : "") +
@@ -1879,7 +1884,7 @@ export function SettingsPage({
       <div
         className={
           "settings-page__content" +
-          (providersPaneFill ? " settings-page__content--pane-fill" : "")
+          (dualPaneFill ? " settings-page__content--pane-fill" : "")
         }
         hidden={phoneIndex || undefined}
         aria-hidden={phoneIndex || undefined}
@@ -1900,7 +1905,7 @@ export function SettingsPage({
       <main
         className={
           "settings-page__main" +
-          (providersPaneFill ? " settings-page__main--pane-fill" : "")
+          (dualPaneFill ? " settings-page__main--pane-fill" : "")
         }
       >
         {!phoneDetail ? (
