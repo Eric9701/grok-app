@@ -134,6 +134,25 @@ export function canRewindToUserPrompt(
   return end >= 0 && end < messages.length;
 }
 
+/**
+ * Prompt index to **keep** when the user clicks rewind on a user bubble.
+ *
+ * - Older bubbles: keep that full turn, drop everything after (CLI `/rewind`).
+ * - Last bubble: undo that turn (CLI `/undo`) — keep the previous prompt, or
+ *   `null` when this is the only user turn (drop last / empty the chat).
+ */
+export function rewindKeepPromptIndex(
+  messages: ChatMessage[],
+  clickedUserPromptIndex: number,
+): number | null {
+  if (clickedUserPromptIndex < 0) return null;
+  if (canRewindToUserPrompt(messages, clickedUserPromptIndex)) {
+    return clickedUserPromptIndex;
+  }
+  if (clickedUserPromptIndex === 0) return null;
+  return clickedUserPromptIndex - 1;
+}
+
 export interface LocalRewindPoint {
   promptIndex: number;
   messageId: string;

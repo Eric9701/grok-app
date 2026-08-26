@@ -135,6 +135,7 @@ export function WorkbenchSessionModals(p: WorkbenchSessionModalsProps) {
     runForkSession,
     runMcpDoctor,
     runResumeWithCodeRestore,
+    runRewindDropLastUser,
     runRewindToPrompt,
     saveSessionMaxTurnsModal,
     saveSessionNoteModal,
@@ -438,6 +439,10 @@ export function WorkbenchSessionModals(p: WorkbenchSessionModalsProps) {
         }}
         onConfirm={() => {
           if (!rewindConfirm) return;
+          if (rewindConfirm.targetPromptIndex == null) {
+            void runRewindDropLastUser(rewindConfirm.sessionId);
+            return;
+          }
           void runRewindToPrompt(
             rewindConfirm.sessionId,
             rewindConfirm.targetPromptIndex,

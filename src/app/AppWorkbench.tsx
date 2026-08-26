@@ -99,7 +99,7 @@ import {
   weaveToolsIntoAssistantSegments,
   truncateBeforeLastUser,
   truncateThroughUserPrompt,
-  canRewindToUserPrompt,
+  rewindKeepPromptIndex,
   canRegenerateAssistant,
   userPromptIndexOf,
   userPromptIndexContaining,
@@ -8777,8 +8777,64 @@ export function AppWorkbench() {
     [canRewindSession, session.sessionId, session.state, showToast, tr],
   );
 
+  const runRewindDropLastUser = useCallback(
+    async (sessionId: string) => {
+      if (!api.isTauri()) {
+        const msg = tr("error.needTauri");
+        setRewindError(msg);
+        showToast(msg);
+        return;
+      }
+      if (!canRewindSession) {
+        const msg = tr("session.rewindBusy");
+        setRewindError(msg);
+        showToast(msg);
+        return;
+      }
+      setRewindError(null);
+      setRewindBusy(true);
+      try {
+        if (
+          (session.sessionId === sessionId ||
+            viewingSessionIdRef.current === sessionId) &&
+          session.state !== "ready"
+        ) {
+          try {
+            await ensureConnected();
+          } catch {
+            /* local-only path */
+          }
+        }
+        await api.sessionRewindDropLastUser(sessionId);
+        if (viewingSessionIdRef.current === sessionId) {
+          const stored = await api.sessionMessages(sessionId);
+          const mapped = mapStoredMessagesToChat(stored);
+          const woven = weaveToolsIntoAssistantSegments(mapped);
+          messagesBySessionRef.current.set(sessionId, woven);
+          setMessages(woven);
+        } else {
+          messagesBySessionRef.current.delete(sessionId);
+        }
+        setRewindTimeline(null);
+        setRewindConfirm(null);
+        setRewindRestoreFiles(false);
+        setRewindError(null);
+        showToast(tr("session.rewindOk"));
+        await refreshSessions();
+      } catch (e) {
+        const msg = tr("session.rewindFailed") + ": " + String(e);
+        setRewindError(msg);
+        showToast(msg, 4500);
+      } finally {
+        setRewindBusy(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canRewindSession, session.sessionId, session.state, showToast, tr],
+  );
+
   const confirmRewindToPrompt = useCallback(
-    (sessionId: string, targetPromptIndex: number, preview?: string) => {
+    (sessionId: string, targetPromptIndex: number | null, preview?: string) => {
       setCtxMenu(null);
       // GlassModal with restore-files checkbox (default off) — not bare setAppDialog.
       // Close the timeline first so two overlays cannot swallow the confirm click.
@@ -8858,15 +8914,12 @@ export function AppWorkbench() {
         showToast(tr("session.rewindFailed"));
         return;
       }
-      if (!canRewindToUserPrompt(messages, idx)) {
-        showToast(tr("session.rewindNoop"));
-        return;
-      }
+      const keep = rewindKeepPromptIndex(messages, idx);
       const preview = (msg.content || "")
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 80);
-      confirmRewindToPrompt(sid, idx, preview);
+      confirmRewindToPrompt(sid, keep, preview);
     },
     [
       canRewindSession,
@@ -14962,6 +15015,7 @@ export function AppWorkbench() {
         runForkSession={runForkSession}
         runMcpDoctor={runMcpDoctor}
         runResumeWithCodeRestore={runResumeWithCodeRestore}
+        runRewindDropLastUser={runRewindDropLastUser}
         runRewindToPrompt={runRewindToPrompt}
         saveSessionMaxTurnsModal={saveSessionMaxTurnsModal}
         saveSessionNoteModal={saveSessionNoteModal}
