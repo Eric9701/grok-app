@@ -156,10 +156,10 @@ pub async fn providers_upsert(
         )
         .await?;
         let selected = models.clone().unwrap_or_else(|| {
-            vec![crate::providers::ProviderModelEntry {
-                id: model.clone(),
-                name: model.clone(),
-            }]
+            vec![crate::providers::ProviderModelEntry::named(
+                model.clone(),
+                model.clone(),
+            )]
         });
         crate::providers::validate_grok_build_proxy_models(&remote.models, &selected)?;
     }

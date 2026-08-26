@@ -421,14 +421,14 @@ where
             provider_mode: Some(provider_mode),
             set_as_default: Some(false),
             create_only: Some(false),
-            models: Some(vec![providers::ProviderModelEntry {
-                id: parsed.model.clone(),
-                name: if parsed.model.trim().is_empty() {
+            models: Some(vec![providers::ProviderModelEntry::named(
+                parsed.model.clone(),
+                if parsed.model.trim().is_empty() {
                     parsed.name.clone()
                 } else {
                     parsed.model.clone()
                 },
-            }]),
+            )]),
             efforts: None,
             context_window: None,
             // Imports carry no channel rules; the user can add them per provider.
@@ -759,10 +759,10 @@ where
             return Ok(providers::PROVIDER_MODE_GENERIC.into());
         }
     };
-    let selected = [providers::ProviderModelEntry {
-        id: parsed.model.clone(),
-        name: parsed.model.clone(),
-    }];
+    let selected = [providers::ProviderModelEntry::named(
+        parsed.model.clone(),
+        parsed.model.clone(),
+    )];
     match providers::validate_grok_build_proxy_models(&remote.models, &selected) {
         Ok(()) => Ok(providers::PROVIDER_MODE_GROK_BUILD_PROXY.into()),
         Err(error) if explicit.as_deref() == Some(providers::PROVIDER_MODE_GROK_BUILD_PROXY) => {
@@ -934,6 +934,7 @@ app_provider_mode = "grok_build_proxy"
                     id: "grok-4.6".into(),
                     owned_by: Some("grok_build".into()),
                     supports_backend_search: Some(true),
+                    ..Default::default()
                 }],
             })
         })
@@ -951,6 +952,7 @@ app_provider_mode = "grok_build_proxy"
                     id: "grok-4.6".into(),
                     owned_by: None,
                     supports_backend_search: None,
+                    ..Default::default()
                 }],
             })
         })

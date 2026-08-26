@@ -15,16 +15,25 @@ import * as api from "@/lib/api";
 import { createT, type Locale, type MessageKey } from "@/i18n";
 import { Select } from "@/components/Select";
 import { GlassModal } from "@/components/GlassModal";
+import { OverlayScroll } from "@/components/OverlayScroll";
 import {
   IconCheck,
   IconClose,
   IconEdit,
+  IconHelp,
   IconPlus,
   IconRefresh,
+  IconSettings,
   IconTrash,
   IconPlug,
   IconAlertTriangle,
 } from "@/components/icons";
+import { Tip } from "@/components/ui/tooltip";
+import { ProviderModelSettingsModal } from "@/components/ProviderModelSettingsModal";
+import {
+  materializeActiveModelChannel,
+  mergeRemoteModelCaps,
+} from "@/lib/providerModelConfig";
 import {
   PROVIDER_SAVE_TIMEOUT_MS,
   providerMutationNeedsAgentReload,
@@ -44,7 +53,10 @@ import {
 import {
   PROVIDER_PRESETS,
   alignGrokPresetEfforts,
+  applyPresetEndpoint,
   defaultCustomChannelEfforts,
+  matchPresetEndpoint,
+  resolveMatchedProviderPreset,
   resolveProviderApiKeyUrl,
   resolveProviderBrandId,
   type ProviderPreset,
@@ -83,18 +95,67 @@ export interface ProvidersPanelProps {
   ) => void;
 }
 
-type FormModel = {
-  /** Upstream request body model id. */
-  id: string;
-  /** Display name shown on composer chip / menu. */
-  name: string;
-};
-
 type FormEffort = {
   id: string;
   name: string;
   isDefault: boolean;
 };
+
+type FormModel = {
+  /** Upstream request body model id. */
+  id: string;
+  /** Display name shown on composer chip / menu. */
+  name: string;
+  contextWindow?: number | null;
+  supportsVision?: boolean;
+  supportsVideo?: boolean;
+  efforts?: FormEffort[];
+};
+
+function toFormEfforts(
+  list?: Array<{ id: string; name?: string; isDefault?: boolean }>,
+): FormEffort[] | undefined {
+  if (!list?.length) return list ? [] : undefined;
+  return list.map((e) => ({
+    id: e.id,
+    name: e.name?.trim() || e.id,
+    isDefault: !!e.isDefault,
+  }));
+}
+
+function asFormModel(m: api.ProviderModelEntry): FormModel {
+  return {
+    id: m.id,
+    name: m.name,
+    contextWindow: m.contextWindow ?? null,
+    supportsVision: m.supportsVision,
+    supportsVideo: m.supportsVideo,
+    efforts: toFormEfforts(m.efforts),
+  };
+}
+
+function FieldHelp({ label, tip }: { label: string; tip: string }) {
+  return (
+    <span className="prov-field__label">
+      <span>{label}</span>
+      {tip ? (
+        <Tip label={tip} placement="top" className="ui-tip--wrap" delayMs={280}>
+          <button
+            type="button"
+            className="settings-label-help"
+            aria-label={tip}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <IconHelp size={14} stroke={1.75} />
+          </button>
+        </Tip>
+      ) : null}
+    </span>
+  );
+}
 
 type FormState = {
   id: string;
@@ -147,6 +208,14 @@ function modelsFromProvider(p: api.CustomProvider): FormModel[] {
     return p.models.map((m) => ({
       id: m.id,
       name: m.name?.trim() || m.id,
+      contextWindow: m.contextWindow ?? null,
+      supportsVision: m.supportsVision,
+      supportsVideo: m.supportsVideo,
+      efforts: m.efforts?.map((e) => ({
+        id: e.id,
+        name: e.name?.trim() || e.id,
+        isDefault: !!e.isDefault,
+      })),
     }));
   }
   const id = p.model?.trim() ?? "";
@@ -175,13 +244,17 @@ function effortsFromProvider(p: api.CustomProvider): FormEffort[] {
   }));
 }
 
-function formFromPreset(preset: ProviderPreset): FormState {
+function formFromPreset(preset: ProviderPreset, endpointId?: string): FormState {
+  const applied = applyPresetEndpoint(
+    preset,
+    endpointId ?? preset.defaultEndpointId,
+  );
   return {
     id: preset.suggestedId,
     name: preset.name,
-    baseUrl: preset.baseUrl,
-    // Most presets ship with `/v1`; Volcengine Ark Coding Plan needs full path as typed.
-    baseUrlFullPath: !!preset.baseUrlFullPath,
+    baseUrl: applied.baseUrl,
+    // Most presets ship with `/v1`; Volcengine Ark / Zhipu roots are already complete.
+    baseUrlFullPath: applied.baseUrlFullPath,
     apiKey: "",
     apiBackend: preset.apiBackend,
     providerMode: "generic",
@@ -191,13 +264,21 @@ function formFromPreset(preset: ProviderPreset): FormState {
     models: preset.models.map((m) => ({
       id: m.id,
       name: m.name || m.id,
+      contextWindow: m.contextWindow ?? preset.contextWindow ?? null,
+      supportsVision: m.supportsVision ?? preset.supportsVision,
+      supportsVideo: m.supportsVideo,
+      efforts: (m.efforts?.length ? m.efforts : preset.efforts).map((e) => ({
+        id: e.id,
+        name: e.name || e.id,
+        isDefault: !!e.isDefault,
+      })),
     })),
     efforts: preset.efforts.map((e) => ({
       id: e.id,
       name: e.name || e.id,
       isDefault: !!e.isDefault,
     })),
-    apiKeyUrl: preset.apiKeyUrl ?? null,
+    apiKeyUrl: applied.apiKeyUrl,
     extraHeaders: [],
     contextWindow:
       preset.contextWindow && preset.contextWindow > 0
@@ -251,8 +332,17 @@ export function ProvidersPanel({
   const [busy, setBusy] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [remoteModels, setRemoteModels] = useState<
-    Array<{ id: string; supportsBackendSearch?: boolean }>
+    Array<{
+      id: string;
+      supportsBackendSearch?: boolean;
+      contextWindow?: number | null;
+      supportsVision?: boolean | null;
+      supportsVideo?: boolean | null;
+    }>
   >([]);
+  const [modelSettingsIndex, setModelSettingsIndex] = useState<number | null>(
+    null,
+  );
   /** Frontend substring filter for the fetched model list. */
   const [modelSearch, setModelSearch] = useState("");
   /** Busy flag for fetch-models only (disables button while in flight). */
@@ -269,9 +359,6 @@ export function ProvidersPanel({
   /** Draft row for manually adding a model. */
   const [draftModelId, setDraftModelId] = useState("");
   const [draftModelName, setDraftModelName] = useState("");
-  /** Draft row for adding a reasoning effort. */
-  const [draftEffortId, setDraftEffortId] = useState("");
-  const [draftEffortName, setDraftEffortName] = useState("");
   const [hint, setHint] = useState<string | null>(null);
   const [hintTone, setHintTone] = useState<"ok" | "err" | "muted">("muted");
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -283,6 +370,10 @@ export function ProvidersPanel({
   const [officialKeyDraft, setOfficialKeyDraft] = useState("");
   const [showOfficialKey, setShowOfficialKey] = useState(false);
   const [officialKeyBusy, setOfficialKeyBusy] = useState(false);
+
+  /** Zhipu-style multi-endpoint picker (gallery click). */
+  const [endpointPickerPreset, setEndpointPickerPreset] =
+    useState<ProviderPreset | null>(null);
 
   /** CC Switch import dialog */
   const [ccImportOpen, setCcImportOpen] = useState(false);
@@ -378,8 +469,6 @@ export function ProvidersPanel({
     setForm(emptyForm());
     setDraftModelId("");
     setDraftModelName("");
-    setDraftEffortId("");
-    setDraftEffortName("");
     setRemoteModels([]);
     setHint(null);
     setShowKey(false);
@@ -392,8 +481,18 @@ export function ProvidersPanel({
     setForm(emptyForm());
     setDraftModelId("");
     setDraftModelName("");
-    setDraftEffortId("");
-    setDraftEffortName("");
+    setRemoteModels([]);
+    setHint(null);
+    setShowKey(false);
+    setRightMode("create");
+  };
+
+  const fillPresetForm = (preset: ProviderPreset, endpointId?: string) => {
+    setSelection(null);
+    setEditingId(null);
+    setForm(formFromPreset(preset, endpointId));
+    setDraftModelId("");
+    setDraftModelName("");
     setRemoteModels([]);
     setHint(null);
     setShowKey(false);
@@ -401,17 +500,26 @@ export function ProvidersPanel({
   };
 
   const openPresetCreate = (preset: ProviderPreset) => {
-    setSelection(null);
-    setEditingId(null);
-    setForm(formFromPreset(preset));
-    setDraftModelId("");
-    setDraftModelName("");
-    setDraftEffortId("");
-    setDraftEffortName("");
-    setRemoteModels([]);
-    setHint(null);
-    setShowKey(false);
-    setRightMode("create");
+    if (preset.endpoints && preset.endpoints.length > 1) {
+      setEndpointPickerPreset(preset);
+      return;
+    }
+    fillPresetForm(preset);
+  };
+
+  const applyEndpointToForm = (endpointId: string) => {
+    const preset = resolveMatchedProviderPreset({
+      providerId: form.id,
+      baseUrl: form.baseUrl,
+    });
+    if (!preset?.endpoints?.length) return;
+    const applied = applyPresetEndpoint(preset, endpointId);
+    setForm((f) => ({
+      ...f,
+      baseUrl: applied.baseUrl,
+      baseUrlFullPath: applied.baseUrlFullPath,
+      apiKeyUrl: applied.apiKeyUrl,
+    }));
   };
 
   const openCcImport = () => {
@@ -597,8 +705,6 @@ export function ProvidersPanel({
     });
     setDraftModelId("");
     setDraftModelName("");
-    setDraftEffortId("");
-    setDraftEffortName("");
     setRemoteModels([]);
     setHint(null);
     setShowKey(false);
@@ -613,17 +719,36 @@ export function ProvidersPanel({
     setRemoteModels([]);
     setDraftModelId("");
     setDraftModelName("");
-    setDraftEffortId("");
-    setDraftEffortName("");
   };
 
-  const addModelToForm = (modelId: string, displayName?: string) => {
+  const addModelToForm = (
+    modelId: string,
+    displayName?: string,
+    extras?: {
+      contextWindow?: number | null;
+      supportsVision?: boolean | null;
+      supportsVideo?: boolean | null;
+    },
+  ) => {
     const id = modelId.trim();
     if (!id) return;
     const name = (displayName ?? draftModelName).trim() || id;
+    const remote = remoteModels.find((m) => m.id === id);
     setForm((f) => {
       if (f.models.some((m) => m.id === id)) return f;
-      return { ...f, models: [...f.models, { id, name }] };
+      const row = asFormModel(
+        mergeRemoteModelCaps(
+          {
+            id,
+            name,
+            contextWindow: extras?.contextWindow ?? null,
+            supportsVision: extras?.supportsVision ?? undefined,
+            supportsVideo: extras?.supportsVideo ?? undefined,
+          },
+          remote,
+        ),
+      );
+      return { ...f, models: [...f.models, row] };
     });
     setDraftModelId("");
     setDraftModelName("");
@@ -644,6 +769,16 @@ export function ProvidersPanel({
       .map((m) => ({
         id: m.id.trim(),
         name: m.name.trim() || m.id.trim(),
+        contextWindow: m.contextWindow ?? null,
+        supportsVision: m.supportsVision,
+        supportsVideo: m.supportsVideo,
+        efforts: (m.efforts ?? [])
+          .map((e) => ({
+            id: e.id.trim(),
+            name: e.name.trim() || e.id.trim(),
+            isDefault: !!e.isDefault,
+          }))
+          .filter((e) => e.id),
       }))
       .filter((m) => m.id);
     if (models.length === 0) {
@@ -651,21 +786,24 @@ export function ProvidersPanel({
       setHintTone("err");
       return;
     }
-    let efforts = form.efforts
+    let fallbackEfforts = form.efforts
       .map((e) => ({
         id: e.id.trim(),
         name: e.name.trim() || e.id.trim(),
         isDefault: !!e.isDefault,
       }))
       .filter((e) => e.id);
-    if (efforts.length === 0) {
-      efforts = defaultCustomChannelEfforts().map((e) => ({
+    if (fallbackEfforts.length === 0) {
+      fallbackEfforts = defaultCustomChannelEfforts().map((e) => ({
         id: e.id,
         name: e.name || e.id,
         isDefault: !!e.isDefault,
       }));
-    } else if (!efforts.some((e) => e.isDefault)) {
-      efforts = efforts.map((e, i) => ({ ...e, isDefault: i === 0 }));
+    } else if (!fallbackEfforts.some((e) => e.isDefault)) {
+      fallbackEfforts = fallbackEfforts.map((e, i) => ({
+        ...e,
+        isDefault: i === 0,
+      }));
     }
     setBusy(true);
     setHint(tr("prov.saving"));
@@ -684,6 +822,24 @@ export function ProvidersPanel({
       models.some((m) => m.id === existing.model)
         ? existing.model
         : models[0].id;
+    const applied = materializeActiveModelChannel({
+      provider: {
+        id,
+        model: preferred,
+        baseUrl: form.baseUrl.trim(),
+        name: form.name.trim() || id,
+        hasApiKey: true,
+        apiBackend: form.apiBackend,
+        providerMode: form.providerMode,
+        isDefault: false,
+        models,
+        efforts: fallbackEfforts,
+        contextWindow: form.contextWindow,
+        supportsVision: form.supportsVision,
+      },
+      modelId: preferred,
+      models,
+    });
     const payload = {
       id,
       model: preferred,
@@ -694,18 +850,17 @@ export function ProvidersPanel({
       providerMode: form.providerMode,
       setAsDefault: false as boolean,
       models,
-      efforts,
+      efforts: applied.efforts ?? fallbackEfforts,
       baseUrlFullPath: form.baseUrlFullPath,
       // Always sent: "" clears the channel rules, so an emptied box sticks.
       appendPrompt: form.appendPrompt.trim(),
-      supportsVision: form.supportsVision,
+      supportsVision: applied.supportsVision,
       extraHeaders: form.extraHeaders
         .map((h) => ({ name: h.name.trim(), value: h.value.trim() }))
         .filter((h) => h.name && h.value),
-      // Preset / form value wins; else keep composer-set context_window (#538).
       contextWindow:
-        form.contextWindow != null && form.contextWindow > 0
-          ? form.contextWindow
+        applied.contextWindow != null && applied.contextWindow > 0
+          ? applied.contextWindow
           : !isCreate &&
               existing?.contextWindow != null &&
               existing.contextWindow > 0
@@ -902,6 +1057,15 @@ export function ProvidersPanel({
       setModelSearch("");
       if (!r.models.length) {
         onToast?.(tr("prov.emptyList"), 2800);
+      } else {
+        setForm((f) => ({
+          ...f,
+          models: f.models.map((m) => {
+            const remote = r.models.find((x) => x.id === m.id);
+            return remote ? asFormModel(mergeRemoteModelCaps(m, remote)) : m;
+          }),
+        }));
+        onToast?.(tr("prov.fetchedCapsApplied", { n: String(r.models.length) }), 2800);
       }
     } catch (e) {
       // Soft-fail: classify ping / list-models errors (never invent reachability).
@@ -1118,7 +1282,8 @@ export function ProvidersPanel({
             </button>
           </div>
 
-          <div className="prov-rail" role="list">
+          <OverlayScroll className="prov-rail">
+            <div className="prov-rail__items" role="list">
             {showOfficialRow && (
               <div
                 role="listitem"
@@ -1251,11 +1416,12 @@ export function ProvidersPanel({
                 {tr(emptyState.messageKey as MessageKey)}
               </div>
             ) : null}
-          </div>
+            </div>
+          </OverlayScroll>
         </aside>
 
         {/* ── Right: detail / form ─────────────────────────────────── */}
-        <section className="prov-split__detail">
+        <OverlayScroll className="prov-split__detail">
           {rightMode === "empty" && (
             <div className="prov-detail-empty">
               <p>{tr("prov.detailEmpty")}</p>
@@ -1448,7 +1614,10 @@ export function ProvidersPanel({
               <div className="prov-form__grid">
                 {/* Row: display name | config id */}
                 <label className="prov-field">
-                  <span className="prov-field__label">{tr("prov.name")}</span>
+                  <FieldHelp
+                    label={tr("prov.name")}
+                    tip={tr("prov.nameChipHint")}
+                  />
                   <input
                     className="settings-input"
                     value={form.name}
@@ -1463,7 +1632,6 @@ export function ProvidersPanel({
                     placeholder={tr("prov.namePh")}
                     autoComplete="off"
                   />
-                  <span className="prov-field__hint">{tr("prov.nameChipHint")}</span>
                 </label>
 
                 <label className="prov-field">
@@ -1489,8 +1657,53 @@ export function ProvidersPanel({
 
                 {/* Base URL full — typically long; optional full-path (no auto /v1) */}
                 <div className="prov-field prov-field--full">
+                  {(() => {
+                    const epPreset = resolveMatchedProviderPreset({
+                      providerId: form.id,
+                      baseUrl: form.baseUrl,
+                    });
+                    const endpoints = epPreset?.endpoints;
+                    if (!epPreset || !endpoints?.length) return null;
+                    const activeId = matchPresetEndpoint(
+                      epPreset,
+                      form.baseUrl,
+                    )?.id;
+                    return (
+                      <div
+                        className="prov-endpoint-tags"
+                        role="radiogroup"
+                        aria-label={tr("prov.preset.endpointTitle")}
+                      >
+                        {endpoints.map((ep) => {
+                          const on = ep.id === activeId;
+                          return (
+                            <button
+                              key={ep.id}
+                              type="button"
+                              role="radio"
+                              aria-checked={on}
+                              className={
+                                "prov-endpoint-tags__chip" +
+                                (on ? " is-on" : "")
+                              }
+                              onClick={() => applyEndpointToForm(ep.id)}
+                            >
+                              {tr(ep.labelKey as MessageKey)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                   <span className="prov-field__label-row">
-                    <span className="prov-field__label">{tr("prov.baseUrl")}</span>
+                    <FieldHelp
+                      label={tr("prov.baseUrl")}
+                      tip={
+                        form.baseUrlFullPath
+                          ? tr("prov.baseUrlFullPathOnHint")
+                          : tr("prov.baseUrlFullPathOffHint")
+                      }
+                    />
                     <button
                       type="button"
                       role="switch"
@@ -1533,107 +1746,9 @@ export function ProvidersPanel({
                     spellCheck={false}
                     aria-label={tr("prov.baseUrl")}
                   />
-                  <span className="prov-field__hint">
-                    {form.baseUrlFullPath
-                      ? tr("prov.baseUrlFullPathOnHint")
-                      : tr("prov.baseUrlFullPathOffHint")}
-                  </span>
-                </div>
-
-                {/* Row: protocol | API key — equal grid columns */}
-                <div
-                  className="prov-field prov-field--full"
-                  id="settings-anchor-provider-mode"
-                >
-                  <span className="prov-field__label">{tr("prov.mode")}</span>
-                  <Select
-                    value={form.providerMode}
-                    onChange={(v) =>
-                      setForm((f) => ({
-                        ...f,
-                        providerMode:
-                          v === "grok_build_proxy"
-                            ? "grok_build_proxy"
-                            : "generic",
-                        apiBackend:
-                          v === "grok_build_proxy" ? "responses" : f.apiBackend,
-                      }))
-                    }
-                    options={providerModeOptions}
-                    aria-label={tr("prov.mode")}
-                    className="prov-field__select"
-                  />
-                  <span className="prov-field__hint">
-                    {form.providerMode === "grok_build_proxy"
-                      ? tr("prov.mode.grokBuildProxyHint")
-                      : tr("prov.mode.genericHint")}
-                  </span>
-                  {unsupportedNativeModels.length > 0 ? (
-                    <span
-                      className="prov-field__hint prov-field__hint--error"
-                      role="alert"
-                    >
-                      {tr("prov.mode.grokBuildProxyUnsupported", {
-                        models: unsupportedNativeModels.join(", "),
-                      })}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="prov-field">
-                  <span className="prov-field__label">{tr("prov.protocol")}</span>
-                  <Select
-                    value={form.apiBackend}
-                    onChange={(v) =>
-                      setForm((f) => ({ ...f, apiBackend: v }))
-                    }
-                    options={protocolOptions}
-                    aria-label={tr("prov.protocol")}
-                    className="prov-field__select"
-                  />
                 </div>
 
                 <div className="prov-field prov-field--full">
-                  <span className="prov-field__label-row">
-                    <span className="prov-field__label">
-                      {tr("prov.supportsVision")}
-                    </span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={form.supportsVision}
-                      id="settings-anchor-prov-supports-vision"
-                      className={
-                        "prov-field__full-path-switch" +
-                        (form.supportsVision ? " is-on" : "")
-                      }
-                      title={tr("prov.supportsVisionHint")}
-                      onClick={() =>
-                        setForm((f) => ({
-                          ...f,
-                          supportsVision: !f.supportsVision,
-                        }))
-                      }
-                    >
-                      <span className="prov-field__full-path-label">
-                        {form.supportsVision
-                          ? tr("prov.supportsVisionOn")
-                          : tr("prov.supportsVisionOff")}
-                      </span>
-                      <span
-                        className="prov-field__full-path-track"
-                        aria-hidden
-                      >
-                        <span className="prov-field__full-path-thumb" />
-                      </span>
-                    </button>
-                  </span>
-                  <span className="prov-field__hint">
-                    {tr("prov.supportsVisionHint")}
-                  </span>
-                </div>
-
-                <div className="prov-field">
                   <span className="prov-field__label-row">
                     <span className="prov-field__label">{tr("prov.apiKey")}</span>
                     {form.apiKeyUrl ? (
@@ -1676,115 +1791,17 @@ export function ProvidersPanel({
                   </div>
                 </div>
 
-                <div
-                  className="prov-field prov-field--full"
-                  id="settings-anchor-prov-extra-headers"
-                >
-                  <span className="prov-field__label">
-                    {tr("prov.extraHeaders")}
-                  </span>
-                  <p className="prov-field__hint">{tr("prov.extraHeadersHint")}</p>
-                  <div
-                    className="prov-models"
-                    role="group"
-                    aria-label={tr("prov.extraHeaders")}
-                  >
-                    <div className="prov-models__head" aria-hidden>
-                      <span>{tr("prov.extraHeadersName")}</span>
-                      <span>{tr("prov.extraHeadersValue")}</span>
-                      <span />
-                    </div>
-                    {form.extraHeaders.length === 0 ? (
-                      <p className="prov-models__empty">
-                        {tr("prov.extraHeadersEmpty")}
-                      </p>
-                    ) : (
-                      form.extraHeaders.map((row, i) => (
-                        <div className="prov-models__row" key={i}>
-                          <input
-                            className="settings-input"
-                            value={row.name}
-                            onChange={(e) => {
-                              const name = e.target.value;
-                              setForm((f) => {
-                                const extraHeaders = f.extraHeaders.slice();
-                                extraHeaders[i] = { ...extraHeaders[i]!, name };
-                                return { ...f, extraHeaders };
-                              });
-                            }}
-                            placeholder={tr("prov.extraHeadersNamePh")}
-                            aria-label={tr("prov.extraHeadersName")}
-                            autoComplete="off"
-                            spellCheck={false}
-                          />
-                          <input
-                            className="settings-input"
-                            value={row.value}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setForm((f) => {
-                                const extraHeaders = f.extraHeaders.slice();
-                                extraHeaders[i] = { ...extraHeaders[i]!, value };
-                                return { ...f, extraHeaders };
-                              });
-                            }}
-                            placeholder={tr("prov.extraHeadersValuePh")}
-                            aria-label={tr("prov.extraHeadersValue")}
-                            autoComplete="off"
-                            spellCheck={false}
-                          />
-                          <button
-                            type="button"
-                            className="icon-btn prov-models__remove"
-                            onClick={() =>
-                              setForm((f) => ({
-                                ...f,
-                                extraHeaders: f.extraHeaders.filter((_, j) => j !== i),
-                              }))
-                            }
-                            aria-label={tr("prov.removeHeader")}
-                            title={tr("prov.removeHeader")}
-                          >
-                            <IconClose size={14} />
-                          </button>
-                        </div>
-                      ))
-                    )}
-                    <div className="prov-models__actions">
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        onClick={() =>
-                          setForm((f) => ({
-                            ...f,
-                            extraHeaders: [...f.extraHeaders, { name: "", value: "" }],
-                          }))
-                        }
-                      >
-                        {tr("prov.addHeader")}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Channel rules appended to the system prompt (opt-in). */}
                 <div className="prov-field prov-field--full">
-                  <span className="prov-field__label">
-                    {tr("prov.appendPrompt")}
-                  </span>
-                  <textarea
-                    className="settings-input prov-field__textarea"
-                    rows={4}
-                    value={form.appendPrompt}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, appendPrompt: e.target.value }))
+                  <span className="prov-field__label">{tr("prov.protocol")}</span>
+                  <Select
+                    value={form.apiBackend}
+                    onChange={(v) =>
+                      setForm((f) => ({ ...f, apiBackend: v }))
                     }
-                    placeholder={tr("prov.appendPromptPh")}
-                    aria-label={tr("prov.appendPrompt")}
+                    options={protocolOptions}
+                    aria-label={tr("prov.protocol")}
+                    className="prov-field__select"
                   />
-                  <p className="prov-field__hint">
-                    {tr("prov.appendPromptHint")}
-                  </p>
                 </div>
 
                 {showBalanceAction ? (
@@ -1864,11 +1881,15 @@ export function ProvidersPanel({
                 ) : null}
 
                 {/* Models — full-width section, 2 equal columns inside */}
-                <div className="prov-field prov-field--full prov-section">
+                <div
+                  className="prov-field prov-field--full prov-section"
+                  id="settings-anchor-prov-supports-vision"
+                >
                   <span className="prov-field__label-row">
-                    <span className="prov-field__label">
-                      {tr("prov.requestModel")}
-                    </span>
+                    <FieldHelp
+                      label={tr("prov.requestModel")}
+                      tip={tr("prov.modelsHint")}
+                    />
                     <button
                       type="button"
                       className="btn btn--ghost btn--sm"
@@ -1881,7 +1902,6 @@ export function ProvidersPanel({
                         : tr("prov.fetchModels")}
                     </button>
                   </span>
-                  <p className="prov-field__hint">{tr("prov.modelsHint")}</p>
 
                   {remoteModels.length > 0 ? (
                     <div className="prov-models__remote">
@@ -2068,6 +2088,16 @@ export function ProvidersPanel({
                             })()}
                             <button
                               type="button"
+                              className="icon-btn prov-models__settings"
+                              onClick={() => setModelSettingsIndex(index)}
+                              aria-label={tr("prov.modelSettings")}
+                              title={tr("prov.modelSettings")}
+                              disabled={busy}
+                            >
+                              <IconSettings size={15} />
+                            </button>
+                            <button
+                              type="button"
                               className="icon-btn prov-models__remove"
                               onClick={() =>
                                 setForm((f) => ({
@@ -2132,199 +2162,157 @@ export function ProvidersPanel({
                   </div>
                 </div>
 
-                {/* Efforts — full-width section, 2 equal columns inside */}
-                <div className="prov-field prov-field--full prov-section">
-                  <span className="prov-field__label-row">
-                    <span className="prov-field__label">
-                      {tr("prov.efforts")}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm"
-                      disabled={busy}
-                      onClick={() =>
-                        setForm((f) => {
-                          const grok = alignGrokPresetEfforts({
-                            providerId: f.id,
-                            baseUrl: f.baseUrl,
-                            efforts: [],
-                          });
-                          const reset = grok ?? defaultCustomChannelEfforts();
-                          return {
-                            ...f,
-                            efforts: reset.map((e) => ({
-                              id: e.id,
-                              name: e.name || e.id,
-                              isDefault: !!e.isDefault,
-                            })),
-                          };
-                        })
-                      }
-                    >
-                      {tr("prov.effortsResetGrok")}
-                    </button>
-                  </span>
-                  <p className="prov-field__hint">{tr("prov.effortsHint")}</p>
+                <div
+                  className="prov-field prov-field--full"
+                  id="settings-anchor-prov-extra-headers"
+                >
+                  <FieldHelp
+                    label={tr("prov.extraHeaders")}
+                    tip={tr("prov.extraHeadersHint")}
+                  />
                   <div
-                    className="prov-models prov-efforts"
+                    className="prov-headers"
                     role="group"
-                    aria-label={tr("prov.efforts")}
+                    aria-label={tr("prov.extraHeaders")}
                   >
-                    <div className="prov-models__head" aria-hidden>
-                      <span>{tr("prov.effortDisplayName")}</span>
-                      <span>{tr("prov.effortId")}</span>
+                    <div className="prov-headers__head" aria-hidden>
+                      <span>{tr("prov.extraHeadersName")}</span>
+                      <span>{tr("prov.extraHeadersValue")}</span>
                       <span />
                     </div>
-                    {form.efforts.length === 0 ? (
-                      <p className="prov-models__empty">
-                        {tr("prov.effortsEmpty")}
+                    {form.extraHeaders.length === 0 ? (
+                      <p className="prov-headers__empty">
+                        {tr("prov.extraHeadersEmpty")}
                       </p>
                     ) : (
-                      form.efforts.map((e, index) => (
-                        <div key={index} className="prov-models__row">
+                      form.extraHeaders.map((row, i) => (
+                        <div className="prov-headers__row" key={i}>
                           <input
                             className="settings-input"
-                            value={e.name}
-                            onChange={(ev) => {
-                              const name = ev.target.value;
-                              setForm((f) => ({
-                                ...f,
-                                efforts: f.efforts.map((row, i) =>
-                                  i === index ? { ...row, name } : row,
-                                ),
-                              }));
+                            value={row.name}
+                            onChange={(e) => {
+                              const name = e.target.value;
+                              setForm((f) => {
+                                const extraHeaders = f.extraHeaders.slice();
+                                extraHeaders[i] = { ...extraHeaders[i]!, name };
+                                return { ...f, extraHeaders };
+                              });
                             }}
-                            placeholder={tr("prov.effortDisplayNamePh")}
-                            aria-label={tr("prov.effortDisplayName")}
+                            placeholder={tr("prov.extraHeadersNamePh")}
+                            aria-label={tr("prov.extraHeadersName")}
                             autoComplete="off"
+                            spellCheck={false}
                           />
                           <input
                             className="settings-input"
-                            value={e.id}
-                            onChange={(ev) => {
-                              const next = ev.target.value;
-                              setForm((f) => ({
-                                ...f,
-                                efforts: f.efforts.map((row, i) =>
-                                  i === index
-                                    ? {
-                                        ...row,
-                                        id: next,
-                                        name:
-                                          !row.name.trim() ||
-                                          row.name.trim() === row.id
-                                            ? next
-                                            : row.name,
-                                      }
-                                    : row,
-                                ),
-                              }));
+                            value={row.value}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setForm((f) => {
+                                const extraHeaders = f.extraHeaders.slice();
+                                extraHeaders[i] = { ...extraHeaders[i]!, value };
+                                return { ...f, extraHeaders };
+                              });
                             }}
-                            placeholder={tr("prov.effortIdPh")}
-                            aria-label={tr("prov.effortId")}
+                            placeholder={tr("prov.extraHeadersValuePh")}
+                            aria-label={tr("prov.extraHeadersValue")}
                             autoComplete="off"
                             spellCheck={false}
                           />
                           <button
                             type="button"
-                            className="icon-btn prov-models__remove"
+                            className="icon-btn prov-headers__remove"
                             onClick={() =>
                               setForm((f) => ({
                                 ...f,
-                                efforts: f.efforts.filter((_, i) => i !== index),
+                                extraHeaders: f.extraHeaders.filter((_, j) => j !== i),
                               }))
                             }
-                            aria-label={tr("prov.removeEffort")}
-                            disabled={busy}
+                            aria-label={tr("prov.removeHeader")}
                           >
-                            <IconTrash size={15} />
+                            <IconClose size={14} />
                           </button>
                         </div>
                       ))
                     )}
-                    <div className="prov-models__add-row">
-                      <input
-                        className="settings-input"
-                        value={draftEffortName}
-                        onChange={(ev) => setDraftEffortName(ev.target.value)}
-                        placeholder={tr("prov.effortDisplayNamePh")}
-                        aria-label={tr("prov.effortDisplayName")}
-                        autoComplete="off"
-                      />
-                      <input
-                        className="settings-input"
-                        value={draftEffortId}
-                        onChange={(ev) => {
-                          const id = ev.target.value;
-                          setDraftEffortId(id);
-                          setDraftEffortName((n) =>
-                            !n.trim() || n.trim() === draftEffortId.trim()
-                              ? id
-                              : n,
-                          );
-                        }}
-                        placeholder={tr("prov.effortIdPh")}
-                        aria-label={tr("prov.effortId")}
-                        autoComplete="off"
-                        spellCheck={false}
-                        onKeyDown={(ev) => {
-                          if (ev.key === "Enter") {
-                            ev.preventDefault();
-                            const id = draftEffortId.trim();
-                            if (!id) return;
-                            setForm((f) => {
-                              if (f.efforts.some((x) => x.id === id)) return f;
-                              return {
-                                ...f,
-                                efforts: [
-                                  ...f.efforts,
-                                  {
-                                    id,
-                                    name: draftEffortName.trim() || id,
-                                    isDefault: f.efforts.length === 0,
-                                  },
-                                ],
-                              };
-                            });
-                            setDraftEffortId("");
-                            setDraftEffortName("");
-                          }
-                        }}
-                      />
+                    <div className="prov-headers__add">
                       <button
                         type="button"
-                        className="btn btn--ghost btn--sm prov-models__add-btn"
-                        disabled={busy || !draftEffortId.trim()}
-                        onClick={() => {
-                          const id = draftEffortId.trim();
-                          if (!id) return;
-                          setForm((f) => {
-                            if (f.efforts.some((x) => x.id === id)) return f;
-                            return {
-                              ...f,
-                              efforts: [
-                                ...f.efforts,
-                                {
-                                  id,
-                                  name: draftEffortName.trim() || id,
-                                  isDefault: f.efforts.length === 0,
-                                },
-                              ],
-                            };
-                          });
-                          setDraftEffortId("");
-                          setDraftEffortName("");
-                        }}
+                        className="btn btn--ghost btn--sm"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            extraHeaders: [...f.extraHeaders, { name: "", value: "" }],
+                          }))
+                        }
                       >
-                        <IconPlus size={14} />
-                        {tr("prov.addEffort")}
+                        {tr("prov.addHeader")}
                       </button>
                     </div>
                   </div>
                 </div>
+
+                <div className="prov-field prov-field--full">
+                  <FieldHelp
+                    label={tr("prov.appendPrompt")}
+                    tip={tr("prov.appendPromptHint")}
+                  />
+                  <textarea
+                    className="settings-input prov-field__textarea"
+                    rows={4}
+                    value={form.appendPrompt}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, appendPrompt: e.target.value }))
+                    }
+                    placeholder={tr("prov.appendPromptPh")}
+                    aria-label={tr("prov.appendPrompt")}
+                  />
+                </div>
+
+                <div
+                  className="prov-field prov-field--full"
+                  id="settings-anchor-provider-mode"
+                >
+                  <FieldHelp
+                    label={tr("prov.mode")}
+                    tip={
+                      form.providerMode === "grok_build_proxy"
+                        ? tr("prov.mode.grokBuildProxyHint")
+                        : tr("prov.mode.genericHint")
+                    }
+                  />
+                  <Select
+                    value={form.providerMode}
+                    onChange={(v) =>
+                      setForm((f) => ({
+                        ...f,
+                        providerMode:
+                          v === "grok_build_proxy"
+                            ? "grok_build_proxy"
+                            : "generic",
+                        apiBackend:
+                          v === "grok_build_proxy" ? "responses" : f.apiBackend,
+                      }))
+                    }
+                    options={providerModeOptions}
+                    aria-label={tr("prov.mode")}
+                    className="prov-field__select"
+                  />
+                  {unsupportedNativeModels.length > 0 ? (
+                    <span
+                      className="prov-field__hint prov-field__hint--error"
+                      role="alert"
+                    >
+                      {tr("prov.mode.grokBuildProxyUnsupported", {
+                        models: unsupportedNativeModels.join(", "),
+                      })}
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
               {hint && (
+
                 <div
                   className={
                     "prov-form__hint" +
@@ -2389,8 +2377,76 @@ export function ProvidersPanel({
               </div>
             </div>
           )}
-        </section>
+        </OverlayScroll>
       </div>
+
+      <GlassModal
+        open={!!endpointPickerPreset}
+        onClose={() => setEndpointPickerPreset(null)}
+        title={tr("prov.preset.endpointTitle")}
+        size="md"
+        closeLabel={tr("common.close")}
+        wrapBody
+      >
+        <p className="prov-field__hint">{tr("prov.preset.endpointHint")}</p>
+        <div className="prov-endpoint-picker" role="list">
+          {(endpointPickerPreset?.endpoints ?? []).map((ep) => (
+            <button
+              key={ep.id}
+              type="button"
+              className="prov-endpoint-picker__row"
+              role="listitem"
+              onClick={() => {
+                const preset = endpointPickerPreset;
+                setEndpointPickerPreset(null);
+                if (preset) fillPresetForm(preset, ep.id);
+              }}
+            >
+              <span className="prov-endpoint-picker__name">
+                {tr(ep.labelKey as MessageKey)}
+              </span>
+              <span className="prov-endpoint-picker__url">{ep.baseUrl}</span>
+            </button>
+          ))}
+        </div>
+      </GlassModal>
+
+      <ProviderModelSettingsModal
+        open={modelSettingsIndex != null && !!form.models[modelSettingsIndex]}
+        locale={locale}
+        model={
+          modelSettingsIndex != null
+            ? form.models[modelSettingsIndex] ?? null
+            : null
+        }
+        providerId={form.id}
+        baseUrl={form.baseUrl}
+        fallbackEfforts={form.efforts.map((e) => ({
+          id: e.id,
+          name: e.name,
+          isDefault: e.isDefault,
+        }))}
+        onClose={() => setModelSettingsIndex(null)}
+        onSave={(next) => {
+          const index = modelSettingsIndex;
+          if (index == null) return;
+          setForm((f) => ({
+            ...f,
+            models: f.models.map((row, i) =>
+              i === index
+                ? {
+                    ...row,
+                    contextWindow: next.contextWindow,
+                    supportsVision: next.supportsVision,
+                    supportsVideo: next.supportsVideo,
+                    efforts: toFormEfforts(next.efforts),
+                  }
+                : row,
+            ),
+          }));
+          setModelSettingsIndex(null);
+        }}
+      />
 
       <GlassModal
         open={!!deleteTarget}

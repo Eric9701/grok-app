@@ -24,6 +24,7 @@ import {
   SESSION_MODES,
   effortCatalogForRoute,
   effortDisplayLabel,
+  effortUiOptionIsActive,
   effortUiOptionsForCatalog,
   findModel,
   spawnIdToEffortUiSlot,
@@ -518,9 +519,11 @@ export function PhoneComposerToolsSheet({
 
           {panel === "effort" &&
             effortUiList.map((e) => {
-              const active =
-                e.spawnId === effort ||
-                spawnIdToEffortUiSlot(effort, effortCatalog) === e.uiId;
+              const active = effortUiOptionIsActive(
+                e,
+                effort,
+                effortCatalog,
+              );
               return (
                 <button
                   key={e.uiId}

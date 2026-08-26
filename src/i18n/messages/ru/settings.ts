@@ -359,7 +359,7 @@ export const ruSettings = {
   "settings.exportLogoTooLarge": "Изображение слишком большое (макс. 1,5 МБ)",
   "settings.exportLogoInvalid": "Не удалось прочитать это изображение",
   "settings.replaceProviderBrandLogo": "Заменить логотип бренда",
-  "settings.replaceProviderBrandLogoDesc": "Когда активный канал — брендированный провайдер (DeepSeek, OpenCode, Volcengine Ark, Amux), заменить метку Grok слева вверху боковой панели логотипом этого провайдера. Бренды только с иконкой сохраняют текстовую метку рядом. По умолчанию выкл.",
+  "settings.replaceProviderBrandLogoDesc": "Когда активный канал — брендированный провайдер (DeepSeek, OpenCode, Volcengine Ark, Amux, Zhipu), заменить метку Grok слева вверху боковой панели логотипом этого провайдера. Бренды только с иконкой сохраняют текстовую метку рядом. По умолчанию выкл.",
   "settings.messageTimeFormat": "Формат времени",
   "settings.messageTimeFormatDesc": "Абсолютный показывает день недели и часы; относительный — «2 минуты назад» и обновляется примерно раз в минуту.",
   "settings.messageTimeFormat.absolute": "Абсолютный",

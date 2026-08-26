@@ -359,7 +359,7 @@ export const idSettings = {
   "settings.exportLogoTooLarge": "Gambar terlalu besar (maks 1,5 MB)",
   "settings.exportLogoInvalid": "Tidak dapat membaca gambar itu",
   "settings.replaceProviderBrandLogo": "Ganti logo merek",
-  "settings.replaceProviderBrandLogoDesc": "Saat saluran aktif adalah penyedia bermerek (DeepSeek, OpenCode, Volcengine Ark, Amux), ganti tanda Grok kiri atas bilah sisi dengan logo penyedia itu. Merek hanya-ikon mempertahankan label teks di samping tanda. Mati secara bawaan.",
+  "settings.replaceProviderBrandLogoDesc": "Saat saluran aktif adalah penyedia bermerek (DeepSeek, OpenCode, Volcengine Ark, Amux, Zhipu), ganti tanda Grok kiri atas bilah sisi dengan logo penyedia itu. Merek hanya-ikon mempertahankan label teks di samping tanda. Mati secara bawaan.",
   "settings.messageTimeFormat": "Format stempel waktu",
   "settings.messageTimeFormatDesc": "Absolut menampilkan hari kerja dan waktu jam; relatif menampilkan \"2 menit lalu\" dan disegarkan sekitar sekali per menit.",
   "settings.messageTimeFormat.absolute": "Absolut",

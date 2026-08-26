@@ -904,6 +904,9 @@ textarea::-webkit-scrollbar-thumb:active,
 
 .settings-page__main--pane-fill > .prov-panel {
   min-height: 0;
+  overflow: hidden;
+  /* 0-basis: leftover pane height, not the provider-list max-content. */
+  flex: 1 1 0%;
 }
 
 .prov-panel > .prov-alert {
@@ -941,6 +944,24 @@ textarea::-webkit-scrollbar-thumb:active,
 
 .settings-page__main--pane-fill .prov-split {
   min-height: 0;
+  flex: 1 1 0%;
+}
+
+/*
+ * Desktop pane-fill: implicit auto rows size to max(list, form) and overflow
+ * the clipped parent, so .prov-rail never becomes a scrollport. minmax(0, 1fr)
+ * caps the row to the panel. Narrow stacked layout (part3) keeps two rows.
+ */
+@media (min-width: 861px) {
+  .settings-page__main--pane-fill .prov-split {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .settings-page__main--pane-fill .prov-split__list,
+  .settings-page__main--pane-fill .prov-split__detail {
+    height: 100%;
+    max-height: 100%;
+  }
 }
 
 .prov-split__list {

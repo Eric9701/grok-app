@@ -359,7 +359,7 @@ export const taSettings = {
   "settings.exportLogoTooLarge": "படம் மிகவும் பெரியது (அதிகபட்சம் 1.5 எம்பி)",
   "settings.exportLogoInvalid": "அந்தப் படத்தைப் படிக்க முடியவில்லை",
   "settings.replaceProviderBrandLogo": "பிராண்ட் லோகோவை மாற்று",
-  "settings.replaceProviderBrandLogoDesc": "செயலில் உள்ள சேனல் பிராண்டட் வழங்குநராக இருக்கும் போது (DeepSeek, OpenCode, Volcengine Ark, Amux), அந்த வழங்குநரின் லோகோவுடன் பக்கப்பட்டியின் மேல் இடது Grok குறியை மாற்றவும். ஐகான்-மட்டும் பிராண்டுகள் குறிக்கு அடுத்ததாக உரை லேபிளை வைத்திருக்கும். இயல்பாக ஆஃப்.",
+  "settings.replaceProviderBrandLogoDesc": "செயலில் உள்ள சேனல் பிராண்டட் வழங்குநராக இருக்கும் போது (DeepSeek, OpenCode, Volcengine Ark, Amux, Zhipu), அந்த வழங்குநரின் லோகோவுடன் பக்கப்பட்டியின் மேல் இடது Grok குறியை மாற்றவும். ஐகான்-மட்டும் பிராண்டுகள் குறிக்கு அடுத்ததாக உரை லேபிளை வைத்திருக்கும். இயல்பாக ஆஃப்.",
   "settings.messageTimeFormat": "நேர முத்திரை வடிவம்",
   "settings.messageTimeFormatDesc": "முழுமையான நிகழ்ச்சிகள் வார நாள் மற்றும் கடிகார நேரம்; உறவினர் நிகழ்ச்சிகள் \"2 நிமிடங்களுக்கு முன்பு\" மற்றும் ஒரு நிமிடத்திற்கு ஒருமுறை புதுப்பிக்கப்படும்.",
   "settings.messageTimeFormat.absolute": "முழுமையான",

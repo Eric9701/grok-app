@@ -794,7 +794,7 @@
   fill: #646362;
 }
 
-/* Preset provider wordmarks on the welcome composer (DeepSeek / OpenCode / Ark).
+/* Preset provider wordmarks on the welcome composer (DeepSeek / OpenCode / Ark / Zhipu).
  * DeepSeek keeps its brand blue in light mode and flips to white in dark
  * mode; OpenCode is monochrome — black in light mode, white in dark mode.
  * Volcengine Ark uses brand icon colors + theme-aware label ink. */
@@ -848,6 +848,38 @@
 }
 
 .volcano-ark-welcome-mark__text {
+  flex: 0 0 auto;
+  font-size: clamp(2.1125rem, 6.76vw, 2.7625rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: inherit;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* 智谱: same icon+label row as 火山方舟 */
+.zhipu-welcome-mark {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-width: min(468px, 94vw);
+  margin-inline: auto;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.zhipu-welcome-mark .provider-brand-icon {
+  flex: 0 0 auto;
+  display: block;
+  width: 47px;
+  height: 47px;
+}
+
+.zhipu-welcome-mark__text {
   flex: 0 0 auto;
   font-size: clamp(2.1125rem, 6.76vw, 2.7625rem);
   font-weight: 600;

@@ -26,7 +26,8 @@ Flags **必须在** `stdio` 之前。连接后 `session/set_model` 再对齐一�
 CLI `models_cache.json` 每模型可带 `info.reasoning_efforts: [{id,value,label,description,default}]`。Host 经 `AvailableModel.reasoningEfforts`（`isDefault`）下发。
 
 Composer **UI 阶梯**统一为 4 档（低 → 高）：**低 / 中 / 高 / 极高**。  
-3 档模型（Grok 4.5）不展示「极高」；4 档官方模型（Grok 4.6）展示极高并 spawn `xhigh`。选中后映射为该模型真实 spawn / `reasoning_effort` 值。
+3 档模型（Grok 4.5）不展示「极高」；4 档官方模型（Grok 4.6）展示极高并 spawn `xhigh`。选中后映射为该模型真实 spawn / `reasoning_effort` 值。  
+自定义通道若只配了部分 id（如 `low` / `high` / `max`，没有 `medium`）：**按 id 对号入座，缺档不展示**。不要当成 DeepSeek（DeepSeek 才把 `high` 映射到「中」）。同一 spawn id 不得同时勾选两档。
 
 | UI 阶梯 | Grok 4.5 spawn | Grok 4.6 spawn | Grok 自定义(4档) | DeepSeek spawn |
 |---------|----------------|----------------|------------------|----------------|

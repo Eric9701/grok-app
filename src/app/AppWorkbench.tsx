@@ -241,6 +241,11 @@ import {
   type PermissionPolicyId,
 } from "@/lib/grokCatalog";
 import {
+  materializeActiveModelChannel,
+  resolveProviderEfforts,
+  withModelContextWindow,
+} from "@/lib/providerModelConfig";
+import {
   mapPermissionButtons,
 } from "@/lib/permissionOptions";
 import { dropAskUserClocks } from "@/lib/askUserClocks";
@@ -558,7 +563,6 @@ import {
 
 import type { ComposerModelPick } from "@/lib/composerModelGroups";
 import {
-  alignGrokPresetEfforts,
   resolveProviderBrandId,
 } from "@/lib/providerPresets";
 import {
@@ -643,6 +647,7 @@ import {
   DeepSeekFullMark,
   OpenCodeWordmark,
   VolcanoArkWelcomeMark,
+  ZhipuWelcomeMark,
 } from "@/components/ProviderWelcomeMark";
 import {
   WindowControls,
@@ -9579,13 +9584,8 @@ export function AppWorkbench() {
     if (providerActiveSource !== "custom" || !activeCustomProvider) {
       return null;
     }
-    const aligned = alignGrokPresetEfforts({
-      providerId: activeCustomProvider.id,
-      baseUrl: activeCustomProvider.baseUrl,
-      efforts: activeCustomProvider.efforts,
-    });
     return effortOptionsFromProvider(
-      aligned ?? activeCustomProvider.efforts,
+      resolveProviderEfforts(activeCustomProvider),
     );
   }, [providerActiveSource, activeCustomProvider]);
 
@@ -9680,17 +9680,19 @@ export function AppWorkbench() {
             return;
           }
           // Switch request model on the channel when needed (keeps multi-model catalog).
+          const models =
+            provider.models?.length
+              ? provider.models
+              : [{ id: provider.model, name: provider.model }];
+          const catalog = models.some((m) => m.id === pick.modelId)
+            ? models
+            : [...models, { id: pick.modelId, name: pick.modelId }];
+          const appliedLive = materializeActiveModelChannel({
+            provider,
+            modelId: pick.modelId,
+            models: catalog,
+          });
           if (provider.model.trim() !== pick.modelId.trim()) {
-            const models =
-              provider.models?.length
-                ? provider.models
-                : [{ id: provider.model, name: provider.model }];
-            const catalog = models.some((m) => m.id === pick.modelId)
-              ? models
-              : [
-                  ...models,
-                  { id: pick.modelId, name: pick.modelId },
-                ];
             await api.providersUpsert({
               id: provider.id,
               model: pick.modelId,
@@ -9698,10 +9700,12 @@ export function AppWorkbench() {
               name: provider.name,
               apiBackend: provider.apiBackend,
               models: catalog,
-              efforts: provider.efforts,
-              // Preserve channel context window (Host also keeps on omit; pass
-              // explicitly so load/fillback never drops a 1M custom cap).
-              contextWindow: provider.contextWindow ?? undefined,
+              efforts: appliedLive.efforts ?? provider.efforts,
+              contextWindow:
+                appliedLive.contextWindow ??
+                provider.contextWindow ??
+                undefined,
+              supportsVision: appliedLive.supportsVision,
               setAsDefault: false,
             });
           }
@@ -9720,15 +9724,9 @@ export function AppWorkbench() {
             }
           }
           await refreshProviderRoute();
-          // Map effort into the picked channel's catalog (Grok ↔ DeepSeek tiers).
-          const alignedPick = alignGrokPresetEfforts({
-            providerId: provider.id,
-            baseUrl: provider.baseUrl,
-            efforts: provider.efforts,
-          });
+          // Map effort into the picked model's catalog (Grok ↔ DeepSeek tiers).
           const nextEfforts =
-            effortOptionsFromProvider(alignedPick ?? provider.efforts) ??
-            GROK_BUILD_EFFORTS;
+            effortOptionsFromProvider(appliedLive.efforts) ?? GROK_BUILD_EFFORTS;
           const clampedCustom = mapEffortToTargetCatalog(
             effort,
             nextEfforts,
@@ -9778,7 +9776,11 @@ export function AppWorkbench() {
           baseUrl: activeCustomProvider.baseUrl,
           name: activeCustomProvider.name,
           apiBackend: activeCustomProvider.apiBackend,
-          models: activeCustomProvider.models,
+          models: withModelContextWindow(
+            activeCustomProvider.models,
+            activeCustomProvider.model,
+            tokens,
+          ),
           efforts: activeCustomProvider.efforts,
           setAsDefault: false,
           contextWindow: tokens,
@@ -9824,7 +9826,8 @@ export function AppWorkbench() {
   /**
    * Preset provider wordmark on the welcome composer.
    * DeepSeek → full DeepSeek wordmark; OpenCode → theme-aware wordmark;
-   * Volcengine Ark → logo + “火山方舟”; every other channel keeps SuperGrok.
+   * Volcengine Ark → logo + “火山方舟”; Zhipu → logo + “智谱”;
+   * every other channel keeps SuperGrok.
    */
   const welcomeProviderBrandNode = useMemo(() => {
     if (!customRouteActive) return null;
@@ -9840,6 +9843,9 @@ export function AppWorkbench() {
     }
     if (brand === "volcano-ark") {
       return <VolcanoArkWelcomeMark title="火山方舟" />;
+    }
+    if (brand === "zhipu") {
+      return <ZhipuWelcomeMark title="智谱" />;
     }
     return null;
   }, [customRouteActive, activeCustomProvider]);

@@ -203,6 +203,73 @@ export function shouldReleaseStickOnScrollUp(input: {
   return true;
 }
 
+/**
+ * Pixel-mode trackpad: many 2–8px ticks never hit {@link STICK_ESCAPE_MIN_DELTA_PX}
+ * in one event. Release once the viewport has walked ≥ that far off the
+ * bottom *from a position that was still in the leave band*.
+ *
+ * Must not treat stream / phase growth as a leave. Thinking collapse, a new
+ * tool row, or the next body round grows the tail; scrollTop stays put and
+ * distance jumps to tens/hundreds of px until follow lands. A 2–6px spacer
+ * tick there is layout, not the user walking away from the locked bottom.
+ */
+export function shouldReleaseStickOnSlowScrollUp(input: {
+  pinned: boolean;
+  escaped?: boolean;
+  scrollTop: number;
+  previousScrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+  minDeltaPx?: number;
+}): boolean {
+  if (!input.pinned || input.escaped) return false;
+  const min = input.minDeltaPx ?? STICK_ESCAPE_MIN_DELTA_PX;
+  if (input.previousScrollTop - input.scrollTop < 0.5) return false;
+  const prevDist = distanceFromBottom(
+    input.previousScrollTop,
+    input.scrollHeight,
+    input.clientHeight,
+  );
+  if (prevDist >= min) return false;
+  return (
+    distanceFromBottom(
+      input.scrollTop,
+      input.scrollHeight,
+      input.clientHeight,
+    ) >= min
+  );
+}
+
+/**
+ * Scroll-event pin release used by the chat hook.
+ *
+ * Do **not** pass a sub-pixel `minDeltaPx` into {@link shouldReleaseStickOnScrollUp}:
+ * thinking / tool auto-collapse and markdown settle routinely move 2–8px
+ * without landing on the hard bottom, and that used to drop pin until the
+ * next user send (stream then grows below the fold).
+ */
+export function shouldEscapePinnedScroll(input: {
+  pinned: boolean;
+  escaped?: boolean;
+  scrollTop: number;
+  previousScrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+}): boolean {
+  if (
+    shouldReleaseStickOnScrollUp({
+      pinned: input.pinned,
+      scrollTop: input.scrollTop,
+      previousScrollTop: input.previousScrollTop,
+      scrollHeight: input.scrollHeight,
+      clientHeight: input.clientHeight,
+    })
+  ) {
+    return true;
+  }
+  return shouldReleaseStickOnSlowScrollUp(input);
+}
+
 export function distanceFromBottom(
   scrollTop: number,
   scrollHeight: number,

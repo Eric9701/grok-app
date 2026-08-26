@@ -359,7 +359,7 @@ export const filSettings = {
   "settings.exportLogoTooLarge": "Masyadong malaki ang larawan (max 1.5 MB)",
   "settings.exportLogoInvalid": "Hindi mabasa ang larawang iyon",
   "settings.replaceProviderBrandLogo": "Palitan ang brand logo",
-  "settings.replaceProviderBrandLogoDesc": "Kapag branded provider ang aktibong channel (DeepSeek, OpenCode, Volcengine Ark, Amux), palitan ang Grok mark sa itaas-kaliwa ng sidebar ng logo ng provider na iyon. Pinananatili ng icon-only brands ang text label sa tabi ng mark. Naka-off bilang default.",
+  "settings.replaceProviderBrandLogoDesc": "Kapag branded provider ang aktibong channel (DeepSeek, OpenCode, Volcengine Ark, Amux, Zhipu), palitan ang Grok mark sa itaas-kaliwa ng sidebar ng logo ng provider na iyon. Pinananatili ng icon-only brands ang text label sa tabi ng mark. Naka-off bilang default.",
   "settings.messageTimeFormat": "Format ng timestamp",
   "settings.messageTimeFormatDesc": "Ipinapakita ng ganap ang araw ng linggo at oras; ipinapakita ng relatibo ang \"2 minuto ang nakalipas\" at nire-refresh mga minsan bawat minuto.",
   "settings.messageTimeFormat.absolute": "Ganap",

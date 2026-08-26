@@ -606,19 +606,36 @@ pub fn looks_text_only_model(id_or_name: &str) -> bool {
         || s.contains("v4_pro")
 }
 
-/// Custom channel is vision-capable when the user opted in, or the id / name /
-/// active model / catalog looks multimodal. Unknown relays stay text-only.
+/// Custom channel is vision-capable when the **active** model opted in, or the
+/// id / name / active model looks multimodal. Unknown relays stay text-only.
+/// Per-model `supports_vision` wins over the channel flag so mixed catalogs
+/// (DeepSeek flash + vision-exp) do not treat every row as vision.
 pub fn custom_provider_is_text_only(p: &crate::providers::CustomProvider) -> bool {
+    let active = p
+        .models
+        .iter()
+        .find(|m| m.id.trim() == p.model.trim())
+        .or_else(|| p.models.first());
+    if let Some(m) = active {
+        match m.supports_vision {
+            Some(true) => return false,
+            Some(false) => {
+                return !(looks_vision_model(&m.id) || looks_vision_model(&m.name));
+            }
+            None => {
+                if p.supports_vision
+                    || looks_vision_model(&m.id)
+                    || looks_vision_model(&m.name)
+                {
+                    return false;
+                }
+            }
+        }
+    }
     if p.supports_vision {
         return false;
     }
     if looks_vision_model(&p.id) || looks_vision_model(&p.model) || looks_vision_model(&p.name) {
-        return false;
-    }
-    if p.models
-        .iter()
-        .any(|m| looks_vision_model(&m.id) || looks_vision_model(&m.name))
-    {
         return false;
     }
     true
@@ -1641,6 +1658,29 @@ yolo = false
             "DeepSeek",
             false
         )));
+    }
+
+    #[test]
+    fn custom_vision_follows_active_model_not_sibling_catalog() {
+        let mut p = sample_provider("deepseek", "deepseek-v4-flash", "DeepSeek", false);
+        p.models = vec![
+            crate::providers::ProviderModelEntry::named(
+                "deepseek-v4-flash",
+                "DeepSeek V4 Flash",
+            ),
+            crate::providers::ProviderModelEntry {
+                id: "deepseek-v4-flash-vision-exp".into(),
+                name: "Flash Vision".into(),
+                supports_vision: Some(true),
+                ..Default::default()
+            },
+        ];
+        assert!(
+            custom_provider_is_text_only(&p),
+            "active flash must stay text-only even when a sibling is vision"
+        );
+        p.model = "deepseek-v4-flash-vision-exp".into();
+        assert!(!custom_provider_is_text_only(&p));
     }
 
     #[test]

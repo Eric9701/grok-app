@@ -382,7 +382,7 @@ export const zhTWSettings = {
   "settings.exportLogoTooLarge": "圖片過大（最大 1.5 MB）",
   "settings.exportLogoInvalid": "無法讀取該圖片",
   "settings.replaceProviderBrandLogo": "替換品牌 Logo",
-  "settings.replaceProviderBrandLogoDesc": "目前通道為帶 Logo 的服務商（DeepSeek、OpenCode、火山方舟、Amux 等）時，將側欄左上角 Grok 標記替換為對應服務商 Logo。僅有圖示、無文字的品牌（如火山方舟）會在圖示旁保留名稱。預設關閉。",
+  "settings.replaceProviderBrandLogoDesc": "目前通道為帶 Logo 的服務商（DeepSeek、OpenCode、火山方舟、Amux、智譜等）時，將側欄左上角 Grok 標記替換為對應服務商 Logo。僅有圖示、無文字的品牌（如火山方舟）會在圖示旁保留名稱。預設關閉。",
   "settings.showReplyLength": "顯示回覆長度",
   "settings.showReplyLengthDesc": "在已完成的助手回覆下方顯示詞數與字數。預設關閉。",
   "settings.messageTimeFormat": "時間戳格式",

@@ -75,6 +75,34 @@ export function liveActivityFollowKey(
 }
 
 /**
+ * How much to add to a container's `scrollTop` so `child` sits inside it.
+ * 0 when already visible. Callers must apply this to the nested scroller
+ * only — `Element.scrollIntoView` walks ancestor overflow (the chat
+ * viewport) and drops stick-to-bottom when the next thinking / tool / body
+ * round starts below a still-visible live step.
+ */
+export function scrollDeltaToBringChildIntoContainer(
+  container: { top: number; bottom: number },
+  child: { top: number; bottom: number },
+): number {
+  if (child.bottom > container.bottom) return child.bottom - container.bottom;
+  if (child.top < container.top) return child.top - container.top;
+  return 0;
+}
+
+/** Scroll `child` inside `container` without touching ancestor scrollports. */
+export function scrollChildIntoContainer(
+  container: HTMLElement,
+  child: HTMLElement,
+): void {
+  const delta = scrollDeltaToBringChildIntoContainer(
+    container.getBoundingClientRect(),
+    child.getBoundingClientRect(),
+  );
+  if (delta !== 0) container.scrollTop += delta;
+}
+
+/**
  * Parent-owned expand set update. Remounts must call this only on real user
  * toggles / policy defaults — never clear a key solely because a row unmounted.
  */

@@ -359,7 +359,7 @@ export const ptBRSettings = {
   "settings.exportLogoTooLarge": "A imagem é grande demais (máx. 1,5 MB)",
   "settings.exportLogoInvalid": "Não foi possível ler essa imagem",
   "settings.replaceProviderBrandLogo": "Substituir o logo da marca",
-  "settings.replaceProviderBrandLogoDesc": "Quando o canal ativo é um provedor com marca (DeepSeek, OpenCode, Volcengine Ark, Amux), substituir a marca Grok no canto superior esquerdo da barra lateral pelo logo desse provedor. Marcas só de ícone mantêm um rótulo de texto ao lado da marca. Desligado por padrão.",
+  "settings.replaceProviderBrandLogoDesc": "Quando o canal ativo é um provedor com marca (DeepSeek, OpenCode, Volcengine Ark, Amux, Zhipu), substituir a marca Grok no canto superior esquerdo da barra lateral pelo logo desse provedor. Marcas só de ícone mantêm um rótulo de texto ao lado da marca. Desligado por padrão.",
   "settings.messageTimeFormat": "Formato do horário",
   "settings.messageTimeFormatDesc": "Absoluto mostra o dia da semana e o horário; relativo mostra \"há 2 minutos\" e atualiza cerca de uma vez por minuto.",
   "settings.messageTimeFormat.absolute": "Absoluto",

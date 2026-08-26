@@ -11,6 +11,14 @@ export interface ProviderModelEntry {
   id: string;
   /** Composer chip / menu display label. */
   name: string;
+  /** Per-model context window (tokens). Missing → channel, then App default. */
+  contextWindow?: number | null;
+  /** Per-model: this request id accepts image pixels. Missing → channel flag. */
+  supportsVision?: boolean;
+  /** Per-model: this request id accepts video input. Missing → unset. */
+  supportsVideo?: boolean;
+  /** Per-model reasoning ladder. Empty/missing → channel `efforts`. */
+  efforts?: ProviderEffortEntry[];
 }
 
 export interface ProviderEffortEntry {
@@ -378,6 +386,9 @@ export async function providersListModels(opts: {
       id: string;
       ownedBy?: string;
       supportsBackendSearch?: boolean;
+      contextWindow?: number | null;
+      supportsVision?: boolean | null;
+      supportsVideo?: boolean | null;
     }>;
   }>("providers_list_models", {
     baseUrl: opts.baseUrl,

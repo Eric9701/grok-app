@@ -359,7 +359,7 @@ export const koSettings = {
   "settings.exportLogoTooLarge": "이미지가 너무 큽니다(최대 1.5MB)",
   "settings.exportLogoInvalid": "해당 이미지를 읽지 못했습니다",
   "settings.replaceProviderBrandLogo": "브랜드 로고 바꾸기",
-  "settings.replaceProviderBrandLogoDesc": "활성 채널이 브랜드 공급자(DeepSeek, OpenCode, Volcengine Ark, Amux)일 때 사이드바 왼쪽 위 Grok 마크를 해당 공급자 로고로 바꿉니다. 아이콘만 있는 브랜드는 마크 옆에 텍스트 레이블을 유지합니다. 기본값은 꺼짐입니다.",
+  "settings.replaceProviderBrandLogoDesc": "활성 채널이 브랜드 공급자(DeepSeek, OpenCode, Volcengine Ark, Amux, Zhipu)일 때 사이드바 왼쪽 위 Grok 마크를 해당 공급자 로고로 바꿉니다. 아이콘만 있는 브랜드는 마크 옆에 텍스트 레이블을 유지합니다. 기본값은 꺼짐입니다.",
   "settings.messageTimeFormat": "타임스탬프 형식",
   "settings.messageTimeFormatDesc": "절대는 요일과 시계 시각을 표시하고, 상대는 “2분 전”을 표시하며 약 1분마다 새로고침됩니다.",
   "settings.messageTimeFormat.absolute": "절대",

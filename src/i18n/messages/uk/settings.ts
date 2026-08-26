@@ -359,7 +359,7 @@ export const ukSettings = {
   "settings.exportLogoTooLarge": "Зображення завелике (макс. 1,5 МБ)",
   "settings.exportLogoInvalid": "Не вдалося прочитати це зображення",
   "settings.replaceProviderBrandLogo": "Замінити логотип бренду",
-  "settings.replaceProviderBrandLogoDesc": "Якщо активним каналом є фірмовий провайдер (DeepSeek, OpenCode, Volcengine Ark, Amux), замініть позначку Grok на бічній панелі вгорі ліворуч логотипом цього провайдер. Бренди з лише значками зберігають текстову позначку поруч із позначкою. За замовчуванням вимкнено.",
+  "settings.replaceProviderBrandLogoDesc": "Якщо активним каналом є фірмовий провайдер (DeepSeek, OpenCode, Volcengine Ark, Amux, Zhipu), замініть позначку Grok на бічній панелі вгорі ліворуч логотипом цього провайдер. Бренди з лише значками зберігають текстову позначку поруч із позначкою. За замовчуванням вимкнено.",
   "settings.messageTimeFormat": "Формат часу",
   "settings.messageTimeFormatDesc": "Абсолютний показує день тижня та час на годиннику; відносний показує \"2 хвилини тому\" та оновлюється приблизно раз на хвилину.",
   "settings.messageTimeFormat.absolute": "Абсолютний",

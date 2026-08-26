@@ -383,7 +383,7 @@ export const zhSettings = {
   "settings.exportLogoTooLarge": "图片过大（最大 1.5 MB）",
   "settings.exportLogoInvalid": "无法读取该图片",
   "settings.replaceProviderBrandLogo": "替换品牌 Logo",
-  "settings.replaceProviderBrandLogoDesc": "当前通道为带 Logo 的服务商（DeepSeek、OpenCode、火山方舟、Amux 等）时，将侧栏左上角 Grok 标记替换为对应服务商 Logo。仅有图标、无文字的品牌（如火山方舟）会在图标旁保留名称。默认关闭。",
+  "settings.replaceProviderBrandLogoDesc": "当前通道为带 Logo 的服务商（DeepSeek、OpenCode、火山方舟、Amux、智谱等）时，将侧栏左上角 Grok 标记替换为对应服务商 Logo。仅有图标、无文字的品牌（如火山方舟）会在图标旁保留名称。默认关闭。",
   "settings.messageTimeFormat": "时间戳格式",
   "settings.messageTimeFormatDesc": "绝对时间显示星期与钟点；相对时间为「2 分钟前」，约每分钟刷新。",
   "settings.messageTimeFormat.absolute": "绝对",

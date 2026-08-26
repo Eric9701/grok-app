@@ -11,7 +11,8 @@ export type ProviderBrandId =
   | "openrouter"
   | "amux"
   | "opencode-go"
-  | "volcano-ark";
+  | "volcano-ark"
+  | "zhipu";
 
 export type ProviderPreset = {
   id: string;
@@ -44,6 +45,22 @@ export type ProviderPreset = {
    * Missing → Host/composer default 200k for custom channels.
    */
   contextWindow?: number;
+  /**
+   * Alternate Base URLs for the same brand (Zhipu: CN/intl × API/Coding Plan).
+   * Gallery stays one chip; the form shows tags above Base URL.
+   */
+  endpoints?: ProviderEndpointOption[];
+  defaultEndpointId?: string;
+};
+
+/** One switchable Base URL on a multi-endpoint preset (Zhipu only today). */
+export type ProviderEndpointOption = {
+  id: string;
+  /** i18n key for the tag / picker row. */
+  labelKey: string;
+  baseUrl: string;
+  baseUrlFullPath?: boolean;
+  apiKeyUrl?: string;
 };
 
 /**
@@ -147,35 +164,52 @@ export const DEEPSEEK_EFFORTS: ProviderEffortEntry[] = [
 ];
 
 export const DEEPSEEK_MODELS: ProviderModelEntry[] = [
-  { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+  { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", supportsVision: false },
   {
     id: "deepseek-v4-flash-vision-exp",
     name: "DeepSeek V4 Flash Vision Exp",
+    supportsVision: true,
   },
-  { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro" },
+  { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", supportsVision: false },
 ];
 
-/** OpenRouter OpenAI-compatible catalog (chat_completions). */
+/**
+ * OpenRouter GLM-5.3-Flash (was stealth/ox-alpha). Docs: low / high / max only;
+ * OpenRouter ships `max` reasoning by default. 1M context, native vision/video.
+ */
+export const OPENROUTER_EFFORTS: ProviderEffortEntry[] = [
+  { id: "low", name: "low" },
+  { id: "high", name: "high" },
+  { id: "max", name: "max", isDefault: true },
+];
+
 export const OPENROUTER_MODELS: ProviderModelEntry[] = [
-  { id: "stealth/ox-alpha", name: "Ox Alpha" },
+  {
+    id: "z-ai/glm-5.3-flash",
+    name: "GLM-5.3 Flash",
+    contextWindow: 1_048_576,
+    supportsVision: true,
+    supportsVideo: true,
+    efforts: OPENROUTER_EFFORTS.map((e) => ({ ...e })),
+  },
 ];
 
 /** Amux OpenAI-compatible relay (official Grok catalog ids). */
 export const AMUX_MODELS: ProviderModelEntry[] = [
-  { id: "grok-4.6", name: "Grok 4.6" },
-  { id: "grok-4.5", name: "Grok 4.5" },
+  { id: "grok-4.6", name: "Grok 4.6", supportsVision: true },
+  { id: "grok-4.5", name: "Grok 4.5", supportsVision: true },
 ];
 
 /** Yun API (云驿 yunyi) OpenAI-compatible relay. */
 export const YUN_API_MODELS: ProviderModelEntry[] = [
-  { id: "grok-4.6", name: "Grok 4.6" },
-  { id: "grok-4.5", name: "Grok 4.5" },
+  { id: "grok-4.6", name: "Grok 4.6", supportsVision: true },
+  { id: "grok-4.5", name: "Grok 4.5", supportsVision: true },
 ];
 
 /** AI98PRO OpenAI-compatible Grok relay. */
 export const AI98PRO_MODELS: ProviderModelEntry[] = [
-  { id: "grok-4.6", name: "Grok 4.6" },
-  { id: "grok-4.5", name: "Grok 4.5" },
+  { id: "grok-4.6", name: "Grok 4.6", supportsVision: true },
+  { id: "grok-4.5", name: "Grok 4.5", supportsVision: true },
 ];
 
 /**
@@ -184,6 +218,59 @@ export const AI98PRO_MODELS: ProviderModelEntry[] = [
  */
 export const VOLCANO_ARK_MODELS: ProviderModelEntry[] = [
   { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+];
+
+/**
+ * Zhipu GLM thinking ladder (docs: glm-5.3 / glm-5.3-flash only accept
+ * low / high / max). Matches the saved 智谱 channel.
+ */
+export const ZHIPU_EFFORTS: ProviderEffortEntry[] = [
+  { id: "low", name: "low", isDefault: true },
+  { id: "high", name: "high" },
+  { id: "max", name: "max" },
+];
+
+export const ZHIPU_MODELS: ProviderModelEntry[] = [
+  {
+    id: "glm-5.3-flash",
+    name: "GLM-5.3 Flash",
+    contextWindow: 1_000_000,
+    supportsVision: true,
+    supportsVideo: true,
+    efforts: ZHIPU_EFFORTS.map((e) => ({ ...e })),
+  },
+];
+
+/** CN general / CN Coding Plan / international general / international Coding Plan. */
+export const ZHIPU_ENDPOINTS: ProviderEndpointOption[] = [
+  {
+    id: "cn-api",
+    labelKey: "prov.preset.endpoint.cnApi",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    baseUrlFullPath: true,
+    apiKeyUrl: "https://open.bigmodel.cn/usercenter/proj-api-key",
+  },
+  {
+    id: "cn-coding",
+    labelKey: "prov.preset.endpoint.cnCoding",
+    baseUrl: "https://open.bigmodel.cn/api/coding/paas/v4",
+    baseUrlFullPath: true,
+    apiKeyUrl: "https://bigmodel.cn/coding-plan/personal/overview",
+  },
+  {
+    id: "intl-api",
+    labelKey: "prov.preset.endpoint.intlApi",
+    baseUrl: "https://api.z.ai/api/paas/v4",
+    baseUrlFullPath: true,
+    apiKeyUrl: "https://z.ai/manage-apikey/apikey-list",
+  },
+  {
+    id: "intl-coding",
+    labelKey: "prov.preset.endpoint.intlCoding",
+    baseUrl: "https://api.z.ai/api/coding/paas/v4",
+    baseUrlFullPath: true,
+    apiKeyUrl: "https://z.ai/manage-apikey/apikey-list",
+  },
 ];
 
 export const PROVIDER_PRESETS: ProviderPreset[] = [
@@ -200,8 +287,9 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     brandId: "deepseek",
   },
   /**
-   * OpenRouter unified API. Model slug is the OpenRouter id (`stealth/ox-alpha`);
-   * chat_completions — not Responses. Vision + 1M context from the model card.
+   * OpenRouter unified API. Model slug is the OpenRouter id
+   * (`z-ai/glm-5.3-flash`); chat_completions — not Responses.
+   * Vision + 1M context from the model card.
    */
   {
     id: "openrouter",
@@ -210,7 +298,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     baseUrl: "https://openrouter.ai/api/v1",
     apiBackend: "chat_completions",
     models: OPENROUTER_MODELS,
-    efforts: GROK_CHANNEL_EFFORTS.map((e) => ({ ...e })),
+    efforts: OPENROUTER_EFFORTS.map((e) => ({ ...e })),
     blurbKey: "prov.preset.openrouter.blurb",
     apiKeyUrl: "https://openrouter.ai/settings/keys",
     brandId: "openrouter",
@@ -294,6 +382,28 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     apiKeyUrl: "https://ai98pro.xyz",
     supportsVision: true,
   },
+  /**
+   * Zhipu / Z.AI GLM. One gallery chip, four OpenAI-compatible roots
+   * (China API, China Coding Plan, international API, international Coding Plan).
+   * All are full-path chat_completions — do not auto-append `/v1`.
+   */
+  {
+    id: "zhipu",
+    name: "智谱",
+    suggestedId: "zhipu",
+    baseUrl: ZHIPU_ENDPOINTS[0]!.baseUrl,
+    baseUrlFullPath: true,
+    apiBackend: "chat_completions",
+    models: ZHIPU_MODELS,
+    efforts: ZHIPU_EFFORTS.map((e) => ({ ...e })),
+    blurbKey: "prov.preset.zhipu.blurb",
+    apiKeyUrl: ZHIPU_ENDPOINTS[0]!.apiKeyUrl,
+    brandId: "zhipu",
+    supportsVision: true,
+    contextWindow: 1_000_000,
+    endpoints: ZHIPU_ENDPOINTS,
+    defaultEndpointId: "cn-api",
+  },
 ];
 
 export function findProviderPreset(id: string): ProviderPreset | undefined {
@@ -334,6 +444,16 @@ function matchPreset(opts: {
       const or = PROVIDER_PRESETS.find((p) => p.id === "openrouter");
       if (or) return or;
     }
+    if (
+      pid === "zhipu" ||
+      pid === "zhi-p" ||
+      pid === "zhipuai" ||
+      pid.startsWith("zhipu-") ||
+      pid.startsWith("zhi-p-")
+    ) {
+      const zp = PROVIDER_PRESETS.find((p) => p.id === "zhipu");
+      if (zp) return zp;
+    }
   }
   let host = "";
   try {
@@ -342,6 +462,14 @@ function matchPreset(opts: {
     host = "";
   }
   if (!host) return undefined;
+  if (host === "open.bigmodel.cn" || host.endsWith(".open.bigmodel.cn")) {
+    const zp = PROVIDER_PRESETS.find((p) => p.id === "zhipu");
+    if (zp) return zp;
+  }
+  if (host === "api.z.ai") {
+    const zp = PROVIDER_PRESETS.find((p) => p.id === "zhipu");
+    if (zp) return zp;
+  }
   // Volcengine Ark hosts: ark.*.volces.com / *.volcengineapi.com
   if (
     host.includes("volces.com") ||
@@ -354,10 +482,12 @@ function matchPreset(opts: {
     }
   }
   for (const p of PROVIDER_PRESETS) {
-    try {
-      if (new URL(p.baseUrl).host.toLowerCase() === host) return p;
-    } catch {
-      /* skip */
+    for (const url of presetUrls(p)) {
+      try {
+        if (new URL(url).host.toLowerCase() === host) return p;
+      } catch {
+        /* skip */
+      }
     }
   }
   for (const p of PROVIDER_PRESETS) {
@@ -373,12 +503,83 @@ function matchPreset(opts: {
   return undefined;
 }
 
+function normalizeEndpointUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+function presetUrls(preset: ProviderPreset): string[] {
+  const extra = (preset.endpoints ?? []).map((e) => e.baseUrl);
+  return [preset.baseUrl, ...extra];
+}
+
+export function matchPresetEndpoint(
+  preset: ProviderPreset,
+  baseUrl?: string | null,
+): ProviderEndpointOption | undefined {
+  const endpoints = preset.endpoints;
+  if (!endpoints?.length) return undefined;
+  const cur = normalizeEndpointUrl(baseUrl ?? "");
+  if (cur) {
+    const hit = endpoints.find(
+      (e) => normalizeEndpointUrl(e.baseUrl) === cur,
+    );
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+export function defaultPresetEndpoint(
+  preset: ProviderPreset,
+): ProviderEndpointOption | undefined {
+  const endpoints = preset.endpoints;
+  if (!endpoints?.length) return undefined;
+  return (
+    endpoints.find((e) => e.id === preset.defaultEndpointId) ?? endpoints[0]
+  );
+}
+
+/** Apply one endpoint onto a preset (Base URL / full-path / Get API Key). */
+export function applyPresetEndpoint(
+  preset: ProviderPreset,
+  endpointId?: string | null,
+): {
+  baseUrl: string;
+  baseUrlFullPath: boolean;
+  apiKeyUrl: string | null;
+  endpoint: ProviderEndpointOption | undefined;
+} {
+  const endpoints = preset.endpoints;
+  const endpoint =
+    (endpointId && endpoints?.find((e) => e.id === endpointId)) ||
+    matchPresetEndpoint(preset, preset.baseUrl) ||
+    defaultPresetEndpoint(preset);
+  return {
+    baseUrl: endpoint?.baseUrl ?? preset.baseUrl,
+    baseUrlFullPath: !!(endpoint?.baseUrlFullPath ?? preset.baseUrlFullPath),
+    apiKeyUrl: endpoint?.apiKeyUrl ?? preset.apiKeyUrl ?? null,
+    endpoint,
+  };
+}
+
 /** Resolve API-key signup URL for a form (by preset id or base URL host). */
 export function resolveProviderApiKeyUrl(opts: {
   providerId?: string | null;
   baseUrl?: string | null;
 }): string | null {
-  return matchPreset(opts)?.apiKeyUrl ?? null;
+  const preset = matchPreset(opts);
+  if (!preset) return null;
+  if (preset.endpoints?.length) {
+    const hit = matchPresetEndpoint(preset, opts.baseUrl);
+    if (hit?.apiKeyUrl) return hit.apiKeyUrl;
+  }
+  return preset.apiKeyUrl ?? null;
+}
+
+export function resolveMatchedProviderPreset(opts: {
+  providerId?: string | null;
+  baseUrl?: string | null;
+}): ProviderPreset | undefined {
+  return matchPreset(opts);
 }
 
 /** Resolve brand logo key for UI avatars (null when no mark). */

@@ -26,6 +26,9 @@ See `docs/llm-wiki/release.md`.
 - **自定义外观**：设置 → 外观 → 主题可改文字颜色（默认跟随浅/深色近黑/近白）和字体阴影（默认关）。「恢复默认」需二次确认，会把这两项恢复出厂。这两项会随 `.grokskin` 导入导出。
 
 ### Changed
+- **OpenRouter preset model is GLM-5.3 Flash**: gallery fill uses `z-ai/glm-5.3-flash` instead of `stealth/ox-alpha` (Ox Alpha). Reasoning is GLM `low` / `high` / `max` (default `max`). Existing saved OpenRouter channels are unchanged until re-added.
+- **Zhipu GLM preset**: one gallery chip copies the saved 智谱 channel (`glm-5.3-flash`, low/high/max). Clicking it picks among four endpoints (China API, China Coding Plan, international API, international Coding Plan). The same four tags sit above Base URL on the form so the gallery does not need four chips. The official Z.AI tile (dark square + white Z, inverted in dark theme) shows in the provider list, footer avatar, empty-chat welcome banner, and — when Replace brand logo is on — the sidebar top-left.
+- **Custom provider form puts identity first**: name, Base URL, API key, then models. Extra headers / appended prompt / provider mode sit lower. Field comments move into `?` tips. Each model row has a settings gear for context window, image/video modalities, and that model's reasoning ladder. Fetching `/models` writes advertised context and modalities onto matching rows. Channel `app_efforts` / `context_window` / `app_supports_vision` still receive the **active** model's values so Grok Build spawn does not change.
 - **Environment info can pin to a dock**: the panel stays a dropdown by default. A pin control in the header switches to the chat-column card (316px stage gutter; parks when the right rail opens). Unpinning restores the dropdown.
 - **Titlebar chips (#924)**: disconnected status and Open Location match the 28px flat chrome-btn / chip language (no stroke, transparent rest, hover wash).
 - **Plan bar overlay (#925)**: the plan/goal card floats over the transcript (42rem) instead of reserving a full-width strip; list padding follows measured height. Stream-perf drops the blur.
@@ -39,6 +42,9 @@ See `docs/llm-wiki/release.md`.
 - **Unused AI Elements widgets (#907)**: drop seven unreachable UI files (`button`, `collapsible`, `marker`, `message`, `message-response`, `reasoning`, `shimmer`) and their exclusive deps (`streamdown`, `@radix-ui/react-collapsible`, `@radix-ui/react-slot`, `class-variance-authority`). The `mermaid` pnpm override went with `streamdown`. Chat still uses `MarkdownBody` / Lobe thread.
 
 **中文 · 变更**
+- **OpenRouter 预设模型改为 GLM-5.3 Flash**：图库一键填入 `z-ai/glm-5.3-flash`，不再用 `stealth/ox-alpha`（Ox Alpha）。思考档为 GLM 的 `low` / `high` / `max`（默认 `max`）。已经保存的 OpenRouter 通道不会自动改，除非重新添加。
+- **智谱 GLM 预设**：画廊一个入口，带入当前智谱通道（`glm-5.3-flash`，low/high/max）。点开先选四个端点（国内 API / 国内 Coding Plan / 海外 API / 海外 Coding Plan）。表单里 Base URL 上方同一组标签可切换，不再放四个预设芯片。官方 Z.AI 方标（浅色深底白 Z，深色反相）出现在服务商列表、左下角头像、空会话欢迎横幅；打开「替换品牌 Logo」后左上角也会换成智谱。
+- **自定义服务商表单把关键信息放到上面**：名称、Base URL、API Key，然后才是模型。自定义请求头 / 追加提示词 / 提供商模式下移。说明收进问号。每条模型有设置齿轮：上下文窗口、图片/视频、该模型的思考深度。拉取 `/models` 会把接口给出的窗口和模态写到对应条目。通道上的 `app_efforts` / `context_window` / `app_supports_vision` 仍写入**当前模型**的值，Grok Build 启动方式不变。
 - **环境信息可固定为钉板**：默认仍是下拉。标题栏固定按钮切到对话列卡片（主列让出 316px；打开右侧栏会 park）。取消固定后回到下拉。
 - **标题栏芯片（#924）**：「已断开」和「打开位置」对齐 28px 无描边 chip / chrome-btn，hover 只洗一层。
 - **计划顶框浮层（#925）**：计划/目标卡片浮在对话上（42rem），不再占整行；列表按实测高度让位。流式输出关掉 blur。
@@ -52,6 +58,9 @@ See `docs/llm-wiki/release.md`.
 - **未使用的 AI Elements 控件（#907）**：删除 7 个不可达 UI 文件及其独占依赖（`streamdown`、`@radix-ui/react-collapsible`、`@radix-ui/react-slot`、`class-variance-authority`）；`mermaid` override 随 `streamdown` 去掉。聊天仍走 `MarkdownBody` / Lobe 线程。
 
 ### Fixed
+- **Chat stick-to-bottom no longer stops at thinking / tool / body round changes**: phase auto-collapse and the next output round used to drop pin (2–8px layout ticks were treated as a leave; live tool `scrollIntoView` also walked the chat ancestor). Follow continues for the rest of the turn; a real flick or slow trackpad still leaves the lock.
+- **Custom effort catalog `low` / `high` / `max` no longer marks both Medium and High**: incomplete ladders map by id (Low / High / Extra high). Only the DeepSeek four-id set (`low` / `high` / `xhigh` / `max`) remaps `high` onto Medium. Default `high` shows as High, with a single check.
+- **Account → Providers left list scrolls when many channels are saved**: pane-fill still locks the page, but the dual-pane grid row is now `minmax(0, 1fr)` so the rail is a real scrollport instead of clipping behind `overflow: hidden`. The rail uses the in-app overlay thumb (native bars stay hidden).
 - **Windows Open in editor no longer hands VS Code `\\?\` paths (#928)**: `open_in_editor` now strips the extended-length prefix the same way Explorer reveal already did, so workspace URIs stay `file:///d:/…`.
 - **Desktop pet morphs again for typing, a triggered turn, and a finished task**: composer typing plays the catalog slanted-`!` alert; a live turn plays orbit/comet belts then holds the thinking dots (so a long job does not spin the triangle forever); a finished turn celebrates with notify + colorful spin, including when the workbench already has that chat in view. Overlay paint throttle and hidden-pause stay.
 - **Pet overlay copy follows the app language (#930)**: the pet webview now gets the same boot locale as the main window and loads the matching catalog.
@@ -63,6 +72,9 @@ See `docs/llm-wiki/release.md`.
 - **Narrow-window plan overlay leftover (#902)**: an open aside overlay now uses the existing full-cover mode instead of a leftover scrim over the main column.
 
 **中文 · 修复**
+- **思考 / 工具 / 正文换轮时聊天不再停住吸底**：阶段收起和下一轮输出曾把 2–8px 布局抖动当成上滑离底；直播工具的 `scrollIntoView` 还会带动会话祖先滚动。本轮剩余输出继续跟底；真的上滑或慢速触控板仍可离开。
+- **自定义推理档只配 `low` / `high` / `max` 时不再同时勾中「中」和「高」**：缺档按 id 对号入座（低 / 高 / 极高）。只有 DeepSeek 四档（`low` / `high` / `xhigh` / `max`）才把 `high` 映射到「中」。默认 `high` 显示为「高」，只勾一档。
+- **设置 → 账户 → 服务商左侧列表在条目很多时可以滚动**：页面仍锁定外层滚动，但双栏 grid 行改为 `minmax(0, 1fr)`，左侧轨道成为真正的滚动容器，不再被 `overflow: hidden` 裁切。列表使用应用内 overlay 滑块（原生滚动条仍隐藏）。
 - **Windows「在编辑器中打开」不再把 `\\?\` 路径交给 VS Code（#928）**：`open_in_editor` 与资源管理器揭示一样剥掉扩展前缀，工作区 URI 保持 `file:///d:/…`。
 - **桌宠打字 / 触发回合 / 任务完成的形变回来了**：输入框打字走斜感叹号；一轮任务开始播轨道/彗星彩带，然后停在思考三点（长任务不再无限转三角形）；完成时通知圆点 + 彩带旋转，主窗已经在看这场对话也会庆祝。绘制节流和隐藏暂停保留。
 - **宠物浮层文案跟随应用语言（#930）**：宠物独立 webview 注入与主窗相同的启动语言，并加载对应文案表。

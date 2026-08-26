@@ -1,7 +1,8 @@
 /* domain CSS chunk (move-only split; selectors unchanged) */
 
 @media (max-width: 860px) {
-  .prov-split {
+  .prov-split,
+  .settings-page__main--pane-fill .prov-split {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 40%) minmax(0, 1fr);
     min-height: 0;
@@ -12,6 +13,7 @@
   }
   .settings-page__main--pane-fill .prov-split__list {
     /* Cap list so detail still gets room when stacked */
+    height: auto;
     max-height: 40vh;
   }
   .prov-form__grid {

@@ -6,6 +6,7 @@
  * - OpenCode: simple monochrome wordmark (`docs/svg/opencode-wordmark-simple-*.svg`)
  *   — white in dark theme, black in light theme via `currentColor`.
  * - Volcengine Ark (火山方舟): brand icon + “火山方舟” text.
+ * - Zhipu / Z.AI: official rounded-square Z + “智谱”.
  *
  * Inline SVG (no network fetch) — paths sourced from `docs/svg/`.
  */
@@ -113,6 +114,32 @@ export const VolcanoArkWelcomeMark = memo(function VolcanoArkWelcomeMark({
       <ProviderBrandIcon brand="volcano-ark" size={47} />
       <span className="volcano-ark-welcome-mark__text" aria-hidden>
         火山方舟
+      </span>
+    </div>
+  );
+});
+
+/**
+ * Zhipu / Z.AI welcome mark: official tile + “智谱”.
+ * Horizontal row, same scale as Volcengine Ark.
+ */
+export const ZhipuWelcomeMark = memo(function ZhipuWelcomeMark({
+  className = "",
+  title,
+}: {
+  className?: string;
+  title?: string;
+}) {
+  const label = title ?? "智谱";
+  return (
+    <div
+      className={`zhipu-welcome-mark ${className}`.trim()}
+      role="img"
+      aria-label={label}
+    >
+      <ProviderBrandIcon brand="zhipu" size={47} />
+      <span className="zhipu-welcome-mark__text" aria-hidden>
+        智谱
       </span>
     </div>
   );

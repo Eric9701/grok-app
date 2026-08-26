@@ -34,11 +34,11 @@ Custom providers are written to **`$GROK_HOME/config.toml`** as `[model.<id>]` s
 | `baseUrlFullPath` | When **true**, host stores the URL as typed and **does not** auto-append `/v1` (App TOML `app_base_url_full_path`). Default **false** = legacy auto-`/v1` for CPA/sub2api. Use for gateways like Volcengine Ark Coding Plan (`…/api/coding`, `…/api/coding/v3`). Settings UI: switch **完整路径 / Full path** next to Base URL label. |
 | `apiKey` | Required for custom relay; never returned plaintext to UI |
 | `model` | **Active** request body model id (written to config `model = …`) |
-| `models` | Multi-model catalog (`[{id, name}]`); App field `app_models` JSON in TOML (ignored by Grok Build). Each entry has request id + **display name** for composer chip |
-| `efforts` | Reasoning-effort options for this channel (`[{id, name, isDefault}]`); App field `app_efforts` JSON. Composer effort menu uses this on custom route. Empty → Grok `low`/`medium`/`high` fallback |
-| `contextWindow` | Optional token cap → TOML `context_window` as a **bare integer** (never `"1000000"`). Grok Build rejects string type and falls back to 200k (#538). Composer can set it; list/upsert preserves and reloads. Missing → UI chip uses `DEFAULT_CUSTOM_CONTEXT_WINDOW` (200k) only. |
+| `models` | Multi-model catalog (`[{id, name, contextWindow?, supportsVision?, supportsVideo?, efforts?}]`); App field `app_models` JSON in TOML (ignored by Grok Build). Each entry has request id + **display name** for composer chip. Per-model extras (context window, image/video, reasoning ladder) live here; Settings row **gear** edits them. Live `/models` fills `contextWindow` / modalities when the API advertises them. |
+| `efforts` | Channel-level reasoning-effort fallback (`[{id, name, isDefault}]`); App field `app_efforts` JSON. Composer uses the **active model**'s `efforts` when present, else this list. Empty → Grok `low`/`medium`/`high` fallback. Switching models copies the active model's ladder onto `app_efforts` so Grok Build spawn stays unchanged. |
+| `contextWindow` | Channel-level token cap → TOML `context_window` as a **bare integer** (never `"1000000"`). Grok Build rejects string type and falls back to 200k (#538). Effective value is the **active model**'s window when set, else this field. Composer can still edit it; upsert writes both the model row and the channel field. Missing → UI chip uses `DEFAULT_CUSTOM_CONTEXT_WINDOW` (200k) only. |
 | `apiBackend` | Message format: `responses` (default) \| `chat_completions` \| `messages` |
-| `supportsVision` | App field `app_supports_vision`. When **true**, this custom channel is treated as multimodal: image `@path` stays in the prompt (CLI injects pixels) and the custom-main hook does **not** block `read_file` on PNG/JPG. Names / model ids that look like Grok / GPT-4o / Claude / Gemini already count as vision even when this is off. Unknown relays stay text-only (Host vision / path note) so DeepSeek-style APIs do not 400 on `image_url`. |
+| `supportsVision` | Channel-level App field `app_supports_vision` (live value for the **active** model). Per-model `supportsVision` / `supportsVideo` in `app_models` win when set. Host `custom_provider_is_text_only` follows the active row, not sibling catalog ids — mixed DeepSeek flash + vision-exp stays text-only on flash. Names / model ids that look like Grok / GPT-4o / Claude / Gemini still count as vision when the per-model flag is unset. Unknown relays stay text-only so DeepSeek-style APIs do not 400 on `image_url`. |
 | `extraHeaders` | Extra HTTP headers written as Grok Build `[model.<id>].extra_headers` (inline TOML table, sent verbatim on inference). Settings → Account → Providers editor. Use for gateways that WAF-check `User-Agent` / `Originator` (e.g. AgentRouter) or Anthropic `x-api-key`. Empty = omit the field. Newlines in values are rejected. |
 | `providerMode` | Explicit transport semantics: `generic` (default) or `grok_build_proxy`. Never infer this from a provider id or hostname. |
 | `isDefault` | Maps to `[models].default` (set only via **Use** / composer pick activate, not a form checkbox) |
@@ -53,12 +53,13 @@ Add flow opens a **preset gallery** (`providerPresets.ts`):
 |--------|--------|-----------------|
 | **Custom** | empty (user fills) | Grok `low`/`medium`/`high` |
 | **DeepSeek** | `deepseek-v4-flash`, `deepseek-v4-flash-vision-exp`, `deepseek-v4-pro` | `low` / `high` / `xhigh` / `max` (docs mapping table; default `high`) |
-| **OpenRouter** | `stealth/ox-alpha` | Grok `low`/`medium`/`high`/`max` (default `medium`); vision on; `context_window` 1 048 576 |
+| **OpenRouter** | `z-ai/glm-5.3-flash` | GLM `low`/`high`/`max` (default `max`); vision on; `context_window` 1 048 576 |
 | **Amux** | `grok-4.6` + `grok-4.5` | Official Grok `low`/`medium`/`high`/`xhigh` (default `xhigh`) |
 | **Yun API** | `grok-4.6` + `grok-4.5` | Official Grok `low`/`medium`/`high`/`xhigh` (default `xhigh`) |
 | **OpenCode Go** | `deepseek-v4-flash`, `deepseek-v4-pro` | DeepSeek efforts (default `high`) |
 | **火山方舟** (Volcengine Ark) | `deepseek-v4-flash` | Grok `low`/`medium`/`high`/`max` (default `medium`); **full path** on |
 | **AI98PRO** | `grok-4.6` + `grok-4.5` | Official Grok `low`/`medium`/`high`/`xhigh` (default `xhigh`); vision on |
+| **智谱** | `glm-5.3-flash` (1M, vision+video, `low`/`high`/`max`) | One gallery chip. Click picks China API / China Coding Plan / international API / international Coding Plan. Form tags above Base URL switch the same four roots. All `chat_completions` + **full path**. Official Z tile (`docs/svg/zhipu.svg`) on list / footer / welcome; sidebar top-left when Replace brand logo is on (dark square + white Z, inverted in dark theme). |
 
 | Preset | Base | Get API Key |
 |--------|------|-------------|
@@ -69,6 +70,10 @@ Add flow opens a **preset gallery** (`providerPresets.ts`):
 | OpenCode Go | `https://opencode.ai/zen/go/v1` (`chat_completions`) | https://opencode.ai/ |
 | 火山方舟 | `https://ark.cn-beijing.volces.com/api/plan/v3` (`chat_completions`, **full path**) | https://console.volcengine.com/ark |
 | AI98PRO | `https://ai98pro.xyz/v1` (`responses`) | https://ai98pro.xyz |
+| 智谱 · 国内 API | `https://open.bigmodel.cn/api/paas/v4` (`chat_completions`, **full path**) | https://open.bigmodel.cn/usercenter/proj-api-key |
+| 智谱 · 国内 Coding Plan | `https://open.bigmodel.cn/api/coding/paas/v4` | https://bigmodel.cn/coding-plan/personal/overview |
+| 智谱 · 海外 API | `https://api.z.ai/api/paas/v4` | https://z.ai/manage-apikey/apikey-list |
+| 智谱 · 海外 Coding Plan | `https://api.z.ai/api/coding/paas/v4` | https://z.ai/manage-apikey/apikey-list |
 
 ### Protocol pitfall (OpenCode Go / DeepSeek)
 

@@ -18,7 +18,7 @@ export const DEFAULT_REPLACE_PROVIDER_BRAND_LOGO = false;
 /**
  * Shared height (px) for every swappable sidebar brand mark.
  * Wordmarks scale by height (`height: N; width: auto`); icon-only marks
- * (Volcengine Ark, Amux) use the same height as `size`.
+ * (Volcengine Ark, Amux, Zhipu) use the same height as `size`.
  */
 export const SIDEBAR_BRAND_LOGO_HEIGHT = 18;
 

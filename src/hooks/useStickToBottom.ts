@@ -31,7 +31,7 @@ import {
   pinnedFollowDelayForLayout,
   shouldClampPinnedOverscroll,
   shouldClampPinnedStreamDrift,
-  shouldReleaseStickOnScrollUp,
+  shouldEscapePinnedScroll,
 } from "@/lib/stickToBottom";
 
 
@@ -215,13 +215,17 @@ export function useStickToBottom(
       }
 
       const maxTop = bottomScrollTop(el.scrollHeight, el.clientHeight);
-      const shouldEscapeStick = shouldReleaseStickOnScrollUp({
+      // Default 10px event + slow-trackpad accumulation from the locked
+      // bottom. Never use a sub-pixel minDelta: thinking / tool collapse and
+      // the next body round routinely move 2–8px off hard bottom, and that
+      // used to drop pin so the rest of the stream grew below the fold.
+      const shouldEscapeStick = shouldEscapePinnedScroll({
         pinned: isPinnedRef.current,
+        escaped: escapedRef.current,
         scrollTop,
         previousScrollTop: lastScrollTop,
         scrollHeight: el.scrollHeight,
         clientHeight: el.clientHeight,
-        minDeltaPx: 0.5,
       });
       const isMovingUp = scrollTop < lastScrollTop - 0.5;
       const meaningfulDown =

@@ -359,7 +359,7 @@ export const jaSettings = {
   "settings.exportLogoTooLarge": "画像が大きすぎます（最大 1.5 MB）",
   "settings.exportLogoInvalid": "その画像を読み取れませんでした",
   "settings.replaceProviderBrandLogo": "ブランドロゴを差し替え",
-  "settings.replaceProviderBrandLogoDesc": "アクティブチャネルがブランド付きプロバイダー（DeepSeek、OpenCode、Volcengine Ark、Amux）のとき、サイドバー左上の Grok マークをそのプロバイダーのロゴに差し替えます。アイコンのみのブランドはマークの横にテキストラベルを残します。既定はオフ。",
+  "settings.replaceProviderBrandLogoDesc": "アクティブチャネルがブランド付きプロバイダー（DeepSeek、OpenCode、Volcengine Ark、Amux、Zhipu）のとき、サイドバー左上の Grok マークをそのプロバイダーのロゴに差し替えます。アイコンのみのブランドはマークの横にテキストラベルを残します。既定はオフ。",
   "settings.messageTimeFormat": "時刻の形式",
   "settings.messageTimeFormatDesc": "絶対は曜日と時刻。相対は「2分前」で、約1分ごとに更新します。",
   "settings.messageTimeFormat.absolute": "絶対",

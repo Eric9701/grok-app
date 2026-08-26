@@ -359,7 +359,7 @@ export const deSettings = {
   "settings.exportLogoTooLarge": "Bild ist zu groß (max. 1,5 MB)",
   "settings.exportLogoInvalid": "Dieses Bild konnte nicht gelesen werden",
   "settings.replaceProviderBrandLogo": "Markenlogo ersetzen",
-  "settings.replaceProviderBrandLogoDesc": "Wenn der aktive Kanal ein gebrandeter Anbieter ist (DeepSeek, OpenCode, Volcengine Ark, Amux), das Grok-Zeichen oben links in der Seitenleiste durch das Anbieterlogo ersetzen. Nur-Icon-Marken behalten ein Textlabel neben dem Zeichen. Standard aus.",
+  "settings.replaceProviderBrandLogoDesc": "Wenn der aktive Kanal ein gebrandeter Anbieter ist (DeepSeek, OpenCode, Volcengine Ark, Amux, Zhipu), das Grok-Zeichen oben links in der Seitenleiste durch das Anbieterlogo ersetzen. Nur-Icon-Marken behalten ein Textlabel neben dem Zeichen. Standard aus.",
   "settings.messageTimeFormat": "Zeitstempelformat",
   "settings.messageTimeFormatDesc": "Absolut zeigt Wochentag und Uhrzeit; Relativ zeigt „vor 2 Minuten“ und aktualisiert etwa einmal pro Minute.",
   "settings.messageTimeFormat.absolute": "Absolut",

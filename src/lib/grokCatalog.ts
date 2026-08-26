@@ -292,9 +292,13 @@ export function effortCatalogKind(
   const list = efforts?.length ? efforts : [];
   const ids = new Set(list.map((e) => e.id.trim().toLowerCase()));
   const hasMedium = ids.has("medium");
-  const hasDsTop = ids.has("xhigh") || ids.has("max");
-  // DeepSeek-style: low/high/xhigh/max (no medium).
-  if (hasDsTop && !hasMedium) return "deepseek4";
+  const hasXhigh = ids.has("xhigh");
+  const hasMax = ids.has("max");
+  const hasDsTop = hasXhigh || hasMax;
+  // DeepSeek 4-tier remap (high→中, xhigh→高, max→极高) only when both
+  // xhigh and max exist. `low/high/max` must not take this path — otherwise
+  // `high` occupies 中 and falls back onto 高, so both rows look selected.
+  if (!hasMedium && hasXhigh && hasMax) return "deepseek4";
   // 4-tier with medium: official grok-4.6 (low/medium/high/xhigh) or a
   // custom channel that adds max. 极高 maps to max, else xhigh.
   if (hasDsTop && hasMedium) return "tier4";
@@ -309,6 +313,7 @@ export function effortCatalogKind(
  * Grok 3-tier: low→低, medium→中, high→高 (no 极高).
  * Official grok-4.6 / custom 4-tier: low→低, medium→中, high→高, xhigh|max→极高.
  * DeepSeek 4-tier: low→低, high→中, xhigh→高, max→极高.
+ * Incomplete no-medium catalogs (e.g. low/high/max): by id, omit empty slots.
  */
 function spawnMapForCatalog(
   catalog: EffortOption[],
@@ -338,8 +343,8 @@ function spawnMapForCatalog(
     return {
       low: byLower.get("low"),
       medium: byLower.get("high"),
-      high: byLower.get("xhigh") ?? byLower.get("high"),
-      xhigh: byLower.get("max") ?? byLower.get("xhigh"),
+      high: byLower.get("xhigh"),
+      xhigh: byLower.get("max"),
     };
   }
   // Generic: place known ids on the ladder; keep catalog order for the rest.
@@ -361,10 +366,28 @@ export function effortUiOptionsForCatalog(
 ): EffortUiOption[] {
   const list = effortsForModel(null, catalogEfforts);
   const map = spawnMapForCatalog(list);
-  return EFFORT_UI_LADDER.filter((uiId) => !!map[uiId]).map((uiId) => ({
-    uiId,
-    spawnId: map[uiId]!,
-  }));
+  const used = new Set<string>();
+  const out: EffortUiOption[] = [];
+  for (const uiId of EFFORT_UI_LADDER) {
+    const spawnId = map[uiId];
+    if (!spawnId) continue;
+    const key = spawnId.trim().toLowerCase();
+    if (used.has(key)) continue;
+    used.add(key);
+    out.push({ uiId, spawnId });
+  }
+  return out;
+}
+
+/** True when this UI row is the selected effort (at most one row). */
+export function effortUiOptionIsActive(
+  option: EffortUiOption,
+  spawnId: string,
+  catalogEfforts?: EffortOption[] | null,
+): boolean {
+  const slot = spawnIdToEffortUiSlot(spawnId, catalogEfforts);
+  if (slot) return option.uiId === slot;
+  return option.spawnId.trim().toLowerCase() === spawnId.trim().toLowerCase();
 }
 
 /** Resolve which UI slot a spawn id occupies for this catalog. */
@@ -388,8 +411,9 @@ export function spawnIdToEffortUiSlot(
 
 /**
  * Map a spawn effort into another catalog via the shared UI ladder.
- * If the target has fewer slots (e.g. no 极高), clamp down to the highest
- * available tier so order stays aligned (低/中/高).
+ * Missing middle slots prefer the next higher remaining tier
+ * (e.g. 中 → 高 on low/high/max). Missing top slots clamp down
+ * (e.g. 极高 → 高 on 3-tier).
  */
 export function mapEffortToTargetCatalog(
   current: string,
@@ -411,16 +435,15 @@ export function mapEffortToTargetCatalog(
   const exact = targetOpts.find((o) => o.uiId === slot);
   if (exact) return exact.spawnId;
 
-  // Clamp: e.g. 极高 → 高 when switching to a 3-tier model.
+  // Missing middle (no 中 on low/high/max) → next higher slot (高).
+  // Missing top (极高 on 3-tier) → clamp down to 高.
   const idx = EFFORT_UI_LADDER.indexOf(slot);
-  for (let i = idx; i >= 0; i--) {
-    const uiId = EFFORT_UI_LADDER[i];
-    const hit = targetOpts.find((o) => o.uiId === uiId);
+  for (let i = idx + 1; i < EFFORT_UI_LADDER.length; i++) {
+    const hit = targetOpts.find((o) => o.uiId === EFFORT_UI_LADDER[i]);
     if (hit) return hit.spawnId;
   }
-  for (let i = idx + 1; i < EFFORT_UI_LADDER.length; i++) {
-    const uiId = EFFORT_UI_LADDER[i];
-    const hit = targetOpts.find((o) => o.uiId === uiId);
+  for (let i = idx - 1; i >= 0; i--) {
+    const hit = targetOpts.find((o) => o.uiId === EFFORT_UI_LADDER[i]);
     if (hit) return hit.spawnId;
   }
   return pickDefaultEffort(null, targetList);
