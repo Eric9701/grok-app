@@ -339,6 +339,8 @@ export const ruSettings = {
   "settings.codeLineNumbersDesc": "Показывать колонку номеров строк слева у ограждённого кода в чате. По умолчанию выкл.",
   "settings.backBottomAlways": "Всегда показывать кнопку к последнему сообщению",
   "settings.backBottomAlwaysDesc": "Держать кнопку прокрутки к последнему видимой даже внизу. По умолчанию выкл. (показывается только после прокрутки вверх).",
+  "settings.selectionToolbar": "Панель выделения",
+  "settings.selectionToolbarDesc": "Показывать панель «копировать / в чат» при выделении текста. Правый клик остаётся, если выключить.",
   "settings.confirmExternalLinks": "Подтверждать открытие внешних ссылок",
   "settings.confirmExternalLinksDesc": "Спрашивать перед открытием ссылок http(s) из чата в браузере. По умолчанию выкл.",
   "settings.messageActions": "Действия с сообщением",

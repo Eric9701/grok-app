@@ -11,7 +11,10 @@ import {
   type ReactNode,
 } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import {
+  MARKDOWN_REHYPE_PLUGINS,
+  MARKDOWN_REMARK_PLUGINS,
+} from "@/lib/markdownMath";
 import type { Locale } from "@/i18n";
 import { createT } from "@/i18n";
 import { ImageUi, imageUiLabels } from "@/components/ImageUi";
@@ -113,7 +116,8 @@ function textFromChildren(children: ReactNode): string {
 }
 
 /** Stable identity so ReactMarkdown does not remount the tree every stream tick. */
-export const MARKDOWN_CHAT_REMARK_PLUGINS = [remarkGfm];
+export const MARKDOWN_CHAT_REMARK_PLUGINS = MARKDOWN_REMARK_PLUGINS;
+export const MARKDOWN_CHAT_REHYPE_PLUGINS = MARKDOWN_REHYPE_PLUGINS;
 
 type MdKids = { children?: ReactNode };
 
@@ -243,7 +247,8 @@ export function getMarkdownFileLabels(locale: Locale): FilePathCardLabels {
 
 function isSimplePlainText(text: string): boolean {
   if (!text || text.length > 500) return false;
-  if (/[\n#*_`\[\]|~<>]|^\s*[-*+]\s|^\s*\d+\.\s/m.test(text)) {
+  // `$` / `\` keep math (`$E=mc^2$`, `\(x\)`) on the ReactMarkdown path.
+  if (/[\n#*_`$\\[\]|~<>]|^\s*[-*+]\s|^\s*\d+\.\s/m.test(text)) {
     return false;
   }
   return true;
@@ -699,6 +704,7 @@ export const MarkdownChat = memo(function MarkdownChat({
       ) : (
         <ReactMarkdown
           remarkPlugins={MARKDOWN_CHAT_REMARK_PLUGINS}
+          rehypePlugins={MARKDOWN_CHAT_REHYPE_PLUGINS}
           components={components}
         >
           {painted}

@@ -339,6 +339,8 @@ export const idSettings = {
   "settings.codeLineNumbersDesc": "Tampilkan selokan nomor baris di kiri kode berpagar di obrolan. Mati secara bawaan.",
   "settings.backBottomAlways": "Selalu tampilkan kembali-ke-bawah",
   "settings.backBottomAlwaysDesc": "Jaga kontrol gulir-ke-terbaru terlihat bahkan saat sudah di bawah. Mati secara bawaan (hanya tampil setelah Anda menggulir ke atas).",
+  "settings.selectionToolbar": "Bilah pemilihan",
+  "settings.selectionToolbarDesc": "Tampilkan bilah salin / tambah ke chat saat teks dipilih. Klik kanan tetap ada jika dimatikan.",
   "settings.confirmExternalLinks": "Konfirmasi sebelum membuka tautan",
   "settings.confirmExternalLinksDesc": "Tanya sebelum membuka tautan http(s) dari obrolan di peramban. Mati secara bawaan.",
   "settings.messageActions": "Tindakan pesan",

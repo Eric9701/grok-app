@@ -363,6 +363,8 @@ export const zhSettings = {
   "settings.codeLineNumbersDesc": "在聊天中的围栏代码块左侧显示行号栏。默认关闭。",
   "settings.backBottomAlways": "始终显示回到底部",
   "settings.backBottomAlwaysDesc": "即使已在底部也保留「回到最新」按钮。默认关闭（仅在上滚后显示）。",
+  "settings.selectionToolbar": "选中文字工具栏",
+  "settings.selectionToolbarDesc": "在会话里划选文字后弹出复制 / 加入输入框。关掉后仍可用右键菜单。",
   "settings.confirmExternalLinks": "打开链接前确认",
   "settings.confirmExternalLinksDesc": "从聊天打开 http(s) 链接前先询问。默认关闭，减少打扰。",
   "settings.messageActions": "消息操作按钮",

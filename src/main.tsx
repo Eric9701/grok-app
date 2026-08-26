@@ -11,6 +11,7 @@ import "./styles/skins.css";
 import "./styles/tailwind.css";
 import "./styles/app.css";
 import "./styles/setup-wizard.css";
+import "katex/dist/katex.min.css";
 import "@/lib/scrollPerfDebug";
 import { detectAppPlatform } from "./lib/appPlatform";
 import {

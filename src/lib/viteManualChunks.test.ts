@@ -35,6 +35,15 @@ describe("vendorManualChunk", () => {
       vendorManualChunk("/repo/node_modules/remark-gfm/index.js"),
     ).toBe("markdown");
     expect(
+      vendorManualChunk("/repo/node_modules/remark-math/index.js"),
+    ).toBe("markdown");
+    expect(
+      vendorManualChunk("/repo/node_modules/rehype-katex/index.js"),
+    ).toBe("markdown");
+    expect(
+      vendorManualChunk("/repo/node_modules/katex/dist/katex.min.js"),
+    ).toBe("markdown");
+    expect(
       vendorManualChunk("/repo/node_modules/micromark/index.js"),
     ).toBe("markdown");
   });

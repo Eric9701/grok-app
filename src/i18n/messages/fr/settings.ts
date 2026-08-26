@@ -339,6 +339,8 @@ export const frSettings = {
   "settings.codeLineNumbersDesc": "Afficher une gouttière de numéros de ligne à gauche du code clôturé dans le chat. Désactivé par défaut.",
   "settings.backBottomAlways": "Toujours afficher retour en bas",
   "settings.backBottomAlwaysDesc": "Garder le contrôle aller au plus récent visible même déjà en bas. Désactivé par défaut (s’affiche seulement après défilement vers le haut).",
+  "settings.selectionToolbar": "Barre de sélection",
+  "settings.selectionToolbarDesc": "Afficher une barre copier / ajouter au chat quand vous sélectionnez du texte. Le clic droit reste disponible si c’est désactivé.",
   "settings.confirmExternalLinks": "Confirmer avant d’ouvrir les liens",
   "settings.confirmExternalLinksDesc": "Demander avant d’ouvrir des liens http(s) du chat dans le navigateur. Désactivé par défaut.",
   "settings.messageActions": "Actions de message",

@@ -582,6 +582,18 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   display: none;
 }
 
+.chat-md .katex {
+  font-size: 1.08em;
+  color: inherit;
+}
+
+.chat-md .katex-display {
+  margin: 0.7em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.1em 0;
+}
+
 .chat-md__link {
   color: var(--chat-link);
   text-decoration: none;

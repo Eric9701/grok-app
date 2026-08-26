@@ -339,6 +339,8 @@ export const koSettings = {
   "settings.codeLineNumbersDesc": "채팅의 펜스 코드 왼쪽에 줄 번호 거터를 표시합니다. 기본값은 꺼짐입니다.",
   "settings.backBottomAlways": "항상 맨 아래로 돌아가기 표시",
   "settings.backBottomAlwaysDesc": "이미 맨 아래에 있어도 최신으로 스크롤 컨트롤을 보이게 유지합니다. 기본값은 꺼짐입니다(위로 스크롤한 뒤에만 표시).",
+  "settings.selectionToolbar": "선택 도구 모음",
+  "settings.selectionToolbarDesc": "대화 텍스트를 드래그하면 복사 / 입력에 추가 막대가 나타납니다. 꺼도 우클릭은 됩니다.",
   "settings.confirmExternalLinks": "링크를 열기 전에 확인",
   "settings.confirmExternalLinksDesc": "채팅의 http(s) 링크를 브라우저에서 열기 전에 묻습니다. 기본값은 꺼짐입니다.",
   "settings.messageActions": "메시지 동작",

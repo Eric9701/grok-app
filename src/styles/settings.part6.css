@@ -43,6 +43,18 @@
   color: var(--text-secondary);
 }
 
+.md-body .katex {
+  font-size: 1.08em;
+  color: inherit;
+}
+
+.md-body .katex-display {
+  margin: 0.65em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.1em 0;
+}
+
 .md-body__pre {
   margin: 0.6em 0;
   padding: 12px 14px;

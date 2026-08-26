@@ -339,6 +339,8 @@ export const jaSettings = {
   "settings.codeLineNumbersDesc": "チャットのフェンス付きコードの左に行番号ガターを表示します。既定はオフ。",
   "settings.backBottomAlways": "最新へ戻るを常に表示",
   "settings.backBottomAlwaysDesc": "すでに一番下にいても、最新へスクロールする操作を表示したままにします。既定はオフ（上にスクロールしたときだけ表示）。",
+  "settings.selectionToolbar": "選択ツールバー",
+  "settings.selectionToolbarDesc": "会話テキストを選択するとコピー／入力へ追加バーを表示します。オフでも右クリックは使えます。",
   "settings.confirmExternalLinks": "リンクを開く前に確認",
   "settings.confirmExternalLinksDesc": "チャットの http(s) リンクをブラウザで開く前に確認します。既定はオフ。",
   "settings.messageActions": "メッセージ操作",

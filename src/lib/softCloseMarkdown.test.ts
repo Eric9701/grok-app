@@ -46,4 +46,25 @@ describe("softCloseMarkdown", () => {
   it("returns empty as-is", () => {
     expect(softCloseMarkdown("", true)).toBe("");
   });
+
+  it("closes incomplete inline and display math while streaming", () => {
+    expect(softCloseMarkdown("Energy $E=mc^2", true)).toBe("Energy $E=mc^2$");
+    expect(softCloseMarkdown("$$\\int x", true)).toBe("$$\\int x\n$$");
+    expect(softCloseMarkdown("done $E=mc^2$", true)).toBe("done $E=mc^2$");
+    expect(softCloseMarkdown("$$a+b$$\nmore", true)).toBe("$$a+b$$\nmore");
+  });
+
+  it("does not close dollars inside a fenced code block", () => {
+    const src = "```js\nconst n = $price\n";
+    const out = softCloseMarkdown(src, true);
+    expect(out).toContain("const n = $price");
+    expect(out.endsWith("\n```")).toBe(true);
+    expect(out).not.toContain("$price$");
+  });
+
+  it("does not close dollars inside inline code", () => {
+    expect(softCloseMarkdown("use `$price` please", true)).toBe(
+      "use `$price` please",
+    );
+  });
 });

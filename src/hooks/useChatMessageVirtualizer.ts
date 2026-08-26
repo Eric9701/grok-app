@@ -58,6 +58,7 @@ import {
 } from "@/lib/paneSplitMotion";
 import {
   distanceFromBottom,
+  markProgrammaticStickScroll,
   STICK_ESCAPE_MIN_DELTA_PX,
 } from "@/lib/stickToBottom";
 import { createScrollVelocityTracker } from "@/lib/scrollVelocity";
@@ -590,6 +591,7 @@ export function useChatMessageVirtualizer(
     const desired = Math.max(0, top - dist);
     if (Math.abs(v.scrollTop - desired) <= 0.5) return;
     ignoreScrollAdjustRef.current = true;
+    markProgrammaticStickScroll(v, desired);
     v.scrollTop = desired;
   }, [
     virtualized,

@@ -285,6 +285,7 @@ describe("settingsCatalog", () => {
     expect(appearance).toContain("settings.sessionMuteSummary");
     expect(appearance).toContain("settings.sessionUnreadSummary");
     expect(appearance).toContain("settings.backBottomAlways");
+    expect(appearance).toContain("settings.selectionToolbar");
     const rim = keywordKeysForSection("remote_im");
     expect(rim).toContain("settings.nav.remoteIm");
     expect(rim).toContain("settings.tab.remoteIm");
@@ -481,6 +482,16 @@ describe("settingsCatalog", () => {
     const backBottomZh = searchSettingsEntries("回到底部", tZh, tEn);
     expect(
       backBottomZh.some((h) => h.entry.id === "appearance.backBottomAlways"),
+    ).toBe(true);
+    const selectionToolbar = searchSettingsEntries("selection toolbar", tZh, tEn);
+    expect(
+      selectionToolbar.some((h) => h.entry.id === "appearance.selectionToolbar"),
+    ).toBe(true);
+    const selectionToolbarZh = searchSettingsEntries("选中文字", tZh, tEn);
+    expect(
+      selectionToolbarZh.some(
+        (h) => h.entry.id === "appearance.selectionToolbar",
+      ),
     ).toBe(true);
     const toolCollapse = searchSettingsEntries("tool steps", tZh, tEn);
     expect(

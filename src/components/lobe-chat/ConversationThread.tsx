@@ -166,6 +166,10 @@ import {
   loadBackBottomAlwaysPref,
 } from "@/lib/backBottomAlwaysPref";
 import {
+  TRANSCRIPT_SELECTION_TOOLBAR_CHANGE_EVENT,
+  loadTranscriptSelectionToolbarPref,
+} from "@/lib/transcriptSelectionToolbarPref";
+import {
   TOOL_STEPS_AUTO_COLLAPSE_CHANGE_EVENT,
   loadToolStepsAutoCollapsePref,
 } from "@/lib/toolStepsAutoCollapsePref";
@@ -1989,6 +1993,23 @@ export function ConversationThread({
       window.removeEventListener(BACK_BOTTOM_ALWAYS_CHANGE_EVENT, onPref);
   }, []);
 
+  const [selectionToolbar, setSelectionToolbar] = useState(() =>
+    loadTranscriptSelectionToolbarPref(),
+  );
+  useEffect(() => {
+    const onPref = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail;
+      if (typeof detail === "boolean") setSelectionToolbar(detail);
+      else setSelectionToolbar(loadTranscriptSelectionToolbarPref());
+    };
+    window.addEventListener(TRANSCRIPT_SELECTION_TOOLBAR_CHANGE_EVENT, onPref);
+    return () =>
+      window.removeEventListener(
+        TRANSCRIPT_SELECTION_TOOLBAR_CHANGE_EVENT,
+        onPref,
+      );
+  }, []);
+
   /** Finished tool steps start collapsed when true (default). */
   const [toolStepsAutoCollapse, setToolStepsAutoCollapse] = useState(() =>
     loadToolStepsAutoCollapsePref(),
@@ -2174,6 +2195,7 @@ export function ConversationThread({
   }, []);
 
   useEffect(() => {
+    if (!selectionToolbar) return;
     const showBar = (next: {
       text: string;
       sourceMessageId?: string;
@@ -2207,7 +2229,7 @@ export function ConversationThread({
       document.removeEventListener("selectionchange", onSel);
       document.removeEventListener("mouseup", onUp);
     };
-  }, [readTranscriptSelection]);
+  }, [readTranscriptSelection, selectionToolbar]);
 
   useEffect(() => {
     if (!selectionBar) return;
@@ -2998,7 +3020,7 @@ export function ConversationThread({
         onClose={() => setSelectionMenu(null)}
         items={selectionMenuItems}
       />
-      {selectionBar ? (
+      {selectionBar && selectionToolbar ? (
         <TranscriptSelectionToolbar
           x={selectionBar.x}
           y={selectionBar.y}

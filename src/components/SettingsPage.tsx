@@ -133,6 +133,9 @@ import {
   loadBackBottomAlwaysPref,
 } from "@/lib/backBottomAlwaysPref";
 import {
+  loadTranscriptSelectionToolbarPref,
+} from "@/lib/transcriptSelectionToolbarPref";
+import {
   loadSessionSearchRankPref,
 } from "@/lib/sessionSearchRankPref";
 import type { SessionSearchRankMode } from "@/lib/sessionSearch";
@@ -687,6 +690,10 @@ export function SettingsPage({
   /** Always-show back-to-bottom control — frontend-only localStorage. */
   const [backBottomAlways, setBackBottomAlways] = useState(() =>
     loadBackBottomAlwaysPref(),
+  );
+  /** Transcript selection copy/quote bar — frontend-only localStorage. */
+  const [selectionToolbar, setSelectionToolbar] = useState(() =>
+    loadTranscriptSelectionToolbarPref(),
   );
   /** Session search ranking (keyword vs local hybrid) — frontend-only. */
   const [sessionSearchRank, setSessionSearchRank] =
@@ -1748,6 +1755,8 @@ export function SettingsPage({
     setCodeLineNumbers,
     backBottomAlways,
     setBackBottomAlways,
+    selectionToolbar,
+    setSelectionToolbar,
     sessionSearchRank,
     setSessionSearchRank,
     voiceHotkeyEnabled,

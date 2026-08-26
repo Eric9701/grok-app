@@ -7,7 +7,10 @@
 
 import { useMemo, type MouseEvent, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import {
+  MARKDOWN_REHYPE_PLUGINS,
+  MARKDOWN_REMARK_PLUGINS,
+} from "@/lib/markdownMath";
 import type { Locale } from "@/i18n";
 import { ImageUi, imageUiLabels } from "@/components/ImageUi";
 import { VideoUi, videoUiLabels } from "@/components/VideoUi";
@@ -99,7 +102,8 @@ export function MarkdownBody({
       }
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={MARKDOWN_REMARK_PLUGINS}
+        rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
         components={{
           a: ({ href, children: c }) => {
             const text = textFromChildren(c).trim();

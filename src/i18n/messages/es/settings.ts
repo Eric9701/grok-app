@@ -339,6 +339,8 @@ export const esSettings = {
   "settings.codeLineNumbersDesc": "Muestra un margen de números de línea a la izquierda del código delimitado en el chat. Desactivado de forma predeterminada.",
   "settings.backBottomAlways": "Mostrar siempre volver al final",
   "settings.backBottomAlwaysDesc": "Mantén visible el control de ir al más reciente incluso si ya estás al final. Desactivado de forma predeterminada (solo aparece al desplazarte hacia arriba).",
+  "settings.selectionToolbar": "Barra de selección",
+  "settings.selectionToolbarDesc": "Mostrar una barra de copiar / añadir al chat al seleccionar texto. El clic derecho sigue funcionando si está desactivada.",
   "settings.confirmExternalLinks": "Confirmar antes de abrir enlaces",
   "settings.confirmExternalLinksDesc": "Preguntar antes de abrir enlaces http(s) del chat en el navegador. Desactivado de forma predeterminada.",
   "settings.messageActions": "Acciones del mensaje",

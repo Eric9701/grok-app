@@ -339,6 +339,8 @@ export const deSettings = {
   "settings.codeLineNumbersDesc": "Zeilennummern-Gutter links von fenced Code im Chat anzeigen. Standard aus.",
   "settings.backBottomAlways": "Zurück-nach-unten immer zeigen",
   "settings.backBottomAlwaysDesc": "Zum-Neuesten-scrollen-Steuerung sichtbar halten, auch wenn du schon unten bist. Standard aus (nur nach Hochscrollen).",
+  "settings.selectionToolbar": "Auswahl-Werkzeugleiste",
+  "settings.selectionToolbarDesc": "Beim Markieren von Chat-Text eine Leiste zum Kopieren / Übernehmen anzeigen. Rechtsklick bleibt an, wenn das aus ist.",
   "settings.confirmExternalLinks": "Vor dem Öffnen von Links bestätigen",
   "settings.confirmExternalLinksDesc": "Fragen, bevor http(s)-Links aus dem Chat im Browser geöffnet werden. Standard aus.",
   "settings.messageActions": "Nachrichtenaktionen",

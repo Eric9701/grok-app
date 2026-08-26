@@ -15,6 +15,8 @@ See `docs/llm-wiki/release.md`.
 - **Settings page opacity slider**: Settings → Appearance → Theme can set how opaque the settings overlay is over wallpaper. 100% is fully solid. The lowest setting still keeps a 20% fill; the remaining 80% follows the slider. Independent of wallpaper overlay. Not packed into `.grokskin`.
 - **What's new after an update (#922)**: the first launch of a newer version opens a GlassModal of that version's CHANGELOG (Added / Changed / Fixed). The account menu and Settings → About can reopen it. First install does not auto-show; setup wizard and the product tour are not blocked.
 - **Slash can pick a whole plugin (#929)**: `/` and `+` list plugin packs as well as skills. Choosing a pack inserts a plugin chip; send expands to that pack's enabled, user-invocable skills. A single skill from the pack can still be chosen on its own.
+- **LaTeX in chat (#932)**: assistant markdown renders `$…$` / `$$…$$` (and `\(` `\[`) with KaTeX, matching Grok Build CLI. Incomplete math is closed while streaming.
+- **Selection toolbar setting (#933)**: Settings → Appearance → Interface can hide the copy / add-to-chat bar that appears after highlighting transcript text. Right-click still works. On by default.
 - **Progress rail side**: Settings → Appearance → Interface can put the conversation ticks on the left or right.
 - **Custom appearance chrome**: Settings → Appearance → Theme can set a text color (default follows Light / Dark near-black / near-white) and an optional text shadow (off by default). Restore defaults asks for confirmation and resets both. These fields travel with `.grokskin` import / export.
 
@@ -22,6 +24,8 @@ See `docs/llm-wiki/release.md`.
 - **设置页透明度滑块**：设置 → 外观 → 主题可调设置页在壁纸上的不透明度。100% 全实色。最低仍保留 20% 底色，其余 80% 跟滑块。不与壁纸遮罩合并。不进 `.grokskin`。
 - **更新公告（#922）**：装上新版本后第一次打开，弹出这一版 CHANGELOG（新增 / 变更 / 修复）。账户菜单和设置 → 关于可再打开。全新安装不自动弹；不挡设置向导和产品导览。
 - **斜杠可选整个插件（#929）**：`/` 和 `+` 里插件包和 skill 都是条目。选插件插入插件 chip，发送时带上该包里已启用、可调用的 skill。仍可只选其中一条。
+- **对话 LaTeX（#932）**：助手 Markdown 用 KaTeX 渲染 `$…$` / `$$…$$`（以及 `\(` `\[`），与 Grok Build CLI 一致。流式输出时会补上未闭合的公式。
+- **选中文字工具栏（#933）**：设置 → 外观 → 界面可关掉划选文字后的复制 / 加入输入框。右键菜单仍可用。默认开。
 - **进度条左右**：设置 → 外观 → 界面可把对话刻度放到左侧或右侧。
 - **自定义外观**：设置 → 外观 → 主题可改文字颜色（默认跟随浅/深色近黑/近白）和字体阴影（默认关）。「恢复默认」需二次确认，会把这两项恢复出厂。这两项会随 `.grokskin` 导入导出。
 
@@ -58,7 +62,7 @@ See `docs/llm-wiki/release.md`.
 - **未使用的 AI Elements 控件（#907）**：删除 7 个不可达 UI 文件及其独占依赖（`streamdown`、`@radix-ui/react-collapsible`、`@radix-ui/react-slot`、`class-variance-authority`）；`mermaid` override 随 `streamdown` 去掉。聊天仍走 `MarkdownBody` / Lobe 线程。
 
 ### Fixed
-- **Chat stick-to-bottom no longer stops at thinking / tool / body round changes**: phase auto-collapse and the next output round used to drop pin (2–8px layout ticks were treated as a leave; live tool `scrollIntoView` also walked the chat ancestor). Follow continues for the rest of the turn; a real flick or slow trackpad still leaves the lock.
+- **Chat stick-to-bottom no longer stops at thinking / tool / body round changes (#931)**: phase auto-collapse and the next output round used to drop pin (2–8px layout ticks were treated as a leave; live tool `scrollIntoView` also walked the chat ancestor). Virtual-list pin-snap writes are ignored as user scroll. Follow continues for the rest of the turn; a real flick or slow trackpad still leaves the lock.
 - **Custom effort catalog `low` / `high` / `max` no longer marks both Medium and High**: incomplete ladders map by id (Low / High / Extra high). Only the DeepSeek four-id set (`low` / `high` / `xhigh` / `max`) remaps `high` onto Medium. Default `high` shows as High, with a single check.
 - **Account → Providers left list scrolls when many channels are saved**: pane-fill still locks the page, but the dual-pane grid row is now `minmax(0, 1fr)` so the rail is a real scrollport instead of clipping behind `overflow: hidden`. The rail uses the in-app overlay thumb (native bars stay hidden).
 - **Windows Open in editor no longer hands VS Code `\\?\` paths (#928)**: `open_in_editor` now strips the extended-length prefix the same way Explorer reveal already did, so workspace URIs stay `file:///d:/…`.
@@ -72,7 +76,7 @@ See `docs/llm-wiki/release.md`.
 - **Narrow-window plan overlay leftover (#902)**: an open aside overlay now uses the existing full-cover mode instead of a leftover scrim over the main column.
 
 **中文 · 修复**
-- **思考 / 工具 / 正文换轮时聊天不再停住吸底**：阶段收起和下一轮输出曾把 2–8px 布局抖动当成上滑离底；直播工具的 `scrollIntoView` 还会带动会话祖先滚动。本轮剩余输出继续跟底；真的上滑或慢速触控板仍可离开。
+- **思考 / 工具 / 正文换轮时聊天不再停住吸底（#931）**：阶段收起和下一轮输出曾把 2–8px 布局抖动当成上滑离底；直播工具的 `scrollIntoView` 还会带动会话祖先滚动。虚拟列表 pin-snap 写入不再当成用户上滑。本轮剩余输出继续跟底；真的上滑或慢速触控板仍可离开。
 - **自定义推理档只配 `low` / `high` / `max` 时不再同时勾中「中」和「高」**：缺档按 id 对号入座（低 / 高 / 极高）。只有 DeepSeek 四档（`low` / `high` / `xhigh` / `max`）才把 `high` 映射到「中」。默认 `high` 显示为「高」，只勾一档。
 - **设置 → 账户 → 服务商左侧列表在条目很多时可以滚动**：页面仍锁定外层滚动，但双栏 grid 行改为 `minmax(0, 1fr)`，左侧轨道成为真正的滚动容器，不再被 `overflow: hidden` 裁切。列表使用应用内 overlay 滑块（原生滚动条仍隐藏）。
 - **Windows「在编辑器中打开」不再把 `\\?\` 路径交给 VS Code（#928）**：`open_in_editor` 与资源管理器揭示一样剥掉扩展前缀，工作区 URI 保持 `file:///d:/…`。

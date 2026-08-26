@@ -339,6 +339,8 @@ export const ptBRSettings = {
   "settings.codeLineNumbersDesc": "Exibir uma calha de números de linha à esquerda do código cercado no chat. Desligado por padrão.",
   "settings.backBottomAlways": "Sempre mostrar voltar ao final",
   "settings.backBottomAlwaysDesc": "Manter o controle de ir para o mais recente visível mesmo quando já estiver no final. Desligado por padrão (aparece só depois que você rola para cima).",
+  "settings.selectionToolbar": "Barra de seleção",
+  "settings.selectionToolbarDesc": "Mostrar uma barra de copiar / adicionar ao chat ao selecionar texto. O botão direito continua funcionando se estiver desligada.",
   "settings.confirmExternalLinks": "Confirmar antes de abrir links",
   "settings.confirmExternalLinksDesc": "Perguntar antes de abrir links http(s) do chat no navegador. Desligado por padrão.",
   "settings.messageActions": "Ações da mensagem",

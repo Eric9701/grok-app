@@ -270,6 +270,37 @@ export function shouldEscapePinnedScroll(input: {
   return shouldReleaseStickOnSlowScrollUp(input);
 }
 
+/**
+ * Virtual-list pin-snap writes `scrollTop` without going through the stick
+ * hook. Remember that assignment so the next scroll event is not treated as
+ * a user leave. Entries older than {@link PROGRAMMATIC_STICK_SCROLL_TTL_MS}
+ * are ignored (a missed event must not swallow a later flick).
+ */
+export const PROGRAMMATIC_STICK_SCROLL_TTL_MS = 100;
+
+type ProgrammaticStickScroll = { top: number; at: number };
+
+const programmaticStickScroll = new WeakMap<Element, ProgrammaticStickScroll>();
+
+export function markProgrammaticStickScroll(el: Element, top: number): void {
+  programmaticStickScroll.set(el, { top, at: nowMs() });
+}
+
+/** Consume a recent pin-snap; stale or missing → undefined. */
+export function takeProgrammaticStickScroll(el: Element): number | undefined {
+  const v = programmaticStickScroll.get(el);
+  if (!v) return undefined;
+  programmaticStickScroll.delete(el);
+  if (nowMs() - v.at > PROGRAMMATIC_STICK_SCROLL_TTL_MS) return undefined;
+  return v.top;
+}
+
+function nowMs(): number {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
+
 export function distanceFromBottom(
   scrollTop: number,
   scrollHeight: number,

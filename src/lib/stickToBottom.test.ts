@@ -24,6 +24,8 @@ import {
   shouldSnapPinnedLayoutToBottom,
   STICK_MEDIA_FOLLOW_DELAY_MS,
   STICK_MEDIA_HEIGHT_PX,
+  markProgrammaticStickScroll,
+  takeProgrammaticStickScroll,
 } from "./stickToBottom";
 
 describe("distanceFromBottom", () => {
@@ -593,6 +595,15 @@ describe("shouldEscapePinnedScroll", () => {
         clientHeight: ch,
       }),
     ).toBe(false);
+  });
+});
+
+describe("programmatic stick scroll ignore", () => {
+  it("hands the written top to the next scroll event once", () => {
+    const el = { id: "vp" } as unknown as Element;
+    markProgrammaticStickScroll(el, 592);
+    expect(takeProgrammaticStickScroll(el)).toBe(592);
+    expect(takeProgrammaticStickScroll(el)).toBeUndefined();
   });
 });
 

@@ -339,6 +339,8 @@ export const itSettings = {
   "settings.codeLineNumbersDesc": "Mostra un gutter con numeri di riga a sinistra del codice delimitato in chat. Disattivato per impostazione predefinita.",
   "settings.backBottomAlways": "Mostra sempre torna-in-fondo",
   "settings.backBottomAlwaysDesc": "Tieni visibile il controllo scorri-all’ultimo anche quando sei già in fondo. Disattivato per impostazione predefinita (compare solo dopo che scorri su).",
+  "settings.selectionToolbar": "Barra di selezione",
+  "settings.selectionToolbarDesc": "Mostra una barra copia / aggiungi alla chat quando evidenzi il testo. Il tasto destro resta disponibile se è disattivata.",
   "settings.confirmExternalLinks": "Conferma prima di aprire i link",
   "settings.confirmExternalLinksDesc": "Chiedi prima di aprire i link http(s) dalla chat nel browser. Disattivato per impostazione predefinita.",
   "settings.messageActions": "Azioni messaggio",

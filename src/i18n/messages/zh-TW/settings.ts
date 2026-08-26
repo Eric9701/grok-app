@@ -364,6 +364,8 @@ export const zhTWSettings = {
   "settings.codeLineNumbersDesc": "在聊天中的圍欄程式碼區塊左側顯示行號欄。預設關閉。",
   "settings.backBottomAlways": "始終顯示回到底部",
   "settings.backBottomAlwaysDesc": "即使已在底部也保留「回到最新」按鈕。預設關閉（僅在上滾後顯示）。",
+  "settings.selectionToolbar": "選取文字工具列",
+  "settings.selectionToolbarDesc": "在對話裡劃選文字後彈出複製 / 加入輸入框。關掉後仍可用右鍵選單。",
   "settings.confirmExternalLinks": "開啟連結前確認",
   "settings.confirmExternalLinksDesc": "從聊天開啟 http(s) 連結前先詢問。預設關閉，減少打擾。",
   "settings.messageActions": "訊息操作按鈕",

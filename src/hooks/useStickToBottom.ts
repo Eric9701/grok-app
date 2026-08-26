@@ -32,6 +32,7 @@ import {
   shouldClampPinnedOverscroll,
   shouldClampPinnedStreamDrift,
   shouldEscapePinnedScroll,
+  takeProgrammaticStickScroll,
 } from "@/lib/stickToBottom";
 
 
@@ -205,7 +206,8 @@ export function useStickToBottom(
     const handleScroll = () => {
       const scrollTop = el.scrollTop;
       let lastScrollTop = lastScrollTopRef.current;
-      const ignore = ignoreScrollTopRef.current;
+      const ignore =
+        ignoreScrollTopRef.current ?? takeProgrammaticStickScroll(el);
       lastScrollTopRef.current = scrollTop;
       ignoreScrollTopRef.current = undefined;
 

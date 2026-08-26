@@ -85,6 +85,7 @@ import {
 import { loadCodeWrapPref } from "@/lib/codeWrapPref";
 import { loadCodeLineNumbersPref } from "@/lib/codeLineNumbersPref";
 import { loadBackBottomAlwaysPref } from "@/lib/backBottomAlwaysPref";
+import { loadTranscriptSelectionToolbarPref } from "@/lib/transcriptSelectionToolbarPref";
 import { loadSessionSearchRankPref } from "@/lib/sessionSearchRankPref";
 import type { SessionSearchRankMode } from "@/lib/sessionSearch";
 import { loadConfirmExternalLinksPref } from "@/lib/externalLinkPref";
@@ -263,6 +264,9 @@ export function useAppearanceEditorModel(opts: {
   );
   const [backBottomAlways, setBackBottomAlways] = useState(() =>
     loadBackBottomAlwaysPref(),
+  );
+  const [selectionToolbar, setSelectionToolbar] = useState(() =>
+    loadTranscriptSelectionToolbarPref(),
   );
   const [sessionSearchRank, setSessionSearchRank] =
     useState<SessionSearchRankMode>(() => loadSessionSearchRankPref());
@@ -620,6 +624,11 @@ export function useAppearanceEditorModel(opts: {
     backBottomAlways,
     setBackBottomAlways: (next: boolean) => {
       setBackBottomAlways(next);
+      notifyAppearanceChanged();
+    },
+    selectionToolbar,
+    setSelectionToolbar: (next: boolean) => {
+      setSelectionToolbar(next);
       notifyAppearanceChanged();
     },
     sessionSearchRank,

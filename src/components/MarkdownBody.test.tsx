@@ -21,4 +21,11 @@ describe("MarkdownBody http(s) links", () => {
     expect(html).toContain('href="#section"');
     expect(html).not.toContain("md-body__link");
   });
+
+  it("renders LaTeX via KaTeX", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownBody>{"The identity $a^2+b^2=c^2$."}</MarkdownBody>,
+    );
+    expect(html).toContain("katex");
+  });
 });

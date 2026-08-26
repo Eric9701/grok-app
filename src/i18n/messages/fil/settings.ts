@@ -339,6 +339,8 @@ export const filSettings = {
   "settings.codeLineNumbersDesc": "Magpakita ng gutter ng numero ng linya sa kaliwa ng fenced code sa chat. Naka-off bilang default.",
   "settings.backBottomAlways": "Palaging ipakita ang bumalik-sa-ibaba",
   "settings.backBottomAlwaysDesc": "Panatilihing nakikita ang kontrol na mag-scroll sa pinakabago kahit nasa ibaba na. Naka-off bilang default (lumalabas lang pagkatapos kang mag-scroll pataas).",
+  "settings.selectionToolbar": "Toolbar ng seleksyon",
+  "settings.selectionToolbarDesc": "Magpakita ng copy / add-to-chat bar kapag nag-highlight ng text. Gumagana pa rin ang right-click kung naka-off.",
   "settings.confirmExternalLinks": "Kumpirmahin bago magbukas ng link",
   "settings.confirmExternalLinksDesc": "Magtanong bago magbukas ng http(s) link mula sa chat sa iyong browser. Naka-off bilang default.",
   "settings.messageActions": "Mga aksyon ng mensahe",

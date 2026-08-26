@@ -363,6 +363,8 @@ export const enSettings = {
   "settings.codeLineNumbersDesc": "Display a line-number gutter on the left of fenced code in chat. Off by default.",
   "settings.backBottomAlways": "Always show back-to-bottom",
   "settings.backBottomAlwaysDesc": "Keep the scroll-to-latest control visible even when already at the bottom. Off by default (shows only after you scroll up).",
+  "settings.selectionToolbar": "Selection toolbar",
+  "settings.selectionToolbarDesc": "Show a copy / add-to-chat bar when you highlight transcript text. Right-click still works when this is off.",
   "settings.confirmExternalLinks": "Confirm before opening links",
   "settings.confirmExternalLinksDesc": "Ask before opening http(s) links from chat in your browser. Off by default.",
   "settings.messageActions": "Message actions",

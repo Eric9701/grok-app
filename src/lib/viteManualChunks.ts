@@ -22,6 +22,9 @@ export function vendorManualChunk(id: string): string | undefined {
   if (
     rest.startsWith("react-markdown/") ||
     rest.startsWith("remark-gfm/") ||
+    rest.startsWith("remark-math/") ||
+    rest.startsWith("rehype-katex/") ||
+    rest.startsWith("katex/") ||
     rest.startsWith("remark-parse/") ||
     rest.startsWith("remark-rehype/") ||
     rest.startsWith("micromark/") ||

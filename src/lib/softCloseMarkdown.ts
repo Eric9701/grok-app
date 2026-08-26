@@ -15,12 +15,15 @@ export function softCloseMarkdown(src: string, streaming: boolean): string {
 
   let fenceOpen = false;
   let fenceCount = 0;
+  let mathBlockOpen = false;
+  let mathBlockCount = 0;
   let bold = 0; // **
   let strike = 0; // ~~
   let underlineBold = 0; // __
   let italicStar = 0; // single *
   let italicUnder = 0; // single _
   let inlineCode = 0; // single `
+  let inlineMath = 0; // $…$
 
   let i = 0;
   const n = src.length;
@@ -45,6 +48,32 @@ export function softCloseMarkdown(src: string, streaming: boolean): string {
     const prev = i > 0 ? src[i - 1] : "";
     const escaped = prev === "\\";
 
+    if (!escaped && ch === "`") {
+      // Multi-backtick runs (``` already handled at line start): skip.
+      if (src[i + 1] === "`") {
+        while (i < n && src[i] === "`") i += 1;
+        continue;
+      }
+      inlineCode += 1;
+      i += 1;
+      continue;
+    }
+    if (inlineCode % 2 === 1) {
+      i += 1;
+      continue;
+    }
+
+    if (src.startsWith("$$", i) && !escaped) {
+      mathBlockOpen = !mathBlockOpen;
+      mathBlockCount += 1;
+      i += 2;
+      continue;
+    }
+    if (mathBlockOpen) {
+      i += 1;
+      continue;
+    }
+
     if (!escaped && src.startsWith("**", i)) {
       bold += 1;
       i += 2;
@@ -60,13 +89,8 @@ export function softCloseMarkdown(src: string, streaming: boolean): string {
       i += 2;
       continue;
     }
-    if (!escaped && ch === "`") {
-      // Multi-backtick runs (``` already handled at line start): skip.
-      if (src[i + 1] === "`") {
-        while (i < n && src[i] === "`") i += 1;
-        continue;
-      }
-      inlineCode += 1;
+    if (!escaped && ch === "$") {
+      inlineMath += 1;
       i += 1;
       continue;
     }
@@ -92,6 +116,8 @@ export function softCloseMarkdown(src: string, streaming: boolean): string {
   if (italicStar % 2 === 1) s += "*";
   if (italicUnder % 2 === 1) s += "_";
   if (inlineCode % 2 === 1) s += "`";
+  if (inlineMath % 2 === 1) s += "$";
+  if (mathBlockCount % 2 === 1) s += "\n$$";
   if (fenceCount % 2 === 1) s += "\n```";
   return s;
 }

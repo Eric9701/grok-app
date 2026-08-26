@@ -40,6 +40,7 @@ import {
 import { saveCodeWrapPref } from "@/lib/codeWrapPref";
 import { saveCodeLineNumbersPref } from "@/lib/codeLineNumbersPref";
 import { saveBackBottomAlwaysPref } from "@/lib/backBottomAlwaysPref";
+import { saveTranscriptSelectionToolbarPref } from "@/lib/transcriptSelectionToolbarPref";
 import { saveSessionSearchRankPref } from "@/lib/sessionSearchRankPref";
 import type { SessionSearchRankMode } from "@/lib/sessionSearch";
 import { saveConfirmExternalLinksPref } from "@/lib/externalLinkPref";
@@ -59,6 +60,7 @@ export function AppearanceSection() {
     unreadSessionCount = 0,
     activeTab,
     backBottomAlways,
+    selectionToolbar = true,
     chatDensity,
     chatFontScale,
     chatWidth,
@@ -114,6 +116,7 @@ export function AppearanceSection() {
     sectionNav,
     sessionSearchRank,
     setBackBottomAlways,
+    setSelectionToolbar,
     setCodeLineNumbers,
     setCodeWrapDefault,
     setConfirmExternalLinks,
@@ -1163,6 +1166,29 @@ export function AppearanceSection() {
                   saveBackBottomAlwaysPref(next);
                 }}
                 ariaLabel={t("settings.backBottomAlways")}
+              />
+            </div>
+            <div
+              className={
+                "settings-row" +
+                rowHighlight("settings-anchor-selectionToolbar")
+              }
+              id="settings-anchor-selectionToolbar"
+            >
+              <div className="settings-row__text">
+                <SettingsLabelWithTip
+                  label={t("settings.selectionToolbar")}
+                  tip={t("settings.selectionToolbarDesc")}
+                />
+              </div>
+              <UiCheck
+                checked={selectionToolbar}
+                onChange={() => {
+                  const next = !selectionToolbar;
+                  setSelectionToolbar(next);
+                  saveTranscriptSelectionToolbarPref(next);
+                }}
+                ariaLabel={t("settings.selectionToolbar")}
               />
             </div>
           </div>
