@@ -76,12 +76,20 @@ export const WALLPAPER_BLUR_STORAGE_KEY = "grok-app.wallpaper-blur";
 export const COMPOSER_OPACITY_STORAGE_KEY = "grok-app.composer-opacity";
 /** File cards / code / user bubbles / resource controls (0–100). Independent of scrim. */
 export const UI_OPACITY_STORAGE_KEY = "grok-app.ui-opacity";
+/** Settings overlay fill over wallpaper (0–100). Independent of scrim. */
+export const SETTINGS_OPACITY_STORAGE_KEY = "grok-app.settings-opacity";
 /** Default matches the built-in gradient at full opacity. */
 export const DEFAULT_WALLPAPER_SCRIM = 100;
+/**
+ * Settings overlay never drops below this mix / blur floor.
+ * Workbench panes still follow the raw slider (0% stays fully clear).
+ */
+export const SETTINGS_WALLPAPER_FLOOR_PCT = 20;
 /** Default matches previous full-scrim blur (22px / 14px). */
 export const DEFAULT_WALLPAPER_BLUR = 100;
 export const DEFAULT_COMPOSER_OPACITY = 100;
 export const DEFAULT_UI_OPACITY = 100;
+export const DEFAULT_SETTINGS_OPACITY = 100;
 export const DEFAULT_SKIN: ThemeSkinId = "default";
 
 /** Accept common image types + short-loop video for wallpaper upload. */
@@ -247,11 +255,11 @@ export function saveWallpaperScrim(
 
 /**
  * 20% opacity floor; remaining 80% tracks t in [0, 1].
- * Used by the independent UI-surface slider (not wallpaper scrim).
+ * Used by independent UI-surface / settings-overlay sliders (not wallpaper scrim).
  */
 export function wallpaperFlooredMixPct(t: number): string {
   const clamped = Math.max(0, Math.min(1, t));
-  return `${Math.round(20 + 80 * clamped)}%`;
+  return `${Math.round(SETTINGS_WALLPAPER_FLOOR_PCT + (100 - SETTINGS_WALLPAPER_FLOOR_PCT) * clamped)}%`;
 }
 
 export function parseComposerOpacity(raw: unknown): number {
@@ -332,6 +340,52 @@ export function applyUiOpacityToDocument(
   );
 }
 
+export function parseSettingsOpacity(raw: unknown): number {
+  const n =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+        ? Number(raw)
+        : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_SETTINGS_OPACITY;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+export function loadSettingsOpacity(
+  storage: SkinStorage = localStorage,
+): number {
+  try {
+    return parseSettingsOpacity(storage.getItem(SETTINGS_OPACITY_STORAGE_KEY));
+  } catch {
+    return DEFAULT_SETTINGS_OPACITY;
+  }
+}
+
+export function saveSettingsOpacity(
+  storage: SkinStorage,
+  value: number,
+): void {
+  storage.setItem(
+    SETTINGS_OPACITY_STORAGE_KEY,
+    String(parseSettingsOpacity(value)),
+  );
+}
+
+/**
+ * Settings overlay mix: 20% floor + 80% × slider; not combined with scrim.
+ * Dark and light share the same mix so 100% is fully opaque on both.
+ */
+export function applySettingsOpacityToDocument(
+  value: number,
+  root: SkinRoot = document.documentElement,
+): void {
+  if (!root.style?.setProperty) return;
+  const mix = wallpaperFlooredMixPct(parseSettingsOpacity(value) / 100);
+  root.style.setProperty("--wallpaper-overlay-mix", mix);
+  root.style.setProperty("--wallpaper-light-overlay-mix", mix);
+  root.style.setProperty("--wallpaper-overlay-veil-opacity", "0");
+}
+
 /**
  * Apply scrim opacity as CSS vars on the root (veil + pane tint only).
  * Blur is independent — see {@link applyWallpaperBlurToDocument}.
@@ -342,7 +396,8 @@ export function applyUiOpacityToDocument(
  * in some WebViews. At 0, also sets `data-wallpaper-clear` so CSS can force
  * fully transparent pane fills (some engines leave a residual from 0% mix).
  * Right rail mix tracks the left sidebar curve. Chat cards keep a 20% floor
- * via {@link wallpaperFlooredMixPct}.
+ * via {@link wallpaperFlooredMixPct}. Settings overlay mix is independent —
+ * see {@link applySettingsOpacityToDocument}.
  */
 export function applyWallpaperScrimToDocument(
   value: number,
@@ -440,6 +495,11 @@ export function applyWallpaperBlurToDocument(
     "--wallpaper-settings-blur",
     `${(14 * t).toFixed(1)}px`,
   );
+  const overlayBlurPx = Math.max(
+    14 * (SETTINGS_WALLPAPER_FLOOR_PCT / 100),
+    14 * t,
+  );
+  root.style.setProperty("--wallpaper-overlay-blur", `${overlayBlurPx.toFixed(1)}px`);
 }
 
 /**

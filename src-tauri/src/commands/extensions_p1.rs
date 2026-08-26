@@ -581,6 +581,7 @@ fn attach_skill_enabled(skills: Vec<SkillDto>) -> Vec<serde_json::Value> {
                 "description": s.description,
                 "source": s.source,
                 "path": s.path,
+                "pluginName": s.plugin_name,
                 "userInvocable": s.user_invocable,
                 "enabled": enabled,
             })

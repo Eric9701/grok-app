@@ -20,6 +20,8 @@ describe("PetMark long-run paint", () => {
     expect(src).toContain("petLocalLookAxes");
     expect(src).toContain("BLOUB_LOOK_LOCAL_ENTER_MORPH");
     expect(src).toContain("isMorphing");
+    expect(src).toContain("bloubSettleState");
+    expect(src).toContain("bloubStateNeedsLivePaint");
   });
 
   it("mirrors the face from Host overlay position, not window.screenX", () => {

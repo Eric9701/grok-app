@@ -35,7 +35,7 @@ export const itSettingsPet = {
   "settings.pet.identityDesc": "Forma, volto a riposo, colore del corpo e degli occhi.",
   "settings.pet.shape": "Forma",
   "settings.pet.expression": "Espressione",
-  "settings.pet.expressionDesc": "Volto a riposo. La forma scelta resta visibile durante il lavoro; una chat finita non letta mostra un puntino in angolo.",
+  "settings.pet.expressionDesc": "Volto a riposo. Digitazione, un turno avviato e una chat finita morphano ancora nel catalogo, comprese le fasce colorate.",
   "settings.pet.expression.neutre": "Neutra",
   "settings.pet.expression.attentif": "Attento",
   "settings.pet.expression.surpris": "Sorpreso",

@@ -12,13 +12,15 @@ Gate: `showComposerProjectRow = !phoneLayout` in `AppWorkbench` (do not require 
 
 ## Composer document model
 
-- Draft is **segments**, not a plain string: `text | skill | chat`.
+- Draft is **segments**, not a plain string: `text | skill | plugin | chat`.
 - Skills render as **inline chips** inside the editor (not a top-only chip bar).
+- Plugin packs render as **plugin chips** (`[[plugin:name]]`). Send expands to that pack's enabled, user-invocable `/skill` tokens. A skill chip already covered by the pack is not sent twice.
 - Attached chats render as **composer chips** (`ChatRefChip`); the editor skips `chat` segments so `[[chat:uuid]]` never becomes typed text.
 - Mode markers (`goal`, and plan via session mode) live in the **composer toolbar**, not in the body.
-- Storage / user bubble text uses stable tokens: `[[skill:name]]`, `[[chat:<session-uuid>]]`.
+- Storage / user bubble text uses stable tokens: `[[skill:name]]`, `[[plugin:name]]`, `[[chat:<session-uuid>]]`.
 - Agent prompt serialization:
   - Skills → `/name` tokens (Grok Build invocable form), then plain text.
+  - Plugin chips → all enabled + user-invocable skills in that pack, then plain text.
   - Chat tokens are **not** sent as agent text. Host `session_attach` expands ids into a compact transcript prefix (max 3 chats). Source journals are unchanged.
   - Goal task on → prefix `/goal\n` (finite objective until done — **not** a scheduled timer; copy says 目标任务 / Goal task).
   - Attachments still append `@/abs/path` lines via `buildAgentPrompt`.
@@ -41,6 +43,7 @@ While the palette is open, Enter does **not** send the message.
 |------|--------|
 | `mode` | Toolbar chip / session mode (`goal`, `plan`) |
 | `skill` | Insert inline skill chip at caret |
+| `plugin` | Insert inline plugin chip at caret (this turn uses the pack's invocable skills) |
 | `action` | Host action (modal, navigation, toggle) — no body insert |
 | `prompt` | Insert or send a slash command string |
 

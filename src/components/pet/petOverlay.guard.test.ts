@@ -31,6 +31,7 @@ describe("PetOverlay drag hit target", () => {
   it("keeps celebrate spin after drag and bubble changes", () => {
     expect(src).toContain("spinSignal");
     expect(src).toContain("shouldTriggerPetSpin");
+    expect(src).toContain("petDoneTaskIds");
     expect(src).toContain("pet.menu.spin");
   });
 

@@ -35,7 +35,7 @@ export const frSettingsPet = {
   "settings.pet.identityDesc": "Forme, expression au repos, couleur du corps et des yeux.",
   "settings.pet.shape": "Forme",
   "settings.pet.expression": "Expression",
-  "settings.pet.expressionDesc": "Visage au repos. La forme choisie reste à l'écran pendant le travail ; un chat terminé non lu affiche un point dans le coin.",
+  "settings.pet.expressionDesc": "Visage au repos. La saisie, un tour déclenché et un chat terminé morphent encore dans le catalogue, y compris les rubans colorés.",
   "settings.pet.expression.neutre": "Neutre",
   "settings.pet.expression.attentif": "Attentif",
   "settings.pet.expression.surpris": "Surpris",

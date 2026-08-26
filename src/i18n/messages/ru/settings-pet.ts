@@ -35,7 +35,7 @@ export const ruSettingsPet = {
   "settings.pet.identityDesc": "Форма, выражение покоя, цвет тела и глаз живой метки.",
   "settings.pet.shape": "Форма",
   "settings.pet.expression": "Выражение",
-  "settings.pet.expressionDesc": "Лицо в покое. Выбранная форма остаётся на экране во время работы; непрочитанный готовый чат показывает точку в углу.",
+  "settings.pet.expressionDesc": "Лицо в покое. Набор текста, запуск хода и завершённый чат по-прежнему играют морфы каталога, включая цветные ленты.",
   "settings.pet.expression.neutre": "Спокойное",
   "settings.pet.expression.attentif": "Внимательное",
   "settings.pet.expression.surpris": "Удивлённое",

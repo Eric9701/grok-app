@@ -22,6 +22,8 @@ export const jaSlash = {
   "slash.kind.action": "アクション",
   "slash.kind.prompt": "プロンプト",
   "slash.kind.skill": "スキル",
+  "slash.kind.plugin": "プラグイン",
+  "slash.pluginDesc": "{n} スキル",
   "slash.goal": "ゴールタスク",
   "slash.goalDesc": "有限の目標 · 完了まで複数ラウンド · タイマーではありません",
   "slash.goalClear": "ゴールタスクをクリア",

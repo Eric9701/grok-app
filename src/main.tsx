@@ -28,12 +28,14 @@ import {
 } from "./lib/themeSchedule";
 import {
   applyComposerOpacityToDocument,
+  applySettingsOpacityToDocument,
   applySkinToDocument,
   applyUiOpacityToDocument,
   applyWallpaperBlurToDocument,
   applyWallpaperFlag,
   applyWallpaperScrimToDocument,
   loadComposerOpacity,
+  loadSettingsOpacity,
   loadSkin,
   loadUiOpacity,
   loadWallpaperBlur,
@@ -127,6 +129,7 @@ if (!petShell && !themeEditorShell) {
   applyWallpaperBlurToDocument(loadWallpaperBlur(localStorage));
   applyComposerOpacityToDocument(loadComposerOpacity(localStorage));
   applyUiOpacityToDocument(loadUiOpacity(localStorage));
+  applySettingsOpacityToDocument(loadSettingsOpacity(localStorage));
 }
 applyAppearanceChrome(loadAppearanceChrome(localStorage));
 // macOS: null = follow OS (live matchMedia). Windows: lock to the resolved

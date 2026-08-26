@@ -50,6 +50,7 @@ import {
 } from "@/lib/appearanceChromePref";
 import {
   applyComposerOpacityToDocument,
+  applySettingsOpacityToDocument,
   applySkinToDocument,
   applyUiOpacityToDocument,
   applyWallpaperFlag,
@@ -57,12 +58,14 @@ import {
   applyWallpaperScrimToDocument,
   clearWallpaper,
   loadComposerOpacity,
+  loadSettingsOpacity,
   loadSkin,
   loadUiOpacity,
   loadWallpaperBlur,
   loadWallpaperRecord,
   loadWallpaperScrim,
   saveComposerOpacity,
+  saveSettingsOpacity,
   saveSkin,
   saveUiOpacity,
   saveWallpaper,
@@ -108,6 +111,7 @@ export type ThemeShellValue = {
   setWallpaperBlur: (v: number) => void;
   composerOpacity: number;
   uiOpacity: number;
+  settingsOpacity: number;
   textColor: string | null;
   fontShadow: boolean;
   applyThemeChoice: (next: ThemePreference) => void;
@@ -130,6 +134,7 @@ export type ThemeShellValue = {
   applyWallpaperBlurChoice: (value: number) => void;
   applyComposerOpacityChoice: (value: number) => void;
   applyUiOpacityChoice: (value: number) => void;
+  applySettingsOpacityChoice: (value: number) => void;
   applyTextColorChoice: (value: string | null) => void;
   applyFontShadowChoice: (value: boolean) => void;
   resetAppearanceChromeChoice: () => void;
@@ -189,6 +194,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     loadComposerOpacity(localStorage),
   );
   const [uiOpacity, setUiOpacity] = useState(() => loadUiOpacity(localStorage));
+  const [settingsOpacity, setSettingsOpacity] = useState(() =>
+    loadSettingsOpacity(localStorage),
+  );
   const [textColor, setTextColor] = useState<string | null>(
     () => loadAppearanceChrome(localStorage).textColor,
   );
@@ -302,6 +310,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setWallpaperBlur(loadWallpaperBlur(localStorage));
         setComposerOpacity(loadComposerOpacity(localStorage));
         setUiOpacity(loadUiOpacity(localStorage));
+        setSettingsOpacity(loadSettingsOpacity(localStorage));
         const chrome = loadAppearanceChrome(localStorage);
         setTextColor(chrome.textColor);
         setFontShadow(chrome.fontShadow);
@@ -361,6 +370,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (isThemeEditorDocument()) return;
     applyUiOpacityToDocument(uiOpacity);
   }, [uiOpacity]);
+
+  useEffect(() => {
+    if (isThemeEditorDocument()) return;
+    applySettingsOpacityToDocument(settingsOpacity);
+  }, [settingsOpacity]);
 
   useEffect(() => {
     applyAppearanceChrome({ textColor, fontShadow });
@@ -601,6 +615,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     notifyAppearanceChanged();
   }, []);
 
+  const applySettingsOpacityChoice = useCallback((value: number) => {
+    saveSettingsOpacity(localStorage, value);
+    applySettingsOpacityToDocument(value);
+    setSettingsOpacity(value);
+    notifyAppearanceChanged();
+  }, []);
+
   const applyTextColorChoice = useCallback((value: string | null) => {
     const next = parseTextColor(value);
     saveTextColor(next, localStorage);
@@ -630,6 +651,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     saveUiOpacity(localStorage, 100);
     applyUiOpacityToDocument(100);
     setUiOpacity(100);
+    saveSettingsOpacity(localStorage, 100);
+    applySettingsOpacityToDocument(100);
+    setSettingsOpacity(100);
     notifyAppearanceChanged();
   }, []);
 
@@ -658,6 +682,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setWallpaperBlur,
       composerOpacity,
       uiOpacity,
+      settingsOpacity,
       textColor,
       fontShadow,
       applyThemeChoice,
@@ -670,6 +695,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyWallpaperBlurChoice,
       applyComposerOpacityChoice,
       applyUiOpacityChoice,
+      applySettingsOpacityChoice,
       applyTextColorChoice,
       applyFontShadowChoice,
       resetAppearanceChromeChoice,
@@ -688,6 +714,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       wallpaperBlur,
       composerOpacity,
       uiOpacity,
+      settingsOpacity,
       textColor,
       fontShadow,
       applyThemeChoice,
@@ -700,6 +727,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyWallpaperBlurChoice,
       applyComposerOpacityChoice,
       applyUiOpacityChoice,
+      applySettingsOpacityChoice,
       applyTextColorChoice,
       applyFontShadowChoice,
       resetAppearanceChromeChoice,

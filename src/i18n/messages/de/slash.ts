@@ -22,6 +22,8 @@ export const deSlash = {
   "slash.kind.action": "Aktion",
   "slash.kind.prompt": "Prompt",
   "slash.kind.skill": "Skill",
+  "slash.kind.plugin": "Plugin",
+  "slash.pluginDesc": "{n} Skills",
   "slash.goal": "Ziel-Aufgabe",
   "slash.goalDesc": "Endliches Ziel · mehrere Runden bis fertig · kein Timer",
   "slash.goalClear": "Ziel-Aufgabe löschen",

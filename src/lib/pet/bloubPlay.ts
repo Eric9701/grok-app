@@ -90,11 +90,16 @@ export function bloubShapeRadii(shape: string | null | undefined): number[] | nu
 
 const VERB_STATE: Record<string, StateId> = {
   idle: "idle",
+  thinking: "thinking",
+  searching: "comet",
+  working: "orbit",
+  writing: "alert",
   waiting: "wide",
   notifying: "notify",
   sleeping: "sleep",
-  waking: "idle",
+  waking: "swirl",
   dragging: "egg",
+  sad: "exclaim",
 };
 
 const VERB_EXPRESSION: Record<string, ExpressionId> = {
@@ -113,11 +118,6 @@ const VERB_EXPRESSION: Record<string, ExpressionId> = {
   scared: "effraye",
   angry: "colere",
   suspicious: "mefiant",
-  thinking: "attentif",
-  searching: "curieux",
-  working: "attentif",
-  writing: "attentif",
-  sad: "triste",
 };
 
 export type BloubPlay = {
@@ -145,9 +145,43 @@ export function bloubStateDuration(id: StateId): number {
   return STATE_BY_ID.get(id)?.duration ?? 2;
 }
 
+/** Typing (alert) replays while the composer is still live. */
+const HOLD_LOOP = new Set<StateId>(["alert"]);
+
 /** Narrative states that should restart while the session verb stays put. */
-export function bloubShouldLoop(_id: StateId): boolean {
-  return false;
+export function bloubShouldLoop(id: StateId): boolean {
+  return HOLD_LOOP.has(id);
+}
+
+/**
+ * Heavy signature morphs (orbit/comet belts, swirl) play one catalogue
+ * cycle, then hold this lighter state so a long turn does not spin the
+ * triangle forever.
+ */
+const SETTLE_AFTER_ONE: Partial<Record<StateId, StateId>> = {
+  orbit: "thinking",
+  comet: "thinking",
+  swirl: "idle",
+};
+
+export function bloubSettleState(id: StateId): StateId | null {
+  return SETTLE_AFTER_ONE[id] ?? null;
+}
+
+/** States whose pose still moves after the enter morph — keep live paint. */
+const LIVE_PAINT = new Set<StateId>([
+  "thinking",
+  "alert",
+  "orbit",
+  "comet",
+  "sleep",
+  "play",
+  "burst",
+  "swirl",
+]);
+
+export function bloubStateNeedsLivePaint(id: StateId): boolean {
+  return LIVE_PAINT.has(id);
 }
 
 /** 3/4 rest → frontal hover: same curve and duration as the expression morph. */
@@ -221,15 +255,15 @@ export function petVerbForComposer(input: {
     input.composing &&
     (input.sessionVerb === "idle" || input.sessionVerb === "waking")
   ) {
-    return "listening";
+    return "writing";
   }
   return input.sessionVerb;
 }
 
-/** How long after the last keystroke the pet holds the attentive rest face. */
+/** How long after the last keystroke the pet holds the catalog alert morph. */
 export const PET_COMPOSING_HOLD_MS = 1500;
 
-/** Typing → attentive rest face; empty draft or a pause → original rest shape. */
+/** Typing → catalog `alert` (slanted !); empty draft or a pause → original rest shape. */
 export function petIsComposing(input: {
   empty: boolean;
   lastTypeAt: number;

@@ -24,9 +24,11 @@ import {
   bloubExpressionOf,
   bloubLookAtPointer,
   bloubNotifFill,
+  bloubSettleState,
   bloubShapeRadii,
   bloubShouldLoop,
   bloubStateDuration,
+  bloubStateNeedsLivePaint,
   normalizePetExpression,
   resolveBloubPlay,
 } from "@/lib/pet/bloubPlay";
@@ -407,7 +409,8 @@ export function PetMark({
     let idleBurstMood = "";
     let idleBurstUntil = 0;
     let idleBurstNextAt = 0;
-    let lastPlayState = engine.state;
+    let requestedState = engine.state;
+    let shownState = engine.state;
     let stateSince = clockRef.current;
     let spin: PetSpinRun | null = null;
     let lastSpinKind: PetSpinKind | null = null;
@@ -477,22 +480,39 @@ export function PetMark({
       const play = resolvePlay(nowMs);
       engine.setShape(bloubShapeRadii(shapeRef.current), clock);
       engine.setExpression(bloubExpressionOf(play.expression), clock);
-      if (play.state !== lastPlayState) {
+      if (play.state !== requestedState) {
+        requestedState = play.state;
+        shownState = play.state;
         engine.setState(play.state, clock);
-        lastPlayState = play.state;
         stateSince = clock;
+        if (
+          !pausedRef.current &&
+          !reduce &&
+          !restOnlyRef.current &&
+          (play.state === "orbit" || play.state === "comet")
+        ) {
+          orbit.burst(14, 0.85, 0.28);
+        }
       } else if (
+        shownState === play.state &&
         bloubShouldLoop(play.state) &&
         clock - stateSince >= bloubStateDuration(play.state)
       ) {
         engine.reset(play.state, clock);
         stateSince = clock;
+      } else if (shownState === play.state) {
+        const settle = bloubSettleState(play.state);
+        if (settle && clock - stateSince >= bloubStateDuration(play.state)) {
+          shownState = settle;
+          engine.setState(settle, clock);
+          stateSince = clock;
+        }
       }
       const frozen = pausedRef.current || reduce;
-      const t = frozen ? (POSES[play.state] ?? 1) : clock;
+      const t = frozen ? (POSES[shownState] ?? 1) : clock;
       syncFaceMirror();
       const baseFace =
-        play.state === "idle" || play.state === "swirl";
+        shownState === "idle" || shownState === "swirl";
       const axes = baseFace ? readLocalLook(nowMs) : null;
       if (!axes) {
         if (aiming) {
@@ -583,13 +603,26 @@ export function PetMark({
       const morphing =
         wantSpinRef.current !== playedSpinRef.current ||
         engine.isMorphing(clockRef.current);
-      if (trackingLook || spin || morphing || draggingRef.current) {
+      const catalogLive = bloubStateNeedsLivePaint(engine.state);
+      const beltsLive = orbit.hasLife();
+      if (
+        trackingLook ||
+        spin ||
+        morphing ||
+        draggingRef.current ||
+        catalogLive ||
+        beltsLive
+      ) {
         idleSince = nowMs;
       }
       const minMs = petPaintMinMs({
-        spinning: spin != null || wantSpinRef.current !== playedSpinRef.current,
+        spinning:
+          spin != null ||
+          wantSpinRef.current !== playedSpinRef.current ||
+          beltsLive,
         morphing,
         trackingLook: trackingLook || draggingRef.current,
+        catalogLive,
         idleMs: nowMs - idleSince,
       });
       if (lastPaint && ms - lastPaint < minMs) {

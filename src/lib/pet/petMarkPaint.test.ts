@@ -40,6 +40,15 @@ describe("petPaintMinMs", () => {
         idleMs: 0,
       }),
     ).toBe(PET_PAINT_LIVE_MS);
+    expect(
+      petPaintMinMs({
+        spinning: false,
+        morphing: false,
+        trackingLook: false,
+        catalogLive: true,
+        idleMs: 60_000,
+      }),
+    ).toBe(PET_PAINT_LIVE_MS);
   });
 
   it("drops to a rest cadence after a long idle", () => {

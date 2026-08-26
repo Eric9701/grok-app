@@ -18,6 +18,7 @@ html[data-wallpaper="1"] {
   --wallpaper-theme-mix-main: var(--wallpaper-mix-main, 70%);
   --wallpaper-theme-mix-aside: var(--wallpaper-theme-mix-sidebar);
   --wallpaper-theme-mix-settings: var(--wallpaper-mix-settings, 78%);
+  --wallpaper-theme-overlay-mix: var(--wallpaper-overlay-mix, 100%);
   --wallpaper-theme-mix-card: var(--wallpaper-mix-card, 100%);
   --wallpaper-foreground-shadow-color: rgb(
     0 0 0 / var(--wallpaper-sidebar-shadow-alpha, 0)
@@ -34,6 +35,7 @@ html[data-theme="light"][data-wallpaper="1"] {
   --wallpaper-theme-mix-main: var(--wallpaper-light-mix-main, 24%);
   --wallpaper-theme-mix-aside: var(--wallpaper-theme-mix-sidebar);
   --wallpaper-theme-mix-settings: var(--wallpaper-light-mix-settings, 72%);
+  --wallpaper-theme-overlay-mix: var(--wallpaper-light-overlay-mix, 100%);
   --wallpaper-chrome-foreground: rgb(255 255 255 / 0.96);
   --wallpaper-chrome-shadow-color: rgb(0 0 0 / 0.68);
 }
@@ -128,12 +130,32 @@ html[data-wallpaper="1"] .workbench {
   background: transparent !important;
 }
 
-/* Settings overlay is always a solid plate — never sample wallpaper glass. */
+/*
+ * Settings overlay samples wallpaper via --wallpaper-overlay-mix
+ * (independent slider; 20% floor + 80% range). Extra veil is ::before so the
+ * stage stays position:absolute; inset:0 (#846). Workbench panes still follow
+ * the wallpaper scrim slider (0% stays fully clear).
+ */
 html[data-wallpaper="1"] .app-settings-stage {
   z-index: 20;
+  background: transparent;
+  backdrop-filter: blur(var(--wallpaper-overlay-blur, 2.8px));
+  -webkit-backdrop-filter: blur(var(--wallpaper-overlay-blur, 2.8px));
+}
+
+html[data-wallpaper="1"] .app-settings-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   background: var(--bg-main);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  opacity: var(--wallpaper-overlay-veil-opacity, 0);
+}
+
+html[data-wallpaper="1"] .app-settings-stage .settings-page {
+  position: relative;
+  z-index: 1;
 }
 
 /*
@@ -144,6 +166,8 @@ html[data-theme-editor-shell],
 html[data-theme-editor-shell][data-wallpaper="1"] {
   --composer-opacity-mix: 100%;
   --ui-opacity-mix: 100%;
+  --wallpaper-overlay-mix: 100%;
+  --wallpaper-light-overlay-mix: 100%;
   --wallpaper-theme-scrim-opacity: 0;
 }
 
@@ -341,23 +365,25 @@ html[data-wallpaper="1"] .setup-gate {
 }
 
 html[data-wallpaper="1"] .settings-page,
-html[data-wallpaper="1"] .platform-mac .settings-page {
-  background: var(--bg-main) !important;
-}
-
+html[data-wallpaper="1"] .platform-mac .settings-page,
 html.platform-mac[data-theme="light"][data-wallpaper="1"] .settings-page {
-  background: #ffffff !important;
+  background: transparent !important;
 }
 
 /*
- * Settings chrome stays opaque over wallpaper. Theme mix / blur used to
- * punch through forms; that is no longer wanted.
+ * Settings nav uses the overlay mix token — never sidebar mix — so a 0%
+ * workbench slider does not punch through the settings chrome.
  */
 html[data-wallpaper="1"] .settings-page__nav,
 html[data-wallpaper="1"] .platform-win .settings-page__nav,
 html[data-wallpaper="1"] .platform-other .settings-page__nav,
 html[data-wallpaper="1"] .platform-mac .settings-page__nav {
-  background: var(--bg-sidebar-solid, var(--bg-sidebar)) !important;
+  background: color-mix(
+    in srgb,
+    var(--bg-sidebar-solid, var(--bg-sidebar))
+      var(--wallpaper-theme-overlay-mix, 100%),
+    transparent
+  ) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -386,12 +412,20 @@ html[data-stream-perf="1"][data-wallpaper="1"] .app-wallpaper-media {
 
 html[data-wallpaper="1"] .settings-page__content,
 html[data-wallpaper="1"].platform-mac .settings-page__content {
-  background: var(--bg-main) !important;
+  background: color-mix(
+    in srgb,
+    var(--bg-main) var(--wallpaper-theme-overlay-mix, 100%),
+    transparent
+  ) !important;
   box-shadow: none !important;
 }
 
 html[data-wallpaper="1"].platform-mac[data-theme="light"] .settings-page__content {
-  background: #ffffff !important;
+  background: color-mix(
+    in srgb,
+    #ffffff var(--wallpaper-theme-overlay-mix, 100%),
+    transparent
+  ) !important;
   box-shadow: none !important;
 }
 
@@ -457,15 +491,8 @@ html[data-wallpaper="1"][data-wallpaper-clear="1"] .app-shell::after {
   opacity: 0 !important;
 }
 
-html[data-wallpaper="1"][data-wallpaper-clear="1"] .app-settings-stage,
-html[data-wallpaper="1"][data-wallpaper-clear="1"] .settings-page,
-html[data-wallpaper="1"][data-wallpaper-clear="1"] .settings-page__nav,
-html[data-wallpaper="1"][data-wallpaper-clear="1"] .settings-page__content,
-html[data-wallpaper="1"][data-wallpaper-clear="1"].platform-mac[data-theme="light"] .settings-page,
-html[data-wallpaper="1"][data-wallpaper-clear="1"].platform-mac[data-theme="light"] .settings-page__content {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
+/* wallpaper-clear (scrim 0%) only clears workbench panes — settings overlay
+ * keeps the independent settings-opacity mix / blur. */
 
 html[data-wallpaper="1"][data-wallpaper-clear="1"] .sidebar,
 html[data-wallpaper="1"][data-wallpaper-clear="1"] .main,

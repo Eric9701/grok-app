@@ -358,6 +358,7 @@ import {
 } from "@/lib/attachmentsPro";
 import { fileKey as clipboardFileKey, readClipboardMediaFiles } from "@/lib/clipboardPaste";
 import {
+  applyPluginAtSlash,
   applySkillAtSlash,
   isDraftEmpty,
   detectSlashQueryFromEditor,
@@ -5834,6 +5835,7 @@ export function AppWorkbench() {
     attachments,
     chatAttachments,
     quotes,
+    skillInfos,
     editSubmitting,
     editingUserMessageId,
     isPlaceholderTitle,
@@ -6535,6 +6537,8 @@ export function AppWorkbench() {
             name: s.name,
             description: s.description ?? "",
             source: s.source,
+            path: s.path ?? null,
+            pluginName: s.pluginName ?? null,
             // Host omits or defaults invocable; explicit false stays false.
             userInvocable: s.userInvocable !== false,
             enabled: s.enabled !== false,
@@ -6573,6 +6577,11 @@ export function AppWorkbench() {
   );
   const resolveSlashDescription = useCallback(
     (item: SlashItem) => {
+      if (item.kind === "plugin") {
+        return tr("slash.pluginDesc", {
+          n: String(item.aliases?.length ?? 0),
+        });
+      }
       if (item.descriptionKey) {
         try {
           return tr(item.descriptionKey as MessageKey);
@@ -9056,7 +9065,13 @@ export function AppWorkbench() {
         return;
       }
 
-      if (item.kind === "skill") {
+      if (item.kind === "skill" || item.kind === "plugin") {
+        const applyAtSlash =
+          item.kind === "plugin" ? applyPluginAtSlash : applySkillAtSlash;
+        const token =
+          item.kind === "plugin"
+            ? `[[plugin:${item.name}]] `
+            : `[[skill:${item.name}]] `;
         setDraft((d) => {
           // Prefer live range (DOM/draft poll), then re-detect on this draft.
           const range =
@@ -9064,20 +9079,17 @@ export function AppWorkbench() {
               ? q
               : null) ?? detectSlashRangeOnStored(d);
           if (range && d.slice(range.start, range.end).startsWith("/")) {
-            const next = applySkillAtSlash(
+            const next = applyAtSlash(
               d,
               range.start,
               range.end,
               item.name,
             );
-            // Caret after `[[skill:name]] ` — not document start (panel click blurs).
-            requestComposerStoredCaret(
-              range.start + `[[skill:${item.name}]] `.length,
-            );
+            requestComposerStoredCaret(range.start + token.length);
             return next;
           }
           const needsSpace = d.length > 0 && !/\s$/.test(d);
-          const next = `${d}${needsSpace ? " " : ""}[[skill:${item.name}]] `;
+          const next = `${d}${needsSpace ? " " : ""}${token}`;
           requestComposerStoredCaret("end");
           return next;
         });
@@ -14801,6 +14813,8 @@ export function AppWorkbench() {
           markProductTutorialDone();
           setShowProductTutorial(false);
         }}
+        gateReady={appGate === "ready"}
+        setupOpen={appGate === "setup"}
         liveVoiceOpen={liveVoiceOpen}
         voiceLocale={resolveLocale(locale)}
         voiceProjectPath={effectiveProjectPath}

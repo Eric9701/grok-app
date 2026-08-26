@@ -21,10 +21,11 @@ export function petPaintMinMs(input: {
   spinning: boolean;
   morphing: boolean;
   trackingLook: boolean;
+  catalogLive?: boolean;
   idleMs: number;
 }): number {
   if (input.spinning || input.morphing) return PET_PAINT_SPIN_MS;
-  if (input.trackingLook) return PET_PAINT_LIVE_MS;
+  if (input.trackingLook || input.catalogLive) return PET_PAINT_LIVE_MS;
   if (input.idleMs >= PET_PAINT_REST_AFTER_MS) return PET_PAINT_REST_MS;
   return PET_PAINT_IDLE_MS;
 }

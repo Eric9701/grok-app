@@ -253,15 +253,21 @@ describe("wallpaper theme contrast CSS", () => {
     );
   });
 
-  it("keeps settings chrome solid over wallpaper and mac glass", () => {
+  it("settings overlay uses independent mix tokens, not sidebar mix", () => {
     expect(css).toMatch(
-      /html\[data-wallpaper="1"\] \.app-settings-stage\s*\{[^}]*background:\s*var\(--bg-main\)[^}]*backdrop-filter:\s*none/s,
+      /html\[data-wallpaper="1"\]\s*\{[^}]*--wallpaper-theme-overlay-mix:\s*var\(--wallpaper-overlay-mix/s,
     );
     expect(css).toMatch(
-      /html\[data-wallpaper="1"\] \.settings-page__nav,[^}]*background:\s*var\(--bg-sidebar-solid[^}]*backdrop-filter:\s*none !important/s,
+      /html\[data-theme="light"\]\[data-wallpaper="1"\]\s*\{[^}]*--wallpaper-theme-overlay-mix:\s*var\(--wallpaper-light-overlay-mix/s,
     );
     expect(css).toMatch(
-      /html\[data-wallpaper="1"\] \.settings-page__content,[^}]*background:\s*var\(--bg-main\) !important/s,
+      /html\[data-wallpaper="1"\] \.settings-page__nav,[^}]*--wallpaper-theme-overlay-mix/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.settings-page__content,[^}]*--wallpaper-theme-overlay-mix/s,
+    );
+    expect(css).not.toMatch(
+      /html\[data-wallpaper="1"\] \.settings-page__nav,[^}]*--wallpaper-theme-mix-sidebar/s,
     );
     expect(css).not.toMatch(
       /html\[data-wallpaper="1"\]\[data-wallpaper-clear="1"\] \.settings-page__content[^}]*background:\s*transparent/s,

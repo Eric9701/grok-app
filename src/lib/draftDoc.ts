@@ -7,16 +7,18 @@
 export type DraftSegment =
   | { type: "text"; text: string }
   | { type: "skill"; name: string }
+  | { type: "plugin"; name: string }
   | { type: "chat"; sessionId: string; scope?: "recent" | "user" | "full" };
 
 /** Skill name character class: letters, digits, `_` `.` `:` `-`. */
 export const SKILL_NAME_RE = /[a-zA-Z0-9_.:-]+/;
 
 const SKILL_TOKEN_RE = /\[\[skill:([a-zA-Z0-9_.:-]+)\]\]/g;
+const PLUGIN_TOKEN_RE = /\[\[plugin:([a-zA-Z0-9_.:-]+)\]\]/g;
 
-/** Combined skill + attached-chat tokens, in document order. */
+/** Combined skill + plugin + attached-chat tokens, in document order. */
 const STORED_TOKEN_RE =
-  /\[\[skill:([a-zA-Z0-9_.:-]+)\]\]|\[\[chat:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?::(recent|user|full))?\]\]/g;
+  /\[\[skill:([a-zA-Z0-9_.:-]+)\]\]|\[\[plugin:([a-zA-Z0-9_.:-]+)\]\]|\[\[chat:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?::(recent|user|full))?\]\]/g;
 
 /**
  * Slash names that are App/Build commands, not skill chips, when rehydrating
@@ -121,7 +123,11 @@ export function draftFromPlainText(text: string): DraftSegment[] {
  */
 export function parseStoredContent(content: string): DraftSegment[] {
   if (!content) return [];
-  if (!content.includes("[[skill:") && !content.includes("[[chat:")) {
+  if (
+    !content.includes("[[skill:") &&
+    !content.includes("[[plugin:") &&
+    !content.includes("[[chat:")
+  ) {
     return [{ type: "text", text: content }];
   }
   const segments: DraftSegment[] = [];
@@ -135,13 +141,15 @@ export function parseStoredContent(content: string): DraftSegment[] {
     if (m[1]) {
       segments.push({ type: "skill", name: m[1] });
     } else if (m[2]) {
+      segments.push({ type: "plugin", name: m[2] });
+    } else if (m[3]) {
       const scope =
-        m[3] === "user" || m[3] === "full" || m[3] === "recent"
-          ? m[3]
+        m[4] === "user" || m[4] === "full" || m[4] === "recent"
+          ? m[4]
           : undefined;
       segments.push({
         type: "chat",
-        sessionId: m[2],
+        sessionId: m[3],
         scope: scope === "recent" ? undefined : scope,
       });
     }
@@ -159,6 +167,7 @@ export function serializeStored(segments: DraftSegment[]): string {
     .map((s) => {
       if (s.type === "text") return s.text;
       if (s.type === "skill") return `[[skill:${s.name}]]`;
+      if (s.type === "plugin") return `[[plugin:${s.name}]]`;
       return s.scope && s.scope !== "recent"
         ? `[[chat:${s.sessionId}:${s.scope}]]`
         : `[[chat:${s.sessionId}]]`;
@@ -175,6 +184,7 @@ export function previewStoredAsSlash(stored: string): string {
   if (!stored) return stored;
   return stored
     .replace(new RegExp(SKILL_TOKEN_RE.source, "g"), "/$1")
+    .replace(new RegExp(PLUGIN_TOKEN_RE.source, "g"), "/$1")
     .replace(
       /\[\[chat:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?::(recent|user|full))?\]\]/g,
       "",
@@ -198,7 +208,9 @@ export function plainTextOf(segments: DraftSegment[]): string {
 /** Empty when there are no skills, no attached chats, and no non-whitespace text. */
 export function isDraftEmpty(segments: DraftSegment[]): boolean {
   for (const s of segments) {
-    if (s.type === "skill" || s.type === "chat") return false;
+    if (s.type === "skill" || s.type === "plugin" || s.type === "chat") {
+      return false;
+    }
     if (s.type === "text" && s.text.trim() !== "") return false;
   }
   return true;
@@ -212,13 +224,32 @@ export function isDraftEmpty(segments: DraftSegment[]): boolean {
  */
 export function serializeForAgent(
   segments: DraftSegment[],
-  opts?: { goalMode?: boolean },
+  opts?: { goalMode?: boolean; pluginSkills?: Record<string, string[]> },
 ): string {
+  const pluginSkills = opts?.pluginSkills ?? {};
+  const covered = new Set<string>();
+  for (const s of segments) {
+    if (s.type !== "plugin") continue;
+    for (const n of pluginSkills[s.name] ?? []) {
+      covered.add(n.toLowerCase());
+    }
+  }
   const skillTokens: string[] = [];
+  const seenSkill = new Set<string>();
+  const pushSkill = (name: string) => {
+    const key = name.toLowerCase();
+    if (!name || seenSkill.has(key)) return;
+    seenSkill.add(key);
+    skillTokens.push(`/${name}`);
+  };
   const textParts: string[] = [];
   for (const s of segments) {
-    if (s.type === "skill") skillTokens.push(`/${s.name}`);
-    else if (s.type === "text") textParts.push(s.text);
+    if (s.type === "plugin") {
+      for (const n of pluginSkills[s.name] ?? []) pushSkill(n);
+    } else if (s.type === "skill") {
+      if (covered.has(s.name.toLowerCase())) continue;
+      pushSkill(s.name);
+    } else if (s.type === "text") textParts.push(s.text);
   }
 
   const skillsPart = skillTokens.join(" ");
@@ -247,6 +278,16 @@ export function applySkillAtSlash(
   skillName: string,
 ): string {
   const token = `[[skill:${skillName}]] `;
+  return stored.slice(0, slashStart) + token + stored.slice(slashEnd);
+}
+
+export function applyPluginAtSlash(
+  stored: string,
+  slashStart: number,
+  slashEnd: number,
+  pluginName: string,
+): string {
+  const token = `[[plugin:${pluginName}]] `;
   return stored.slice(0, slashStart) + token + stored.slice(slashEnd);
 }
 
@@ -314,6 +355,19 @@ function cleanEditorText(raw: string): string {
     .replace(/\r/g, "\n");
 }
 
+function chipTokenFromEl(he: HTMLElement): string | null {
+  const plugin =
+    he.dataset?.plugin || he.getAttribute("data-plugin") || "";
+  if (plugin || he.hasAttribute("data-plugin")) {
+    return plugin ? `[[plugin:${plugin}]]` : null;
+  }
+  if (he.dataset?.skill != null || he.hasAttribute("data-skill")) {
+    const name = he.dataset?.skill || he.getAttribute("data-skill") || "";
+    return name ? `[[skill:${name}]]` : null;
+  }
+  return null;
+}
+
 /**
  * Inline content of one line box: text + soft `<br>` → `\n` + skill tokens.
  * A caret-only `<br>` in an otherwise empty line yields `""` (empty line body).
@@ -329,10 +383,9 @@ export function serializeEditorLineContent(el: HTMLElement): string {
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
     const he = node as HTMLElement;
-    if (he.dataset?.skill != null || he.hasAttribute("data-skill")) {
-      const name =
-        he.dataset?.skill || he.getAttribute("data-skill") || "";
-      parts.push(`[[skill:${name}]]`);
+    const chip = chipTokenFromEl(he);
+    if (chip) {
+      parts.push(chip);
       return;
     }
     if (he.tagName === "BR") {
@@ -394,10 +447,9 @@ export function serializeEditorDomWalk(
         lines.push("");
         continue;
       }
-      if (he.dataset?.skill != null || he.hasAttribute("data-skill")) {
-        const name =
-          he.dataset?.skill || he.getAttribute("data-skill") || "";
-        lines.push(`[[skill:${name}]]`);
+      const chip = chipTokenFromEl(he);
+      if (chip) {
+        lines.push(chip);
         continue;
       }
       if (isEditorBlockTag(he.tagName)) {
@@ -435,10 +487,9 @@ export function serializeEditorDomWalk(
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return;
       const he = node as HTMLElement;
-      if (he.dataset?.skill != null || he.hasAttribute("data-skill")) {
-        const name =
-          he.dataset?.skill || he.getAttribute("data-skill") || "";
-        parts.push(`[[skill:${name}]]`);
+      const chip = chipTokenFromEl(he);
+      if (chip) {
+        parts.push(chip);
         return;
       }
       if (he.tagName === "BR") {
@@ -455,7 +506,7 @@ export function serializeEditorDomWalk(
   if (
     !opts?.preserveWhitespaceOnly &&
     !t.replace(/\n/g, "").trim() &&
-    !/\[\[skill:/.test(t)
+    !/\[\[(?:skill|plugin):/.test(t)
   ) {
     return "";
   }

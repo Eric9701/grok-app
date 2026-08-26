@@ -12,10 +12,16 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- **Settings page opacity slider**: Settings → Appearance → Theme can set how opaque the settings overlay is over wallpaper. 100% is fully solid. The lowest setting still keeps a 20% fill; the remaining 80% follows the slider. Independent of wallpaper overlay. Not packed into `.grokskin`.
+- **What's new after an update (#922)**: the first launch of a newer version opens a GlassModal of that version's CHANGELOG (Added / Changed / Fixed). The account menu and Settings → About can reopen it. First install does not auto-show; setup wizard and the product tour are not blocked.
+- **Slash can pick a whole plugin (#929)**: `/` and `+` list plugin packs as well as skills. Choosing a pack inserts a plugin chip; send expands to that pack's enabled, user-invocable skills. A single skill from the pack can still be chosen on its own.
 - **Progress rail side**: Settings → Appearance → Interface can put the conversation ticks on the left or right.
 - **Custom appearance chrome**: Settings → Appearance → Theme can set a text color (default follows Light / Dark near-black / near-white) and an optional text shadow (off by default). Restore defaults asks for confirmation and resets both. These fields travel with `.grokskin` import / export.
 
 **中文 · 新增**
+- **设置页透明度滑块**：设置 → 外观 → 主题可调设置页在壁纸上的不透明度。100% 全实色。最低仍保留 20% 底色，其余 80% 跟滑块。不与壁纸遮罩合并。不进 `.grokskin`。
+- **更新公告（#922）**：装上新版本后第一次打开，弹出这一版 CHANGELOG（新增 / 变更 / 修复）。账户菜单和设置 → 关于可再打开。全新安装不自动弹；不挡设置向导和产品导览。
+- **斜杠可选整个插件（#929）**：`/` 和 `+` 里插件包和 skill 都是条目。选插件插入插件 chip，发送时带上该包里已启用、可调用的 skill。仍可只选其中一条。
 - **进度条左右**：设置 → 外观 → 界面可把对话刻度放到左侧或右侧。
 - **自定义外观**：设置 → 外观 → 主题可改文字颜色（默认跟随浅/深色近黑/近白）和字体阴影（默认关）。「恢复默认」需二次确认，会把这两项恢复出厂。这两项会随 `.grokskin` 导入导出。
 
@@ -28,7 +34,7 @@ See `docs/llm-wiki/release.md`.
 - **Agent question no longer covers the transcript (#891)**: `_x.ai/ask_user_question` sits above the composer like the permission bar. Chat stays scrollable. Collapse to a chip (not Dismiss) keeps the draft. The question is the title; options sit on the left with Dismiss / Submit on the right (Submit pinned to the bottom of the card). Short chips stay in a row. Selection uses the theme accent fill; Enter submits except while an IME is committing a candidate.
 - **Dock icons from authored black / white appiconsets**: production `icon.icns` / `icon.ico` pack the black 16–1024 rasters; `pnpm dev` packs the white set into `icons/dev`. Pixel sizes are not resampled (`scripts/pack_appiconset.py`).
 - **Linux AppImage runtime packages (#899)**: README documents the host apt line for a clean Debian/Ubuntu (`libegl1`, `libgles2`, `libwebkit2gtk-4.1-0`, `libayatana-appindicator3-1`) when the official AppImage exits with `libEGL.so.1: cannot open shared object file`. Distinct from the Wayland black-window / `EGL_BAD_PARAMETER` notes.
-- **Settings page is always solid**: nav, content, and the settings overlay no longer pick up theme glass or wallpaper mix. Wallpaper contrast no longer forces light-theme ink to white; text shadow is opt-in.
+- **Settings overlay wallpaper floor (#927)**: settings still samples wallpaper. Mix is an independent slider (20% floor + 80% range). Overlay blur still never drops below 20%. Workbench panes still follow the wallpaper slider (0% stays fully clear). `data-wallpaper-clear` no longer punches settings transparent.
 - **Wallpaper and pane surfaces (#883–#890, #892–#894, #900)**: bottom terminal uses a 1px seam plus theme glass; plan pane reuses sidebar frost; dark wallpaper composer glass; exposed chrome contrast; settings cards stay opaque and share `UiSwitch` / `Select` / `UiCheck`.
 - **Unused AI Elements widgets (#907)**: drop seven unreachable UI files (`button`, `collapsible`, `marker`, `message`, `message-response`, `reasoning`, `shimmer`) and their exclusive deps (`streamdown`, `@radix-ui/react-collapsible`, `@radix-ui/react-slot`, `class-variance-authority`). The `mermaid` pnpm override went with `streamdown`. Chat still uses `MarkdownBody` / Lobe thread.
 
@@ -41,11 +47,13 @@ See `docs/llm-wiki/release.md`.
 - **Agent 提问不再挡住会话（#891）**：`_x.ai/ask_user_question` 放到输入框上方，和权限条一样。会话可滚动。收成一条不算忽略，草稿还在。问题当标题；选项在左、忽略/提交在右（提交贴容器底）。短芯片横排。选中用主题色填充；回车提交，中文输入法选词回车不提交。
 - **Dock 图标改用已调好的黑 / 白 appiconset**：正式版 `icon.icns` / `icon.ico` 打黑色 16–1024；`pnpm dev` 打白色到 `icons/dev`。按原像素封装，不再缩放（`scripts/pack_appiconset.py`）。
 - **Linux AppImage 运行时包（#899）**：README 补上干净 Debian/Ubuntu 的 apt 行（`libegl1`、`libgles2`、`libwebkit2gtk-4.1-0`、`libayatana-appindicator3-1`）。官方 AppImage 缺 `libEGL.so.1` 会立刻退出；这与 Wayland 黑窗 / `EGL_BAD_PARAMETER` 不是同一类问题。
-- **设置页始终实色**：导航、内容区和设置层不再吃主题玻璃或壁纸混色。浅色壁纸不再把文字强制成白；字体阴影改为可选。
+- **设置页壁纸遮罩保底 20%（#927）**：设置页仍能透出壁纸。底色 mix 改由独立滑块控制（20% 保底 + 其余 80% 跟滑块）。overlay blur 仍不低于 20%。工作区侧栏 / 主栏 / 右栏继续跟壁纸滑杆，0% 仍全透。`data-wallpaper-clear` 不再把设置页刷成全透明。
 - **壁纸与分栏表面（#883–#890、#892–#894、#900）**：底部终端改为 1px 分隔加主题玻璃；计划面板复用侧栏霜化；深色壁纸输入框补齐玻璃；暴露文字对比统一；设置页卡片不透明并共用 `UiSwitch` / `Select` / `UiCheck`。
 - **未使用的 AI Elements 控件（#907）**：删除 7 个不可达 UI 文件及其独占依赖（`streamdown`、`@radix-ui/react-collapsible`、`@radix-ui/react-slot`、`class-variance-authority`）；`mermaid` override 随 `streamdown` 去掉。聊天仍走 `MarkdownBody` / Lobe 线程。
 
 ### Fixed
+- **Windows Open in editor no longer hands VS Code `\\?\` paths (#928)**: `open_in_editor` now strips the extended-length prefix the same way Explorer reveal already did, so workspace URIs stay `file:///d:/…`.
+- **Desktop pet morphs again for typing, a triggered turn, and a finished task**: composer typing plays the catalog slanted-`!` alert; a live turn plays orbit/comet belts then holds the thinking dots (so a long job does not spin the triangle forever); a finished turn celebrates with notify + colorful spin, including when the workbench already has that chat in view. Overlay paint throttle and hidden-pause stay.
 - **Pet overlay copy follows the app language (#930)**: the pet webview now gets the same boot locale as the main window and loads the matching catalog.
 - **Composer newline no longer moves the whole typed line down (#923)**: WebKit often reports the caret on the editor root at offset 0 after wrapping. End-of-line Enter inserts an empty next line; mid-line Enter still splits at the caret.
 - **Transcript stays pinned when the chat column width interpolates (#920)**: opening the right pane no longer jumps the thread up then snaps back to the bottom.
@@ -55,6 +63,8 @@ See `docs/llm-wiki/release.md`.
 - **Narrow-window plan overlay leftover (#902)**: an open aside overlay now uses the existing full-cover mode instead of a leftover scrim over the main column.
 
 **中文 · 修复**
+- **Windows「在编辑器中打开」不再把 `\\?\` 路径交给 VS Code（#928）**：`open_in_editor` 与资源管理器揭示一样剥掉扩展前缀，工作区 URI 保持 `file:///d:/…`。
+- **桌宠打字 / 触发回合 / 任务完成的形变回来了**：输入框打字走斜感叹号；一轮任务开始播轨道/彗星彩带，然后停在思考三点（长任务不再无限转三角形）；完成时通知圆点 + 彩带旋转，主窗已经在看这场对话也会庆祝。绘制节流和隐藏暂停保留。
 - **宠物浮层文案跟随应用语言（#930）**：宠物独立 webview 注入与主窗相同的启动语言，并加载对应文案表。
 - **输入框换行不再把整行挪到下一行（#923）**：WebKit 换行后常把光标报到编辑器根节点 offset 0。行尾换行插入空行；行中换行从光标切开。
 - **对话列变窄时仍钉在底部（#920）**：打开右侧栏不再先把会话挤上去再抽回底部。

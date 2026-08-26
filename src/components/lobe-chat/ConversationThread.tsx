@@ -404,7 +404,11 @@ const UserBodyText = memo(function UserBodyText({
   const chatLookup = useAttachedChatLookup();
   const hydrated = hydrateDisplayContent(content);
   const segs = parseStoredContent(hydrated);
-  if (!segs.some((s) => s.type === "skill" || s.type === "chat")) {
+  if (
+    !segs.some(
+      (s) => s.type === "skill" || s.type === "plugin" || s.type === "chat",
+    )
+  ) {
     if (findQuery?.trim()) {
       return (
         <span className="user-msg-body">
@@ -423,6 +427,16 @@ const UserBodyText = memo(function UserBodyText({
       {segs.map((s, i) => {
         if (s.type === "skill") {
           return <SkillChip key={`sk-${i}-${s.name}`} name={s.name} size="sm" />;
+        }
+        if (s.type === "plugin") {
+          return (
+            <SkillChip
+              key={`pl-${i}-${s.name}`}
+              name={s.name}
+              size="sm"
+              kind="plugin"
+            />
+          );
         }
         if (s.type === "chat") {
           const status = chatLookup.statusOf(s.sessionId);

@@ -93,6 +93,14 @@ export function AppearanceOpacityCard() {
             onChange={theme.applyUiOpacityChoice}
             highlight={rowHighlight("settings-anchor-uiOpacity")}
           />
+          <OpacitySlider
+            id="settings-anchor-settingsOpacity"
+            label={t("settings.settingsOpacity")}
+            desc={t("settings.settingsOpacityDesc")}
+            value={theme.settingsOpacity}
+            onChange={theme.applySettingsOpacityChoice}
+            highlight={rowHighlight("settings-anchor-settingsOpacity")}
+          />
         </div>
       </div>
     </div>

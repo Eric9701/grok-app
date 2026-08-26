@@ -50,6 +50,7 @@ import {
 } from "@/lib/layout";
 import { paneSplitSizeStyle } from "@/lib/paneSplitMotion";
 import type { Theme, ThemePreference } from "@/lib/theme";
+import { requestWhatsNewOpen } from "@/lib/whatsNew";
 
 type TFn = ReturnType<typeof createT>;
 
@@ -378,6 +379,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
           }
           labels={{
             settings: tr("sidebar.settings"),
+            whatsNew: tr("whatsNew.menu"),
             tutorial: tr("tutorial.menu"),
             theme: tr("user.theme"),
             themeSystem: tr("settings.themeSystem"),
@@ -403,6 +405,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
           }}
           onSettings={onSettings}
           onAccountSettings={onAccountSettings}
+          onWhatsNew={() => requestWhatsNewOpen()}
           onTutorial={onTutorial}
           onTheme={applyThemeChoice}
           onThemeEditor={() => {

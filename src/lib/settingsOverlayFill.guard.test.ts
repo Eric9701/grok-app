@@ -28,19 +28,22 @@ describe("settings overlay fills the window with wallpaper on", () => {
     expect(css).toMatch(/\.app-settings-stage\s*\{[^}]*inset:\s*0/s);
   });
 
-  it("keeps the settings stage solid above the mounted workbench", () => {
+  it("samples wallpaper on the settings stage via overlay tokens and a ::before veil", () => {
     const css = readFileSync(join(STYLES, "skins.css"), "utf8");
     expect(css).toMatch(
-      /html\[data-wallpaper="1"\] \.app-settings-stage\s*\{[^}]*background:\s*var\(--bg-main\)[^}]*backdrop-filter:\s*none/s,
+      /html\[data-wallpaper="1"\] \.app-settings-stage\s*\{[^}]*backdrop-filter:\s*blur\(var\(--wallpaper-overlay-blur/s,
+    );
+    expect(css).toMatch(
+      /html\[data-wallpaper="1"\] \.app-settings-stage::before\s*\{[^}]*--wallpaper-overlay-veil-opacity/s,
     );
   });
 
-  it("drops settings-stage blur for stream-perf and a clear wallpaper", () => {
+  it("drops settings-stage blur for stream-perf but not wallpaper-clear", () => {
     const css = readFileSync(join(STYLES, "skins.css"), "utf8");
     expect(css).toMatch(
       /html\[data-stream-perf="1"\]\[data-wallpaper="1"\] \.app-settings-stage,[^{]*\{[^}]*backdrop-filter:\s*none\s*!important/s,
     );
-    expect(css).toMatch(
+    expect(css).not.toMatch(
       /html\[data-wallpaper="1"\]\[data-wallpaper-clear="1"\] \.app-settings-stage,[^{]*\{[^}]*backdrop-filter:\s*none\s*!important/s,
     );
   });
@@ -61,7 +64,7 @@ describe("settings overlay fills the window with wallpaper on", () => {
       "",
     );
     expect(css).not.toMatch(
-      /\.app-settings-stage[^{]*\{[^}]*position:\s*relative/s,
+      /\.app-settings-stage\s*\{[^}]*position:\s*relative/s,
     );
   });
 });

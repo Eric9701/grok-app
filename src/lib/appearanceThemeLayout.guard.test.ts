@@ -44,7 +44,10 @@ describe("appearance theme layout", () => {
       /\.settings-appearance-theme-layout__rail,\s*\.settings-appearance-theme-layout__main\s*\{[^}]*overflow-y:\s*auto/s,
     );
     expect(css).toMatch(
-      /\.settings-appearance-theme-layout__main\s*>\s*\.settings-card\s*\{[^}]*flex:\s*0 0 auto/s,
+      /\.settings-appearance-theme-layout__main,\s*\.settings-appearance-interface\s*\{[^}]*gap:\s*14px/s,
+    );
+    expect(css).toMatch(
+      /\.settings-appearance-theme-layout__main\s*>\s*\.settings-card,\s*\.settings-appearance-interface\s*>\s*\.settings-card\s*\{[^}]*flex:\s*0 0 auto/s,
     );
     expect(wallpaperCss).toMatch(/\.settings-wallpaper--split/);
     expect(wallpaperCss).toMatch(

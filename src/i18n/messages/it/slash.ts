@@ -22,6 +22,8 @@ export const itSlash = {
   "slash.kind.action": "Azione",
   "slash.kind.prompt": "Prompt",
   "slash.kind.skill": "Skill",
+  "slash.kind.plugin": "Plugin",
+  "slash.pluginDesc": "{n} skill",
   "slash.goal": "Attività obiettivo",
   "slash.goalDesc": "Obiettivo finito · più round fino al completamento · non un timer",
   "slash.goalClear": "Cancella attività obiettivo",

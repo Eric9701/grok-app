@@ -124,10 +124,25 @@ export function stripCaretPadsInEditor(el: HTMLElement) {
   }
 }
 
-function isSkillChipEl(node: Node | null | undefined): node is HTMLElement {
+function isChipEl(node: Node | null | undefined): node is HTMLElement {
   if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
   const he = node as HTMLElement;
-  return !!(he.dataset?.skill || he.getAttribute("data-skill"));
+  return !!(
+    he.dataset?.skill ||
+    he.getAttribute("data-skill") ||
+    he.dataset?.plugin ||
+    he.getAttribute("data-plugin")
+  );
+}
+
+function chipTokenOf(he: HTMLElement): string {
+  const plugin =
+    he.dataset?.plugin || he.getAttribute("data-plugin") || "";
+  if (plugin || he.hasAttribute("data-plugin")) {
+    return plugin ? `[[plugin:${plugin}]]` : "";
+  }
+  const name = he.dataset?.skill || he.getAttribute("data-skill") || "";
+  return name ? `[[skill:${name}]]` : "";
 }
 
 function makeSkillChipEl(name: string): HTMLElement {
@@ -136,7 +151,29 @@ function makeSkillChipEl(name: string): HTMLElement {
   wrap.contentEditable = "false";
   wrap.dataset.skill = name;
   wrap.setAttribute("data-skill", name);
-  // Atomic unit for caret — prevents caret from landing inside glyph/label.
+  wrap.setAttribute("contenteditable", "false");
+
+  const icon = document.createElement("span");
+  icon.className = "skill-chip__glyph";
+  icon.setAttribute("aria-hidden", "true");
+  icon.innerHTML = skillChipGlyphSvg(name);
+
+  const label = document.createElement("span");
+  label.className = "skill-chip__name";
+  label.textContent = name;
+
+  wrap.appendChild(icon);
+  wrap.appendChild(label);
+  return wrap;
+}
+
+function makePluginChipEl(name: string): HTMLElement {
+  const wrap = document.createElement("span");
+  wrap.className =
+    "skill-chip skill-chip--sm skill-chip--editor skill-chip--plugin";
+  wrap.contentEditable = "false";
+  wrap.dataset.plugin = name;
+  wrap.setAttribute("data-plugin", name);
   wrap.setAttribute("contenteditable", "false");
 
   const icon = document.createElement("span");
@@ -162,13 +199,14 @@ const COMPOSER_NL_ATTR = "data-composer-nl";
 
 type LineInline =
   | { type: "text"; value: string }
-  | { type: "skill"; name: string };
+  | { type: "skill"; name: string }
+  | { type: "plugin"; name: string };
 
 function segmentsToLines(segments: DraftSegment[]): LineInline[][] {
   const lines: LineInline[][] = [[]];
   for (const seg of segments) {
-    if (seg.type === "skill") {
-      lines[lines.length - 1]!.push({ type: "skill", name: seg.name });
+    if (seg.type === "skill" || seg.type === "plugin") {
+      lines[lines.length - 1]!.push({ type: seg.type, name: seg.name });
       continue;
     }
     if (seg.type === "chat") {
@@ -193,7 +231,11 @@ function fillLineDiv(div: HTMLElement, items: LineInline[]) {
       div.appendChild(document.createTextNode(item.value));
     } else {
       appendCaretPad(div);
-      div.appendChild(makeSkillChipEl(item.name));
+      div.appendChild(
+        item.type === "plugin"
+          ? makePluginChipEl(item.name)
+          : makeSkillChipEl(item.name),
+      );
       appendCaretPad(div);
     }
   }
@@ -230,11 +272,11 @@ function skillChipBeforeCaret(el: HTMLElement): HTMLElement | null {
   if (node === el) {
     // Caret between children of the editor root.
     const prev = el.childNodes[offset - 1] ?? null;
-    if (isSkillChipEl(prev)) return prev;
+    if (isChipEl(prev)) return prev;
     if (
       prev?.nodeType === Node.TEXT_NODE &&
       isPadOnlyText(prev.textContent) &&
-      isSkillChipEl(prev.previousSibling)
+      isChipEl(prev.previousSibling)
     ) {
       return prev.previousSibling as HTMLElement;
     }
@@ -247,10 +289,10 @@ function skillChipBeforeCaret(el: HTMLElement): HTMLElement | null {
     // or at offset 0 with previous sibling chip, or offset into empty/pad after chip.
     if (offset === 0) {
       let prev = node.previousSibling;
-      if (isSkillChipEl(prev)) return prev;
+      if (isChipEl(prev)) return prev;
       if (prev?.nodeType === Node.TEXT_NODE && isPadOnlyText(prev.textContent)) {
         prev = prev.previousSibling;
-        if (isSkillChipEl(prev)) return prev;
+        if (isChipEl(prev)) return prev;
       }
       return null;
     }
@@ -258,14 +300,14 @@ function skillChipBeforeCaret(el: HTMLElement): HTMLElement | null {
     const before = text.slice(0, offset);
     if (isPadOnlyText(before)) {
       let prev = node.previousSibling;
-      if (isSkillChipEl(prev)) return prev;
+      if (isChipEl(prev)) return prev;
     }
     return null;
   }
 
   if (node.nodeType === Node.ELEMENT_NODE) {
     const prev = node.childNodes[offset - 1] ?? null;
-    if (isSkillChipEl(prev)) return prev;
+    if (isChipEl(prev)) return prev;
   }
   return null;
 }
@@ -282,11 +324,11 @@ function skillChipAfterCaret(el: HTMLElement): HTMLElement | null {
 
   if (node === el) {
     const next = el.childNodes[offset] ?? null;
-    if (isSkillChipEl(next)) return next;
+    if (isChipEl(next)) return next;
     if (
       next?.nodeType === Node.TEXT_NODE &&
       isPadOnlyText(next.textContent) &&
-      isSkillChipEl(next.nextSibling)
+      isChipEl(next.nextSibling)
     ) {
       return next.nextSibling as HTMLElement;
     }
@@ -297,10 +339,10 @@ function skillChipAfterCaret(el: HTMLElement): HTMLElement | null {
     const text = node.textContent ?? "";
     if (offset >= text.length || isPadOnlyText(text.slice(offset))) {
       let next = node.nextSibling;
-      if (isSkillChipEl(next)) return next;
+      if (isChipEl(next)) return next;
       if (next?.nodeType === Node.TEXT_NODE && isPadOnlyText(next.textContent)) {
         next = next.nextSibling;
-        if (isSkillChipEl(next)) return next;
+        if (isChipEl(next)) return next;
       }
     }
     return null;
@@ -308,7 +350,7 @@ function skillChipAfterCaret(el: HTMLElement): HTMLElement | null {
 
   if (node.nodeType === Node.ELEMENT_NODE) {
     const next = node.childNodes[offset] ?? null;
-    if (isSkillChipEl(next)) return next;
+    if (isChipEl(next)) return next;
   }
   return null;
 }
@@ -441,12 +483,14 @@ function lineDivsOf(el: HTMLElement): HTMLElement[] {
       c instanceof HTMLElement &&
       c.tagName === "DIV" &&
       !c.dataset?.skill &&
-      !c.hasAttribute("data-skill"),
+      !c.hasAttribute("data-skill") &&
+      !c.dataset?.plugin &&
+      !c.hasAttribute("data-plugin"),
   );
 }
 
 function padEmptyComposerLine(div: HTMLElement) {
-  const hasChip = !!div.querySelector("[data-skill]");
+  const hasChip = !!div.querySelector("[data-skill], [data-plugin]");
   if (hasChip || serializeEditorLineContent(div)) return;
   while (div.firstChild) div.removeChild(div.firstChild);
   div.appendChild(document.createElement("br"));
@@ -681,12 +725,8 @@ function placeCaretInLineAt(div: HTMLElement, offset: number) {
       }
       continue;
     }
-    if (child.nodeType === Node.ELEMENT_NODE && isSkillChipEl(child)) {
-      const name =
-        (child as HTMLElement).dataset?.skill ||
-        (child as HTMLElement).getAttribute("data-skill") ||
-        "";
-      const tokenLen = `[[skill:${name}]]`.length;
+    if (child.nodeType === Node.ELEMENT_NODE && isChipEl(child)) {
+      const tokenLen = chipTokenOf(child as HTMLElement).length;
       if (seen + tokenLen >= offset) {
         const after = child.nextSibling;
         const range = document.createRange();
@@ -774,10 +814,9 @@ function placeCaretAtStoredOffset(el: HTMLElement, target: number) {
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return false;
     const he = node as HTMLElement;
-    if (he.dataset?.skill != null || he.hasAttribute("data-skill")) {
-      const name =
-        he.dataset?.skill || he.getAttribute("data-skill") || "";
-      const tokenLen = `[[skill:${name}]]`.length;
+    const chipTok = chipTokenOf(he);
+    if (chipTok) {
+      const tokenLen = chipTok.length;
       if (count + tokenLen >= want) {
         // Land after the chip (and its following pad if any).
         const after = he.nextSibling;
@@ -1210,7 +1249,8 @@ export const ComposerEditor = memo(function ComposerEditor({
       (parseStoredContent(stored).every(
         (s) => s.type === "text" && !s.text.trim(),
       ) &&
-        !stored.includes("[[skill:"));
+        !stored.includes("[[skill:") &&
+        !stored.includes("[[plugin:"));
     setDomEmpty(empty);
   }, []);
 
@@ -1218,8 +1258,8 @@ export const ComposerEditor = memo(function ComposerEditor({
     (el: HTMLElement) => {
       let stored = serializeComposerDraft(el);
       if (
-        /\[\[skill:[a-zA-Z0-9_.:-]+\]\]/.test(stored) &&
-        !el.querySelector("[data-skill]")
+        /\[\[(?:skill|plugin):[a-zA-Z0-9_.:-]+\]\]/.test(stored) &&
+        !el.querySelector("[data-skill], [data-plugin]")
       ) {
         renderSegmentsInto(el, parseStoredContent(stored));
         stored = serializeDom(el);
@@ -1424,7 +1464,8 @@ export const ComposerEditor = memo(function ComposerEditor({
     (parseStoredContent(value).every(
       (s) => s.type === "text" && !s.text.trim(),
     ) &&
-      !value.includes("[[skill:"));
+      !value.includes("[[skill:") &&
+      !value.includes("[[plugin:"));
   // Both prop and live DOM must be empty — otherwise placeholder covers ink.
   const isEmpty = valueEmpty && domEmpty;
 

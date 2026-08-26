@@ -196,6 +196,9 @@ pub struct SkillDto {
     pub path: Option<String>,
     #[serde(default)]
     pub user_invocable: bool,
+    /// Owning plugin id when this skill came from a plugin pack (#929).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugin_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -267,6 +270,27 @@ fn run_grok_inspect(project_path: Option<&str>) -> (Option<serde_json::Value>, O
     }
 }
 
+fn plugin_name_from_skill_path(path: Option<&str>) -> Option<String> {
+    let raw = path?;
+    let p = raw.replace('\\', "/");
+    let p = p
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("/");
+    let p = format!("/{p}");
+    for marker in ["/installed-plugins/", "/plugins/"] {
+        if let Some(idx) = p.to_ascii_lowercase().find(marker) {
+            let rest = &p[idx + marker.len()..];
+            let name = rest.split('/').next().unwrap_or("").trim();
+            if !name.is_empty() && !name.eq_ignore_ascii_case("skills") {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
+}
+
 fn normalize_skill_source(source: &serde_json::Value) -> (String, Option<String>) {
     if let Some(s) = source.as_str() {
         return (s.to_string(), None);
@@ -321,12 +345,21 @@ fn parse_skills(v: &serde_json::Value) -> Vec<SkillDto> {
             .or_else(|| item.get("user-invocable"))
             .and_then(|x| x.as_bool())
             .unwrap_or(true);
+        let plugin_name = item
+            .get("pluginName")
+            .or_else(|| item.get("plugin_name"))
+            .or_else(|| item.get("plugin"))
+            .and_then(|x| x.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .or_else(|| plugin_name_from_skill_path(path.as_deref()));
         out.push(SkillDto {
             name,
             description,
             source,
             path,
             user_invocable,
+            plugin_name,
         });
     }
     out
@@ -473,6 +506,7 @@ fn scan_project_skills(project_path: Option<&str>) -> Vec<SkillDto> {
             source: "project".into(),
             path: Some(skill_md.to_string_lossy().to_string()),
             user_invocable,
+            plugin_name: None,
         });
     }
     out.sort_by(|a, b| {
@@ -548,6 +582,7 @@ mod skill_project_scan_tests {
             source: "user".into(),
             path: Some("/u/shared/SKILL.md".into()),
             user_invocable: true,
+            plugin_name: None,
         }];
         let project = vec![SkillDto {
             name: "shared".into(),
@@ -555,6 +590,7 @@ mod skill_project_scan_tests {
             source: "project".into(),
             path: Some("/p/shared/SKILL.md".into()),
             user_invocable: true,
+            plugin_name: None,
         }];
         let merged = merge_skills_prefer_project(inspect, project);
         assert_eq!(merged.len(), 1);
@@ -571,6 +607,7 @@ mod skill_project_scan_tests {
                 source: "user".into(),
                 path: None,
                 user_invocable: true,
+                plugin_name: None,
             },
             SkillDto {
                 name: "Both".into(),
@@ -578,6 +615,7 @@ mod skill_project_scan_tests {
                 source: "user".into(),
                 path: None,
                 user_invocable: true,
+                plugin_name: None,
             },
         ];
         let project = vec![
@@ -587,6 +625,7 @@ mod skill_project_scan_tests {
                 source: "project".into(),
                 path: Some("/p/both/SKILL.md".into()),
                 user_invocable: true,
+                plugin_name: None,
             },
             SkillDto {
                 name: "proj-only".into(),
@@ -594,6 +633,7 @@ mod skill_project_scan_tests {
                 source: "project".into(),
                 path: Some("/p/proj-only/SKILL.md".into()),
                 user_invocable: true,
+                plugin_name: None,
             },
         ];
         let merged = merge_skills_prefer_project(inspect, project);
@@ -635,6 +675,37 @@ mod skill_project_scan_tests {
             .path
             .as_ref()
             .is_some_and(|p| p.ends_with("SKILL.md")));
+    }
+
+    #[test]
+    fn plugin_name_from_skill_path_markers() {
+        assert_eq!(
+            plugin_name_from_skill_path(Some(
+                "/Users/me/.grok/installed-plugins/agent-plugin-codex/skills/x/SKILL.md"
+            ))
+            .as_deref(),
+            Some("agent-plugin-codex")
+        );
+        assert_eq!(
+            plugin_name_from_skill_path(Some(
+                "/Users/me/.grok/plugins/foo/skills/bar/SKILL.md"
+            ))
+            .as_deref(),
+            Some("foo")
+        );
+        assert_eq!(
+            plugin_name_from_skill_path(Some(r"D:\work\.grok\plugins\pdf\skills\a\SKILL.md"))
+                .as_deref(),
+            Some("pdf")
+        );
+        assert_eq!(
+            plugin_name_from_skill_path(Some("/Users/me/.grok/skills/help/SKILL.md")),
+            None
+        );
+        assert_eq!(
+            plugin_name_from_skill_path(Some("/Users/me/.grok/bundled/skills/pdf/SKILL.md")),
+            None
+        );
     }
 }
 

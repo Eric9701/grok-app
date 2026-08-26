@@ -800,17 +800,24 @@ textarea.settings-input.settings-agents-json__textarea {
   min-height: auto;
 }
 
-.settings-appearance-theme-layout__main {
+.settings-appearance-theme-layout__main,
+.settings-appearance-interface {
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
   justify-content: flex-start;
   align-items: stretch;
-  gap: 12px;
+  /* Match .settings-page__main > .settings-card + .settings-card (14px).
+   * Cards here are nested, so that sibling rule never fires. */
+  gap: 14px;
+}
+
+.settings-appearance-theme-layout__main {
   padding-bottom: 24px;
 }
 
-.settings-appearance-theme-layout__main > .settings-card {
+.settings-appearance-theme-layout__main > .settings-card,
+.settings-appearance-interface > .settings-card {
   /* Natural content height — never shrink to fit the viewport. */
   flex: 0 0 auto;
   margin: 0;

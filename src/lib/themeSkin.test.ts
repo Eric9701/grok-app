@@ -4,14 +4,17 @@ import {
   applyWallpaperFlag,
   applyWallpaperBlurToDocument,
   applyComposerOpacityToDocument,
+  applySettingsOpacityToDocument,
   applyUiOpacityToDocument,
   applyWallpaperScrimToDocument,
   clearWallpaper,
   DEFAULT_SKIN,
+  DEFAULT_SETTINGS_OPACITY,
   DEFAULT_WALLPAPER_BLUR,
   DEFAULT_WALLPAPER_SCRIM,
   getThemeSkinMeta,
   isThemeSkinId,
+  loadSettingsOpacity,
   loadSkin,
   loadWallpaperBlur,
   loadWallpaperMeta,
@@ -19,16 +22,19 @@ import {
   loadWallpaperScrim,
   memoryWallpaperBlobStorage,
   parseThemeSkin,
+  parseSettingsOpacity,
   parseWallpaperBlur,
   wallpaperFlooredMixPct,
   parseWallpaperScrim,
   prepareWallpaperFromFile,
+  saveSettingsOpacity,
   saveSkin,
   saveWallpaper,
   saveWallpaperAdjust,
   saveWallpaperBlur,
   saveWallpaperFocus,
   saveWallpaperScrim,
+  SETTINGS_OPACITY_STORAGE_KEY,
   SKIN_STORAGE_KEY,
   skinPreferredTheme,
   THEME_SKINS,
@@ -333,6 +339,46 @@ describe("wallpaper scrim", () => {
     expect(props.get("--ui-opacity-mix")).toBe("100%");
   });
 
+  it("applies settings page opacity as 20% floor plus 80% slider, not combined with scrim", () => {
+    expect(DEFAULT_SETTINGS_OPACITY).toBe(100);
+    expect(parseSettingsOpacity(null)).toBe(100);
+    expect(parseSettingsOpacity("nope")).toBe(100);
+    expect(parseSettingsOpacity(-20)).toBe(0);
+    expect(parseSettingsOpacity(140)).toBe(100);
+    expect(parseSettingsOpacity("35.6")).toBe(36);
+
+    const storage = memoryStorage();
+    expect(loadSettingsOpacity(storage)).toBe(DEFAULT_SETTINGS_OPACITY);
+    saveSettingsOpacity(storage, 40);
+    expect(storage.data[SETTINGS_OPACITY_STORAGE_KEY]).toBe("40");
+    expect(loadSettingsOpacity(storage)).toBe(40);
+
+    const props = new Map<string, string>();
+    const el = {
+      setAttribute() {},
+      removeAttribute() {},
+      style: {
+        setProperty(name: string, value: string) {
+          props.set(name, value);
+        },
+        removeProperty(name: string) {
+          props.delete(name);
+        },
+      },
+    };
+    applySettingsOpacityToDocument(0, el);
+    expect(props.get("--wallpaper-overlay-mix")).toBe("20%");
+    expect(props.get("--wallpaper-light-overlay-mix")).toBe("20%");
+    expect(props.get("--wallpaper-overlay-veil-opacity")).toBe("0");
+    applySettingsOpacityToDocument(50, el);
+    expect(props.get("--wallpaper-overlay-mix")).toBe("60%"); // 20 + 80 * 0.5
+    expect(props.get("--wallpaper-light-overlay-mix")).toBe("60%");
+    applySettingsOpacityToDocument(100, el);
+    expect(props.get("--wallpaper-overlay-mix")).toBe("100%");
+    expect(props.get("--wallpaper-light-overlay-mix")).toBe("100%");
+    expect(props.get("--wallpaper-overlay-veil-opacity")).toBe("0");
+  });
+
   it("persists and reloads scrim strength", () => {
     const storage = memoryStorage();
     expect(loadWallpaperScrim(storage)).toBe(DEFAULT_WALLPAPER_SCRIM);
@@ -409,6 +455,43 @@ describe("wallpaper scrim", () => {
     expect(props.has("--wallpaper-light-foreground-shadow-alpha")).toBe(false);
   });
 
+  it("does not let wallpaper scrim write settings overlay mix tokens", () => {
+    const props = new Map<string, string>();
+    const attrs = new Map<string, string>();
+    const el = {
+      setAttribute(name: string, value: string) {
+        attrs.set(name, value);
+      },
+      removeAttribute(name: string) {
+        attrs.delete(name);
+      },
+      style: {
+        setProperty(name: string, value: string) {
+          props.set(name, value);
+        },
+        removeProperty(name: string) {
+          props.delete(name);
+        },
+      },
+    };
+
+    applyWallpaperScrimToDocument(0, el);
+    expect(attrs.get("data-wallpaper-clear")).toBe("1");
+    expect(props.get("--wallpaper-mix-sidebar")).toBe("0%");
+    expect(props.get("--wallpaper-mix-main")).toBe("0%");
+    expect(props.get("--wallpaper-mix-aside")).toBe("0%");
+    expect(props.get("--wallpaper-mix-settings")).toBe("0%");
+    expect(props.has("--wallpaper-overlay-mix")).toBe(false);
+    expect(props.has("--wallpaper-light-overlay-mix")).toBe(false);
+    expect(props.has("--wallpaper-overlay-veil-opacity")).toBe(false);
+
+    applyWallpaperScrimToDocument(50, el);
+    expect(props.get("--wallpaper-mix-sidebar")).toBe("29%"); // 58 * 0.50
+    expect(props.has("--wallpaper-overlay-mix")).toBe(false);
+    expect(props.has("--wallpaper-light-overlay-mix")).toBe(false);
+    expect(props.has("--wallpaper-overlay-veil-opacity")).toBe(false);
+  });
+
   it("wallpaper blur is independent of scrim and migrates from scrim when unset", () => {
     expect(DEFAULT_WALLPAPER_BLUR).toBe(100);
     expect(parseWallpaperBlur(null)).toBe(100);
@@ -444,6 +527,32 @@ describe("wallpaper scrim", () => {
     applyWallpaperBlurToDocument(100, el);
     expect(props.get("--wallpaper-sidebar-blur")).toBe("22.0px");
     expect(props.get("--wallpaper-settings-blur")).toBe("14.0px");
+  });
+
+  it("floors settings overlay blur at 20% without raising sidebar blur", () => {
+    const props = new Map<string, string>();
+    const el = {
+      setAttribute() {},
+      removeAttribute() {},
+      style: {
+        setProperty(name: string, value: string) {
+          props.set(name, value);
+        },
+        removeProperty(name: string) {
+          props.delete(name);
+        },
+      },
+    };
+    applyWallpaperBlurToDocument(0, el);
+    expect(props.get("--wallpaper-sidebar-blur")).toBe("0.0px");
+    expect(props.get("--wallpaper-settings-blur")).toBe("0.0px");
+    expect(props.get("--wallpaper-overlay-blur")).toBe("2.8px"); // 14 * 0.20
+    applyWallpaperBlurToDocument(20, el);
+    expect(props.get("--wallpaper-sidebar-blur")).toBe("4.4px"); // 22 * 0.20
+    expect(props.get("--wallpaper-overlay-blur")).toBe("2.8px"); // max(2.8, 2.8)
+    applyWallpaperBlurToDocument(100, el);
+    expect(props.get("--wallpaper-sidebar-blur")).toBe("22.0px");
+    expect(props.get("--wallpaper-overlay-blur")).toBe("14.0px");
   });
 });
 

@@ -212,11 +212,7 @@ pub fn open_in_editor(
     if !path.exists() {
         return Err(format!("path not found: {file_path}"));
     }
-    let abs = path
-        .canonicalize()
-        .unwrap_or(path)
-        .to_string_lossy()
-        .to_string();
+    let abs = crate::process_util::path_for_editor(&path);
 
     let id = editor.unwrap_or("").trim().to_ascii_lowercase();
     if !id.is_empty() && id != "finder" && id != "explorer" && id != "system" && id != "default"

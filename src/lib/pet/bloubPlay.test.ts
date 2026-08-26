@@ -8,8 +8,11 @@ import {
   bloubExpressionOf,
   bloubLookAtPointer,
   bloubNotifFill,
+  bloubSettleState,
   bloubShapeId,
   bloubShapeRadii,
+  bloubShouldLoop,
+  bloubStateNeedsLivePaint,
   normalizePetExpression,
   petIsComposing,
   petVerbForComposer,
@@ -26,29 +29,14 @@ describe("bloub product mapping", () => {
     expect(bloubShapeId("nope")).toBe("cercle");
   });
 
-  it("maps session verbs onto rest-body states", () => {
-    expect(resolveBloubPlay("writing", "neutre")).toEqual({
-      state: "idle",
-      expression: "attentif",
-    });
+  it("maps session verbs onto measured animation states", () => {
+    expect(resolveBloubPlay("writing", "neutre").state).toBe("alert");
     expect(resolveBloubPlay("notifying", "neutre").state).toBe("notify");
     expect(resolveBloubPlay("waiting", "neutre").state).toBe("wide");
-    expect(resolveBloubPlay("thinking", "neutre")).toEqual({
-      state: "idle",
-      expression: "attentif",
-    });
-    expect(resolveBloubPlay("searching", "neutre")).toEqual({
-      state: "idle",
-      expression: "curieux",
-    });
-    expect(resolveBloubPlay("working", "neutre")).toEqual({
-      state: "idle",
-      expression: "attentif",
-    });
-    expect(resolveBloubPlay("sad", "neutre")).toEqual({
-      state: "idle",
-      expression: "triste",
-    });
+    expect(resolveBloubPlay("thinking", "neutre").state).toBe("thinking");
+    expect(resolveBloubPlay("searching", "neutre").state).toBe("comet");
+    expect(resolveBloubPlay("working", "neutre").state).toBe("orbit");
+    expect(resolveBloubPlay("sad", "neutre").state).toBe("exclaim");
     expect(resolveBloubPlay("celebrate", "neutre").state).toBe("idle");
   });
 
@@ -60,14 +48,11 @@ describe("bloub product mapping", () => {
     expect(normalizePetExpression("nope")).toBe("neutre");
   });
 
-  it("turns composer typing into an attentive rest face while idle", () => {
+  it("turns composer typing into the catalog alert morph while idle", () => {
     expect(
       petVerbForComposer({ sessionVerb: "idle", composing: true }),
-    ).toBe("listening");
-    expect(resolveBloubPlay("listening", "neutre")).toEqual({
-      state: "idle",
-      expression: "attentif",
-    });
+    ).toBe("writing");
+    expect(resolveBloubPlay("writing", "neutre").state).toBe("alert");
     expect(
       petVerbForComposer({ sessionVerb: "working", composing: true }),
     ).toBe("working");
@@ -76,7 +61,7 @@ describe("bloub product mapping", () => {
     ).toBe("idle");
   });
 
-  it("drops the attentive hold when typing pauses or the draft is empty", () => {
+  it("drops the alert morph when typing pauses or the draft is empty", () => {
     expect(
       petIsComposing({ empty: true, lastTypeAt: 1000, now: 1100 }),
     ).toBe(false);
@@ -93,6 +78,18 @@ describe("bloub product mapping", () => {
         now: 1000 + PET_COMPOSING_HOLD_MS + 1,
       }),
     ).toBe(false);
+  });
+
+  it("loops the typing alert and settles orbit/comet after one cycle", () => {
+    expect(bloubShouldLoop("alert")).toBe(true);
+    expect(bloubShouldLoop("orbit")).toBe(false);
+    expect(bloubShouldLoop("comet")).toBe(false);
+    expect(bloubSettleState("orbit")).toBe("thinking");
+    expect(bloubSettleState("comet")).toBe("thinking");
+    expect(bloubSettleState("alert")).toBeNull();
+    expect(bloubStateNeedsLivePaint("orbit")).toBe(true);
+    expect(bloubStateNeedsLivePaint("thinking")).toBe(true);
+    expect(bloubStateNeedsLivePaint("idle")).toBe(false);
   });
 
   it("uses a non-blue unread pastille", () => {
@@ -118,6 +115,30 @@ describe("bloub product mapping", () => {
     const note = engine.sample(POSES.notify);
     expect(note.notif).not.toBeNull();
     expect(note.notif!.r).toBeGreaterThan(0);
+  });
+
+  it("samples distinct typing / trigger / finish catalogue poses", () => {
+    const engine = new BotEngine(
+      100,
+      "idle",
+      bloubShapeRadii("blob"),
+      bloubExpressionOf("neutre"),
+    );
+    const idle = engine.sample(POSES.idle);
+    engine.reset(resolveBloubPlay("writing", "neutre").state, 0);
+    const typing = engine.sample(POSES.alert);
+    expect(typing.bodyPath).not.toBe(idle.bodyPath);
+    expect(typing.dots.length).toBeGreaterThan(0);
+
+    engine.reset(resolveBloubPlay("working", "neutre").state, 0);
+    const trigger = engine.sample(POSES.orbit);
+    expect(trigger.arcs.length).toBeGreaterThan(0);
+    expect(trigger.bodyPath).not.toBe(typing.bodyPath);
+
+    engine.reset(resolveBloubPlay("notifying", "neutre").state, 0);
+    const done = engine.sample(POSES.notify);
+    expect(done.notif).not.toBeNull();
+    expect(done.bodyPath).not.toBe(trigger.bodyPath);
   });
 });
 

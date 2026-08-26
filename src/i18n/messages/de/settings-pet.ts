@@ -35,7 +35,7 @@ export const deSettingsPet = {
   "settings.pet.identityDesc": "Form, Ruhegesicht, Körperfarbe und Augenfarbe des lebenden Zeichens.",
   "settings.pet.shape": "Form",
   "settings.pet.expression": "Gesicht",
-  "settings.pet.expressionDesc": "Ruheausdruck. Die gewählte Form bleibt während der Arbeit sichtbar; ungelesene fertige Chats zeigen einen kleinen Punkt oben rechts.",
+  "settings.pet.expressionDesc": "Ruheausdruck. Tippen, ein ausgelöster Vorgang und ein abgeschlossener Chat morphen weiter durch den Katalog — inklusive der bunten Bänder.",
   "settings.pet.expression.neutre": "Neutral",
   "settings.pet.expression.attentif": "Aufmerksam",
   "settings.pet.expression.surpris": "Überrascht",
