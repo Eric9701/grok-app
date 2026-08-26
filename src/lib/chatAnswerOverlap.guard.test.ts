@@ -37,13 +37,15 @@ describe("chat answer overlap guard", () => {
     );
   });
 
-  it("reserves a transcript scrollbar gutter so the thumb does not cover cards", () => {
+  it("reserves a transcript scrollbar gutter only when the column is tight", () => {
     const src = css("lobe-chat.part1.css");
     const scrollStart = src.indexOf(".lobe-chat__scroll {");
     const innerStart = src.indexOf(".lobe-chat__inner {");
     expect(scrollStart).toBeGreaterThanOrEqual(0);
     expect(innerStart).toBeGreaterThan(scrollStart);
     const scrollBlock = src.slice(scrollStart, innerStart);
+    expect(scrollBlock).toContain("container-type: inline-size");
+    expect(scrollBlock).toContain("container-name: chat-scroll");
     expect(scrollBlock).toContain("scrollbar-gutter: stable");
     expect(scrollBlock).toMatch(/scrollbar-width:\s*thin\s*!important/);
     expect(scrollBlock).toMatch(
@@ -53,9 +55,11 @@ describe("chat answer overlap guard", () => {
       innerStart,
       src.indexOf(".lobe-chat-item {", innerStart),
     );
+    expect(innerBlock).toMatch(/padding:\s*20px 20px 32px/);
     expect(innerBlock).toMatch(
-      /padding-inline-end:\s*calc\(20px \+ var\(--scrollbar-size/,
+      /padding-inline-end:\s*max\(\s*20px,\s*calc\([\s\S]*100cqi\s*-\s*var\(--chat-width-max/,
     );
+    expect(innerBlock).toContain('html[data-chat-width="full"] .lobe-chat__inner');
   });
 
   it("gives answer paragraphs an explicit unitless line-height", () => {
