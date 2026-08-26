@@ -48,3 +48,9 @@
 
 7. **App shell + AppWorkbench growth freeze** — do **not** add new `useState` / large feature blocks to `src/App.tsx` or `src/app/AppWorkbench.tsx`. Combined line count of App shell + AppWorkbench may only decrease (see `docs/plans/CODE-QUALITY-PROGRESS.md` and `docs/plans/HANDOFF-appworkbench-decomposition.md`). New product state and UI must land in domain modules (`src/providers/`, `src/hooks/`, `src/components/`, `src/lib/`).
 
+8. **Change / new-feature bar** — when asked to add or change product behavior, finish all three. Shipping a button or a stub that does not actually work is not done.
+
+   1. **Interaction Logic** — the full click/keyboard/busy/error/empty path, not only the visible control.
+   2. **Visual Consistency** — same chrome, spacing, menus, and states as the rest of the app. Do not invent a parallel skin.
+   3. **Feature Parity** — same capability as the existing product surface it sits next to (local session, CLI, the other row in the same list). A control that looks like rewind/rollback/fork but does nothing is a Feature Parity miss — same class as the current rewind bug.
+
