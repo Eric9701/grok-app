@@ -125,10 +125,44 @@
    * programmatic scrollTop during stream growth and feels like bounce. */
   overflow-anchor: none;
   /* Reserve gutter so image max-width / text wrap don't thrash when the
-   * scrollbar appears mid-load (classic width↔height oscillation). */
+   * scrollbar appears mid-load (classic width↔height oscillation).
+   * Must beat `*:not(textarea) { scrollbar-width: none }` or the gutter
+   * collapses to 0 and the thumb covers cards when the aside squeezes
+   * this column to ~chat-width-max. */
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--scrollbar-thumb, rgba(128, 128, 128, 0.35)) transparent
+    !important;
+  -ms-overflow-style: auto !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar {
+  display: block !important;
+  width: var(--scrollbar-size, 8px) !important;
+  height: var(--scrollbar-size, 8px) !important;
+  background: transparent !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar-track,
+.lobe-chat__scroll::-webkit-scrollbar-track-piece,
+.lobe-chat__scroll::-webkit-scrollbar-corner {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb, rgba(128, 128, 128, 0.35)) !important;
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  background-clip: padding-box !important;
+  min-height: 28px;
 }
 
 /* Scroll-perf: while a gesture/fling is in motion the virtualizer flags the
@@ -156,6 +190,10 @@
   max-width: var(--chat-width-max, 800px);
   margin: 0 auto;
   padding: 20px 20px 32px;
+  /* Overlay scrollbars (macOS WKWebView) paint on the scrollport edge.
+   * When the right pane squeezes .main, this column is full-bleed and a
+   * 20px pad is not enough — keep a thumb-width gutter inside the box. */
+  padding-inline-end: calc(20px + var(--scrollbar-size, 8px) + 6px);
   display: flex;
   flex-direction: column;
   gap: var(--chat-list-gap, 4px);
