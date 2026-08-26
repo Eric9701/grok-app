@@ -3,9 +3,9 @@
 //! macOS: Overlay title bar + hidden title + traffic lights.
 //! Windows / Linux: frameless, self-drawn caption buttons in the WebView.
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 #[cfg(target_os = "macos")]
 use tauri::LogicalPosition;
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 use crate::os_theme;
 use crate::store;

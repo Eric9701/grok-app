@@ -720,11 +720,7 @@ mod tests {
         let leftover: Vec<_> = fs::read_dir(paths::skin_presets_dir())
             .unwrap()
             .flatten()
-            .filter(|e| {
-                e.file_name()
-                    .to_string_lossy()
-                    .starts_with(".export-")
-            })
+            .filter(|e| e.file_name().to_string_lossy().starts_with(".export-"))
             .collect();
         assert!(leftover.is_empty(), "unexpected export zips: {leftover:?}");
         let _ = fs::remove_dir_all(&home_dir);
@@ -741,10 +737,13 @@ mod tests {
         // Without ffmpeg / valid video, poster extraction fails → no thumb.
         let thumb = preset_thumb_path(id);
         assert!(
-            thumb.as_ref().map(|p| {
-                let s = p.to_string_lossy().to_ascii_lowercase();
-                !s.ends_with(".mp4") && !s.ends_with(".webm")
-            }).unwrap_or(true),
+            thumb
+                .as_ref()
+                .map(|p| {
+                    let s = p.to_string_lossy().to_ascii_lowercase();
+                    !s.ends_with(".mp4") && !s.ends_with(".webm")
+                })
+                .unwrap_or(true),
             "must not return raw video path: {thumb:?}"
         );
         let _ = fs::remove_dir_all(&home_dir);

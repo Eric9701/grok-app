@@ -314,9 +314,14 @@ describe("wallpaper scrim", () => {
   it("applies composer opacity as a direct mix and UI opacity with a 20% floor", () => {
     const props = new Map<string, string>();
     const el = {
+      setAttribute() {},
+      removeAttribute() {},
       style: {
         setProperty(name: string, value: string) {
           props.set(name, value);
+        },
+        removeProperty(name: string) {
+          props.delete(name);
         },
       },
     };
