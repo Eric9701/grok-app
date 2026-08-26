@@ -8760,6 +8760,8 @@ export function AppWorkbench() {
         setRewindError(null);
         if (!result.agentOk) {
           showToast(tr("session.rewindLocalOnly"), 4200);
+        } else {
+          showToast(tr("session.rewindOk"));
         }
         await refreshSessions();
       } catch (e) {
@@ -8852,8 +8854,12 @@ export function AppWorkbench() {
         return;
       }
       const idx = userPromptIndexOf(messages, msg.id);
-      if (idx < 0) return;
+      if (idx < 0) {
+        showToast(tr("session.rewindFailed"));
+        return;
+      }
       if (!canRewindToUserPrompt(messages, idx)) {
+        showToast(tr("session.rewindNoop"));
         return;
       }
       const preview = (msg.content || "")
@@ -8888,7 +8894,10 @@ export function AppWorkbench() {
           updatedAt: new Date().toISOString(),
         } satisfies SessionRow);
       const idx = userPromptIndexContaining(messages, msg.id);
-      if (idx < 0) return;
+      if (idx < 0) {
+        showToast(tr("session.forkFailed"));
+        return;
+      }
       confirmForkSession(row, idx);
     },
     [
@@ -12837,7 +12846,8 @@ export function AppWorkbench() {
           if (
             decision.shouldReveal &&
             decision.revealPath &&
-            api.isTauri()
+            api.isTauri() &&
+            !activeProject?.sshAlias
           ) {
             void api.pathReveal(decision.revealPath).catch(() => {
               /* reveal is best-effort fallback */
