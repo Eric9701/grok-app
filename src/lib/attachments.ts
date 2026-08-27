@@ -678,6 +678,20 @@ export function collectSessionRelativeMediaRefs(
   return out;
 }
 
+/**
+ * Tick / markdown-link media that should occupy a chat card box on first
+ * paint (fixed 150px height, width from the local aspect cache). Path may
+ * still resolve later — occupancy must not wait on that IPC.
+ */
+export function shouldReserveCitedMediaCard(token: string): boolean {
+  const t = token.trim().replace(/^<|>$/g, "");
+  if (!t || t.length > 260) return false;
+  if (t.includes("://") || t.includes("..")) return false;
+  if (t.startsWith("/") || /^[A-Za-z]:[\\/]/.test(t)) return false;
+  if (isSiteRootAbsolutePath(t) || isFusedQueryKeyPath(t)) return false;
+  return isMediaPath(t);
+}
+
 /** @deprecated use collectSessionRelativeMediaRefs */
 export function collectSessionRelativeImageRefs(
   messages: MessageWithAttachments[],

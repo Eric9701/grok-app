@@ -7,6 +7,7 @@ import {
   CHAT_PIN_OVERSCAN_MIN_PX,
   CHAT_VIRTUALIZE_THRESHOLD,
   applyForceIndices,
+  chatOpenPinWindow,
   computeChatVirtualWindow,
   cumulativeOffsets,
   estimateChatRowHeight,
@@ -54,6 +55,23 @@ describe("computeChatVirtualWindow", () => {
     // Window covers the tail
     expect(w.start).toBeLessThan(50);
     expect(w.paddingBottom).toBe(0);
+  });
+
+  it("chatOpenPinWindow paints the tail on the first open frame", () => {
+    expect(chatOpenPinWindow(0)).toEqual({
+      start: 0,
+      end: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      totalHeight: 0,
+    });
+    const w = chatOpenPinWindow(80);
+    expect(w.end).toBe(80);
+    expect(w.start).toBeGreaterThan(0);
+    expect(w.start).toBeLessThan(80);
+    expect(w.paddingBottom).toBe(0);
+    // Must not reuse a previous chat's browse window at index 0.
+    expect(w.start).toBeGreaterThan(40);
   });
 
   it("history browse windows mid-list", () => {

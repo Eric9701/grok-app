@@ -18,12 +18,17 @@ import {
   shouldClampPinnedOverscroll,
   shouldClampPinnedStreamDrift,
   shouldEscapePinnedScroll,
+  shouldForcePinnedSnapOnOpen,
   shouldReleaseStickOnDistanceFromBottom,
   shouldReleaseStickOnScrollUp,
   shouldReleaseStickOnSlowScrollUp,
   shouldSnapPinnedLayoutToBottom,
+  isConversationOpenFollowActive,
+  transcriptStickIdentity,
+  shouldFollowPinnedMediaReveal,
   STICK_MEDIA_FOLLOW_DELAY_MS,
   STICK_MEDIA_HEIGHT_PX,
+  STICK_OPEN_FOLLOW_MS,
   markProgrammaticStickScroll,
   takeProgrammaticStickScroll,
 } from "./stickToBottom";
@@ -116,6 +121,163 @@ describe("pinnedFollowDelayForLayout", () => {
         viewportWidthChanged: false,
       }),
     ).toBe(STICK_MEDIA_FOLLOW_DELAY_MS);
+  });
+
+  it("follows image-sized jumps immediately while a chat is opening", () => {
+    expect(
+      pinnedFollowDelayForLayout({
+        heightDelta: 400,
+        viewportWidthChanged: false,
+        conversationOpening: true,
+      }),
+    ).toBe(0);
+  });
+});
+
+describe("isConversationOpenFollowActive", () => {
+  it("stays active for the open-follow window while still pinned", () => {
+    expect(STICK_OPEN_FOLLOW_MS).toBeGreaterThanOrEqual(400);
+    expect(
+      isConversationOpenFollowActive({
+        now: 100,
+        until: 500,
+        escaped: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("stops when the user leaves the bottom or the window elapses", () => {
+    expect(
+      isConversationOpenFollowActive({
+        now: 100,
+        until: 500,
+        escaped: true,
+      }),
+    ).toBe(false);
+    expect(
+      isConversationOpenFollowActive({
+        now: 500,
+        until: 500,
+        escaped: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("transcriptStickIdentity", () => {
+  it("stays pending until the journal has rows or is confirmed ready", () => {
+    expect(
+      transcriptStickIdentity({
+        sessionKey: "s1",
+        hasMessages: false,
+        journalReady: false,
+      }),
+    ).toBe("s1:pending");
+  });
+
+  it("becomes ready when cached or hydrated rows exist", () => {
+    expect(
+      transcriptStickIdentity({
+        sessionKey: "s1",
+        hasMessages: true,
+        journalReady: false,
+      }),
+    ).toBe("s1:ready");
+    expect(
+      transcriptStickIdentity({
+        sessionKey: "s1",
+        hasMessages: false,
+        journalReady: true,
+      }),
+    ).toBe("s1:ready");
+  });
+
+  it("does not change again as the live turn grows", () => {
+    const open = transcriptStickIdentity({
+      sessionKey: "s1",
+      hasMessages: true,
+      journalReady: true,
+    });
+    const later = transcriptStickIdentity({
+      sessionKey: "s1",
+      hasMessages: true,
+      journalReady: true,
+    });
+    expect(open).toBe(later);
+    expect(open).toBe("s1:ready");
+  });
+});
+
+describe("shouldFollowPinnedMediaReveal", () => {
+  it("follows when pinned and new media cards appear after open", () => {
+    expect(
+      shouldFollowPinnedMediaReveal({
+        pinned: true,
+        prevMediaCount: 0,
+        nextMediaCount: 7,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not yank a user who has left the bottom", () => {
+    expect(
+      shouldFollowPinnedMediaReveal({
+        pinned: false,
+        prevMediaCount: 0,
+        nextMediaCount: 7,
+      }),
+    ).toBe(false);
+  });
+
+  it("ignores non-increasing attachment counts", () => {
+    expect(
+      shouldFollowPinnedMediaReveal({
+        pinned: true,
+        prevMediaCount: 7,
+        nextMediaCount: 7,
+      }),
+    ).toBe(false);
+    expect(
+      shouldFollowPinnedMediaReveal({
+        pinned: true,
+        prevMediaCount: 7,
+        nextMediaCount: 3,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("shouldForcePinnedSnapOnOpen", () => {
+  it("lands on the tail even when leftover distance looks like a leave", () => {
+    expect(
+      shouldForcePinnedSnapOnOpen({
+        pinned: true,
+        forceOpenSnap: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSnapPinnedLayoutToBottom({
+        scrollTop: 0,
+        scrollHeight: 8000,
+        clientHeight: 600,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not yank after the user has escaped", () => {
+    expect(
+      shouldForcePinnedSnapOnOpen({
+        pinned: false,
+        forceOpenSnap: true,
+        escaped: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldForcePinnedSnapOnOpen({
+        pinned: true,
+        forceOpenSnap: false,
+      }),
+    ).toBe(false);
   });
 });
 

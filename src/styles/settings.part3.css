@@ -1018,6 +1018,9 @@ html[data-theme-editor-shell] #root {
   color: var(--text-secondary);
   text-align: left;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none;
   transition:
     border-color var(--motion-fast) ease,
     background var(--motion-fast) ease,
@@ -1041,6 +1044,7 @@ html[data-theme-editor-shell] #root {
   height: 28px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
+  box-shadow: none;
 }
 
 .settings-skin-card__name {

@@ -34,6 +34,7 @@ describe("appearance theme layout", () => {
     expect(chrome).toBeGreaterThan(wallpaper);
     expect(section).not.toContain("settings-appearance-duo");
     expect(section.match(/<SkinPresetsCard/g)?.length).toBe(1);
+    expect(section).toContain("settings.wallpaperBlurMacHint");
   });
 
   it("uses dual-column scroll without compressing card content height", () => {
@@ -58,6 +59,35 @@ describe("appearance theme layout", () => {
     );
     expect(wallpaperCss).not.toMatch(
       /\.settings-wallpaper--split \.settings-wallpaper__preview\s*\{[^}]*height:\s*100%/s,
+    );
+  });
+
+  it("keeps appearance skin chips and preset cards flat (no bevel gradient)", () => {
+    const presets = readFileSync(
+      resolve(__dirname, "../components/settings/SkinPresetsCard.tsx"),
+      "utf8",
+    );
+    const part7 = readFileSync(
+      resolve(__dirname, "../styles/settings.part7.css"),
+      "utf8",
+    );
+    expect(section).not.toMatch(
+      /settings-skin-card__swatch[\s\S]{0,160}135deg/,
+    );
+    expect(section).toMatch(
+      /style=\{\{\s*background:\s*pack\.swatch\s*\}\}/,
+    );
+    expect(presets).toContain("<video");
+    expect(presets).toContain("skin-presets__card-media");
+    expect(presets).not.toMatch(/linear-gradient\(135deg/);
+    expect(part7).toMatch(/\.skin-presets__card-media\s*\{/);
+    expect(part7).not.toMatch(
+      /\.skin-presets__card\s*\{[^}]*inset 0 0 0 1px/s,
+    );
+    expect(part7).toMatch(/\.skin-presets__card\s*\{[^}]*border:\s*none/s);
+    expect(part7).not.toMatch(/\.skin-presets__card:hover\s*\{[^}]*border-color/s);
+    expect(part7).toMatch(
+      /\.skin-presets__card\.is-current\s*\{[^}]*outline:\s*2px solid var\(--accent\)/s,
     );
   });
 });

@@ -29,6 +29,7 @@ import {
   isVideoPath,
   pathBasename,
   resolveInlineMediaToken,
+  shouldReserveCitedMediaCard,
 } from "@/lib/attachments";
 import {
   fileSubtitle,
@@ -469,6 +470,30 @@ export const MarkdownChat = memo(function MarkdownChat({
       !looksLikeFilePath(pathForLooks) &&
       !mediaAbs
     ) {
+      // Cited `` `foo.png` `` / `images/1.jpg`: reserve the chat card box
+      // (150px height, cached aspect width) so load occupancy is known
+      // before Host resolves the abs path.
+      if (shouldReserveCitedMediaCard(raw) && isImagePath(raw)) {
+        return (
+          <ImageUi
+            className="md-body__img md-body__img--card"
+            src={raw}
+            alt={linkText || pathBasename(raw)}
+            gallery={gallery}
+            labels={imageLabels}
+          />
+        );
+      }
+      if (shouldReserveCitedMediaCard(raw) && isVideoPath(raw)) {
+        return (
+          <VideoUi
+            key={raw}
+            src={raw}
+            title={linkText || pathBasename(raw)}
+            labels={videoLabels}
+          />
+        );
+      }
       return null;
     }
 

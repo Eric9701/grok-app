@@ -55,9 +55,12 @@ html[data-wallpaper="1"] .app-shell::after {
    * WKWebView misses damage rects when portaled tips / hover layers
    * come and go (leftover squares). Slider 0% had no layer so no bug.
    * Bake the slider into the gradient; this box stays opacity 1.
+   *
+   * Left-origin veil. Keep the right edge in the same family as the
+   * mid-pane so an open resource rail continues the plate.
    */
   background: linear-gradient(
-    105deg,
+    90deg,
     color-mix(
         in srgb,
         var(--wallpaper-theme-scrim-color)
@@ -68,21 +71,21 @@ html[data-wallpaper="1"] .app-shell::after {
     color-mix(
         in srgb,
         var(--wallpaper-theme-scrim-color)
+          calc(76% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      36%,
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
+          calc(68% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      70%,
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
           calc(62% * var(--wallpaper-theme-scrim-opacity, 1)),
-        transparent
-      )
-      42%,
-    color-mix(
-        in srgb,
-        var(--wallpaper-theme-scrim-color)
-          calc(28% * var(--wallpaper-theme-scrim-opacity, 1)),
-        transparent
-      )
-      78%,
-    color-mix(
-        in srgb,
-        var(--wallpaper-theme-scrim-color)
-          calc(12% * var(--wallpaper-theme-scrim-opacity, 1)),
         transparent
       )
       100%

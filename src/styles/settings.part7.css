@@ -40,34 +40,49 @@
   width: 100%;
   min-height: 88px;
   padding: 0;
-  border: 1.5px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
+  border: none;
   border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
   color: #fff;
   text-align: left;
   font: inherit;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
-  transition:
-    border-color var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease,
-    transform var(--motion-fast) ease;
-}
-
-.skin-presets__card:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none;
+  outline: none;
+  transition: outline-color var(--motion-fast) ease;
 }
 
 .skin-presets__card.is-current {
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
-    inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  /* Inset so overflow:hidden does not clip the ring in WKWebView. */
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.skin-presets__card-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+}
+
+.skin-presets__card.has-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.5));
 }
 
 .skin-presets__card:focus-visible {
   outline: 2px solid var(--border-focus, var(--accent));
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .skin-presets__card.is-disabled {
@@ -80,7 +95,7 @@
   left: 10px;
   right: 10px;
   bottom: 10px;
-  z-index: 1;
+  z-index: 2;
   font-size: 12.5px;
   font-weight: 620;
   line-height: 1.25;
@@ -95,7 +110,7 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;

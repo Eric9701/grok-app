@@ -368,6 +368,7 @@ export const idSettingsUi = {
   "settings.wallpaperScrimDesc": "Seberapa kuat kerudung menutupi wallpaper (seluruh jendela + tint panel). Lebih rendah = lebih jelas. Terpisah dari blur.",
   "settings.wallpaperBlur": "Blur overlay",
   "settings.wallpaperBlurDesc": "Seberapa buram media wallpaper. Lebih rendah = lebih tajam. Terpisah dari opasitas.",
+  "settings.wallpaperBlurMacHint": "macOS 27 ke atas punya bug. Sebaiknya biarkan overlay blur mati.",
   "settings.surfaceOpacity": "Opasitas permukaan",
   "settings.surfaceOpacityDesc": "Terpisah dari overlay wallpaper. Composer mengikuti slider secara langsung. Kartu dan halaman pengaturan punya batas bawah 20%.",
   "settings.composerOpacity": "Opasitas composer",

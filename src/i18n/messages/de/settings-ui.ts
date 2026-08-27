@@ -368,6 +368,7 @@ export const deSettingsUi = {
   "settings.wallpaperScrimDesc": "Wie stark der Abdunkelungsschleier das Wallpaper bedeckt (Vollfenster + Paneel-Tönung). Niedriger = klareres Wallpaper. Unabhängig von der Unschärfe.",
   "settings.wallpaperBlur": "Overlay-Unschärfe",
   "settings.wallpaperBlurDesc": "Wie stark das Wallpaper selbst weichgezeichnet wird. Niedriger = schärfer. Unabhängig von der Deckkraft.",
+  "settings.wallpaperBlurMacHint": "macOS 27 und neuer hat einen Fehler. Overlay-Unschärfe besser aus lassen.",
   "settings.surfaceOpacity": "Flächen-Deckkraft",
   "settings.surfaceOpacityDesc": "Unabhängig vom Wallpaper-Overlay. Das Eingabefeld folgt dem Schieberegler direkt. Karten und die Einstellungsseite behalten eine 20%-Untergrenze.",
   "settings.composerOpacity": "Eingabe-Deckkraft",

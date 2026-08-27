@@ -61,6 +61,13 @@ export const CHAT_PIN_OVERSCAN_MAX_PX = 10400;
 export const CHAT_FORCE_EXPAND_MAX_GAP = 12;
 
 /**
+ * First-paint tail when switching chats. The previous session's browse
+ * window must not paint against the new transcript (history-start flash).
+ * Layout recompute fills spacers; this only needs the latest rows mounted.
+ */
+export const CHAT_OPEN_PIN_TAIL_ROWS = 24;
+
+/**
  * Chat ImageUi card max height (must match ImageUi CHAT_IMAGE_CARD_MAX_H).
  * Used for virtual-row pre-estimates so multi-image turns do not under-scroll.
  */
@@ -176,6 +183,30 @@ export type ChatVirtualWindow = {
   paddingBottom: number;
   totalHeight: number;
 };
+
+/**
+ * Placeholder window so the first paint of a newly opened chat shows the
+ * latest rows, not the previous session's browse range. Spacers are filled
+ * on the following layout recompute.
+ */
+export function chatOpenPinWindow(
+  count: number,
+  tailRows: number = CHAT_OPEN_PIN_TAIL_ROWS,
+): ChatVirtualWindow {
+  const n = Math.max(0, Math.floor(count));
+  if (n <= 0) {
+    return { start: 0, end: 0, paddingTop: 0, paddingBottom: 0, totalHeight: 0 };
+  }
+  const tail = Math.max(1, Math.floor(tailRows));
+  const start = Math.max(0, n - tail);
+  return {
+    start,
+    end: n,
+    paddingTop: 0,
+    paddingBottom: 0,
+    totalHeight: 0,
+  };
+}
 
 /** Cumulative offsets: offsets[i] = sum(heights[0..i)). Length = count+1. */
 export function cumulativeOffsets(

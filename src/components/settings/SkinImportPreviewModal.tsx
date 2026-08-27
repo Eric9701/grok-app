@@ -103,7 +103,7 @@ export function SkinImportPreviewModal({
             <span
               className="skin-preview__swatch"
               style={{
-                background: `linear-gradient(135deg, ${skinMeta?.swatch ?? "#888"} 0%, ${skinMeta?.swatchAlt ?? "#444"} 100%)`,
+                background: skinMeta?.swatch ?? "#888",
               }}
               aria-hidden
             />

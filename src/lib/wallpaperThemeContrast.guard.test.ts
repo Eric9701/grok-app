@@ -94,6 +94,20 @@ describe("wallpaper theme contrast CSS", () => {
     );
   });
 
+  it("extends the wallpaper scrim across the right rail instead of dumping it", () => {
+    const gradient = css.match(
+      /html\[data-wallpaper="1"\] \.app-shell::after\s*\{[^}]*background:\s*linear-gradient\(([\s\S]*?)\);\s*\}/s,
+    )?.[1];
+    expect(gradient).toBeTruthy();
+    expect(gradient).toMatch(/^\s*90deg,/);
+    expect(gradient).not.toMatch(/105deg/);
+    expect(gradient).not.toMatch(/calc\(12% \*/);
+    expect(gradient).not.toMatch(/calc\(28% \*/);
+    expect(gradient).toMatch(
+      /calc\(62% \* var\(--wallpaper-theme-scrim-opacity/,
+    );
+  });
+
   it("keeps wallpaper chrome washes opaque so they do not sample the scrim", () => {
     expect(css).toMatch(
       /html\[data-wallpaper="1"\] \.main\s*\{[^}]*--bg-hover:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 90%,\s*var\(--text-primary\) 10%\s*\)/s,

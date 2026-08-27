@@ -72,6 +72,7 @@ export const APPEARANCE_ENTRIES: readonly SettingsEntry[] = [
       "settings.wallpaperScrimDesc",
       "settings.wallpaperBlur",
       "settings.wallpaperBlurDesc",
+      "settings.wallpaperBlurMacHint",
       "settings.wallpaperFromX",
       "settings.wallpaperImagine",
     ],

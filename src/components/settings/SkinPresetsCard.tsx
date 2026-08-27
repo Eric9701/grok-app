@@ -3,7 +3,7 @@
  * Hidden when not the desktop host.
  */
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isDesktopHost } from "@/lib/api";
 import {
   skinPackExport,
@@ -31,17 +31,12 @@ import {
   uploadCurrentWallpaper,
 } from "@/lib/skinPresetStore";
 import { subscribeAppearanceWriteBusy } from "@/lib/appearanceWriteLock";
-import { mediaVideoPoster } from "@/lib/api/fs";
+import { ensureMediaEndpoint } from "@/lib/imageSrc";
 import {
-  ensureMediaEndpoint,
-  resolveImageSrc,
-  resolveImageSrcSync,
-} from "@/lib/imageSrc";
-import {
-  getThemeSkinMeta,
-  isThemeSkinId,
-  type ThemeSkinId,
-} from "@/lib/themeSkin";
+  presetCardStyle,
+  resolvePresetCardMedia,
+  type PresetCardMedia,
+} from "@/lib/skinPresetCardMedia";
 import { useThemeShell } from "@/providers/ThemeProvider";
 import { useSkinShare } from "@/providers/SkinShareProvider";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
@@ -62,51 +57,67 @@ import {
 import { SkinCatalogModal } from "./SkinCatalogModal";
 import { SkinSourcesModal } from "./SkinSourcesModal";
 
-function isVideoAssetPath(path: string): boolean {
-  const lower = path.toLowerCase();
-  return lower.endsWith(".mp4") || lower.endsWith(".webm");
-}
+function PresetCardVideo({
+  src,
+  poster,
+}: {
+  src: string;
+  poster?: string;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
 
-function presetCardStyle(p: SkinPresetListItem, thumbSrc?: string): CSSProperties {
-  if (thumbSrc) {
-    return {
-      backgroundImage: `linear-gradient(180deg, rgb(0 0 0 / 0.15), rgb(0 0 0 / 0.55)), url(${thumbSrc})`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-    };
-  }
-  const skinId = (isThemeSkinId(p.skin) ? p.skin : "default") as ThemeSkinId;
-  const meta = getThemeSkinMeta(skinId);
-  return {
-    backgroundImage: `linear-gradient(135deg, ${meta.swatch} 0%, ${meta.swatchAlt} 100%)`,
-  };
-}
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.muted = true;
+    el.defaultMuted = true;
 
-/** Resolve a CSS-usable thumb URL; videos need a still poster, not the mp4 URL. */
-async function resolvePresetThumbSrc(
-  p: SkinPresetListItem,
-): Promise<string | null> {
-  const candidates = [p.thumbPath, p.wallpaperPath].filter(
-    (x): x is string => !!x,
-  );
-  for (const path of candidates) {
-    if (isVideoAssetPath(path)) {
-      try {
-        const poster = await mediaVideoPoster(path);
-        if (!poster?.posterPath) continue;
-        const src =
-          resolveImageSrcSync(poster.posterPath) ||
-          (await resolveImageSrc(poster.posterPath));
-        if (src) return src;
-      } catch {
-        /* ffmpeg missing / path denied — keep trying */
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    let visible = false;
+    const playIfShown = () => {
+      if (
+        !visible ||
+        reduceMotion ||
+        document.visibilityState === "hidden"
+      ) {
+        el.pause();
+        return;
       }
-      continue;
-    }
-    const src = resolveImageSrcSync(path) || (await resolveImageSrc(path));
-    if (src) return src;
-  }
-  return null;
+      void el.play().catch(() => {});
+    };
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        visible = !!entry?.isIntersecting;
+        playIfShown();
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    document.addEventListener("visibilitychange", playIfShown);
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", playIfShown);
+      el.pause();
+    };
+  }, [src]);
+
+  return (
+    <video
+      ref={ref}
+      className="skin-presets__card-media"
+      src={src}
+      poster={poster}
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-hidden
+    />
+  );
 }
 
 export function SkinPresetsCard() {
@@ -116,7 +127,9 @@ export function SkinPresetsCard() {
   const s = useSettingsModel() as { t: (k: string, v?: Record<string, string | number>) => string };
   const t = s.t;
   const [presets, setPresets] = useState<SkinPresetListItem[]>([]);
-  const [thumbSrcById, setThumbSrcById] = useState<Record<string, string>>({});
+  const [mediaById, setMediaById] = useState<Record<string, PresetCardMedia>>(
+    {},
+  );
   const [usage, setUsage] = useState({ bytes: 0, budget: 0, hasUndo: false });
   const [busy, setBusy] = useState(false);
   const [writeBusy, setWriteBusy] = useState(false);
@@ -151,14 +164,13 @@ export function SkinPresetsCard() {
     void (async () => {
       await ensureMediaEndpoint();
       if (cancelled) return;
-      const next: Record<string, string> = {};
+      const next: Record<string, PresetCardMedia> = {};
       await Promise.all(
         presets.map(async (p) => {
-          const src = await resolvePresetThumbSrc(p);
-          if (src) next[p.id] = src;
+          next[p.id] = await resolvePresetCardMedia(p);
         }),
       );
-      if (!cancelled) setThumbSrcById(next);
+      if (!cancelled) setMediaById(next);
     })();
     return () => {
       cancelled = true;
@@ -385,15 +397,18 @@ export function SkinPresetsCard() {
         </p>
       ) : (
         <ul className="skin-presets__list">
-          {presets.map((p) => (
+          {presets.map((p) => {
+            const media = mediaById[p.id];
+            return (
             <li key={p.id}>
               <div
                 className={
                   "skin-presets__card" +
                   (p.id === activeId ? " is-current" : "") +
-                  (locked ? " is-disabled" : "")
+                  (locked ? " is-disabled" : "") +
+                  (media?.videoSrc || media?.thumbSrc ? " has-media" : "")
                 }
-                style={presetCardStyle(p, thumbSrcById[p.id])}
+                style={presetCardStyle(p, media)}
                 role="button"
                 tabIndex={locked ? -1 : 0}
                 aria-pressed={p.id === activeId}
@@ -409,6 +424,12 @@ export function SkinPresetsCard() {
                   }
                 }}
               >
+                {media?.videoSrc ? (
+                  <PresetCardVideo
+                    src={media.videoSrc}
+                    poster={media.thumbSrc}
+                  />
+                ) : null}
                 <span className="skin-presets__card-name">{p.name}</span>
                 <div
                   className="skin-presets__card-actions"
@@ -494,7 +515,8 @@ export function SkinPresetsCard() {
                 </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       {actionError || share.notice?.kind === "err" ? (

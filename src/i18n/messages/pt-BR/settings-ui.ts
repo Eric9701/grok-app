@@ -368,6 +368,7 @@ export const ptBRSettingsUi = {
   "settings.wallpaperScrimDesc": "Com que força o véu cobre o papel de parede (janela inteira + tom do painel). Menor = mais nítido. Independente do desfoque.",
   "settings.wallpaperBlur": "Desfoque da sobreposição",
   "settings.wallpaperBlurDesc": "Quanto o próprio papel de parede fica desfocado. Menor = mais nítido. Independente da opacidade.",
+  "settings.wallpaperBlurMacHint": "O macOS 27 ou posterior tem um bug. Deixe o desfoque desligado.",
   "settings.surfaceOpacity": "Opacidade das superfícies",
   "settings.surfaceOpacityDesc": "Independente da sobreposição do papel de parede. O compositor usa o controle diretamente. Cartões e a página de configurações mantêm um piso de 20%.",
   "settings.composerOpacity": "Opacidade do compositor",

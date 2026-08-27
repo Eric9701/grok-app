@@ -103,6 +103,17 @@ function normalizeFsKey(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
+/**
+ * Basename alias so `` `puppy-soda-pixel.png` `` citations hit the same
+ * occupancy box on the next session open, before IPC resolves the abs path.
+ */
+export function imageAspectBasenameKey(name: string): string {
+  const base = name.replace(/\\/g, "/").split("/").pop()?.trim() || "";
+  if (!base || base.includes("..")) return "";
+  if (!/\.[A-Za-z0-9]{2,8}$/.test(base)) return "";
+  return `bn:${base}`;
+}
+
 function hydrate(storage: ImageAspectStorage = defaultStorage()): void {
   if (hydrated) return;
   hydrated = true;
@@ -171,10 +182,14 @@ export function getImageAspect(
     const hit = memory.get(primary);
     if (hit && hit.ar > 0) return hit.ar;
   }
-  // Fallback: raw path / src keys written by older sessions.
+  // Fallback: raw path / src keys written by older sessions, then basename
+  // so tick citations reserve the same card box before abs-path resolve.
   for (const k of [path, src]) {
     if (!k) continue;
-    const hit = memory.get(k) ?? memory.get(normalizeFsKey(k));
+    const hit =
+      memory.get(k) ??
+      memory.get(normalizeFsKey(k)) ??
+      memory.get(imageAspectBasenameKey(k));
     if (hit && hit.ar > 0) return hit.ar;
   }
   return null;
@@ -203,6 +218,12 @@ export function setImageAspect(
     if (!k) continue;
     if (isLocalFsCacheKey(k)) keys.add(normalizeFsKey(k));
     else keys.add(imageAspectCacheKey(k));
+    const bn = imageAspectBasenameKey(k);
+    if (bn) keys.add(bn);
+  }
+  for (const raw of [path, src]) {
+    const bn = raw ? imageAspectBasenameKey(raw) : "";
+    if (bn) keys.add(bn);
   }
   if (keys.size === 0) return;
   for (const k of keys) {

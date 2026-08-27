@@ -368,6 +368,7 @@ export const frSettingsUi = {
   "settings.wallpaperScrimDesc": "Intensité du voile qui couvre le fond (pleine fenêtre + teinte des panneaux). Plus bas = fond plus net. Indépendant du flou.",
   "settings.wallpaperBlur": "Flou du fond",
   "settings.wallpaperBlurDesc": "Degré de flou du média de fond. Plus bas = plus net. Indépendant de l’opacité.",
+  "settings.wallpaperBlurMacHint": "macOS 27 et versions ultérieures ont un bug. Laissez le flou désactivé.",
   "settings.surfaceOpacity": "Opacité des surfaces",
   "settings.surfaceOpacityDesc": "Indépendant du voile du fond. Le champ de saisie suit le curseur. Les cartes et la page des réglages gardent un plancher de 20 %.",
   "settings.composerOpacity": "Opacité du champ de saisie",

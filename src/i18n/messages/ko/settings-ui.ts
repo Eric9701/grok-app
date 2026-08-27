@@ -368,6 +368,7 @@ export const koSettingsUi = {
   "settings.wallpaperScrimDesc": "배경화면을 덮는 어둡게 하는 베일의 세기입니다(전체 창 + 패널 틴트). 낮을수록 배경이 더 선명합니다. 블러와는 별개입니다.",
   "settings.wallpaperBlur": "오버레이 블러",
   "settings.wallpaperBlurDesc": "배경화면 미디어의 흐림 정도입니다. 낮을수록 더 선명합니다. 불투명도와는 별개입니다.",
+  "settings.wallpaperBlurMacHint": "macOS 27 이상에는 버그가 있습니다. 오버레이 블러는 끄두는 것이 좋습니다.",
   "settings.surfaceOpacity": "표면 불투명도",
   "settings.surfaceOpacityDesc": "배경화면 오버레이와 별개입니다. 입력창은 슬라이더 값을 그대로 씁니다. 카드와 설정 페이지는 최소 20%를 유지합니다.",
   "settings.composerOpacity": "입력창 불투명도",

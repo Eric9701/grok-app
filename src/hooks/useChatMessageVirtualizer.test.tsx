@@ -31,6 +31,64 @@ describe("useChatMessageVirtualizer", () => {
     expect(result.current.paddingBottom).toBe(0);
   });
 
+  it("hydrates a journal onto the tail when stick identity goes pending → ready", () => {
+    const viewport = document.createElement("div");
+    Object.defineProperty(viewport, "clientHeight", { value: 600, configurable: true });
+    Object.defineProperty(viewport, "scrollHeight", { value: 8000, configurable: true });
+    Object.defineProperty(viewport, "scrollTop", { value: 0, writable: true, configurable: true });
+    const isPinnedRef = { current: false };
+    const viewportRef = { current: viewport };
+
+    const { result, rerender } = renderHook(
+      ({ key, count }) =>
+        useChatMessageVirtualizer({
+          itemCount: count,
+          getKey: (i) => `s1-${i}`,
+          getEstimateHeight: () => 100,
+          viewportRef,
+          isPinnedRef,
+          conversationKey: key,
+          threshold: 10,
+        }),
+      { initialProps: { key: "s1:pending", count: 0 } },
+    );
+
+    rerender({ key: "s1:ready", count: 80 });
+
+    expect(result.current.virtualized).toBe(true);
+    expect(result.current.end).toBe(80);
+    expect(result.current.paddingBottom).toBe(0);
+  });
+
+  it("opens a conversation on the tail even if the previous chat had escaped pin", () => {
+    const viewport = document.createElement("div");
+    Object.defineProperty(viewport, "clientHeight", { value: 600, configurable: true });
+    Object.defineProperty(viewport, "scrollHeight", { value: 8000, configurable: true });
+    Object.defineProperty(viewport, "scrollTop", { value: 0, writable: true, configurable: true });
+    const isPinnedRef = { current: false };
+    const viewportRef = { current: viewport };
+
+    const { result, rerender } = renderHook(
+      ({ key, count }) =>
+        useChatMessageVirtualizer({
+          itemCount: count,
+          getKey: (i) => `${key}-${i}`,
+          getEstimateHeight: () => 100,
+          viewportRef,
+          isPinnedRef,
+          conversationKey: key,
+          threshold: 10,
+        }),
+      { initialProps: { key: "chat-a", count: 80 } },
+    );
+
+    rerender({ key: "chat-b", count: 80 });
+
+    expect(result.current.virtualized).toBe(true);
+    expect(result.current.end).toBe(80);
+    expect(result.current.paddingBottom).toBe(0);
+  });
+
   it("activates virtualization when itemCount exceeds threshold", () => {
     const viewport = document.createElement("div");
     Object.defineProperty(viewport, "clientHeight", { value: 600, configurable: true });

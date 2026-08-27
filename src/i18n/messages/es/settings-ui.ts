@@ -368,6 +368,7 @@ export const esSettingsUi = {
   "settings.wallpaperScrimDesc": "Qué tan fuerte cubre el velo el fondo (ventana completa + tinte del panel). Más bajo = fondo más claro. Independiente del desenfoque.",
   "settings.wallpaperBlur": "Desenfoque de la superposición",
   "settings.wallpaperBlurDesc": "Cuánto se difumina el propio fondo. Más bajo = más nítido. Independiente de la opacidad.",
+  "settings.wallpaperBlurMacHint": "macOS 27 o posterior tiene un error. Mejor dejar el desenfoque apagado.",
   "settings.surfaceOpacity": "Opacidad de superficies",
   "settings.surfaceOpacityDesc": "Independiente de la superposición del fondo. El compositor usa el control deslizante directamente. Las tarjetas y Ajustes mantienen un mínimo del 20%.",
   "settings.composerOpacity": "Opacidad del compositor",

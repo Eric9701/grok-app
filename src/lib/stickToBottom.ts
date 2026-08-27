@@ -41,6 +41,13 @@ export const STICK_MEDIA_HEIGHT_PX = 24;
 export const STICK_MEDIA_FOLLOW_DELAY_MS = 64;
 
 /**
+ * After switching chats, keep following growth (journal hydrate, image/PDF
+ * decode) even if leftover scrollTop looks far from the new tail.
+ * Wheel/touch escape still wins immediately.
+ */
+export const STICK_OPEN_FOLLOW_MS = 800;
+
+/**
  * Minimum upward scroll (px) to leave stick-lock.
  * Keep this aligned with {@link STICK_ESCAPE_WHEEL_DELTA}: a 10–12px
  * trackpad nudge used to be clamped by the scroll handler and then
@@ -84,6 +91,40 @@ export function shouldBumpStickOnBusyEdge(
   prevLastUserId: string | null,
 ): boolean {
   return lastUserId === prevLastUserId;
+}
+
+/**
+ * Stick / virtual-list identity for a viewed chat.
+ *
+ * `sessionKey` alone fires on sidebar click while the journal is still empty,
+ * so the first pin lands on the loading placeholder and never runs again
+ * when rows appear. Pending → ready is the land-on-latest signal. After
+ * ready, streaming growth must not change this string (browsing / live
+ * follow stay with pin + ResizeObserver, not a new conversation switch).
+ */
+export function transcriptStickIdentity(input: {
+  sessionKey?: string | null;
+  hasMessages: boolean;
+  journalReady: boolean;
+}): string {
+  const key = input.sessionKey || "chat";
+  const ready = input.hasMessages || input.journalReady;
+  return `${key}:${ready ? "ready" : "pending"}`;
+}
+
+/**
+ * Journal open paints text first; relative media (`foo.png` in ticks) is
+ * resolved in a later IPC pass and attached as cards. If stick is still
+ * following, that reveal must re-pin to the new bottom. A user who already
+ * left the tail is not yanked.
+ */
+export function shouldFollowPinnedMediaReveal(input: {
+  pinned: boolean;
+  prevMediaCount: number;
+  nextMediaCount: number;
+}): boolean {
+  if (!input.pinned) return false;
+  return input.nextMediaCount > input.prevMediaCount;
 }
 
 /**
@@ -371,9 +412,34 @@ export function pinnedFollowDelayMs(
 export function pinnedFollowDelayForLayout(input: {
   heightDelta: number;
   viewportWidthChanged: boolean;
+  /** Session just opened — do not wait out the media coalesce window. */
+  conversationOpening?: boolean;
 }): number {
   if (input.viewportWidthChanged) return 0;
+  if (input.conversationOpening) return 0;
   return pinnedFollowDelayMs(input.heightDelta);
+}
+
+/** True while a just-opened chat should keep snapping to the tail. */
+export function isConversationOpenFollowActive(input: {
+  now: number;
+  until: number;
+  escaped: boolean;
+}): boolean {
+  if (input.escaped) return false;
+  return input.now < input.until;
+}
+
+/**
+ * Opening a chat must land on the tail even if leftover distance from the
+ * previous transcript (or the loading placeholder) looks like a user leave.
+ */
+export function shouldForcePinnedSnapOnOpen(input: {
+  pinned: boolean;
+  forceOpenSnap: boolean;
+  escaped?: boolean;
+}): boolean {
+  return input.pinned && input.forceOpenSnap && !input.escaped;
 }
 
 /**

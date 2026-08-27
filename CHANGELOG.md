@@ -42,6 +42,7 @@ See `docs/llm-wiki/release.md`.
 - Environment info can pin beside the chat.
 - Plan card and agent questions no longer cover the transcript.
 - Titlebar, wallpaper, and pane contrast were cleaned up.
+- Overlay blur notes a macOS 27+ bug.
 - Dock icons use the authored black and white sets.
 - README lists Linux AppImage runtime packages.
 - Unused UI widgets were removed.
@@ -54,12 +55,14 @@ See `docs/llm-wiki/release.md`.
 - 环境信息可固定到对话旁。
 - 计划卡片和 Agent 提问不再挡住会话。
 - 标题栏、壁纸和分栏对比已调整。
+- 遮罩模糊下注明 macOS 27+ 有 bug。
 - Dock 图标改用成品黑白套件。
 - 补充 Linux AppImage 运行依赖说明。
 - 移除未使用的界面组件。
 - 更新公告每条只保留一句话。
 
 ### Fixed
+- Opening a past chat waits until image and video cards have a real height, then shows the thread and scrolls to the latest once.
 - Chat stays pinned through thinking, tools, and pane resize.
 - Custom effort catalogs no longer check two rungs at once.
 - The providers list scrolls when there are many channels.
@@ -69,8 +72,12 @@ See `docs/llm-wiki/release.md`.
 - Session API second turn no longer deadlocks.
 - Signed-out startup no longer waits on authenticate.
 - Sidebar selection, new-chat fold, and leftover plan overlay were fixed.
+- Wallpaper overlay now continues across the right pane.
+- Appearance preset and color cards are flat. Video presets play in the card.
+- Appearance preset cards show an outline only when selected.
 
 **中文 · 修复**
+- 修复打开历史会话不滚到最底部。等图片和视频卡片高度算准后再展示记录，并只滚一次到底。
 - 修复思考、工具输出和打开侧栏时聊天不跟到底。
 - 修复自定义推理档会同时勾中两档。
 - 修复服务商列表条目多时无法滚动。
@@ -80,6 +87,9 @@ See `docs/llm-wiki/release.md`.
 - 修复会话接口第二轮卡住。
 - 修复未登录启动长时间等待。
 - 修复侧栏选中、新建会话折叠和计划面板遮罩。
+- 修复壁纸遮罩在右侧栏变亮。
+- 去掉外观预设卡和配色卡的浮雕；视频预设会在卡片里播放。
+- 外观预设卡仅在选中时显示描边。
 
 ## [0.2.26] - 2026-08-24
 
