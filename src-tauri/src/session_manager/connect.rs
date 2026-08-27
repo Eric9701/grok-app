@@ -1219,6 +1219,11 @@ impl SessionManager {
                                         );
                                         Self::kill_acp_bounded(&client).await;
                                         self.unregister_pending_child(&process_id);
+                                        if meta.fork_agent_session {
+                                            let _ = store::clear_session_fork_after_connect_failure(
+                                                &meta.id,
+                                            );
+                                        }
                                         {
                                             let mut guard = self.inner.lock();
                                             if let Some(s) = guard.as_mut() {
