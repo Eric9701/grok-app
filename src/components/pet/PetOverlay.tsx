@@ -30,6 +30,7 @@ import {
   petPointerStep,
   petSettingsHash,
   petShouldManualDrag,
+  petDoneTaskIds,
   petVerbFor,
   placePetContextMenu,
   scaleHitLen,
@@ -67,15 +68,20 @@ export function PetOverlay({
   tasks = [],
   prefs,
   locale = "en",
+  localeCatalogRev = 0,
   policy = PET_OVERLAY_POLICY_FULL,
 }: {
   focus: PetFocus;
   tasks?: readonly PetTask[];
   prefs: PetPrefs;
   locale?: Locale;
+  localeCatalogRev?: number;
   policy?: PetOverlayPolicy;
 }) {
-  const t = useMemo(() => createT(locale), [locale]);
+  const t = useMemo(
+    () => createT(locale),
+    [locale, localeCatalogRev],
+  );
   const shape = isPetShape(prefs.shape) ? prefs.shape : "hex";
   const color = isPetColor(prefs.color) ? prefs.color : "green";
   const eyeColor = normalizePetEyeColor(prefs.eyeColor);
@@ -98,7 +104,8 @@ export function PetOverlay({
   const spinWatchRef = useRef<{
     primed: boolean;
     kind: PetFocus["kind"] | null;
-  }>({ primed: false, kind: null });
+    doneIds: string[];
+  }>({ primed: false, kind: null, doneIds: [] });
   const originRef = useRef<{ x: number; y: number } | null>(null);
   const lastScreenRef = useRef({ x: 0, y: 0 });
   const accumRef = useRef({ x: 0, y: 0 });
@@ -221,17 +228,24 @@ export function PetOverlay({
 
   useEffect(() => {
     const prev = spinWatchRef.current;
+    const nextDoneIds = petDoneTaskIds(tasks);
     if (
       shouldTriggerPetSpin({
         primed: prev.primed,
         prevKind: prev.kind,
         nextKind: focus.kind,
+        prevDoneIds: new Set(prev.doneIds),
+        nextDoneIds: new Set(nextDoneIds),
       })
     ) {
       setSpinSignal((n) => n + 1);
     }
-    spinWatchRef.current = { primed: true, kind: focus.kind };
-  }, [focus.kind]);
+    spinWatchRef.current = {
+      primed: true,
+      kind: focus.kind,
+      doneIds: nextDoneIds,
+    };
+  }, [focus.kind, tasks]);
 
   const closeMenu = useCallback(() => {
     setMenu(null);

@@ -64,7 +64,11 @@ export function currentLookManifest(input: {
   name: string;
   skin: ThemeSkinId;
   scrim: number;
+  composerOpacity?: number;
+  uiOpacity?: number;
   wallpaper: WallpaperRecord | null;
+  textColor?: string | null;
+  fontShadow?: boolean;
   /** Exporter window aspect; wallpaper bake uses this to match the editor crop. */
   viewAspect?: number;
 }): ReturnType<typeof buildExportManifest> {
@@ -78,6 +82,10 @@ export function currentLookManifest(input: {
     name: input.name,
     skin: input.skin,
     scrim: input.scrim,
+    composerOpacity: input.composerOpacity,
+    uiOpacity: input.uiOpacity,
+    textColor: input.textColor,
+    fontShadow: input.fontShadow,
     wallpaper: input.wallpaper
       ? {
           file: `assets/wallpaper.${ext}`,
@@ -139,7 +147,11 @@ export async function snapshotBeforeLastApply(
     name: string;
     skin: ThemeSkinId;
     scrim: number;
+    composerOpacity?: number;
+    uiOpacity?: number;
     wallpaper: WallpaperRecord | null;
+    textColor?: string | null;
+    fontShadow?: boolean;
     onProgress?: (sent: number, total: number) => void;
     signal?: { cancelled: boolean };
   },
@@ -169,7 +181,11 @@ export async function snapshotBeforeLastApply(
       name: opts.name,
       skin: opts.skin,
       scrim: opts.scrim,
+      composerOpacity: opts.composerOpacity,
+      uiOpacity: opts.uiOpacity,
       wallpaper: opts.wallpaper,
+      textColor: opts.textColor,
+      fontShadow: opts.fontShadow,
     });
     await io.commit(id, manifest);
     if (isCancelled(opts.signal)) {

@@ -7,6 +7,12 @@
   initial-value: 0px;
 }
 
+@property --sw-aside-occupied {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 :root,
 [data-theme="dark"] {
   /* color-scheme is set on [data-theme] only — :root alone would force dark
@@ -27,8 +33,9 @@
   --space-7: 32px;
   --space-8: 48px;
 
-  /* Keep in sync with SIDEBAR_DEFAULT_WIDTH in layout.ts */
+  /* Keep in sync with SIDEBAR_DEFAULT_WIDTH / SIDEBAR_WIDTH_MAX in layout.ts */
   --sidebar-width: 268px;
+  --sidebar-width-max: 420px;
   /*
    * Sidebar tree columns (nav icons, L1 chevron, L2 name, L3 title).
    * Change values here only — consumers use var() with no px fallback.
@@ -84,6 +91,8 @@
   --bg-code: #0a0a0a;
   --bg-card: #1a1a1a;
   --bg-user-bubble: #2a2a2e;
+  --composer-opacity-mix: 100%;
+  --ui-opacity-mix: 100%;
 
   /*
    * Unified frosted glass (modals, menus, floating panels).

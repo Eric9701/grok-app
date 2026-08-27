@@ -22,6 +22,8 @@ export const esSlash = {
   "slash.kind.action": "Acción",
   "slash.kind.prompt": "Prompt",
   "slash.kind.skill": "Skill",
+  "slash.kind.plugin": "Plugin",
+  "slash.pluginDesc": "{n} skills",
   "slash.goal": "Tarea de objetivo",
   "slash.goalDesc": "Objetivo finito · varios turnos hasta terminar · no es un temporizador",
   "slash.goalClear": "Borrar tarea de objetivo",

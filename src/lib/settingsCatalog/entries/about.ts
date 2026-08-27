@@ -45,6 +45,23 @@ export const ABOUT_ENTRIES: readonly SettingsEntry[] = [
     ],
   },
   {
+    id: "about.whatsNew",
+    section: "about",
+    anchorId: "settings-anchor-whatsNew",
+    labelKey: "whatsNew.replay",
+    descKeys: ["whatsNew.replayDesc", "whatsNew.menu"],
+    keywords: [
+      "what's new",
+      "whats new",
+      "changelog",
+      "release notes",
+      "update notes",
+      "announcement",
+      "更新公告",
+      "更新说明",
+    ],
+  },
+  {
     id: "about.developerMode",
     section: "about",
     anchorId: "settings-anchor-developerMode",

@@ -37,10 +37,12 @@ export function SkillChip({
   name,
   size = "md",
   className,
+  kind = "skill",
 }: {
   name: string;
   size?: "sm" | "md";
   className?: string;
+  kind?: "skill" | "plugin";
 }) {
   const iconSize = size === "sm" ? SKILL_CHIP_ICON_SM : SKILL_CHIP_ICON_MD;
   const Icon = isImagineSkill(name) ? IconImagine : IconSkills;
@@ -49,9 +51,11 @@ export function SkillChip({
       className={cn(
         "skill-chip",
         size === "sm" && "skill-chip--sm",
+        kind === "plugin" && "skill-chip--plugin",
         className,
       )}
-      data-skill={name}
+      data-skill={kind === "skill" ? name : undefined}
+      data-plugin={kind === "plugin" ? name : undefined}
       contentEditable={false}
       suppressContentEditableWarning
     >

@@ -22,6 +22,8 @@ export const koSlash = {
   "slash.kind.action": "동작",
   "slash.kind.prompt": "프롬프트",
   "slash.kind.skill": "스킬",
+  "slash.kind.plugin": "플러그인",
+  "slash.pluginDesc": "{n}개 스킬",
   "slash.goal": "목표 작업",
   "slash.goalDesc": "유한한 목표 · 완료될 때까지 여러 라운드 · 타이머가 아님",
   "slash.goalClear": "목표 작업 지우기",

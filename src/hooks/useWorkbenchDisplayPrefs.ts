@@ -21,6 +21,7 @@ import {
   COMPOSER_DRAFT_STATS_CHANGED_EVENT,
 } from "@/lib/draftStats";
 import {
+  GOAL_ORCH_UI_CHANGE_EVENT,
   loadGoalOrchUiEnabled,
   type GoalOrchEvent,
 } from "@/lib/goalOrch";
@@ -187,6 +188,11 @@ export function useWorkbenchDisplayPrefs() {
     WELCOME_MOTION_CHANGE_EVENT,
     () => loadWelcomeMotionPref(localStorage),
     setWelcomeMotionEnabled,
+  );
+  useBooleanPrefSync(
+    GOAL_ORCH_UI_CHANGE_EVENT,
+    () => loadGoalOrchUiEnabled(localStorage),
+    setGoalOrchUiEnabled,
   );
   useBooleanPrefSync(
     NOTIFY_SOUND_CHANGE_EVENT,

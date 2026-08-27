@@ -261,9 +261,24 @@ export class BotEngine {
 
   /** Regard effectif a l'instant `now`, rattrapage en cours compris. */
   private lookAtTime(now: number): Look {
+    if (!(this.lookMorph > 0)) return this.look
     const k = (now - this.lookAt) / this.lookMorph
     if (k >= 1) return this.look
     return lerpLook(this.lookPrev, this.look, easings.easeOutQuint(clamp(k)))
+  }
+
+  /**
+   * True while a state, shape, expression, or look morph still has frames to
+   * paint. The overlay uses this to keep a short 60fps burst instead of the
+   * idle/rest cadence that makes a 0.45s expression look like a few slides.
+   */
+  isMorphing(now: number): boolean {
+    const def = STATE_BY_ID.get(this.cur)
+    if (this.prev && def && now - this.tCur < def.morph) return true
+    if (this.shapePrev && now - this.shapeAt < BotEngine.SHAPE_MORPH) return true
+    if (this.exprPrev && now - this.exprAt < BotEngine.SHAPE_MORPH) return true
+    if (this.lookMorph > 0 && now - this.lookAt < this.lookMorph) return true
+    return false
   }
 
   private posed(

@@ -24,6 +24,10 @@ export type ApplySkinPackLook = {
   skin: ThemeSkinId;
   wallpaperRecord: WallpaperRecord | null;
   wallpaperScrim: number;
+  composerOpacity?: number;
+  uiOpacity?: number;
+  textColor?: string | null;
+  fontShadow?: boolean;
 };
 
 export type SnapshotResult =
@@ -51,6 +55,10 @@ export type ApplySkinPackDeps = {
     opts?: { applyPreferredTheme?: boolean },
   ) => void;
   applyWallpaperScrimChoice: (value: number) => void;
+  applyComposerOpacityChoice: (value: number) => void;
+  applyUiOpacityChoice: (value: number) => void;
+  applyTextColorChoice: (value: string | null) => void;
+  applyFontShadowChoice: (value: boolean) => void;
   applyThemeChoice?: (next: string) => void;
   saveFromInspect: (inspectId: string) => Promise<void>;
   inspectAbort: (inspectId: string) => Promise<void>;
@@ -166,6 +174,10 @@ export async function applySkinPack(
     result.applySkinOpts = applySkinOpts;
     deps.applySkinChoice(preview.skin, applySkinOpts);
     deps.applyWallpaperScrimChoice(preview.scrim);
+    deps.applyComposerOpacityChoice(preview.composerOpacity);
+    deps.applyUiOpacityChoice(preview.uiOpacity);
+    deps.applyTextColorChoice(preview.textColor);
+    deps.applyFontShadowChoice(preview.fontShadow);
     result.appearanceWriteCompleted = true;
 
     if (opts.saveToLibrary) {

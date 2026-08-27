@@ -12,26 +12,16 @@ import {
   MARKDOWN_CHAT_REMARK_PLUGINS,
   MarkdownChat,
 } from "./MarkdownChat";
+import { MARKDOWN_REHYPE_PLUGINS, MARKDOWN_REMARK_PLUGINS } from "@/lib/markdownMath";
 
 afterEach(cleanup);
 
 describe("MarkdownChat", () => {
   it("keeps a stable remarkPlugins array", () => {
-    expect(MARKDOWN_CHAT_REMARK_PLUGINS).toEqual([remarkGfm, remarkMath]);
+    expect(MARKDOWN_CHAT_REMARK_PLUGINS).toBe(MARKDOWN_REMARK_PLUGINS);
+    expect(MARKDOWN_CHAT_REHYPE_PLUGINS).toBe(MARKDOWN_REHYPE_PLUGINS);
     expect(MARKDOWN_CHAT_REMARK_PLUGINS[0]).toBe(remarkGfm);
     expect(MARKDOWN_CHAT_REMARK_PLUGINS[1]).toBe(remarkMath);
-    expect(MARKDOWN_CHAT_REHYPE_PLUGINS).toHaveLength(1);
-  });
-
-  it("renders $$LaTeX$$ with KaTeX instead of leaving the delimiters", () => {
-    const html = renderToStaticMarkup(
-      <MarkdownChat>
-        {String.raw`$$\tau=0.53$$ 是基线均值，$$H_{10}=1.40$$、$$\lambda=0.60$$。`}
-      </MarkdownChat>,
-    );
-    expect(html).toContain("katex");
-    expect(html).not.toContain("$$\\tau");
-    expect(html).toContain("0.53");
   });
 
   it("reuses module-level leaf components when find is off", () => {
@@ -81,5 +71,18 @@ describe("MarkdownChat", () => {
     expect(currents).toHaveLength(1);
     expect(currents[0]?.textContent).toBe("foo");
     expect(container.querySelectorAll("[data-find-mark]")).toHaveLength(2);
+  });
+
+  it("renders inline and display LaTeX with KaTeX", () => {
+    const inline = renderToStaticMarkup(
+      <MarkdownChat>{"Energy is $E=mc^2$."}</MarkdownChat>,
+    );
+    expect(inline).toContain("katex");
+    expect(inline).toContain("E");
+    const block = renderToStaticMarkup(
+      <MarkdownChat>{"$$\n\\int_0^1 x\\,dx\n$$"}</MarkdownChat>,
+    );
+    expect(block).toContain("katex");
+    expect(block).toContain("katex-display");
   });
 });

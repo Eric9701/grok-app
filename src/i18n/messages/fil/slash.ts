@@ -22,6 +22,8 @@ export const filSlash = {
   "slash.kind.action": "Aksyon",
   "slash.kind.prompt": "Prompt",
   "slash.kind.skill": "Skill",
+  "slash.kind.plugin": "Plugin",
+  "slash.pluginDesc": "{n} skill",
   "slash.goal": "Gawain ng Goal",
   "slash.goalDesc": "May hangganang layunin · maraming round hanggang matapos · hindi timer",
   "slash.goalClear": "I-clear ang gawain ng Goal",

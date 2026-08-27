@@ -1,14 +1,13 @@
 /**
- * Session / agent action modals (ask-user, status, dashboards, rewind/fork,
+ * Session / agent action modals (status, dashboards, rewind/fork,
  * plan history, json schema, session note/rules/turns/prompt).
  *
  * Compact / queue / chrome overlays stay elsewhere. Host owns send/open
  * verbs; this file is the view cluster so those dialogs can move without
  * opening the workbench return.
  */
-import { lazy, Suspense, useRef } from "react";
+import { lazy, Suspense } from "react";
 import * as api from "@/lib/api";
-import { AskUserModal } from "@/components/AskUserModal";
 import { StatusModal } from "@/components/StatusModal";
 import { UsageLimitModal } from "@/components/UsageLimitModal";
 import { ConfirmCopyModal } from "@/components/workbench-modals/ConfirmCopyModal";
@@ -32,10 +31,6 @@ import { sanitizeExtraRules } from "@/lib/sessionExtraRules";
 import { normalizeMaxAgentTurns } from "@/lib/sessionMaxAgentTurns";
 import { sanitizeSystemPromptOverride } from "@/lib/sessionSystemPrompt";
 import { resolveForkCliOnConfirm } from "@/lib/sessionFork";
-import {
-  canClaimAskUserSettle,
-  settleAskUserDecision,
-} from "@/lib/askUserSettle";
 
 const AgentDashboardModal = lazy(async () => {
   const m = await import("@/components/AgentDashboardModal");
@@ -69,10 +64,7 @@ export function WorkbenchSessionModals(p: WorkbenchSessionModalsProps) {
     account,
     agentDashboardOpen,
     agentDashboardRows,
-    askUser,
-    askUserTimeoutSec,
     batchAgentsOpen,
-    clearPendingGates,
     clearSessionMaxTurnsModal,
     clearSessionRulesModal,
     clearSessionSysPromptModal,
@@ -167,7 +159,6 @@ export function WorkbenchSessionModals(p: WorkbenchSessionModalsProps) {
     sessionTaskBoard,
     sessions,
     setAgentDashboardOpen,
-    setAskUser,
     setBatchAgentsOpen,
     setForkCliSession,
     setForkConfirm,
@@ -215,70 +206,9 @@ export function WorkbenchSessionModals(p: WorkbenchSessionModalsProps) {
     taskBoardOpen,
     tr
   } = p as Record<string, any>;
-  const askUserSettlingRpcRef = useRef<number | null>(null);
 
   return (
     <>
-      <AskUserModal
-        payload={askUser}
-        timeoutSec={askUserTimeoutSec}
-        labels={{
-          title: tr("askUser.title"),
-          submit: tr("askUser.submit"),
-          cancel: tr("askUser.cancel"),
-          otherPlaceholder: tr("askUser.otherPlaceholder"),
-          freeTextHint: tr("askUser.freeTextHint"),
-          multiHint: tr("askUser.multiHint"),
-          close: tr("common.close"),
-          autoCancelCountdown: tr("askUser.autoCancelCountdown"),
-        }}
-        onSubmit={async (answers) => {
-          if (!askUser) return;
-          if (!canClaimAskUserSettle(askUserSettlingRpcRef.current, askUser.rpcId)) {
-            return;
-          }
-          const payload = askUser;
-          askUserSettlingRpcRef.current = payload.rpcId;
-          setAskUser(null);
-          const settled = await settleAskUserDecision({
-            payload,
-            decision: "accepted",
-            answers,
-            viewingSessionId: () => session.sessionId,
-            currentRpcId: () => askUser?.rpcId ?? null,
-            resolve: (args) => api.sessionResolveAskUser(args),
-          });
-          if (settled.kind === "restore") {
-            setAskUser(payload);
-            showToast(String(settled.error), 4500);
-          } else {
-            clearPendingGates(payload.sessionId);
-          }
-          if (askUserSettlingRpcRef.current === payload.rpcId) {
-            askUserSettlingRpcRef.current = null;
-          }
-        }}
-        onCancel={async () => {
-          if (!askUser) return;
-          if (!canClaimAskUserSettle(askUserSettlingRpcRef.current, askUser.rpcId)) {
-            return;
-          }
-          const payload = askUser;
-          askUserSettlingRpcRef.current = payload.rpcId;
-          setAskUser(null);
-          await settleAskUserDecision({
-            payload,
-            decision: "cancelled",
-            viewingSessionId: () => session.sessionId,
-            currentRpcId: () => askUser?.rpcId ?? null,
-            resolve: (args) => api.sessionResolveAskUser(args),
-          });
-          clearPendingGates(payload.sessionId);
-          if (askUserSettlingRpcRef.current === payload.rpcId) {
-            askUserSettlingRpcRef.current = null;
-          }
-        }}
-      />
       <StatusModal
         open={showStatusModal}
         locale={locale}

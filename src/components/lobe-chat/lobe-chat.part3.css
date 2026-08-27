@@ -1,184 +1,10 @@
 /* lobe-chat css chunk */
 
-.lobe-msg-rail__step {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--chat-text-3, var(--text-tertiary, #6e6e73));
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.lobe-msg-rail__step:hover:not(:disabled) {
-  color: var(--chat-text, var(--text-primary));
-  background: color-mix(in srgb, var(--chat-text) 8%, transparent);
-}
-
-.lobe-msg-rail__step:disabled {
-  opacity: 0.28;
-  cursor: default;
-}
-
-.lobe-msg-rail__list {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  flex: 1 1 auto;
-  min-height: 0;
-  max-height: min(56vh, 420px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 4px 0;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.lobe-msg-rail__list::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-/* a11y listitem wrapper — keep flex column of ticks intact */
-.lobe-msg-rail__item {
-  display: flex;
-  flex: 0 0 auto;
-  justify-content: center;
-  align-items: center;
-}
-
-.lobe-msg-rail__tick {
-  position: relative;
-  flex: 0 0 auto;
-  width: 14px;
-  height: 10px;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-/* Short horizontal dash — matches grok.com node ticks */
-.lobe-msg-rail__tick::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 10px;
-  height: 2px;
-  border-radius: 1px;
-  transform: translate(-50%, -50%);
-  background: color-mix(in srgb, var(--chat-text-3, #6e6e73) 55%, transparent);
-  transition:
-    width 120ms ease,
-    background 120ms ease,
-    opacity 120ms ease;
-}
-
-.lobe-msg-rail__tick--user::before {
-  width: 8px;
-  opacity: 0.75;
-}
-
-.lobe-msg-rail__tick--assistant::before {
-  width: 11px;
-}
-
-.lobe-msg-rail__tick.is-hover::before,
-.lobe-msg-rail__tick:hover::before {
-  width: 14px;
-  background: color-mix(in srgb, var(--chat-text-2, #a1a1a6) 90%, transparent);
-}
-
-.lobe-msg-rail__tick.is-active::before {
-  width: 14px;
-  height: 2.5px;
-  background: var(--chat-text, var(--text-primary, #e8e8ea));
-}
-
-.lobe-msg-rail__tick.is-pending::before {
-  opacity: 0.45;
-}
-
-.lobe-msg-rail__tick.is-error::before {
-  background: var(--chat-danger, #f07178);
-}
-
-.lobe-msg-rail__tip {
-  box-sizing: border-box;
-  width: max-content;
-  max-width: min(280px, 42vw);
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--chat-card-border, rgba(0, 0, 0, 0.08));
-  background: color-mix(
-    in srgb,
-    var(--chat-card, #f5f5f7) 92%,
-    var(--chat-bg, #fff)
-  );
-  box-shadow:
-    0 4px 18px rgba(0, 0, 0, 0.1),
-    0 1px 3px rgba(0, 0, 0, 0.06);
-  color: var(--chat-text, var(--text-primary));
-  pointer-events: none;
-  text-align: start;
-}
-
-.lobe-msg-rail__tip--portal {
-  position: fixed;
-  z-index: 80;
-  transform: translateY(-50%);
-}
-
-[data-theme="dark"] .lobe-msg-rail__tip {
-  background: color-mix(in srgb, var(--chat-card, #2a2a2e) 94%, #000);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-}
-
-.lobe-msg-rail__tip-role {
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--chat-text, var(--text-primary));
-  margin-bottom: 4px;
-}
-
-.lobe-msg-rail__tip-body {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--chat-text-2, var(--text-secondary));
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-}
-
-.lobe-msg-rail__tip-count {
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--chat-text-3, var(--text-tertiary));
-  font-variant-numeric: tabular-nums;
-}
-
 .lobe-chat-item--node-focus {
   outline: 1.5px solid color-mix(in srgb, var(--chat-link, #6db3f2) 55%, transparent);
   outline-offset: 4px;
   border-radius: 12px;
   transition: outline-color 0.2s ease;
-}
-
-@media (max-width: 720px) {
-  .lobe-msg-rail {
-    display: none;
-  }
 }
 
 .lobe-chat-back-bottom {
@@ -250,8 +76,28 @@
   padding: 10px 12px;
   border-radius: var(--chat-r-lg);
   border: 1px solid var(--chat-code-border);
-  background: var(--chat-bubble);
+  position: relative;
+  background: transparent;
   box-sizing: border-box;
+}
+
+.lobe-inline-edit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--chat-bubble) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lobe-inline-edit > * {
+  position: relative;
+  z-index: 1;
 }
 .lobe-inline-edit__atts {
   display: flex;
@@ -378,10 +224,18 @@
   min-height: var(--attach-h);
   border-radius: 8px;
   border: 1px solid var(--chat-card-border);
-  background: var(--chat-card);
+  background: transparent;
   box-shadow: none;
   overflow: hidden;
   box-sizing: border-box;
+}
+
+.lobe-chat .att-card::before {
+  background: color-mix(
+    in srgb,
+    var(--chat-card) var(--ui-opacity-mix, 100%),
+    transparent
+  );
 }
 
 .lobe-chat .att-card--image {
@@ -403,7 +257,7 @@
   height: var(--attach-h);
   min-height: var(--attach-h);
   border-radius: 8px;
-  background: var(--chat-card);
+  background: transparent;
   box-shadow: none;
   overflow: hidden;
 }
@@ -452,12 +306,6 @@
   line-height: 1.2;
 }
 
-.lobe-chat .att-card__path,
-.lobe-chat .att-card__sub,
-.lobe-chat .att-card__open {
-  display: none !important;
-}
-
 .lobe-chat .att-card__btn--image,
 .lobe-chat .att-card__thumb {
   width: var(--attach-h);
@@ -477,7 +325,7 @@
   justify-content: center;
   cursor: pointer;
   color: var(--chat-text);
-  background: var(--chat-card);
+  background: transparent;
   border: 1px solid var(--chat-card-border);
   border-radius: 8px;
   font: inherit;
@@ -592,7 +440,8 @@ html[data-chat-density="comfortable"] .lobe-chat,
 /*
  * Chat reading width (Settings → Appearance).
  * Hoist --chat-width-max onto html so the floating composer / perm-bar /
- * composer-stack share the same cap as .lobe-chat__inner (not a hard 42rem).
+ * ask-user-bar / composer-stack share the same cap as .lobe-chat__inner
+ * (not a hard 42rem).
  * Element-level .lobe-chat[data-chat-width] kept for local override.
  * narrow ~640 · medium ~800 · wide ~1000 · full = none
  */

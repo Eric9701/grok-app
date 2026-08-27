@@ -20,17 +20,20 @@ import {
   type BotFrame,
 } from "@/lib/pet/bloub";
 import {
+  BLOUB_LOOK_LOCAL_ENTER_MORPH,
   bloubExpressionOf,
   bloubLookAtPointer,
   bloubNotifFill,
+  bloubSettleState,
   bloubShapeRadii,
   bloubShouldLoop,
   bloubStateDuration,
+  bloubStateNeedsLivePaint,
   normalizePetExpression,
   resolveBloubPlay,
 } from "@/lib/pet/bloubPlay";
 import { pickRestEmote, resolveLivingMood } from "@/lib/pet/petMood";
-import { petLookIsNear, petPaintMinMs } from "@/lib/pet/petMarkPaint";
+import { petLocalLookAxes, petPaintMinMs } from "@/lib/pet/petMarkPaint";
 import {
   petMarkScreenCenter,
   petNormXOnWorkArea,
@@ -278,6 +281,8 @@ export function PetMark({
     const look = { dx: 0, dy: 0, localR: 48, at: 0, fromScreen: false };
     let unlistenCursor: (() => void) | undefined;
     let aiming = false;
+    let lastLookNx = NaN;
+    let lastLookNy = NaN;
     let mirrored = false;
     let markBox: DOMRect | null = null;
     let markBoxAt = 0;
@@ -298,6 +303,18 @@ export function PetMark({
         markBoxAt = now;
       }
       return markBox;
+    };
+    const readLocalLook = (nowMs: number) => {
+      if (restOnlyRef.current) return null;
+      return petLocalLookAxes({
+        fromScreen: look.fromScreen,
+        at: look.at,
+        now: nowMs,
+        dx: look.dx,
+        dy: look.dy,
+        localR: look.localR || 64,
+        box: look.fromScreen ? null : measureMark(),
+      });
     };
     const syncFaceMirror = () => {
       const svg = svgRef.current;
@@ -392,7 +409,8 @@ export function PetMark({
     let idleBurstMood = "";
     let idleBurstUntil = 0;
     let idleBurstNextAt = 0;
-    let lastPlayState = engine.state;
+    let requestedState = engine.state;
+    let shownState = engine.state;
     let stateSince = clockRef.current;
     let spin: PetSpinRun | null = null;
     let lastSpinKind: PetSpinKind | null = null;
@@ -414,14 +432,7 @@ export function PetMark({
       if (restOnlyRef.current) {
         return resolveBloubPlay(session, restRef.current);
       }
-      const nearMark = petLookIsNear({
-        fromScreen: look.fromScreen,
-        at: look.at,
-        now: nowMs,
-        dx: look.dx,
-        dy: look.dy,
-        localR: look.localR || 64,
-      });
+      const nearMark = !!readLocalLook(nowMs);
       const trackingLook =
         nearMark &&
         session !== "sleeping" &&
@@ -469,52 +480,65 @@ export function PetMark({
       const play = resolvePlay(nowMs);
       engine.setShape(bloubShapeRadii(shapeRef.current), clock);
       engine.setExpression(bloubExpressionOf(play.expression), clock);
-      if (play.state !== lastPlayState) {
+      if (play.state !== requestedState) {
+        requestedState = play.state;
+        shownState = play.state;
         engine.setState(play.state, clock);
-        lastPlayState = play.state;
         stateSince = clock;
+        if (
+          !pausedRef.current &&
+          !reduce &&
+          !restOnlyRef.current &&
+          (play.state === "orbit" || play.state === "comet")
+        ) {
+          orbit.burst(14, 0.85, 0.28);
+        }
       } else if (
+        shownState === play.state &&
         bloubShouldLoop(play.state) &&
         clock - stateSince >= bloubStateDuration(play.state)
       ) {
         engine.reset(play.state, clock);
         stateSince = clock;
+      } else if (shownState === play.state) {
+        const settle = bloubSettleState(play.state);
+        if (settle && clock - stateSince >= bloubStateDuration(play.state)) {
+          shownState = settle;
+          engine.setState(settle, clock);
+          stateSince = clock;
+        }
       }
       const frozen = pausedRef.current || reduce;
-      const t = frozen ? (POSES[play.state] ?? 1) : clock;
+      const t = frozen ? (POSES[shownState] ?? 1) : clock;
       syncFaceMirror();
       const baseFace =
-        play.state === "idle" || play.state === "swirl";
-      const fresh = petLookIsNear({
-        fromScreen: look.fromScreen,
-        at: look.at,
-        now: nowMs,
-        dx: look.dx,
-        dy: look.dy,
-        localR: look.localR || 64,
-      });
-      if (!baseFace || !fresh || restOnlyRef.current) {
+        shownState === "idle" || shownState === "swirl";
+      const axes = baseFace ? readLocalLook(nowMs) : null;
+      if (!axes) {
         if (aiming) {
-          engine.setLook(null, clock);
+          engine.setLook(null, clock, BLOUB_LOOK_LOCAL_ENTER_MORPH);
           aiming = false;
+          lastLookNx = NaN;
+          lastLookNy = NaN;
         }
       } else {
-        const box = measureMark();
-        let nx = 0;
-        let ny = 0;
-        if (look.fromScreen) {
-          const r = look.localR || 64;
-          nx = look.dx / Math.max(1, r);
-          ny = look.dy / Math.max(1, r);
-        } else if (box && box.width > 0 && box.height > 0) {
-          nx = (look.dx - (box.left + box.width / 2)) / Math.max(1, box.width);
-          ny = (look.dy - (box.top + box.height / 2)) / Math.max(1, box.height);
-        }
+        const nx = mirrored ? -axes.nx : axes.nx;
+        const ny = axes.ny;
         if (Number.isFinite(nx) && Number.isFinite(ny)) {
-          engine.setLook(
-            bloubLookAtPointer(mirrored ? -nx : nx, ny, true),
-            clock,
-          );
+          const enter = !aiming;
+          if (
+            enter ||
+            Math.abs(nx - lastLookNx) > 0.02 ||
+            Math.abs(ny - lastLookNy) > 0.02
+          ) {
+            engine.setLook(
+              bloubLookAtPointer(nx, ny, true),
+              clock,
+              enter ? BLOUB_LOOK_LOCAL_ENTER_MORPH : undefined,
+            );
+            lastLookNx = nx;
+            lastLookNy = ny;
+          }
           aiming = true;
         }
       }
@@ -575,24 +599,30 @@ export function PetMark({
     let idleSince = performance.now();
     const tick = (ms: number) => {
       const nowMs = performance.now();
-      const trackingLook = petLookIsNear({
-        fromScreen: look.fromScreen,
-        at: look.at,
-        now: nowMs,
-        dx: look.dx,
-        dy: look.dy,
-        localR: look.localR || 64,
-      });
+      const trackingLook = !!readLocalLook(nowMs);
       const morphing =
         wantSpinRef.current !== playedSpinRef.current ||
-        clockRef.current - stateSince < 1.2;
-      if (trackingLook || spin || morphing || draggingRef.current) {
+        engine.isMorphing(clockRef.current);
+      const catalogLive = bloubStateNeedsLivePaint(engine.state);
+      const beltsLive = orbit.hasLife();
+      if (
+        trackingLook ||
+        spin ||
+        morphing ||
+        draggingRef.current ||
+        catalogLive ||
+        beltsLive
+      ) {
         idleSince = nowMs;
       }
       const minMs = petPaintMinMs({
-        spinning: spin != null || wantSpinRef.current !== playedSpinRef.current,
+        spinning:
+          spin != null ||
+          wantSpinRef.current !== playedSpinRef.current ||
+          beltsLive,
         morphing,
         trackingLook: trackingLook || draggingRef.current,
+        catalogLive,
         idleMs: nowMs - idleSince,
       });
       if (lastPaint && ms - lastPaint < minMs) {

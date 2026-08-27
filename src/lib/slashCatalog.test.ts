@@ -499,6 +499,7 @@ describe("filterSlashItemsByKind + countSlashByKind", () => {
       action: 1,
       skill: 1,
       prompt: 0,
+      plugin: 0,
     });
   });
 });
@@ -518,6 +519,7 @@ describe("hasActiveSlashFilters + slashKindLabelKey", () => {
     expect(slashKindLabelKey("action")).toBe("slash.kind.action");
     expect(slashKindLabelKey("prompt")).toBe("slash.kind.prompt");
     expect(slashKindLabelKey("skill")).toBe("slash.kind.skill");
+    expect(slashKindLabelKey("plugin")).toBe("slash.kind.plugin");
   });
 });
 

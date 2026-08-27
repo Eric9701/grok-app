@@ -2,15 +2,18 @@
  * Left workbench rail: chrome, primary nav, session tree slot, user footer.
  * Open/new-chat and settings navigation stay with the host.
  */
-import type {
-  CSSProperties,
-  Dispatch,
-  ReactNode,
-  SetStateAction,
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
 } from "react";
 import { Tip } from "@/components/ui/tooltip";
 import { SidebarBrand } from "@/components/SidebarBrand";
 import { SidebarUpdateButton } from "@/components/SidebarUpdateButton";
+import { ThemeEditorModal } from "@/components/ThemeEditorModal";
 import { UserMenu, remainingPercent } from "@/components/UserMenu";
 import { GrokLogo } from "@/components/GrokLogo";
 import {
@@ -22,7 +25,6 @@ import {
   IconFolderPlus,
   IconList,
   IconNewChat,
-  IconPanel,
   IconScheduled,
   IconSearch,
 } from "@/components/icons";
@@ -33,6 +35,7 @@ import {
   type CustomProvider,
   type SavedAccount,
 } from "@/lib/api";
+import { openThemeEditorWindow } from "@/lib/api/system";
 import { accountDisplayName, accountInitials } from "@/lib/accountUi";
 import type { SwitcherQuota } from "@/lib/accountSwitcherQuota";
 import {
@@ -47,6 +50,7 @@ import {
 } from "@/lib/layout";
 import { paneSplitSizeStyle } from "@/lib/paneSplitMotion";
 import type { Theme, ThemePreference } from "@/lib/theme";
+import { requestWhatsNewOpen } from "@/lib/whatsNew";
 
 type TFn = ReturnType<typeof createT>;
 
@@ -77,7 +81,6 @@ export type WorkbenchSidebarProps = {
   sidebarOpenW: number;
   sidebarPaint: number;
   beginSidebarResize: (clientX: number, width: number) => void;
-  closeSidebarPane: () => void;
   dragRegion: "false" | "deep";
   titlebarMax: TitlebarMax;
   replaceProviderBrandLogo: boolean;
@@ -117,6 +120,16 @@ export type WorkbenchSidebarProps = {
 };
 
 export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false);
+  useEffect(() => {
+    const onHash = () => {
+      if ((window.location.hash || "").startsWith("#/settings")) {
+        setThemeEditorOpen(false);
+      }
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
   const {
     tr,
     locale,
@@ -129,7 +142,6 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
     sidebarOpenW,
     sidebarPaint,
     beginSidebarResize,
-    closeSidebarPane,
     dragRegion,
     titlebarMax,
     replaceProviderBrandLogo,
@@ -174,6 +186,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
 
   return (
     <aside
+      id="workbench-sidebar"
       className={
         "sidebar" +
         (layout.sidebarCollapsed ? " sidebar--hidden" : "") +
@@ -240,16 +253,6 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
           data-tauri-drag-region={dragRegion}
           {...titlebarMax}
         >
-          <Tip label={tr("main.leftPaneHide")}>
-            <button
-              type="button"
-              className="chrome-btn chrome-btn--traffic main__pane-toggle is-on"
-              aria-label={tr("main.leftPaneHide")}
-              onClick={() => closeSidebarPane()}
-            >
-              <IconPanel size={16} />
-            </button>
-          </Tip>
           <div
             className="sidebar-chrome__drag"
             data-tauri-drag-region={dragRegion}
@@ -376,11 +379,13 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
           }
           labels={{
             settings: tr("sidebar.settings"),
+            whatsNew: tr("whatsNew.menu"),
             tutorial: tr("tutorial.menu"),
             theme: tr("user.theme"),
             themeSystem: tr("settings.themeSystem"),
             themeLight: tr("settings.themeLight"),
             themeDark: tr("settings.themeDark"),
+            themeEditor: tr("user.themeEditor"),
             local: tr("common.local"),
             signedIn: tr("account.signedIn"),
             signedOut: tr("account.signedOut"),
@@ -400,8 +405,18 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
           }}
           onSettings={onSettings}
           onAccountSettings={onAccountSettings}
+          onWhatsNew={() => requestWhatsNewOpen()}
           onTutorial={onTutorial}
           onTheme={applyThemeChoice}
+          onThemeEditor={() => {
+            if (isDesktopHost()) {
+              void openThemeEditorWindow().catch(() => {
+                setThemeEditorOpen(true);
+              });
+              return;
+            }
+            setThemeEditorOpen(true);
+          }}
           onLogin={onLogin}
           onLogout={onLogout}
           savedAccounts={savedAccounts}
@@ -505,6 +520,13 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
           </Tip>
         </UserMenu>
       </div>
+      {themeEditorOpen ? (
+        <ThemeEditorModal
+          open
+          onClose={() => setThemeEditorOpen(false)}
+          locale={locale}
+        />
+      ) : null}
     </aside>
   );
 }

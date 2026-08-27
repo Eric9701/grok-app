@@ -445,6 +445,8 @@ export const koWorkspace = {
   "side.toggle": "사이드바 표시/숨기기",
   "side.env": "환경",
   "side.envTitle": "환경",
+  "side.env.pin": "고정",
+  "side.env.unpin": "고정 해제",
   "side.envSoon": "환경 세부정보와 git 상태가 여기에 나타납니다.",
   "side.placeholder.file": "파일 작업대",
   "side.placeholder.browser": "브라우저 탭",

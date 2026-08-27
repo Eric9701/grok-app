@@ -445,6 +445,8 @@ export const ukWorkspace = {
   "side.toggle": "Показати/сховати бічну панель",
   "side.env": "Середовище",
   "side.envTitle": "Середовище",
+  "side.env.pin": "Закріпити",
+  "side.env.unpin": "Відкріпити",
   "side.envSoon": "Тут з’являться деталі середовища та стан git.",
   "side.placeholder.file": "Робоча область файлів",
   "side.placeholder.browser": "Вкладка браузера",

@@ -30,7 +30,14 @@ html[data-sidebar-density="compact"] .tree-l3 .tree-icon-btn {
   height: 20px;
 }
 
-
+html[data-sidebar-density="compact"]
+  .tree-l3:hover:has(.tree-l3__actions):not(.tree-l3--renaming)
+  .tree-l3__title,
+html[data-sidebar-density="compact"]
+  .tree-l3:has(.tree-l3__actions:focus-within):not(.tree-l3--renaming)
+  .tree-l3__title {
+  padding-right: 68px;
+}
 
 html[data-sidebar-density="compact"] .session-list {
   gap: 0;
@@ -252,6 +259,7 @@ html[data-sidebar-density="compact"] .session-row__meta {
   text-align: left;
   color: inherit;
   background: transparent;
+  transform: translateZ(0);
 }
 
 .sidebar__footer:hover,
@@ -651,10 +659,11 @@ html[data-sidebar-density="compact"] .session-row__meta {
 
 /* Compact circular avatar — single-line footer */
 .user-avatar {
+  position: relative;
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: var(--bg-elevated);
+  background: transparent;
   border: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
@@ -663,12 +672,34 @@ html[data-sidebar-density="compact"] .session-row__meta {
   font-weight: 600;
   color: var(--text-secondary);
   flex-shrink: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.user-avatar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: -1;
 }
 
 .user-avatar--logo {
   color: var(--text-primary);
-  background: var(--bg-input);
-  overflow: hidden;
+}
+
+.user-avatar--logo::before {
+  background: color-mix(
+    in srgb,
+    var(--bg-input) var(--ui-opacity-mix, 100%),
+    transparent
+  );
 }
 
 .user-avatar--logo .provider-brand-icon {
@@ -718,4 +749,3 @@ html[data-sidebar-density="compact"] .session-row__meta {
 .user-meta__hint {
   display: none;
 }
-

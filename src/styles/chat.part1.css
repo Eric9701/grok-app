@@ -351,120 +351,6 @@
   color: var(--text-primary);
 }
 
-/* Agent ask_user_question questionnaire (GlassModal body) */
-.ask-user {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.ask-user__countdown {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin-right: auto;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-tertiary);
-  line-height: 1.3;
-}
-
-.ask-user__q {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.ask-user__prompt {
-  font-size: 13.5px;
-  font-weight: 550;
-  line-height: 1.45;
-  color: var(--text-primary);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.ask-user__hint {
-  font-size: 11.5px;
-  color: var(--text-tertiary);
-}
-
-.ask-user__options {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ask-user__opt {
-  appearance: none;
-  text-align: left;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-input, var(--bg-hover));
-  color: var(--text-primary);
-  border-radius: 10px;
-  padding: 9px 11px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease;
-}
-
-.ask-user__opt:hover {
-  border-color: var(--border-strong);
-  background: var(--bg-hover);
-}
-
-.ask-user__opt--active {
-  border-color: var(--text-primary);
-  background: color-mix(in srgb, var(--text-primary) 8%, var(--bg-input, var(--bg-hover)));
-}
-
-.ask-user__opt-label {
-  font-size: 13px;
-  font-weight: 550;
-  line-height: 1.3;
-}
-
-.ask-user__opt-desc {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  line-height: 1.35;
-}
-
-.ask-user__free {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.ask-user__free-hint {
-  font-size: 11.5px;
-  color: var(--text-tertiary);
-}
-
-.ask-user__textarea {
-  width: 100%;
-  box-sizing: border-box;
-  resize: vertical;
-  min-height: 2.6em;
-  max-height: 8em;
-  border-radius: 10px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-input);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.4;
-  padding: 8px 10px;
-}
-
-.ask-user__textarea:focus {
-  outline: none;
-  border-color: var(--border-strong);
-}
-
 /* In-thread turn notice — soft Codex-like pill (not a red alert box) */
 .chat-turn-error {
   width: 100%;
@@ -720,23 +606,20 @@
 .composer-wrap--float {
   position: absolute;
   left: 0;
-  right: 0;
+  /* Overlay aside may cover the right edge; never shrink the wrap to 0. */
+  right: min(
+    var(--sw-aside-occupied, 0px),
+    max(0px, calc(100% - 360px))
+  );
   bottom: 0;
   z-index: 20;
-  /* Pass scroll through the fade; only the card captures pointer */
+  /* Only the card captures pointer; chat remains scrollable underneath. */
   pointer-events: none;
   padding: 28px 16px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  background: linear-gradient(
-    to top,
-    var(--bg-main) 0%,
-    color-mix(in srgb, var(--bg-main) 92%, transparent) 42%,
-    color-mix(in srgb, var(--bg-main) 55%, transparent) 72%,
-    transparent 100%
-  );
 }
 
 /* Empty / new session: logo + composer vertically centered in the stage */
@@ -744,14 +627,27 @@
   top: 0;
   bottom: 0;
   left: 0;
-  right: 0;
+  right: min(
+    var(--sw-aside-occupied, 0px),
+    max(0px, calc(100% - 360px))
+  );
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 22px;
   padding: 24px 16px;
-  /* Full-area overlay — no bottom fade while centered */
-  background: transparent;
+}
+
+/* Wallpaper clicks pass through the wrap onto .lobe-chat (user-select:text).
+ * WKWebView then draws native selection carets on the empty transcript. */
+.main__stage:has(.composer-wrap--welcome) .lobe-chat,
+.main__stage:has(.composer-wrap--welcome) .lobe-chat * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.composer-wrap--float .composer-stack {
+  pointer-events: auto;
 }
 
 .composer-wrap--welcome .composer {
@@ -781,7 +677,6 @@
   padding: 4px 8px 8px;
   user-select: none;
   flex-shrink: 0;
-  contain: layout style;
 }
 
 .composer-welcome-brand {
@@ -803,6 +698,12 @@
   text-align: center;
   text-wrap: balance;
   overflow-wrap: anywhere;
+  background: none;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  clip-path: none;
 }
 
 .composer-welcome-mark.is-entering .composer-welcome-brand {
@@ -816,7 +717,6 @@
     steps(var(--welcome-prompt-steps), end)
     480ms
     both;
-  will-change: clip-path;
 }
 
 @keyframes composer-welcome-brand-rise {
@@ -894,7 +794,7 @@
   fill: #646362;
 }
 
-/* Preset provider wordmarks on the welcome composer (DeepSeek / OpenCode / Ark).
+/* Preset provider wordmarks on the welcome composer (DeepSeek / OpenCode / Ark / Zhipu).
  * DeepSeek keeps its brand blue in light mode and flips to white in dark
  * mode; OpenCode is monochrome — black in light mode, white in dark mode.
  * Volcengine Ark uses brand icon colors + theme-aware label ink. */
@@ -948,6 +848,38 @@
 }
 
 .volcano-ark-welcome-mark__text {
+  flex: 0 0 auto;
+  font-size: clamp(2.1125rem, 6.76vw, 2.7625rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: inherit;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* 智谱: same icon+label row as 火山方舟 */
+.zhipu-welcome-mark {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-width: min(468px, 94vw);
+  margin-inline: auto;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.zhipu-welcome-mark .provider-brand-icon {
+  flex: 0 0 auto;
+  display: block;
+  width: 47px;
+  height: 47px;
+}
+
+.zhipu-welcome-mark__text {
   flex: 0 0 auto;
   font-size: clamp(2.1125rem, 6.76vw, 2.7625rem);
   font-weight: 600;

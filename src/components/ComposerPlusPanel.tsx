@@ -69,6 +69,9 @@ function slashItemIcon(item: SlashItem): ReactNode {
   if (item.kind === "skill" && item.name === "imagine") {
     return <IconImagine size={ICON_SIZE} />;
   }
+  if (item.kind === "plugin") {
+    return <IconPlug size={ICON_SIZE} />;
+  }
   if (item.kind === "skill") {
     return <IconPuzzle size={ICON_SIZE} />;
   }
@@ -185,7 +188,7 @@ export function buildComposerPlusRows(
       continue;
     }
 
-    if (entry.item.kind === "skill") {
+    if (entry.item.kind === "skill" || entry.item.kind === "plugin") {
       if (!addedSkillSection) {
         rows.push({ type: "section", id: "sec-skills", label: labels.skills });
         addedSkillSection = true;

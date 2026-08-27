@@ -22,6 +22,8 @@ export const frSlash = {
   "slash.kind.action": "Action",
   "slash.kind.prompt": "Invite",
   "slash.kind.skill": "Skill",
+  "slash.kind.plugin": "Plugin",
+  "slash.pluginDesc": "{n} skills",
   "slash.goal": "Tâche objectif",
   "slash.goalDesc": "Objectif fini · plusieurs tours jusqu’à achèvement · pas un minuteur",
   "slash.goalClear": "Effacer la tâche objectif",

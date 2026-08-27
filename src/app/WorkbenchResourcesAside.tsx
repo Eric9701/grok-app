@@ -2,8 +2,16 @@
  * Right resources pane: resize handle + SideWorkbench.
  * Skill insert and plan verbs stay with the host.
  */
-import { lazy, Suspense, type CSSProperties, type Dispatch, type SetStateAction } from "react";
+import {
+  lazy,
+  Suspense,
+  type CSSProperties,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { PaneToggleButton } from "@/components/PaneToggleButton";
 import { createT, type Locale } from "@/i18n";
+import { usePaneUnreadDot } from "@/hooks/usePaneUnreadDot";
 import { DEFAULT_LAYOUT } from "@/lib/layout";
 import { paneSplitSizeStyle } from "@/lib/paneSplitMotion";
 import type { SessionPlanState } from "@/lib/planSession";
@@ -25,7 +33,7 @@ export type WorkbenchResourcesAsideProps = {
   locale: Locale;
   layout: { asideCollapsed: boolean; asideWidth: number };
   phoneLayout: boolean;
-  hideChatForSideExpand: boolean;
+  sidePaneCoversMain: boolean;
   asideOverlay: boolean;
   resizingAside: boolean;
   asideOpenW: number;
@@ -40,6 +48,7 @@ export type WorkbenchResourcesAsideProps = {
   sideDockComposer: boolean;
   onToggleSideDockComposer: () => void;
   sessionChanges: SessionFileChange[];
+  sessionId: string | null;
   plan: SessionPlanState;
   planFocusKey: number | null;
   composerMode: string;
@@ -54,7 +63,7 @@ export type WorkbenchResourcesAsideProps = {
   onOpenRequestConsumed: () => void;
   closeActiveSideRequest: { token: number } | null;
   onCloseActiveRequestConsumed: () => void;
-  onCloseSide: () => void;
+  onToggleSide: () => void;
   onExpandedChange: (expanded: boolean) => void;
   skillInfos: readonly SkillInfo[];
   skillsLoading: boolean;
@@ -68,7 +77,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
     locale,
     layout,
     phoneLayout,
-    hideChatForSideExpand,
+    sidePaneCoversMain,
     asideOverlay,
     resizingAside,
     asideOpenW,
@@ -83,6 +92,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
     sideDockComposer,
     onToggleSideDockComposer,
     sessionChanges,
+    sessionId,
     plan,
     planFocusKey,
     composerMode,
@@ -97,7 +107,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
     onOpenRequestConsumed,
     closeActiveSideRequest,
     onCloseActiveRequestConsumed,
-    onCloseSide,
+    onToggleSide,
     onExpandedChange,
     skillInfos,
     skillsLoading,
@@ -106,21 +116,59 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
   } = props;
 
   const asideMin = layout.asideWidth || DEFAULT_LAYOUT.asideWidth;
+  const toggleUnread = usePaneUnreadDot({
+    open: !layout.asideCollapsed,
+    keys: sessionChanges.map((change) =>
+      JSON.stringify([
+        change.path,
+        change.updatedAt,
+        change.status,
+        change.toolCallId ?? "",
+      ]),
+    ),
+    resetKey: sessionId || "",
+  });
 
   return (
-    <aside
+    <>
+      {!phoneLayout ? (
+        <PaneToggleButton
+          side="right"
+          open={!layout.asideCollapsed}
+          unread={toggleUnread}
+          label={tr(
+            layout.asideCollapsed
+              ? "main.rightPaneShow"
+              : "main.rightPaneHide",
+          )}
+          unreadLabel={tr("main.paneUnread")}
+          controlsId="workbench-aside"
+          testId="main-side-toggle"
+          onToggle={onToggleSide}
+        />
+      ) : null}
+      <aside
+      id="workbench-aside"
       className={
         (layout.asideCollapsed ? "aside aside--hidden" : "aside") +
         (resizingAside ? " is-resizing" : "") +
         (phoneLayout ? " aside--phone-overlay" : "") +
-        (hideChatForSideExpand ? " aside--side-expanded" : "") +
+        (sidePaneCoversMain ? " aside--side-expanded" : "") +
         (asideOverlay ? " aside--overlay" : "")
       }
       aria-label={tr("a11y.resourcesPane")}
       aria-hidden={layout.asideCollapsed}
       style={
-        phoneLayout || hideChatForSideExpand
+        phoneLayout
           ? undefined
+          : sidePaneCoversMain
+            ? ({
+                width: "calc(100% - var(--sw-sidebar-occupied, 0px))",
+                minWidth: "calc(100% - var(--sw-sidebar-occupied, 0px))",
+                maxWidth: "calc(100% - var(--sw-sidebar-occupied, 0px))",
+                flexBasis: "calc(100% - var(--sw-sidebar-occupied, 0px))",
+                ["--aside-rail-min"]: `${asideMin}px`,
+              } as CSSProperties)
           : asideOverlay
             ? ({
                 width: asideOpenW,
@@ -138,7 +186,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
                 } as CSSProperties)
       }
     >
-      {!layout.asideCollapsed && !hideChatForSideExpand && !asideOverlay && (
+      {!layout.asideCollapsed && !sidePaneCoversMain && !asideOverlay && (
         <div
           className="aside-resizer"
           role="separator"
@@ -182,7 +230,8 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
             onOpenRequestConsumed={onOpenRequestConsumed}
             closeActiveRequest={closeActiveSideRequest}
             onCloseActiveRequestConsumed={onCloseActiveRequestConsumed}
-            onCloseSide={onCloseSide}
+            onCloseSide={onToggleSide}
+            closeToggleInBar={phoneLayout}
             onExpandedChange={onExpandedChange}
             skillInfos={skillInfos}
             skillsLoading={skillsLoading}
@@ -191,6 +240,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
           />
         </Suspense>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

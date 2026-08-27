@@ -60,6 +60,7 @@ import {
   emptyActivityStepExpandState,
   grokActivityVirtualMaxHeightPx,
   liveActivityFollowKey,
+  scrollChildIntoContainer,
   shouldCapMappedGrokActivitySteps,
   shouldVirtualizeActivityWithExpand,
   type ActivityStepExpandState,
@@ -560,8 +561,11 @@ export function GrokActivitySteps({
     const el = root.querySelector(
       `[data-step-key="${CSS.escape(followKey)}"]`,
     );
-    if (el) {
-      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    if (el instanceof HTMLElement) {
+      // Nested scroller only. scrollIntoView walks the chat ancestor and
+      // unpins stick-to-bottom when the next thinking / tool / body round
+      // starts below a still-visible live step.
+      scrollChildIntoContainer(root, el);
       return;
     }
     root.scrollTop = root.scrollHeight;

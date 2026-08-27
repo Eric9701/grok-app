@@ -47,7 +47,7 @@ describe("shouldEscapeStopGeneration", () => {
     );
   });
 
-  it("defers to ask-user modal", () => {
+  it("defers to ask-user composer gate", () => {
     expect(shouldEscapeStopGeneration({ ...free, askUserOpen: true })).toBe(
       false,
     );

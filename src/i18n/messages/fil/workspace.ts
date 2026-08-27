@@ -445,6 +445,8 @@ export const filWorkspace = {
   "side.toggle": "Ipakita/itago ang sidebar",
   "side.env": "Environment",
   "side.envTitle": "Environment",
+  "side.env.pin": "I-pin",
+  "side.env.unpin": "Alisin sa pin",
   "side.envSoon": "Lalabas dito ang mga detalye ng environment at git status.",
   "side.placeholder.file": "Files workbench",
   "side.placeholder.browser": "Browser tab",

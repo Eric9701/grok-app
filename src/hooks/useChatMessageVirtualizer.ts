@@ -58,6 +58,7 @@ import {
 } from "@/lib/paneSplitMotion";
 import {
   distanceFromBottom,
+  markProgrammaticStickScroll,
   STICK_ESCAPE_MIN_DELTA_PX,
 } from "@/lib/stickToBottom";
 import { createScrollVelocityTracker } from "@/lib/scrollVelocity";
@@ -531,12 +532,17 @@ export function useChatMessageVirtualizer(
     const ro =
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(() => {
-            if (scrollingRef.current || isPaneSplitMotionActive()) {
-              if (isPaneSplitMotionActive()) {
-                runAfterPaneSplitMotion(() => {
-                  recomputeNow();
-                });
-              }
+            if (scrollingRef.current) {
+              return;
+            }
+            if (isPinnedRef.current) {
+              scheduleOnFrame(scrollFrameRef.current, () => recomputeNow());
+              return;
+            }
+            if (isPaneSplitMotionActive()) {
+              runAfterPaneSplitMotion(() => {
+                recomputeNow();
+              });
               return;
             }
             recompute();
@@ -585,6 +591,7 @@ export function useChatMessageVirtualizer(
     const desired = Math.max(0, top - dist);
     if (Math.abs(v.scrollTop - desired) <= 0.5) return;
     ignoreScrollAdjustRef.current = true;
+    markProgrammaticStickScroll(v, desired);
     v.scrollTop = desired;
   }, [
     virtualized,
@@ -612,6 +619,7 @@ export function useChatMessageVirtualizer(
     (index: number, el: HTMLElement, measuredHeight?: number) => {
       if (!virtualizedRef.current) return;
       if (
+        !isPinnedRef.current &&
         runAfterPaneSplitMotion(() =>
           commitRowHeight(index, el, measuredHeight),
         )

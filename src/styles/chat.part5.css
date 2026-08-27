@@ -563,19 +563,20 @@
   color: var(--danger);
 }
 
-/* Connection status pill in main chrome */
+/* Connection status — same flat chip language as .chip / .chrome-btn */
 .status-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 22px;
+  height: 28px;
   padding: 0 8px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
   color: var(--text-secondary);
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--bg-elevated) 55%, transparent);
+  border: none;
+  background: transparent;
   flex-shrink: 0;
+  transition: background 120ms ease, color 120ms ease;
 }
 
 .status-pill__dot {
@@ -601,15 +602,15 @@
 .status-pill--action {
   margin: 0;
   cursor: pointer;
-  font: inherit;
+  font-family: inherit;
+  font-weight: inherit;
   appearance: none;
   -webkit-appearance: none;
 }
 
 .status-pill--action:hover {
   color: var(--text-primary);
-  border-color: var(--border-strong, var(--border-subtle));
-  background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
+  background: var(--bg-hover);
 }
 
 .status-pill--action:focus-visible {
@@ -782,6 +783,56 @@
   line-height: 1.55;
   color: var(--text-primary);
   white-space: pre-wrap;
+}
+
+.whats-new .modal-actions {
+  justify-content: flex-end;
+}
+
+.whats-new__body-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  min-width: 0;
+  max-height: min(60vh, 480px);
+  overflow: auto;
+}
+
+.whats-new__highlight {
+  margin: 0;
+  font-size: var(--text-sm, 13px);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.whats-new__section {
+  min-width: 0;
+}
+
+.whats-new__heading {
+  margin: 0 0 6px;
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.whats-new__list {
+  margin: 0;
+  padding-left: 1.15em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--text-sm, 13px);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.whats-new__empty {
+  margin: 0;
+  font-size: var(--text-sm, 13px);
+  color: var(--text-secondary);
 }
 
 .perm-bar__hint {

@@ -445,6 +445,8 @@ export const taWorkspace = {
   "side.toggle": "பக்கப்பட்டியைக் காட்டு/மறை",
   "side.env": "சூழல்",
   "side.envTitle": "சூழல்",
+  "side.env.pin": "பின்",
+  "side.env.unpin": "பின் நீக்கு",
   "side.envSoon": "சுற்றுச்சூழல் விவரங்கள் மற்றும் ஜிட் நிலை இங்கே தோன்றும்.",
   "side.placeholder.file": "ஃபைல்ஸ் ஒர்க் பெஞ்ச்",
   "side.placeholder.browser": "உலாவி தாவல்",

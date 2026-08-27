@@ -123,8 +123,27 @@ pub async fn skin_staging_abort(staging_id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn skin_preset_list() -> Result<serde_json::Value, String> {
     let presets = skin_presets::list_presets()?;
+    let enriched: Vec<serde_json::Value> = presets
+        .into_iter()
+        .map(|p| {
+            let thumb = skin_presets::preset_thumb_path(&p.id)
+                .map(|path| path.to_string_lossy().to_string());
+            let wallpaper = skin_presets::preset_wallpaper_path(&p.id)
+                .map(|path| path.to_string_lossy().to_string());
+            let mut v = serde_json::to_value(&p).unwrap_or_else(|_| serde_json::json!({}));
+            if let Some(obj) = v.as_object_mut() {
+                if let Some(path) = thumb {
+                    obj.insert("thumbPath".into(), serde_json::json!(path));
+                }
+                if let Some(path) = wallpaper {
+                    obj.insert("wallpaperPath".into(), serde_json::json!(path));
+                }
+            }
+            v
+        })
+        .collect();
     Ok(serde_json::json!({
-        "presets": presets,
+        "presets": enriched,
         "usage": skin_presets::disk_usage(),
     }))
 }

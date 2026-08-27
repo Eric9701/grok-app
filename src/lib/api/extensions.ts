@@ -51,6 +51,8 @@ export interface SkillDto {
   /** Normalized source type (e.g. user, project, plugin). */
   source: string;
   path?: string | null;
+  /** Owning plugin id when this skill came from a plugin pack. */
+  pluginName?: string | null;
   userInvocable: boolean;
   /** App Extensions enable flag (default true when omitted). */
   enabled?: boolean;

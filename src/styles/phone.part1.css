@@ -226,6 +226,8 @@
 
   /* ── Touch targets ≥ 44px ────────────────────────────────────────────── */
   .app-shell--phone .perm-bar__btn,
+  .app-shell--phone .ask-user__opt,
+  .app-shell--phone .ask-user-bar__actions .btn,
   .app-shell--phone .nav-new,
   .app-shell--phone .nav-item,
   .app-shell--phone .chrome-btn,
@@ -276,7 +278,19 @@
     min-height: 44px;
   }
 
-  .app-shell--phone .perm-bar__btn {
+  .app-shell--phone .ask-user-bar__main {
+    flex-direction: column;
+  }
+
+  .app-shell--phone .ask-user-bar__actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    width: 100%;
+    position: static;
+  }
+
+  .app-shell--phone .perm-bar__btn,
+  .app-shell--phone .ask-user__opt {
     padding: 10px 14px;
     font-size: 15px;
   }
@@ -310,7 +324,7 @@
 
   .app-shell--phone .status-pill {
     font-size: 13px;
-    padding: 6px 10px;
+    padding: 0 10px;
   }
 
   /*

@@ -107,4 +107,38 @@ describe("shouldTriggerPetSpin", () => {
       }),
     ).toBe(false);
   });
+
+  it("fires when live work ends even if the chat is already in view", () => {
+    expect(
+      shouldTriggerPetSpin({
+        primed: true,
+        prevKind: "working",
+        nextKind: "idle",
+      }),
+    ).toBe(true);
+  });
+
+  it("fires when a done chip appears after live work", () => {
+    expect(
+      shouldTriggerPetSpin({
+        primed: true,
+        prevKind: "idle",
+        nextKind: "idle",
+        prevDoneIds: new Set(),
+        nextDoneIds: new Set(["s1"]),
+      }),
+    ).toBe(true);
+  });
+
+  it("does not celebrate a peer chip while another session is still live", () => {
+    expect(
+      shouldTriggerPetSpin({
+        primed: true,
+        prevKind: "working",
+        nextKind: "working",
+        prevDoneIds: new Set(),
+        nextDoneIds: new Set(["peer"]),
+      }),
+    ).toBe(false);
+  });
 });

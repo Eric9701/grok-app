@@ -4,7 +4,7 @@
  * or display strings for dynamic skills.
  */
 
-export type SlashKind = "mode" | "skill" | "action" | "prompt";
+export type SlashKind = "mode" | "skill" | "action" | "prompt" | "plugin";
 
 export type SlashItem = {
   id: string;
@@ -19,12 +19,17 @@ export type SlashItem = {
   source?: string;
   action?: string;
   mode?: "goal" | "plan";
+  /** Plugin pack id when kind is plugin (or a skill that belongs to one). */
+  pluginName?: string;
 };
 
 export type SkillInfo = {
   name: string;
   description: string;
   source?: string;
+  path?: string | null;
+  /** Owning plugin id when this skill came from a plugin pack. */
+  pluginName?: string | null;
   /** Explicit false = agent-only / not slash-invocable. Missing ⇒ invocable. */
   userInvocable?: boolean;
   /** App Extensions toggle. Explicit false hides from picker. Missing ⇒ on. */
@@ -48,6 +53,8 @@ export function filterPickerSkills(skills: SkillInfo[]): SkillInfo[] {
       name,
       description: (s.description ?? "").trim(),
       source: s.source,
+      path: s.path,
+      pluginName: s.pluginName ?? inferPluginNameFromPath(s.path),
       userInvocable: true,
       enabled: true,
     };
@@ -69,6 +76,77 @@ export function filterPickerSkills(skills: SkillInfo[]): SkillInfo[] {
 function isProjectSource(source: string | null | undefined): boolean {
   const s = (source ?? "").trim().toLowerCase();
   return s === "project" || s === "workspace" || s === "local";
+}
+
+/**
+ * Plugin id from a skill path. `installed-plugins/<name>` wins over
+ * `.grok/plugins/<name>`. User / bundled / project skill dirs return null.
+ */
+export function inferPluginNameFromPath(
+  path: string | null | undefined,
+): string | null {
+  if (!path) return null;
+  const p = path.replace(/\\/g, "/").replace(/\/+/g, "/");
+  const markers = ["/installed-plugins/", "/plugins/"] as const;
+  for (const marker of markers) {
+    const idx = p.toLowerCase().indexOf(marker);
+    if (idx < 0) continue;
+    const rest = p.slice(idx + marker.length);
+    const name = rest.split("/")[0]?.trim() ?? "";
+    if (!name || name.toLowerCase() === "skills") continue;
+    return name;
+  }
+  return null;
+}
+
+export function resolveSkillPluginName(skill: SkillInfo): string | null {
+  const explicit = (skill.pluginName ?? "").trim();
+  if (explicit) return explicit;
+  return inferPluginNameFromPath(skill.path);
+}
+
+/** plugin id → enabled + invocable skill names, insertion order. */
+export function pluginSkillsMap(skills: SkillInfo[]): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  for (const s of filterPickerSkills(skills)) {
+    const plugin = resolveSkillPluginName(s);
+    if (!plugin) continue;
+    const list = map[plugin] ?? (map[plugin] = []);
+    if (!list.some((n) => n.toLowerCase() === s.name.toLowerCase())) {
+      list.push(s.name);
+    }
+  }
+  return map;
+}
+
+/** One slash row per plugin pack that still has invocable skills. */
+export function pluginsToSlashItems(skills: SkillInfo[]): SlashItem[] {
+  const groups = new Map<string, string[]>();
+  for (const s of filterPickerSkills(skills)) {
+    const plugin = resolveSkillPluginName(s);
+    if (!plugin) continue;
+    const list = groups.get(plugin) ?? [];
+    if (!list.some((n) => n.toLowerCase() === s.name.toLowerCase())) {
+      list.push(s.name);
+    }
+    groups.set(plugin, list);
+  }
+  const items: SlashItem[] = [];
+  for (const [name, aliases] of groups) {
+    if (aliases.length === 0) continue;
+    items.push({
+      id: `plugin:${name}`,
+      kind: "plugin",
+      name,
+      displayTitle: name,
+      descriptionKey: "slash.pluginDesc",
+      aliases,
+      pluginName: name,
+      source: "plugin",
+    });
+  }
+  items.sort((a, b) => a.name.localeCompare(b.name));
+  return items;
 }
 
 /** Built-in slash commands (modes, prompts, host actions). */
@@ -297,6 +375,7 @@ export function skillsToSlashItems(skills: SkillInfo[]): SlashItem[] {
   // ghost rows that ignore filter updates (always visible, not keyboard-navable).
   const items = filterPickerSkills(skills).map((s) => {
     const labels = KNOWN_SKILL_I18N[s.name];
+    const pluginName = resolveSkillPluginName(s) ?? undefined;
     return {
       id: `skill:${s.name}`,
       kind: "skill" as const,
@@ -304,6 +383,7 @@ export function skillsToSlashItems(skills: SkillInfo[]): SlashItem[] {
       displayTitle: s.name,
       displayDescription: s.description,
       source: s.source,
+      pluginName,
       ...(labels
         ? {
             titleKey: labels.titleKey,
@@ -337,6 +417,7 @@ export const SLASH_KIND_FILTERS: readonly SlashKindFilter[] = [
   "action",
   "prompt",
   "skill",
+  "plugin",
 ] as const;
 
 /** Per-kind counts plus total under `all`. */
@@ -358,10 +439,17 @@ export function countSlashByKind(
     skill: 0,
     action: 0,
     prompt: 0,
+    plugin: 0,
   };
   for (const item of items) {
     const k = item.kind;
-    if (k === "mode" || k === "skill" || k === "action" || k === "prompt") {
+    if (
+      k === "mode" ||
+      k === "skill" ||
+      k === "action" ||
+      k === "prompt" ||
+      k === "plugin"
+    ) {
       counts[k] += 1;
     }
   }
@@ -388,6 +476,8 @@ export function slashKindLabelKey(kind: SlashKindFilter): string {
       return "slash.kind.prompt";
     case "skill":
       return "slash.kind.skill";
+    case "plugin":
+      return "slash.kind.plugin";
     default:
       return "slash.kind.all";
   }
@@ -525,7 +615,7 @@ export function buildSlashCatalog(skills: SkillInfo[]): {
 } {
   return {
     commands: builtinSlashItems(),
-    skills: skillsToSlashItems(skills),
+    skills: [...pluginsToSlashItems(skills), ...skillsToSlashItems(skills)],
   };
 }
 

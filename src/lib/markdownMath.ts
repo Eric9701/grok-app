@@ -1,11 +1,27 @@
 /**
- * Shared remark/rehype plugins for GFM + KaTeX.
- * Stable arrays so ReactMarkdown does not remount the tree every stream tick.
+ * Shared remark/rehype plugins for chat + preview markdown.
+ * GFM + KaTeX ($…$ / $$…$$ and \(…\) / \[…\]).
  */
+
+import type { Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
 
-export const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkMath];
-export const MARKDOWN_REHYPE_PLUGINS = [rehypeKatex];
+export const MARKDOWN_REMARK_PLUGINS: NonNullable<Options["remarkPlugins"]> = [
+  remarkGfm,
+  remarkMath,
+];
+
+export const MARKDOWN_REHYPE_PLUGINS: NonNullable<Options["rehypePlugins"]> = [
+  [
+    rehypeKatex,
+    {
+      throwOnError: false,
+      errorColor: "#c44",
+      strict: "ignore",
+      output: "html",
+      trust: false,
+    },
+  ],
+];

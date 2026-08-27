@@ -76,6 +76,13 @@ import {
   type ChatWidth,
 } from "@/lib/chatWidthPref";
 import {
+  applyMsgRailSide,
+  dispatchMsgRailSideChange,
+  loadMsgRailSide,
+  saveMsgRailSide,
+  type MsgRailSide,
+} from "@/lib/msgRailSidePref";
+import {
   loadExportLogoPref,
   readImageFileAsDataUrl,
   saveExportLogoPref,
@@ -125,6 +132,9 @@ import {
 import {
   loadBackBottomAlwaysPref,
 } from "@/lib/backBottomAlwaysPref";
+import {
+  loadTranscriptSelectionToolbarPref,
+} from "@/lib/transcriptSelectionToolbarPref";
 import {
   loadSessionSearchRankPref,
 } from "@/lib/sessionSearchRankPref";
@@ -276,6 +286,8 @@ export function SettingsPage({
   wallpaperMediaSize = null,
   wallpaperScrim = 100,
   onWallpaperScrim,
+  wallpaperBlur = 100,
+  onWallpaperBlur,
   onWallpaper,
   onWallpaperAdjust,
   onWallpaperMediaSize,
@@ -638,6 +650,18 @@ export function SettingsPage({
     applyChatWidth(next);
     dispatchChatWidthChange(next);
   }, []);
+  const [msgRailSide, setMsgRailSideState] = useState<MsgRailSide>(() =>
+    loadMsgRailSide(),
+  );
+  useEffect(() => {
+    applyMsgRailSide(loadMsgRailSide());
+  }, []);
+  const onMsgRailSide = useCallback((next: MsgRailSide) => {
+    setMsgRailSideState(next);
+    saveMsgRailSide(next);
+    applyMsgRailSide(next);
+    dispatchMsgRailSideChange(next);
+  }, []);
   /** Share-card export logo — localStorage data URL (no AppSettings). */
   const [exportLogo, setExportLogo] = useState<string | null>(() =>
     loadExportLogoPref(),
@@ -666,6 +690,10 @@ export function SettingsPage({
   /** Always-show back-to-bottom control — frontend-only localStorage. */
   const [backBottomAlways, setBackBottomAlways] = useState(() =>
     loadBackBottomAlwaysPref(),
+  );
+  /** Transcript selection copy/quote bar — frontend-only localStorage. */
+  const [selectionToolbar, setSelectionToolbar] = useState(() =>
+    loadTranscriptSelectionToolbarPref(),
   );
   /** Session search ranking (keyword vs local hybrid) — frontend-only. */
   const [sessionSearchRank, setSessionSearchRank] =
@@ -1337,6 +1365,11 @@ export function SettingsPage({
   /** Providers dual-pane: fill viewport; rail + detail scroll, page does not. */
   const providersPaneFill =
     section === "account" && activeTab === "providers";
+  /** Appearance theme: left presets + right stack scroll independently. */
+  const appearanceThemePaneFill =
+    section === "appearance" &&
+    (activeTab === "theme" || activeTab == null || activeTab === undefined);
+  const dualPaneFill = providersPaneFill || appearanceThemePaneFill;
   const pageClass =
     "settings-page" +
     (phoneIndex ? " settings-page--phone-index" : "") +
@@ -1459,6 +1492,8 @@ export function SettingsPage({
     onWallpaperMediaSize,
     wallpaperScrim,
     onWallpaperScrim,
+    wallpaperBlur,
+    onWallpaperBlur,
     sessionDataMode,
     onSessionDataMode,
     onCliSessionsImported,
@@ -1706,6 +1741,8 @@ export function SettingsPage({
     onChatDensity,
     chatWidth,
     onChatWidth,
+    msgRailSide,
+    onMsgRailSide,
     exportLogo,
     exportLogoInputRef,
     onExportLogoFile,
@@ -1718,6 +1755,8 @@ export function SettingsPage({
     setCodeLineNumbers,
     backBottomAlways,
     setBackBottomAlways,
+    selectionToolbar,
+    setSelectionToolbar,
     sessionSearchRank,
     setSessionSearchRank,
     voiceHotkeyEnabled,
@@ -1875,7 +1914,7 @@ export function SettingsPage({
       <div
         className={
           "settings-page__content" +
-          (providersPaneFill ? " settings-page__content--pane-fill" : "")
+          (dualPaneFill ? " settings-page__content--pane-fill" : "")
         }
         hidden={phoneIndex || undefined}
         aria-hidden={phoneIndex || undefined}
@@ -1896,7 +1935,7 @@ export function SettingsPage({
       <main
         className={
           "settings-page__main" +
-          (providersPaneFill ? " settings-page__main--pane-fill" : "")
+          (dualPaneFill ? " settings-page__main--pane-fill" : "")
         }
       >
         {!phoneDetail ? (

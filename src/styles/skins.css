@@ -16,8 +16,10 @@ html[data-wallpaper="1"] {
   --wallpaper-theme-scrim-opacity: var(--wallpaper-scrim-opacity, 1);
   --wallpaper-theme-mix-sidebar: var(--wallpaper-mix-sidebar, 58%);
   --wallpaper-theme-mix-main: var(--wallpaper-mix-main, 70%);
-  --wallpaper-theme-mix-aside: var(--wallpaper-mix-aside, 70%);
+  --wallpaper-theme-mix-aside: var(--wallpaper-theme-mix-sidebar);
   --wallpaper-theme-mix-settings: var(--wallpaper-mix-settings, 78%);
+  --wallpaper-theme-overlay-mix: var(--wallpaper-overlay-mix, 100%);
+  --wallpaper-theme-mix-card: var(--wallpaper-mix-card, 100%);
   --wallpaper-foreground-shadow-color: rgb(
     0 0 0 / var(--wallpaper-sidebar-shadow-alpha, 0)
   );
@@ -31,13 +33,9 @@ html[data-theme="light"][data-wallpaper="1"] {
   );
   --wallpaper-theme-mix-sidebar: var(--wallpaper-light-mix-sidebar, 72%);
   --wallpaper-theme-mix-main: var(--wallpaper-light-mix-main, 24%);
-  --wallpaper-theme-mix-aside: var(--wallpaper-light-mix-aside, 32%);
+  --wallpaper-theme-mix-aside: var(--wallpaper-theme-mix-sidebar);
   --wallpaper-theme-mix-settings: var(--wallpaper-light-mix-settings, 72%);
-  --wallpaper-light-elevated-surface: color-mix(
-    in srgb,
-    var(--bg-elevated) 74%,
-    transparent
-  );
+  --wallpaper-theme-overlay-mix: var(--wallpaper-light-overlay-mix, 100%);
   --wallpaper-chrome-foreground: rgb(255 255 255 / 0.96);
   --wallpaper-chrome-shadow-color: rgb(0 0 0 / 0.68);
 }
@@ -52,14 +50,42 @@ html[data-wallpaper="1"] .app-shell::after {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: var(--wallpaper-theme-scrim-opacity);
-  /* Left-weighted scrim so chrome stays readable (Dream Skin safe-area left). */
+  /*
+   * Do not use the opacity property. A window-sized opacity layer in
+   * WKWebView misses damage rects when portaled tips / hover layers
+   * come and go (leftover squares). Slider 0% had no layer so no bug.
+   * Bake the slider into the gradient; this box stays opacity 1.
+   */
   background: linear-gradient(
     105deg,
-    color-mix(in srgb, var(--wallpaper-theme-scrim-color) 88%, transparent) 0%,
-    color-mix(in srgb, var(--wallpaper-theme-scrim-color) 62%, transparent) 42%,
-    color-mix(in srgb, var(--wallpaper-theme-scrim-color) 28%, transparent) 78%,
-    color-mix(in srgb, var(--wallpaper-theme-scrim-color) 12%, transparent) 100%
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
+          calc(88% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      0%,
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
+          calc(62% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      42%,
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
+          calc(28% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      78%,
+    color-mix(
+        in srgb,
+        var(--wallpaper-theme-scrim-color)
+          calc(12% * var(--wallpaper-theme-scrim-opacity, 1)),
+        transparent
+      )
+      100%
   );
 }
 
@@ -70,6 +96,14 @@ html[data-wallpaper="1"] .app-shell::after {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+}
+
+/* One static frost behind both rails — not on the interpolating pane boxes.
+ * Grow with inset instead of scale(): filter+transform on the same box
+ * tiles in WKWebView and paints a black cross/grid while dragging blur. */
+html[data-wallpaper="1"] .app-wallpaper-media {
+  filter: blur(var(--wallpaper-sidebar-blur, 22px));
+  inset: calc(-2 * var(--wallpaper-sidebar-blur, 22px));
 }
 
 .app-wallpaper-media__el {
@@ -96,13 +130,65 @@ html[data-wallpaper="1"] .workbench {
   background: transparent !important;
 }
 
-/* Keep the atomic Settings swap above the lifted workbench chrome. */
+/*
+ * Settings overlay samples wallpaper via --wallpaper-overlay-mix
+ * (independent slider; 20% floor + 80% range). Extra veil is ::before so the
+ * stage stays position:absolute; inset:0 (#846). Workbench panes still follow
+ * the wallpaper scrim slider (0% stays fully clear).
+ */
 html[data-wallpaper="1"] .app-settings-stage {
   z-index: 20;
-  backdrop-filter: blur(var(--wallpaper-settings-blur, 14px))
-    saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--wallpaper-settings-blur, 14px))
-    saturate(var(--glass-saturate));
+  background: transparent;
+  backdrop-filter: blur(var(--wallpaper-overlay-blur, 2.8px));
+  -webkit-backdrop-filter: blur(var(--wallpaper-overlay-blur, 2.8px));
+}
+
+html[data-wallpaper="1"] .app-settings-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--bg-main);
+  opacity: var(--wallpaper-overlay-veil-opacity, 0);
+}
+
+html[data-wallpaper="1"] .app-settings-stage .settings-page {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * Standalone appearance window is a settings plate — never wallpaper glass,
+ * scrim, or pane mix. Sliders still write prefs for the workbench.
+ */
+html[data-theme-editor-shell],
+html[data-theme-editor-shell][data-wallpaper="1"] {
+  --composer-opacity-mix: 100%;
+  --ui-opacity-mix: 100%;
+  --wallpaper-overlay-mix: 100%;
+  --wallpaper-light-overlay-mix: 100%;
+  --wallpaper-theme-scrim-opacity: 0;
+}
+
+html[data-theme-editor-shell] .app-shell,
+html[data-theme-editor-shell][data-wallpaper="1"] .app-shell,
+html[data-theme-editor-shell] .theme-editor-shell,
+html[data-theme-editor-shell][data-wallpaper="1"] .theme-editor-shell {
+  background: var(--bg-main) !important;
+}
+
+html[data-theme-editor-shell] .app-shell::after,
+html[data-theme-editor-shell][data-wallpaper="1"] .app-shell::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  opacity: 0 !important;
+}
+
+html[data-theme-editor-shell] .app-wallpaper-media,
+html[data-theme-editor-shell][data-wallpaper="1"] .app-wallpaper-media {
+  display: none !important;
 }
 
 /* Pane fills scale with scrim: 0% = fully clear wallpaper under chrome.
@@ -124,29 +210,24 @@ html[data-wallpaper="1"] .sidebar {
       var(--wallpaper-theme-mix-sidebar),
     transparent
   ) !important;
+}
+
+html[data-wallpaper="1"] .sidebar.sidebar--overlay,
+html[data-wallpaper="1"] .sidebar.sidebar--phone-drawer {
   backdrop-filter: blur(var(--wallpaper-sidebar-blur, 22px)) saturate(1.25);
   -webkit-backdrop-filter: blur(var(--wallpaper-sidebar-blur, 22px))
     saturate(1.25);
 }
 
-html[data-theme="dark"][data-wallpaper="1"] .sidebar {
-  text-shadow: 0 1px 2px var(--wallpaper-foreground-shadow-color);
+html[data-theme="dark"][data-wallpaper="1"] .pane-toggle--pinned {
+  color: var(--text-primary);
 }
 
-html[data-theme="dark"][data-wallpaper="1"] .sidebar svg {
-  filter: drop-shadow(0 1px 1px var(--wallpaper-foreground-shadow-color));
-}
-
-html[data-theme="dark"][data-wallpaper="1"] .main__top,
-html[data-theme="dark"][data-wallpaper="1"] .composer-welcome-mark,
 html[data-theme="dark"][data-wallpaper="1"] .lobe-chat-assistant-timeline {
-  text-shadow: 0 1px 2px var(--wallpaper-foreground-shadow-color);
-}
-
-html[data-theme="dark"][data-wallpaper="1"] .main__top svg,
-html[data-theme="dark"][data-wallpaper="1"] .composer-welcome-mark svg,
-html[data-theme="dark"][data-wallpaper="1"] .lobe-chat-assistant-timeline svg {
-  filter: drop-shadow(0 1px 1px var(--wallpaper-foreground-shadow-color));
+  --chat-text: var(--text-primary);
+  --chat-text-2: color-mix(in srgb, var(--text-primary) 84%, transparent);
+  --chat-text-3: color-mix(in srgb, var(--text-primary) 72%, transparent);
+  color: var(--text-primary);
 }
 
 html[data-wallpaper="1"]
@@ -170,6 +251,19 @@ html[data-wallpaper="1"]
   text-shadow: none;
 }
 
+/* Inline `code` chips sit on wallpaper — give them a real well so they
+ * read as tokens, not a smear of the surrounding chrome ink. */
+html[data-wallpaper="1"]
+  .lobe-chat
+  .lobe-chat-assistant-timeline
+  :is(.chat-md__inline-code, .chat-md :not(pre) > code) {
+  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
+  color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--text-primary) 18%, transparent);
+  text-shadow: none;
+}
+
 html[data-wallpaper="1"]
   .lobe-chat
   .lobe-chat-assistant-timeline
@@ -186,6 +280,63 @@ html[data-wallpaper="1"]
 }
 
 html[data-wallpaper="1"] .main {
+  /* Opaque chrome washes — 4% --bg-hover samples the scrim gradient. */
+  --bg-hover: color-mix(
+    in srgb,
+    var(--bg-elevated) 90%,
+    var(--text-primary) 10%
+  );
+  --bg-active: color-mix(
+    in srgb,
+    var(--bg-elevated) 82%,
+    var(--text-primary) 18%
+  );
+}
+
+/*
+ * Composer sits on its own plate. Keep hover as theme rgba (not wallpaper
+ * color-mix): WKWebView leaves a rectangular ghost after :hover if the wash
+ * is a composited mix / ::before layer (software-path damage-rect miss).
+ */
+html[data-wallpaper="1"] .composer-wrap {
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="light"][data-wallpaper="1"] .composer-wrap {
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+}
+
+/*
+ * Top-bar 28px tiles inherit .main's opaque color-mix --bg-hover.
+ * Same WKWebView leftover as composer hover; pin them to rgba.
+ */
+html[data-wallpaper="1"] .main :is(.chrome-btn, .main__pane-toggle) {
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="light"][data-wallpaper="1"]
+  .main
+  :is(.chrome-btn, .main__pane-toggle) {
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+}
+
+html[data-wallpaper="1"] .main :is(.status-pill, .open-loc) {
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="light"][data-wallpaper="1"]
+  .main
+  :is(.status-pill, .open-loc) {
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+}
+
+html[data-wallpaper="1"] .main {
   background: color-mix(
     in srgb,
     var(--bg-main) var(--wallpaper-theme-mix-main),
@@ -195,15 +346,16 @@ html[data-wallpaper="1"] .main {
   box-shadow: none !important;
 }
 
+/* Right rail uses the same solid + mix as the left sidebar. */
 html[data-wallpaper="1"] .aside {
   background: color-mix(
     in srgb,
-    var(--bg-aside) var(--wallpaper-theme-mix-aside),
+    var(--bg-sidebar-solid, var(--bg-sidebar))
+      var(--wallpaper-theme-mix-sidebar),
     transparent
   ) !important;
 }
 
-html[data-wallpaper="1"] .settings-page,
 html[data-wallpaper="1"] .setup-gate {
   background: color-mix(
     in srgb,
@@ -212,10 +364,15 @@ html[data-wallpaper="1"] .setup-gate {
   ) !important;
 }
 
+html[data-wallpaper="1"] .settings-page,
+html[data-wallpaper="1"] .platform-mac .settings-page,
+html.platform-mac[data-theme="light"][data-wallpaper="1"] .settings-page {
+  background: transparent !important;
+}
+
 /*
- * Settings chrome: nav + content paint solid in app.css and would fully hide
- * the wallpaper even when the outer page / ::after scrim is at 0%.
- * Scale them with the same mix tokens.
+ * Settings nav uses the overlay mix token — never sidebar mix — so a 0%
+ * workbench slider does not punch through the settings chrome.
  */
 html[data-wallpaper="1"] .settings-page__nav,
 html[data-wallpaper="1"] .platform-win .settings-page__nav,
@@ -224,12 +381,11 @@ html[data-wallpaper="1"] .platform-mac .settings-page__nav {
   background: color-mix(
     in srgb,
     var(--bg-sidebar-solid, var(--bg-sidebar))
-      var(--wallpaper-theme-mix-sidebar),
+      var(--wallpaper-theme-overlay-mix, 100%),
     transparent
   ) !important;
-  backdrop-filter: blur(var(--wallpaper-sidebar-blur, 22px)) saturate(1.25);
-  -webkit-backdrop-filter: blur(var(--wallpaper-sidebar-blur, 22px))
-    saturate(1.25);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /*
@@ -239,6 +395,7 @@ html[data-wallpaper="1"] .platform-mac .settings-page__nav {
  */
 html[data-stream-perf="1"][data-wallpaper="1"] .app-settings-stage,
 html[data-stream-perf="1"][data-wallpaper="1"] .sidebar,
+html[data-stream-perf="1"][data-wallpaper="1"] .aside,
 html[data-stream-perf="1"][data-wallpaper="1"] .settings-page__nav,
 html[data-stream-perf="1"][data-wallpaper="1"] .platform-win .settings-page__nav,
 html[data-stream-perf="1"][data-wallpaper="1"] .platform-other .settings-page__nav,
@@ -247,12 +404,26 @@ html[data-stream-perf="1"][data-wallpaper="1"] .platform-mac .settings-page__nav
   -webkit-backdrop-filter: none !important;
 }
 
+html[data-stream-perf="1"][data-wallpaper="1"] .app-wallpaper-media {
+  filter: none;
+  transform: none;
+  inset: 0;
+}
+
 html[data-wallpaper="1"] .settings-page__content,
-html[data-wallpaper="1"].platform-mac .settings-page__content,
+html[data-wallpaper="1"].platform-mac .settings-page__content {
+  background: color-mix(
+    in srgb,
+    var(--bg-main) var(--wallpaper-theme-overlay-mix, 100%),
+    transparent
+  ) !important;
+  box-shadow: none !important;
+}
+
 html[data-wallpaper="1"].platform-mac[data-theme="light"] .settings-page__content {
   background: color-mix(
     in srgb,
-    var(--bg-main) var(--wallpaper-theme-mix-settings),
+    #ffffff var(--wallpaper-theme-overlay-mix, 100%),
     transparent
   ) !important;
   box-shadow: none !important;
@@ -267,34 +438,51 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"] .main {
   ) !important;
 }
 
-html[data-wallpaper="1"].platform-mac[data-theme="light"] .aside {
-  background: color-mix(
-    in srgb,
-    #ffffff var(--wallpaper-theme-mix-aside),
-    transparent
-  ) !important;
+/* Composer + workspace bar: independent slider, never merged with scrim. */
+html[data-wallpaper="1"] :is(.composer, .composer__context-bar) {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
-/* Light wallpaper controls share one translucent elevated material. It stays
- * readable when stream-perf removes pane blur and when the scrim is low. */
-html[data-theme="light"][data-wallpaper="1"]
-  :is(.composer, .composer__context-bar, .main__top .status-pill) {
-  background: var(--wallpaper-light-elevated-surface);
+html[data-theme="light"][data-wallpaper="1"] .plan-bar {
+  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
 }
 
-html[data-theme="light"][data-wallpaper="1"]
-  .main__top
-  .status-pill--action:hover {
-  background: color-mix(
-    in srgb,
-    var(--wallpaper-light-elevated-surface) 90%,
-    var(--text-primary) 10%
-  );
+html[data-theme="dark"][data-wallpaper="1"] .plan-bar {
+  background: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
 }
 
-html[data-theme="light"][data-wallpaper="1"] .composer-wrap--float {
+html[data-stream-perf="1"] .plan-bar {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-wallpaper="1"] .main__top .status-pill,
+html[data-wallpaper="1"] .main__top .status-pill--action:hover,
+html[data-wallpaper="1"] .user-avatar,
+html[data-wallpaper="1"] .user-avatar--logo {
   background: transparent;
 }
+
+html[data-wallpaper="1"]
+  .composer-welcome-mark,
+html[data-wallpaper="1"]
+  .composer-welcome-prompt {
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* clip-path wipe leaves a white inner halo on light wallpaper in WKWebView. */
+html[data-wallpaper="1"]
+  .composer-welcome-mark.is-entering
+  .composer-welcome-prompt {
+  animation: none;
+}
+
+
 
 /*
  * Hard clear at 0% scrim — clear the canvas and pane curves completely.
@@ -303,37 +491,68 @@ html[data-wallpaper="1"][data-wallpaper-clear="1"] .app-shell::after {
   opacity: 0 !important;
 }
 
-html[data-wallpaper="1"][data-wallpaper-clear="1"] .app-settings-stage,
+/* wallpaper-clear (scrim 0%) only clears workbench panes — settings overlay
+ * keeps the independent settings-opacity mix / blur. */
+
 html[data-wallpaper="1"][data-wallpaper-clear="1"] .sidebar,
 html[data-wallpaper="1"][data-wallpaper-clear="1"] .main,
 html[data-wallpaper="1"][data-wallpaper-clear="1"] .aside,
-html[data-wallpaper="1"][data-wallpaper-clear="1"] .settings-page,
 html[data-wallpaper="1"][data-wallpaper-clear="1"] .setup-gate,
-html[data-wallpaper="1"][data-wallpaper-clear="1"] .settings-page__nav,
-html[data-wallpaper="1"][data-wallpaper-clear="1"] .settings-page__content,
 html[data-wallpaper="1"][data-wallpaper-clear="1"].platform-mac[data-theme="light"] .main,
-html[data-wallpaper="1"][data-wallpaper-clear="1"].platform-mac[data-theme="light"] .aside,
-html[data-wallpaper="1"][data-wallpaper-clear="1"].platform-mac[data-theme="light"] .settings-page__content {
+html[data-wallpaper="1"][data-wallpaper-clear="1"].platform-mac[data-theme="light"] .aside {
   background: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   box-shadow: none !important;
 }
 
-/* Wallpaper luminance is unknowable. Keep light and dark wallpaper layouts
- * structurally identical, then protect only foreground ink with the same
- * white-on-dark-edge treatment used by the dark shell. */
+html[data-wallpaper="1"][data-wallpaper-clear="1"] .app-wallpaper-media {
+  filter: none;
+  transform: none;
+  inset: 0;
+}
+
+/*
+ * Custom text color (Settings → Appearance): only exposed chrome that sits
+ * on wallpaper / empty home — never settings, menus, or filled panels.
+ * Theme --text-primary on <html> stays the light/dark default.
+ */
+html[data-text-color="custom"]
+  :is(.sidebar, .main__top, .composer-welcome-mark, .pane-toggle--pinned) {
+  --text-primary: var(--appearance-chrome-ink);
+  --text-secondary: color-mix(
+    in srgb,
+    var(--appearance-chrome-ink) 80%,
+    transparent
+  );
+  --text-tertiary: color-mix(
+    in srgb,
+    var(--appearance-chrome-ink) 62%,
+    transparent
+  );
+  color: var(--text-primary);
+}
+
+html[data-text-color="custom"]
+  .composer-welcome-mark
+  :is(.deepseek-full-mark__ink, .opencode-wordmark, .supergrok-mark) {
+  color: var(--appearance-chrome-ink);
+  fill: var(--appearance-chrome-ink);
+}
+
+/* Wallpaper luminance is unknowable. Light/dark layouts stay structurally
+ * identical; ink follows theme tokens (or scoped appearance chrome). Optional
+ * text shadow is html[data-font-shadow="1"]. */
+html[data-wallpaper="1"] .aside :is(.rp-chrome, .rp__empty-state) {
+  --text-secondary: color-mix(in srgb, var(--text-primary) 80%, transparent);
+  --text-tertiary: color-mix(in srgb, var(--text-primary) 62%, transparent);
+  color: var(--text-primary);
+}
+
 html[data-theme="light"][data-wallpaper="1"] .sidebar {
-  --text-primary: var(--wallpaper-chrome-foreground);
   --text-inverse: rgb(15 15 15 / 0.96);
   --bg-hover: rgb(0 0 0 / 0.14);
   --bg-active: rgb(0 0 0 / 0.2);
-  color: var(--wallpaper-chrome-foreground);
-  text-shadow: 0 1px 2px var(--wallpaper-chrome-shadow-color);
-}
-
-html[data-theme="light"][data-wallpaper="1"] .sidebar svg {
-  filter: drop-shadow(0 1px 1px var(--wallpaper-chrome-shadow-color));
 }
 
 html[data-theme="light"][data-wallpaper="1"]
@@ -360,52 +579,81 @@ html[data-theme="light"][data-wallpaper="1"]
 }
 
 html[data-theme="light"][data-wallpaper="1"]
-  :is(.main__title, .main__title-icon, .main__title-row .chrome-btn, .main__top-actions .chrome-btn) {
-  color: var(--wallpaper-chrome-foreground);
-  text-shadow: 0 1px 2px var(--wallpaper-chrome-shadow-color);
-}
-
-html[data-theme="light"][data-wallpaper="1"]
-  :is(.main__title-icon, .main__title-row .chrome-btn, .main__top-actions .chrome-btn)
-  svg {
-  filter: drop-shadow(0 1px 1px var(--wallpaper-chrome-shadow-color));
-}
-
-html[data-theme="light"][data-wallpaper="1"] .lobe-chat-assistant-timeline {
-  --chat-text: var(--wallpaper-chrome-foreground);
-  --chat-text-2: color-mix(
-    in srgb,
-    var(--wallpaper-chrome-foreground) 84%,
-    transparent
-  );
-  --chat-text-3: color-mix(
-    in srgb,
-    var(--wallpaper-chrome-foreground) 72%,
-    transparent
-  );
-  color: var(--wallpaper-chrome-foreground);
-  text-shadow: 0 1px 2px var(--wallpaper-chrome-shadow-color);
-}
-
-html[data-theme="light"][data-wallpaper="1"] .lobe-chat-assistant-timeline svg {
-  filter: drop-shadow(0 1px 1px var(--wallpaper-chrome-shadow-color));
-}
-
-html[data-theme="light"][data-wallpaper="1"] .composer-welcome-mark {
-  --text-primary: var(--wallpaper-chrome-foreground);
-  color: var(--wallpaper-chrome-foreground);
-  text-shadow: 0 1px 2px var(--wallpaper-chrome-shadow-color);
-}
-
-html[data-theme="light"][data-wallpaper="1"]
   .composer-welcome-mark
   :is(.deepseek-full-mark__ink, .opencode-wordmark) {
-  color: var(--wallpaper-chrome-foreground);
-  fill: var(--wallpaper-chrome-foreground);
+  color: var(--text-primary);
+  fill: var(--text-primary);
 }
 
-html[data-theme="light"][data-wallpaper="1"] .composer-welcome-mark svg {
-  filter: drop-shadow(0 1px 1px var(--wallpaper-chrome-shadow-color));
+html[data-theme="light"][data-wallpaper="1"] .lobe-chat-empty {
+  --chat-text: var(--text-primary);
+  --chat-text-3: color-mix(in srgb, var(--text-primary) 72%, transparent);
+}
+
+html[data-theme="light"][data-wallpaper="1"] .main__stage > .conn-bar strong {
+  color: color-mix(in srgb, var(--text-primary) 84%, transparent);
+}
+
+html[data-theme="dark"][data-wallpaper="1"]
+  :is(.lobe-chat-empty, .main__stage > .conn-bar) {
+  color: var(--text-primary);
+}
+
+html[data-theme="dark"][data-wallpaper="1"] .lobe-chat-empty {
+  --chat-text: var(--text-primary);
+  --chat-text-3: color-mix(in srgb, var(--text-primary) 72%, transparent);
+}
+
+/* Opt-in text shadow (Settings → Appearance). Default off. */
+html[data-font-shadow="1"]
+  :is(
+    .sidebar,
+    .main__top,
+    .composer-welcome-mark,
+    .lobe-chat-assistant-timeline,
+    .lobe-chat-empty,
+    .main__stage > .conn-bar,
+    .pane-toggle--pinned,
+    .aside .rp-chrome,
+    .aside .rp__empty-state,
+    .auto-page :is(.auto-page__title, .auto-page__subtitle),
+    .agent-kanban-page :is(.auto-page__title, .auto-page__subtitle)
+  ) {
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.55);
+}
+
+html[data-font-shadow="1"]
+  :is(
+    .sidebar,
+    .main__top,
+    .composer-welcome-mark,
+    .lobe-chat-assistant-timeline,
+    .pane-toggle--pinned,
+    .aside .rp-chrome,
+    .aside .rp__empty-state
+  )
+  svg {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.45));
+}
+
+html[data-font-shadow="1"] .settings-page {
+  text-shadow: none;
+}
+
+html[data-font-shadow="1"] .settings-page svg {
+  filter: none;
+}
+
+html[data-font-shadow="1"] .theme-editor-shell {
+  text-shadow: none;
+}
+
+html[data-font-shadow="1"] .theme-editor-shell svg {
+  filter: none;
+}
+
+html[data-theme="dark"][data-wallpaper="1"] .main__stage > .conn-bar strong {
+  color: color-mix(in srgb, var(--text-primary) 84%, transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

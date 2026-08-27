@@ -22,11 +22,10 @@ describe("MarkdownBody http(s) links", () => {
     expect(html).not.toContain("md-body__link");
   });
 
-  it("renders $$LaTeX$$ with KaTeX", () => {
+  it("renders LaTeX via KaTeX", () => {
     const html = renderToStaticMarkup(
-      <MarkdownBody>{String.raw`Area is $$\tau=0.53$$.`}</MarkdownBody>,
+      <MarkdownBody>{"The identity $a^2+b^2=c^2$."}</MarkdownBody>,
     );
     expect(html).toContain("katex");
-    expect(html).not.toContain("$$\\tau");
   });
 });

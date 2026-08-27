@@ -47,18 +47,24 @@ describe("softCloseMarkdown", () => {
     expect(softCloseMarkdown("", true)).toBe("");
   });
 
-  it("closes incomplete KaTeX delimiters while streaming", () => {
-    expect(softCloseMarkdown("$$\\tau=0.53", true)).toBe("$$\\tau=0.53$$");
-    expect(softCloseMarkdown("$x=1", true)).toBe("$x=1$");
-    expect(softCloseMarkdown("**$$\\tau", true)).toBe("**$$\\tau$$**");
+  it("closes incomplete inline and display math while streaming", () => {
+    expect(softCloseMarkdown("Energy $E=mc^2", true)).toBe("Energy $E=mc^2$");
+    expect(softCloseMarkdown("$$\\int x", true)).toBe("$$\\int x\n$$");
+    expect(softCloseMarkdown("done $E=mc^2$", true)).toBe("done $E=mc^2$");
+    expect(softCloseMarkdown("$$a+b$$\nmore", true)).toBe("$$a+b$$\nmore");
   });
 
-  it("leaves balanced math alone and ignores $ inside fences", () => {
-    expect(softCloseMarkdown("$$\\tau=0.53$$", true)).toBe("$$\\tau=0.53$$");
-    const fenced = "```js\nconst n = $x\n";
-    const out = softCloseMarkdown(fenced, true);
-    expect(out).toContain("const n = $x");
+  it("does not close dollars inside a fenced code block", () => {
+    const src = "```js\nconst n = $price\n";
+    const out = softCloseMarkdown(src, true);
+    expect(out).toContain("const n = $price");
     expect(out.endsWith("\n```")).toBe(true);
-    expect(out).not.toContain("$x$");
+    expect(out).not.toContain("$price$");
+  });
+
+  it("does not close dollars inside inline code", () => {
+    expect(softCloseMarkdown("use `$price` please", true)).toBe(
+      "use `$price` please",
+    );
   });
 });

@@ -445,6 +445,8 @@ export const deWorkspace = {
   "side.toggle": "Seitenleiste ein-/ausblenden",
   "side.env": "Umgebung",
   "side.envTitle": "Umgebung",
+  "side.env.pin": "Anheften",
+  "side.env.unpin": "Lösen",
   "side.envSoon": "Umgebungsdetails und Git-Status erscheinen hier.",
   "side.placeholder.file": "Dateien-Workbench",
   "side.placeholder.browser": "Browser-Tab",

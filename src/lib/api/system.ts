@@ -495,3 +495,11 @@ export async function focusMainWindow(): Promise<void> {
   await invoke<void>("focus_main_window");
 }
 
+/** Open (or focus) the standalone appearance editor OS window. */
+export async function openThemeEditorWindow(): Promise<void> {
+  if (!isDesktopHost()) {
+    throw new Error("openThemeEditorWindow requires desktop Tauri");
+  }
+  await invoke<void>("open_theme_editor_window");
+}
+

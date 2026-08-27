@@ -33,11 +33,12 @@
    - 背景：`var(--menu-context-bg)` + `var(--menu-context-border)` + `var(--menu-context-shadow)`（见 `sidebar.part3.css` / `tokens.css`）。
 
 2. **玻璃 / 应用内 pop**（composer 芯片、Select 菜单、斜杠等）  
-   - class：已在 glass 列表中的选择器（`.cmm__pop`、`.c-select__menu`、`.composer-plus`、`.slash-palette`、`.user-menu__pop`、`.search-panel`、`.modal` 等）。  
-   - 背景：`var(--glass-surface)` + border + shadow（无 backdrop 时回落 solid）。
+   - class：已在 glass 列表中的选择器（`.cmm__pop`、`.c-select__menu`、`.slash-palette`、`.user-menu__pop`、`.search-panel`、`.modal` 等）。  
+   - 背景：`var(--glass-surface)` + border + shadow（无 backdrop 时回落 solid）。  
+   - Composer `+` 菜单（`.composer-plus`）与侧栏 `+` 菜单（`.sw-plus-menu`）走实心 `--menu-context-bg`，不要玻璃。
 
 3. **区域专用已验收面板**  
-   - 若既有模块已为 `.menu-panel.xxx` 写了完整 surface（如 `.sw-plus-menu`、`.sw-env-menu`），**复用该 class**，不要另起透明壳。
+   - 若既有模块已为 `.menu-panel.xxx` 写了完整 surface（如 `.sw-plus-menu`、`.sw-env-menu` 下拉态），**复用该 class**，不要另起透明壳。环境信息钉住后是 `.sw-env-dock .sw-env-menu`，不是 dropdown `menu-panel`。
 
 ### 禁止写法
 
@@ -163,7 +164,8 @@ setAppDialog({
 | Compact keep-note / Doctor / Status / MCP | `setAppDialog` prompt · `.modal` · `GlassModal` · `DoctorModal` |
 | 文件详情 | `.modal.file-path-details` |
 | 搜索面板 | `.search-panel` |
-| 模型 / 权限 / 项目 / 用户 / 斜杠 / + | `.cmm__pop` · `.menu-panel` · `.slash-palette` · `.composer-plus` |
+| 模型 / 权限 / 项目 / 用户 / 斜杠 | `.cmm__pop` · `.slash-palette` · `.user-menu__pop` |
+| Composer / 侧栏 + 菜单 | 实心 `.composer-plus` / `.sw-plus-menu` + `--menu-context-bg` |
 | 上下文 / 附件 / 打开位置 / Select | `.ctx-menu` · `.att-menu` · `.open-loc-menu` · `.c-select__menu` |
 | 自动化表单侧栏 / 行菜单 | `.auto-panel` · `.auto-row__menu` |
 | Toast / 权限条 / 拖放卡 | `.app-toast` · `.perm-bar` · `.drop-overlay__card` |

@@ -28,12 +28,13 @@ import {
   isHeightDeltaNoise,
   isNearBottom,
   nextStickPinState,
-  pinnedFollowDelayMs,
+  pinnedFollowDelayForLayout,
   shouldClampPinnedOverscroll,
   shouldClampPinnedStreamDrift,
-  shouldReleaseStickOnScrollUp,
+  shouldEscapePinnedScroll,
+  takeProgrammaticStickScroll,
 } from "@/lib/stickToBottom";
-import { runAfterPaneSplitMotion } from "@/lib/paneSplitMotion";
+
 
 export type UseStickToBottomOptions = {
   /** Re-pin when the conversation identity changes (session / first message). */
@@ -205,7 +206,8 @@ export function useStickToBottom(
     const handleScroll = () => {
       const scrollTop = el.scrollTop;
       let lastScrollTop = lastScrollTopRef.current;
-      const ignore = ignoreScrollTopRef.current;
+      const ignore =
+        ignoreScrollTopRef.current ?? takeProgrammaticStickScroll(el);
       lastScrollTopRef.current = scrollTop;
       ignoreScrollTopRef.current = undefined;
 
@@ -215,13 +217,17 @@ export function useStickToBottom(
       }
 
       const maxTop = bottomScrollTop(el.scrollHeight, el.clientHeight);
-      const shouldEscapeStick = shouldReleaseStickOnScrollUp({
+      // Default 10px event + slow-trackpad accumulation from the locked
+      // bottom. Never use a sub-pixel minDelta: thinking / tool collapse and
+      // the next body round routinely move 2–8px off hard bottom, and that
+      // used to drop pin so the rest of the stream grew below the fold.
+      const shouldEscapeStick = shouldEscapePinnedScroll({
         pinned: isPinnedRef.current,
+        escaped: escapedRef.current,
         scrollTop,
         previousScrollTop: lastScrollTop,
         scrollHeight: el.scrollHeight,
         clientHeight: el.clientHeight,
-        minDeltaPx: 0.5,
       });
       const isMovingUp = scrollTop < lastScrollTop - 0.5;
       const meaningfulDown =
@@ -462,16 +468,24 @@ export function useStickToBottom(
     if (!el) return;
 
     let previousHeight: number | undefined;
+    let previousViewportWidth: number | undefined = el.clientWidth;
+    let viewportWidthChanged = false;
     let raf = 0;
     let mediaFollowTimer: ReturnType<typeof setTimeout> | null = null;
 
     const onHeightChange = (height: number) => {
+      const widthMoved = viewportWidthChanged;
+      viewportWidthChanged = false;
       const difference = height - (previousHeight ?? height);
       // Thought-stream / font / 1–3px reflow: skip full follow machinery so
       // micro reflows do not bounce — BUT still clamp if many small stream
       // deltas stacked and left us off hard bottom while pinned (smooth
       // thinking/body reveal is usually 2–7px per frame).
-      if (previousHeight != null && isHeightDeltaNoise(difference)) {
+      if (
+        previousHeight != null &&
+        isHeightDeltaNoise(difference) &&
+        !widthMoved
+      ) {
         previousHeight = height;
         if (
           shouldClampPinnedStreamDrift(
@@ -527,8 +541,13 @@ export function useStickToBottom(
       // Do NOT compensate scrollTop while escaped — stream growth is almost
       // always at the bottom; adding the full height delta would yank the
       // user down. Large jumps (image/PDF decode) wait so a storm of
-      // screenshots is one snap, not one per file.
-      const delay = pinnedFollowDelayMs(difference);
+      // screenshots is one snap, not one per file. Width interpolation
+      // (aside / env gutter) must follow this frame or the column jumps
+      // up until the motion ends, then snaps back.
+      const delay = pinnedFollowDelayForLayout({
+        heightDelta: difference,
+        viewportWidthChanged: widthMoved,
+      });
       if (delay <= 0) {
         if (mediaFollowTimer != null) {
           clearTimeout(mediaFollowTimer);
@@ -560,7 +579,6 @@ export function useStickToBottom(
     };
 
     const scheduleMeasure = () => {
-      if (runAfterPaneSplitMotion(scheduleMeasure)) return;
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
@@ -568,10 +586,21 @@ export function useStickToBottom(
       });
     };
 
-    const ro = new ResizeObserver(() => {
+    const ro = new ResizeObserver((entries) => {
       // Coalesce multi-node notifications to one frame. Always read the
       // content column height from the DOM — viewport RO entries report
       // client box size, which is not what we want for grow/shrink.
+      for (const entry of entries) {
+        if (entry.target !== el) continue;
+        const w = entry.contentRect.width;
+        if (
+          previousViewportWidth != null &&
+          Math.abs(w - previousViewportWidth) >= 0.5
+        ) {
+          viewportWidthChanged = true;
+        }
+        previousViewportWidth = w;
+      }
       scheduleMeasure();
     });
 

@@ -22,6 +22,8 @@ export const enSlash = {
   "slash.kind.action": "Action",
   "slash.kind.prompt": "Prompt",
   "slash.kind.skill": "Skill",
+  "slash.kind.plugin": "Plugin",
+  "slash.pluginDesc": "{n} skills",
   "slash.goal": "Goal task",
   "slash.goalDesc": "Finite objective · multi-round until done · not a timer",
   "slash.goalClear": "Clear goal task",

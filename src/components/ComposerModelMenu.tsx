@@ -19,6 +19,7 @@ import {
   PERMISSION_POLICIES,
   SESSION_MODES,
   effortDisplayLabel,
+  effortUiOptionIsActive,
   effortUiOptionsForCatalog,
   effortsForModel,
   findModel,
@@ -569,9 +570,11 @@ export function ComposerModelMenu({
             ))}
           {nested === "effort" &&
             effortUiList.map((e) => {
-              const active =
-                e.spawnId === effort ||
-                spawnIdToEffortUiSlot(effort, effortCatalog) === e.uiId;
+              const active = effortUiOptionIsActive(
+                e,
+                effort,
+                effortCatalog,
+              );
               return (
                 <button
                   key={e.uiId}

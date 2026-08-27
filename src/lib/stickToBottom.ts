@@ -203,6 +203,104 @@ export function shouldReleaseStickOnScrollUp(input: {
   return true;
 }
 
+/**
+ * Pixel-mode trackpad: many 2–8px ticks never hit {@link STICK_ESCAPE_MIN_DELTA_PX}
+ * in one event. Release once the viewport has walked ≥ that far off the
+ * bottom *from a position that was still in the leave band*.
+ *
+ * Must not treat stream / phase growth as a leave. Thinking collapse, a new
+ * tool row, or the next body round grows the tail; scrollTop stays put and
+ * distance jumps to tens/hundreds of px until follow lands. A 2–6px spacer
+ * tick there is layout, not the user walking away from the locked bottom.
+ */
+export function shouldReleaseStickOnSlowScrollUp(input: {
+  pinned: boolean;
+  escaped?: boolean;
+  scrollTop: number;
+  previousScrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+  minDeltaPx?: number;
+}): boolean {
+  if (!input.pinned || input.escaped) return false;
+  const min = input.minDeltaPx ?? STICK_ESCAPE_MIN_DELTA_PX;
+  if (input.previousScrollTop - input.scrollTop < 0.5) return false;
+  const prevDist = distanceFromBottom(
+    input.previousScrollTop,
+    input.scrollHeight,
+    input.clientHeight,
+  );
+  if (prevDist >= min) return false;
+  return (
+    distanceFromBottom(
+      input.scrollTop,
+      input.scrollHeight,
+      input.clientHeight,
+    ) >= min
+  );
+}
+
+/**
+ * Scroll-event pin release used by the chat hook.
+ *
+ * Do **not** pass a sub-pixel `minDeltaPx` into {@link shouldReleaseStickOnScrollUp}:
+ * thinking / tool auto-collapse and markdown settle routinely move 2–8px
+ * without landing on the hard bottom, and that used to drop pin until the
+ * next user send (stream then grows below the fold).
+ */
+export function shouldEscapePinnedScroll(input: {
+  pinned: boolean;
+  escaped?: boolean;
+  scrollTop: number;
+  previousScrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+}): boolean {
+  if (
+    shouldReleaseStickOnScrollUp({
+      pinned: input.pinned,
+      scrollTop: input.scrollTop,
+      previousScrollTop: input.previousScrollTop,
+      scrollHeight: input.scrollHeight,
+      clientHeight: input.clientHeight,
+    })
+  ) {
+    return true;
+  }
+  return shouldReleaseStickOnSlowScrollUp(input);
+}
+
+/**
+ * Virtual-list pin-snap writes `scrollTop` without going through the stick
+ * hook. Remember that assignment so the next scroll event is not treated as
+ * a user leave. Entries older than {@link PROGRAMMATIC_STICK_SCROLL_TTL_MS}
+ * are ignored (a missed event must not swallow a later flick).
+ */
+export const PROGRAMMATIC_STICK_SCROLL_TTL_MS = 100;
+
+type ProgrammaticStickScroll = { top: number; at: number };
+
+const programmaticStickScroll = new WeakMap<Element, ProgrammaticStickScroll>();
+
+export function markProgrammaticStickScroll(el: Element, top: number): void {
+  programmaticStickScroll.set(el, { top, at: nowMs() });
+}
+
+/** Consume a recent pin-snap; stale or missing → undefined. */
+export function takeProgrammaticStickScroll(el: Element): number | undefined {
+  const v = programmaticStickScroll.get(el);
+  if (!v) return undefined;
+  programmaticStickScroll.delete(el);
+  if (nowMs() - v.at > PROGRAMMATIC_STICK_SCROLL_TTL_MS) return undefined;
+  return v.top;
+}
+
+function nowMs(): number {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
+
 export function distanceFromBottom(
   scrollTop: number,
   scrollHeight: number,
@@ -263,6 +361,19 @@ export function pinnedFollowDelayMs(
   if (!Number.isFinite(heightDelta)) return 0;
   if (Math.abs(heightDelta) < mediaPx) return 0;
   return delayMs;
+}
+
+/**
+ * Aside / env-gutter width interpolation reflows the column every frame.
+ * Media delay would wait until the interpolation stops, then snap — the
+ * transcript jumps up, then back to the bottom. Follow immediately.
+ */
+export function pinnedFollowDelayForLayout(input: {
+  heightDelta: number;
+  viewportWidthChanged: boolean;
+}): number {
+  if (input.viewportWidthChanged) return 0;
+  return pinnedFollowDelayMs(input.heightDelta);
 }
 
 /**

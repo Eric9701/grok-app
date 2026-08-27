@@ -22,6 +22,8 @@ export const idSlash = {
   "slash.kind.action": "Tindakan",
   "slash.kind.prompt": "Prompt",
   "slash.kind.skill": "Skill",
+  "slash.kind.plugin": "Plugin",
+  "slash.pluginDesc": "{n} skill",
   "slash.goal": "Tugas tujuan",
   "slash.goalDesc": "Tujuan berhingga · multi-ronde hingga selesai · bukan penghitung waktu",
   "slash.goalClear": "Hapus tugas tujuan",

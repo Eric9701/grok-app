@@ -55,6 +55,7 @@ import {
   parseStoredContent,
   serializeForAgent,
 } from "@/lib/draftDoc";
+import { pluginSkillsMap, type SkillInfo } from "@/lib/slashCatalog";
 import { countDraftChars } from "@/lib/draftStats";
 import {
   isActiveJsonSchema,
@@ -116,6 +117,7 @@ export type ComposerSendHost = {
   attachments: Attachment[];
   chatAttachments: ChatRef[];
   quotes: ComposerQuote[];
+  skillInfos: SkillInfo[];
   editSubmitting: boolean;
   editingUserMessageId: string | null;
   isPlaceholderTitle: (title: string | undefined | null) => boolean;
@@ -193,6 +195,7 @@ export function useComposerSend(host: ComposerSendHost) {
     attachments,
     chatAttachments,
     quotes,
+    skillInfos,
     editSubmitting,
     editingUserMessageId,
     isPlaceholderTitle,
@@ -310,9 +313,10 @@ const executeSend = async (opts: {
   const viewingTarget = () =>
     isViewingSendTarget(originView, currentViewFocus(), sendTargetId);
 
+  const pluginSkills = pluginSkillsMap(skillInfos);
   const agentBody = serializeQuotesForAgent(
     quotesForSend,
-    serializeForAgent(segments, { goalMode: useGoal }),
+    serializeForAgent(segments, { goalMode: useGoal, pluginSkills }),
   );
   let agentText = opts.agentTextOverride?.trim()
     ? opts.agentTextOverride
@@ -322,7 +326,7 @@ const executeSend = async (opts: {
     agentText = wrapAgentTextWithJsonSchema(agentText, schemaForSend);
   }
   // Intent from user-visible body only (not /goal prefix or attachment paths).
-  const userIntentText = serializeForAgent(segments).trim();
+  const userIntentText = serializeForAgent(segments, { pluginSkills }).trim();
   const explicitAutomationSticky =
     automationSetupDraftRef.current ||
     (!!sendTargetId &&
@@ -338,7 +342,7 @@ const executeSend = async (opts: {
     agentText = wrapAutomationSetupAgentText(agentText);
   }
   const titleSeed =
-    serializeForAgent(segments).replace(/\n/g, " ").trim() ||
+    serializeForAgent(segments, { pluginSkills }).replace(/\n/g, " ").trim() ||
     quotesForSend[0]?.text.replace(/\n/g, " ").trim() ||
     att.map((a) => a.name).join(", ");
   const shouldAutoTitle =
@@ -787,7 +791,10 @@ const send = async () => {
   if (isDraftEmpty(segments) && !att.length && !sendQuotes.length) return;
   // Lone /workflow(s) — App has no TUI dashboard. Bare command opens Settings.
   // `/workflow <args>` falls through as a normal session turn.
-  if (!att.length && !segments.some((s) => s.type === "skill")) {
+  if (
+    !att.length &&
+    !segments.some((s) => s.type === "skill" || s.type === "plugin")
+  ) {
     const plain = segments
       .map((s) => (s.type === "text" ? s.text : ""))
       .join("");

@@ -90,28 +90,6 @@
   color: var(--text-tertiary);
 }
 
-/* Session file-changes chip (composer row) — opens Resources → Changes */
-.chip--changes {
-  font-variant-numeric: tabular-nums;
-  max-width: 120px;
-}
-
-.chip--changes .chip__label--nums {
-  font-feature-settings: "tnum";
-  letter-spacing: 0.01em;
-}
-
-/* Workspace git dirty chip (composer row) — opens Resources → Changes */
-.chip--git-dirty {
-  font-variant-numeric: tabular-nums;
-  max-width: 120px;
-}
-
-.chip--git-dirty .chip__label--nums {
-  font-feature-settings: "tnum";
-  letter-spacing: 0.01em;
-}
-
 .ctx-chip {
   display: inline-flex;
   flex-shrink: 0;
@@ -307,6 +285,24 @@
 .icon-btn--plus.is-open {
   background: var(--bg-active);
   transform: rotate(45deg);
+}
+
+/*
+ * Rest: no disc on the glass plate (same as .chrome-btn). Hover uses the
+ * composer-wrap --bg-hover token (rgba on wallpaper, not color-mix).
+ */
+.composer .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger) {
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.composer
+  .icon-btn:not(.icon-btn--primary):not(.icon-btn--danger):hover:not(:disabled),
+.composer .icon-btn--plus.is-open {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 /* Fixed solid colors — never use transparent --bg-app (icons were disappearing) */
@@ -517,7 +513,7 @@
   cursor: pointer;
   box-sizing: border-box;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .composer-plus__item:hover:not(:disabled):not(.composer-plus__item--muted),

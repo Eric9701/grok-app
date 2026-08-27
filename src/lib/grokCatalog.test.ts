@@ -7,7 +7,9 @@ import {
   GROK_BUILD_EFFORTS,
   GROK_BUILD_MODELS,
   effortCatalogForRoute,
+  effortCatalogKind,
   effortDisplayLabel,
+  effortUiOptionIsActive,
   effortUiOptionsForCatalog,
   effortsForModel,
   isSpawnableReasoningEffort,
@@ -222,6 +224,7 @@ describe("effort UI ladder", () => {
   });
 
   it("orders DeepSeek as 低/中/高/极高 with real spawn ids", () => {
+    expect(effortCatalogKind(deepseek)).toBe("deepseek4");
     const opts = effortUiOptionsForCatalog(deepseek);
     expect(opts.map((o) => o.uiId)).toEqual([
       "low",
@@ -235,6 +238,9 @@ describe("effort UI ladder", () => {
       "xhigh",
       "max",
     ]);
+    expect(
+      opts.filter((o) => effortUiOptionIsActive(o, "high", deepseek)),
+    ).toHaveLength(1);
   });
 
   it("maps spawn ids onto UI slots", () => {
@@ -293,6 +299,46 @@ describe("effort UI ladder", () => {
     ]);
     expect(spawnIdToEffortUiSlot("max", tier4)).toBe("xhigh");
     expect(spawnIdToEffortUiSlot("medium", tier4)).toBe("medium");
+  });
+
+  it("maps custom low/high/max by id (omit 中; high is 高, not DeepSeek 中)", () => {
+    const custom: EffortOption[] = [
+      { id: "low" },
+      { id: "high" },
+      { id: "max" },
+    ];
+    expect(effortCatalogKind(custom)).toBe("other");
+    const opts = effortUiOptionsForCatalog(custom);
+    expect(opts.map((o) => o.uiId)).toEqual(["low", "high", "xhigh"]);
+    expect(opts.map((o) => o.spawnId)).toEqual(["low", "high", "max"]);
+    expect(new Set(opts.map((o) => o.spawnId.toLowerCase())).size).toBe(
+      opts.length,
+    );
+    expect(spawnIdToEffortUiSlot("high", custom)).toBe("high");
+    expect(spawnIdToEffortUiSlot("max", custom)).toBe("xhigh");
+    expect(opts.filter((o) => effortUiOptionIsActive(o, "high", custom))).toEqual(
+      [expect.objectContaining({ uiId: "high", spawnId: "high" })],
+    );
+    expect(opts.filter((o) => effortUiOptionIsActive(o, "low", custom))).toHaveLength(
+      1,
+    );
+    expect(opts.filter((o) => effortUiOptionIsActive(o, "max", custom))).toHaveLength(
+      1,
+    );
+  });
+
+  it("clamps leftover 中 onto 高 when the catalog has no medium", () => {
+    const custom: EffortOption[] = [
+      { id: "low" },
+      { id: "high" },
+      { id: "max" },
+    ];
+    expect(
+      mapEffortToTargetCatalog("medium", custom, GROK_BUILD_EFFORTS),
+    ).toBe("high");
+    expect(mapEffortToTargetCatalog("high", custom, GROK_BUILD_EFFORTS)).toBe(
+      "high",
+    );
   });
 });
 

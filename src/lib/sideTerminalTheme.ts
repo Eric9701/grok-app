@@ -3,12 +3,12 @@ import { joinCssFontStack } from "@/lib/cssFontFamily";
 /**
  * xterm theme + font for Side Workbench interactive terminal.
  *
- * Veil strategy (critical for “fill to bottom”):
- * - CSS paints a single 50% black/white layer on `.sw-terminal--pty`
+ * Surface strategy (critical for “fill to bottom”):
+ * - CSS host `.sw-terminal--pty` shares the aside plate (`--rp-surface`)
  * - xterm canvas background is fully transparent so FitAddon’s fractional-row
  *   gap at the bottom matches the rest of the pane (no empty strip)
  *
- * Do not stack the same veil on ancestors + canvas — that becomes solid black.
+ * Do not stack a second veil on ancestors + canvas — that becomes a darker plate.
  */
 
 /** Minimal theme shape (matches @xterm/xterm ITheme fields we set). */
@@ -65,11 +65,11 @@ export const TERMINAL_FONT_STACK = [
 
 export const TERMINAL_FONT_FAMILY = joinCssFontStack(TERMINAL_FONT_STACK);
 
-/** 50% opacity — used by CSS host (single layer). */
-export const TERM_BG_DARK_50 = "#00000080";
-export const TERM_BG_LIGHT_50 = "#ffffff80";
+/** @deprecated Host no longer paints a 50% veil; kept for test aliases. */
+export const TERM_BG_DARK_50 = "#00000000";
+export const TERM_BG_LIGHT_50 = "#00000000";
 
-/** Fully transparent canvas so cell-grid gaps show the CSS veil evenly. */
+/** Fully transparent canvas so cell-grid gaps show the aside plate evenly. */
 export const TERM_BG_CANVAS = "#00000000";
 
 /**
@@ -100,9 +100,9 @@ export function isAppLightTheme(_el?: HTMLElement | null): boolean {
   return false;
 }
 
-/** CSS host veil color (50%). */
-export function resolveTerminalSurfaceBg(host?: HTMLElement | null): string {
-  return isAppLightTheme(host) ? TERM_BG_LIGHT_50 : TERM_BG_DARK_50;
+/** CSS host surface — transparent so the aside plate shows through. */
+export function resolveTerminalSurfaceBg(_host?: HTMLElement | null): string {
+  return TERM_BG_CANVAS;
 }
 
 /**

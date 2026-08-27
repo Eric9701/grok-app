@@ -22,6 +22,8 @@ export const ruSlash = {
   "slash.kind.action": "Действие",
   "slash.kind.prompt": "Запрос",
   "slash.kind.skill": "Навык",
+  "slash.kind.plugin": "Плагин",
+  "slash.pluginDesc": "{n} навыков",
   "slash.goal": "Целевая задача",
   "slash.goalDesc": "Конечная цель · несколько раундов до завершения · не таймер",
   "slash.goalClear": "Очистить целевую задачу",

@@ -22,6 +22,8 @@ export const ptBRSlash = {
   "slash.kind.action": "Ação",
   "slash.kind.prompt": "Prompt",
   "slash.kind.skill": "Skill",
+  "slash.kind.plugin": "Plugin",
+  "slash.pluginDesc": "{n} skills",
   "slash.goal": "Tarefa de meta",
   "slash.goalDesc": "Objetivo finito · várias rodadas até concluir · não é um timer",
   "slash.goalClear": "Limpar tarefa de meta",

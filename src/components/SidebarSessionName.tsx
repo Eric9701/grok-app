@@ -16,6 +16,7 @@ const MARQUEE_GAP_PX = 28;
 /**
  * Sidebar session title: ellipsis at rest; on row hover, if the title is
  * wider than this name slot, marquee-scroll left (one-way seamless loop).
+ * Short titles must not scroll (`titleNeedsMarquee`).
  */
 export function SidebarSessionName({ title }: Props) {
   const outerRef = useRef<HTMLSpanElement>(null);

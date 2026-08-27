@@ -1,11 +1,13 @@
 /**
- * Main chrome `env` control — environment info dropdown (image-7 five rows).
+ * Main chrome `env` control — environment info dropdown by default.
+ * A header pin switches to the chat-column dock (park with the right rail).
  * Phase 3: display collected git/session status + jump callbacks; no full git write ops.
  */
 
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -16,16 +18,23 @@ import { createT, type Locale } from "@/i18n";
 import {
   IconBrandGithub,
   IconChevronDown,
+  IconClose,
   IconDeviceDesktop,
   IconEnv,
   IconFileDiff,
   IconGitBranch,
   IconGitCommit,
+  IconPin,
+  IconPinOff,
 } from "@/components/icons";
 import { Tip } from "@/components/ui/tooltip";
 import * as api from "@/lib/api";
+import {
+  loadEnvInfoPinnedPref,
+  saveEnvInfoPinnedPref,
+} from "@/lib/envInfoPinnedPref";
 import { useFloatingMenu } from "@/lib/floatingMenu";
-import { useOpenPresence } from "@/lib/openPresence";
+import { OPEN_PRESENCE_MS, useOpenPresence } from "@/lib/openPresence";
 import { pathBaseName } from "@/lib/sessionChanges";
 import { envReviewJumpEnabled } from "@/lib/sideWorkbench";
 
@@ -54,6 +63,8 @@ export type EnvInfoButtonProps = {
   changeSummary?: EnvChangeSummary | null;
   /** Optional branch override; when omitted, loaded from git status on open. */
   branch?: string | null;
+  /** Right rail open — parks the dock instead of closing it. */
+  asideOpen?: boolean;
   className?: string;
   onJump?: (jump: EnvInfoJump) => void;
 };
@@ -83,25 +94,38 @@ export function EnvInfoButton({
   isGitProject = false,
   changeSummary = null,
   branch: branchProp = null,
+  asideOpen = false,
   className = "",
   onJump,
 }: EnvInfoButtonProps) {
   const tr = useMemo(() => createT(locale as Locale), [locale]);
   const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(loadEnvInfoPinnedPref);
+  const [parked, setParked] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const loadGen = useRef(0);
+  const asideOpenRef = useRef(asideOpen);
+  const pinnedRef = useRef(pinned);
+  pinnedRef.current = pinned;
+  const [host, setHost] = useState<HTMLElement | null>(null);
 
   const [snap, setSnap] = useState<EnvSnapshot>(() =>
     emptySnapshot(isGitProject),
   );
 
-  const presence = useOpenPresence(open);
+  const presence = useOpenPresence(
+    open,
+    true,
+    pinned ? 320 : OPEN_PRESENCE_MS,
+  );
   const { pos, style, settled } = useFloatingMenu({
-    open: presence.mounted,
+    open: presence.mounted && !pinned,
     triggerRef,
     panelRef,
-    onClose: () => setOpen(false),
+    onClose: () => {
+      if (!pinnedRef.current) setOpen(false);
+    },
     placement: "down",
     // Chrome trailing control: hang panel so right edges match the env icon.
     align: "end",
@@ -110,8 +134,41 @@ export function EnvInfoButton({
     estHeight: 320,
     gap: 6,
   });
-  const enter = useOpenPresence(Boolean(open && settled));
-  const entered = enter.entered;
+  const entered = pinned
+    ? presence.entered
+    : Boolean(presence.entered && settled);
+
+  const persistPinned = useCallback((next: boolean) => {
+    setPinned(next);
+    saveEnvInfoPinnedPref(next);
+    if (!next) setParked(false);
+    if (next) setOpen(true);
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = document.querySelector(".main");
+    setHost(el instanceof HTMLElement ? el : null);
+  }, []);
+
+  useLayoutEffect(() => {
+    const wasOpen = asideOpenRef.current;
+    asideOpenRef.current = asideOpen;
+    if (!open || !pinned) {
+      setParked(false);
+      return;
+    }
+    if (!wasOpen && asideOpen) setParked(true);
+    if (wasOpen && !asideOpen) setParked(false);
+  }, [asideOpen, open, pinned]);
+
+  useEffect(() => {
+    if (!presence.mounted || !pinned) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [presence.mounted, pinned]);
 
   const localLabel = useMemo(() => {
     const named = (projectName || "").trim();
@@ -270,7 +327,7 @@ export function EnvInfoButton({
       data-testid={`env-row-${key}`}
       onClick={() => {
         if (!jump || !enabled) return;
-        setOpen(false);
+        if (!pinned) setOpen(false);
         onJump?.(jump);
       }}
     >
@@ -283,6 +340,125 @@ export function EnvInfoButton({
       <span className="sw-env-menu__right">{right}</span>
     </button>
   );
+
+  const panel = (
+    <div
+      ref={panelRef}
+      className={
+        pinned
+          ? "sw-env-menu" +
+            (entered ? " is-open" : "") +
+            (parked ? " is-parked" : "")
+          : "sw-env-menu menu-panel" + (entered ? " is-open" : "")
+      }
+      style={pinned ? undefined : style}
+      role="dialog"
+      aria-label={tr("side.envTitle")}
+      data-testid="env-info-menu"
+      data-env-mode={pinned ? "dock" : "dropdown"}
+    >
+      <div className="sw-env-menu__head">
+        <span className="sw-env-menu__title">{tr("side.envTitle")}</span>
+        <div className="sw-env-menu__actions">
+          <button
+            type="button"
+            className={
+              "chrome-btn sw-env-menu__pin" + (pinned ? " is-on" : "")
+            }
+            aria-label={pinned ? tr("side.env.unpin") : tr("side.env.pin")}
+            aria-pressed={pinned}
+            data-testid="env-info-pin"
+            onClick={(e) => {
+              e.stopPropagation();
+              persistPinned(!pinned);
+            }}
+          >
+            {pinned ? <IconPinOff size={14} /> : <IconPin size={14} />}
+          </button>
+          {pinned ? (
+            <button
+              type="button"
+              className="chrome-btn sw-env-menu__close"
+              aria-label={tr("common.close")}
+              data-testid="env-info-close"
+              onClick={() => setOpen(false)}
+            >
+              <IconClose size={14} />
+            </button>
+          ) : null}
+        </div>
+      </div>
+      <div className="sw-env-menu__body">
+        {row(
+          "changes",
+          <IconFileDiff size={16} />,
+          tr("side.env.changes"),
+          changesRight,
+          envReviewJumpEnabled(gitReady) ? { type: "review" } : null,
+          envReviewJumpEnabled(gitReady),
+        )}
+        {row(
+          "local",
+          <IconDeviceDesktop size={16} />,
+          tr("side.env.local"),
+          <>
+            {localLabel ? (
+              <span
+                className="sw-env-menu__right-text"
+                title={projectPath || localLabel}
+                data-testid="env-local-name"
+              >
+                {localLabel}
+              </span>
+            ) : null}
+            {chevron}
+          </>,
+          { type: "local" },
+          true,
+        )}
+        {row(
+          "branch",
+          <IconGitBranch size={16} />,
+          branchLabel,
+          chevron,
+          gitReady ? { type: "branch" } : null,
+          gitReady,
+        )}
+        {row(
+          "push",
+          <IconGitCommit size={16} />,
+          tr("side.env.push"),
+          null,
+          gitReady ? { type: "push" } : null,
+          gitReady,
+        )}
+        {row(
+          "pr",
+          <IconBrandGithub size={16} />,
+          snap.prChecking
+            ? tr("side.env.prChecking")
+            : snap.prLabel || tr("side.env.prChecking"),
+          null,
+          gitReady ? { type: "pr" } : null,
+          gitReady,
+        )}
+      </div>
+    </div>
+  );
+
+  const overlay =
+    presence.mounted && (pinned ? host : pos)
+      ? createPortal(
+          pinned ? (
+            <div className="sw-env-dock" aria-hidden={parked || !entered}>
+              {panel}
+            </div>
+          ) : (
+            panel
+          ),
+          pinned && host ? host : document.body,
+        )
+      : null;
 
   return (
     <>
@@ -303,83 +479,7 @@ export function EnvInfoButton({
           <IconEnv size={16} />
         </button>
       </Tip>
-      {presence.mounted && pos
-        ? createPortal(
-            <div
-              ref={panelRef}
-              className={
-                "sw-env-menu menu-panel" + (entered ? " is-open" : "")
-              }
-              style={style}
-              role="dialog"
-              aria-label={tr("side.envTitle")}
-              data-testid="env-info-menu"
-            >
-              <div className="sw-env-menu__head">
-                <span className="sw-env-menu__title">{tr("side.envTitle")}</span>
-              </div>
-              <div className="sw-env-menu__body">
-                {row(
-                  "changes",
-                  <IconFileDiff size={16} />,
-                  tr("side.env.changes"),
-                  changesRight,
-                  // Review jump is git-only (match SidePicker / Phase 3).
-                  envReviewJumpEnabled(gitReady)
-                    ? { type: "review" }
-                    : null,
-                  envReviewJumpEnabled(gitReady),
-                )}
-                {row(
-                  "local",
-                  <IconDeviceDesktop size={16} />,
-                  tr("side.env.local"),
-                  <>
-                    {localLabel ? (
-                      <span
-                        className="sw-env-menu__right-text"
-                        title={projectPath || localLabel}
-                        data-testid="env-local-name"
-                      >
-                        {localLabel}
-                      </span>
-                    ) : null}
-                    {chevron}
-                  </>,
-                  { type: "local" },
-                  true,
-                )}
-                {row(
-                  "branch",
-                  <IconGitBranch size={16} />,
-                  branchLabel,
-                  chevron,
-                  gitReady ? { type: "branch" } : null,
-                  gitReady,
-                )}
-                {row(
-                  "push",
-                  <IconGitCommit size={16} />,
-                  tr("side.env.push"),
-                  null,
-                  gitReady ? { type: "push" } : null,
-                  gitReady,
-                )}
-                {row(
-                  "pr",
-                  <IconBrandGithub size={16} />,
-                  snap.prChecking
-                    ? tr("side.env.prChecking")
-                    : snap.prLabel || tr("side.env.prChecking"),
-                  null,
-                  gitReady ? { type: "pr" } : null,
-                  gitReady,
-                )}
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      {overlay}
     </>
   );
 }

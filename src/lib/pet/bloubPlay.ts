@@ -3,6 +3,7 @@
  * The morph catalogue stays in `./bloub`; this file is the product mapping.
  */
 import {
+  BotEngine,
   DEFAULT_EXPRESSION,
   DEFAULT_SHAPE,
   EXPRESSION_BY_ID,
@@ -13,6 +14,7 @@ import {
   type ShapeId,
   type StateId,
 } from "./bloub";
+import { PET_LOOK_NEAR_SCALE } from "./petMarkPaint";
 
 export const BLOUB_PICKER_SHAPES = [
   "blob",
@@ -88,11 +90,16 @@ export function bloubShapeRadii(shape: string | null | undefined): number[] | nu
 
 const VERB_STATE: Record<string, StateId> = {
   idle: "idle",
+  thinking: "thinking",
+  searching: "comet",
+  working: "orbit",
+  writing: "alert",
   waiting: "wide",
   notifying: "notify",
   sleeping: "sleep",
-  waking: "idle",
+  waking: "swirl",
   dragging: "egg",
+  sad: "exclaim",
 };
 
 const VERB_EXPRESSION: Record<string, ExpressionId> = {
@@ -111,11 +118,6 @@ const VERB_EXPRESSION: Record<string, ExpressionId> = {
   scared: "effraye",
   angry: "colere",
   suspicious: "mefiant",
-  thinking: "attentif",
-  searching: "curieux",
-  working: "attentif",
-  writing: "attentif",
-  sad: "triste",
 };
 
 export type BloubPlay = {
@@ -143,29 +145,87 @@ export function bloubStateDuration(id: StateId): number {
   return STATE_BY_ID.get(id)?.duration ?? 2;
 }
 
+/** Typing (alert) replays while the composer is still live. */
+const HOLD_LOOP = new Set<StateId>(["alert"]);
+
 /** Narrative states that should restart while the session verb stays put. */
-export function bloubShouldLoop(_id: StateId): boolean {
-  return false;
+export function bloubShouldLoop(id: StateId): boolean {
+  return HOLD_LOOP.has(id);
 }
 
-const YAW_MAX = 16;
-const PITCH_MAX = 13;
-const REST_PITCH = 10;
+/**
+ * Heavy signature morphs (orbit/comet belts, swirl) play one catalogue
+ * cycle, then hold this lighter state so a long turn does not spin the
+ * triangle forever.
+ */
+const SETTLE_AFTER_ONE: Partial<Record<StateId, StateId>> = {
+  orbit: "thinking",
+  comet: "thinking",
+  swirl: "idle",
+};
 
-/** Look at the pointer from the mark centre. No settings-panel left-turn. */
+export function bloubSettleState(id: StateId): StateId | null {
+  return SETTLE_AFTER_ONE[id] ?? null;
+}
+
+/** States whose pose still moves after the enter morph — keep live paint. */
+const LIVE_PAINT = new Set<StateId>([
+  "thinking",
+  "alert",
+  "orbit",
+  "comet",
+  "sleep",
+  "play",
+  "burst",
+  "swirl",
+]);
+
+export function bloubStateNeedsLivePaint(id: StateId): boolean {
+  return LIVE_PAINT.has(id);
+}
+
+/** 3/4 rest → frontal hover: same curve and duration as the expression morph. */
+export const BLOUB_LOOK_LOCAL_ENTER_MORPH = BotEngine.SHAPE_MORPH;
+
+/** Full look budget by the outer face, not only at the body silhouette. */
+const FACE_R = 0.62;
+const YAW_MAX = 18;
+const PITCH_MAX = 14;
+const REST_PITCH = 8;
+
+/**
+ * Local hover look: face the camera, then add spherical perspective from the
+ * offset on the mark. `nx`/`ny` are in mark-radius units (1 = body edge).
+ *
+ * Entering the hover ring (r = PET_LOOK_NEAR_SCALE) stays frontal; travel and
+ * foreshortening grow across the face and reach the look budget before the
+ * silhouette edge, so a pointer on an eye actually turns the pair.
+ */
 export function bloubLookAtPointer(
   nx: number,
   ny: number,
   pointer: boolean,
 ): Look {
-  const x = Math.max(-1, Math.min(1, nx));
-  const y = Math.max(-1, Math.min(1, ny));
+  if (!pointer) {
+    return { yaw: 0, pitch: REST_PITCH, mix: 0, spin: 0, wander: 1 };
+  }
+  const r = Math.hypot(nx, ny);
+  let x = nx;
+  let y = ny;
+  if (r > 1) {
+    const ring = Math.max(PET_LOOK_NEAR_SCALE, 1.0001);
+    const s = r >= ring ? 0 : 1 - (r - 1) / (ring - 1);
+    x *= s;
+    y *= s;
+  }
+  x = Math.max(-1, Math.min(1, x / FACE_R));
+  y = Math.max(-1, Math.min(1, y / FACE_R));
   return {
     yaw: x * YAW_MAX,
     pitch: REST_PITCH - y * PITCH_MAX,
-    mix: pointer ? 1 : 0,
+    mix: 1,
     spin: 0,
-    wander: pointer ? 0 : 1,
+    wander: 0,
   };
 }
 
@@ -195,15 +255,15 @@ export function petVerbForComposer(input: {
     input.composing &&
     (input.sessionVerb === "idle" || input.sessionVerb === "waking")
   ) {
-    return "listening";
+    return "writing";
   }
   return input.sessionVerb;
 }
 
-/** How long after the last keystroke the pet holds the attentive rest face. */
+/** How long after the last keystroke the pet holds the catalog alert morph. */
 export const PET_COMPOSING_HOLD_MS = 1500;
 
-/** Typing → attentive rest face; empty draft or a pause → original rest shape. */
+/** Typing → catalog `alert` (slanted !); empty draft or a pause → original rest shape. */
 export function petIsComposing(input: {
   empty: boolean;
   lastTypeAt: number;

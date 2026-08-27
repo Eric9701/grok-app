@@ -12,7 +12,7 @@ preview.jpg              # 可选
 
 允许的顶层名（规范化后小写）：`manifest.json`、`preview.jpg`、`assets/`、`assets/wallpaper.{jpg,jpeg,png,webp,gif,mp4,webm}`。未知顶层名 fail-closed（`invalid_pack`）。忽略 `__macosx/**`、`.ds_store`、`._*`。只接受 Stored / Deflated。
 
-字段：内置 `skin`、`scrim`、`wallpaper`（含 `focus` / `clip` / `sha256`）。`tokens` / `style` / `css` 或 `schemaVersion !== 1` → `unsupported_schema`。未知 `skin` **不**整包失败：回落 `default` + `warnings: ["unknown_skin"]`。`wallpaper == null` 默认清除接收方壁纸（`will_clear_wallpaper`）。
+字段：内置 `skin`、`scrim`（遮罩**透明度** 0–100）、`wallpaper`（含 `focus` / `clip` / `sha256`）、可选 `textColor`（`#rgb` / `#rrggbb`，缺省或非法 = 跟随浅深色主题；**只**染侧栏 / 顶栏图标 / 首页欢迎标语，经 `--appearance-chrome-ink`，**不**改全局 `--text-primary`）、可选 `fontShadow`（bool，缺省 `false`）、可选 `composerOpacity`（输入框不透明度 0–100，缺省 100，**不**与 `scrim` 合并）、可选 `uiOpacity`（文件卡 / 代码块 / 用户气泡 / 资源栏筛选与打开 / 顶栏状态胶囊 / 账号头像 0–100，缺省 100，**不**与 `scrim` 合并；绘制时保底 20%）。App 另有本地 `wallpaper-blur`（遮罩**模糊**，与 `scrim` 独立；皮肤包暂不携带）和 `settings-opacity`（设置页底色不透明度 0–100，缺省 100，**不**与 `scrim` 合并、**不**进皮肤包；绘制时 20% 保底不参与计算，其余 80% 映射滑块）。`tokens` / `style` / `css` 或 `schemaVersion !== 1` → `unsupported_schema`。未知 `skin` **不**整包失败：回落 `default` + `warnings: ["unknown_skin"]`。`wallpaper == null` 默认清除接收方壁纸（`will_clear_wallpaper`）。
 
 **壁纸导出 bake：** 用户导出 / 分享时，按**当前应用窗口里实际看到的那一块**裁进包里（`.app-wallpaper-media` 宽高比 + 当前 `focus`；缺 focus 当默认 cover）。即使没手动拉焦点，窗口比例和素材不一致时也会裁掉 cover 多出来的边。裁后 `focus` 复位默认（cx=0.5, cy=0.5, zoom=1），接收方 cover-fill 与导出时看起来一致，包体积最小。当前窗口正好等于素材比例且无缩放时不重编码。本地预设库与 undo 快照仍保留原片 + 参数（套用预设可再编辑）；只有用户面向的 export 才 bake。
 
@@ -24,6 +24,8 @@ preview.jpg              # 可选
 **从不写入、不应用 `themePreference`。** 导出 / 保存当前不写该字段；导入忽略。
 
 当前生效壁纸仍只活在 IndexedDB。预设在 `{app_data}/skin-presets/`（入库目录名总是新 UUID）。磁盘合计上限 4 GiB（含 undo + staging + catalog cache；不含 IDB 当前壁纸与 `{app_data}/wallpapers/`）。
+
+**预设预览 / Apply：** `skin_preset_materialize` 直接检视库目录（`inspect_unpacked_dir`），不再 zip→解压。壁纸路径指向库内原片；大视频信任入库时已校验的 `sha256`，弹窗可即时打开。预设卡片背景：静图 / `preview.jpg` / 动图 gif 直接作 CSS 背景；`.mp4`/`.webm` 用 `video_poster` 缓存 JPEG（CSS 无法画视频）。
 
 ## K19 官方 origin allowlist
 

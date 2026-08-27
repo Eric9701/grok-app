@@ -1,9 +1,10 @@
 /**
  * Brand marks for known custom-provider presets
- * (DeepSeek, OpenRouter, Amux, OpenCode Go, Volcengine Ark, …).
+ * (DeepSeek, OpenRouter, Amux, OpenCode Go, Volcengine Ark, Zhipu, …).
  * Amux / OpenCode Go use currentColor so they follow light/dark theme;
  * OpenRouter is purple in light theme, currentColor (ink) in dark;
- * DeepSeek / Volcano Ark keep brand colors.
+ * DeepSeek / Volcano Ark keep brand colors;
+ * Zhipu tile inverts in dark theme (official #2D2D2D + white Z).
  */
 
 import { memo, useId } from "react";
@@ -274,6 +275,49 @@ function VolcanoArkMark({
   );
 }
 
+/** Official Zhipu / Z.AI mark (`docs/svg/zhipu.svg`). Tile + Z invert in dark theme. */
+function ZhipuMark({
+  className = "",
+  title,
+  size = 20,
+}: {
+  className?: string;
+  title?: string;
+  size?: number;
+}) {
+  return (
+    <svg
+      className={`provider-brand-icon provider-brand-icon--zhipu ${className}`.trim()}
+      width={size}
+      height={size}
+      viewBox="0 0 30 30"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      role={title ? "img" : "presentation"}
+      aria-hidden={title ? undefined : true}
+      aria-label={title}
+    >
+      {title ? <title>{title}</title> : null}
+      <path
+        className="zhipu-mark__tile"
+        d="M24.51 28.51H5.49c-2.21 0-4-1.79-4-4V5.49c0-2.21 1.79-4 4-4h19.03c2.21 0 4 1.79 4 4v19.03c0 2.21-1.79 4-4 4z"
+      />
+      <path
+        className="zhipu-mark__z"
+        d="M15.47 7.1 14.17 8.95c-.2.29-.54.47-.9.47H6.17V7.09h9.3z"
+      />
+      <polygon
+        className="zhipu-mark__z"
+        points="24.3,7.1 13.14,22.91 5.7,22.91 16.86,7.1"
+      />
+      <path
+        className="zhipu-mark__z"
+        d="M14.53 22.91 15.84 21.05c.2-.29.54-.47.9-.47h7.09v2.33H14.53z"
+      />
+    </svg>
+  );
+}
+
 export const ProviderBrandIcon = memo(function ProviderBrandIcon({
   brand,
   providerId,
@@ -299,6 +343,9 @@ export const ProviderBrandIcon = memo(function ProviderBrandIcon({
   }
   if (id === "volcano-ark") {
     return <VolcanoArkMark className={className} title={title} size={size} />;
+  }
+  if (id === "zhipu") {
+    return <ZhipuMark className={className} title={title} size={size} />;
   }
   return null;
 });

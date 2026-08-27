@@ -18,6 +18,7 @@ import {
   IconChevronRight,
   IconHelp,
   IconSettings,
+  IconSparkles,
   IconThemeMoon,
   IconThemeSun,
 } from "@/components/icons";
@@ -68,12 +69,16 @@ export interface UserMenuProps {
   locale: string;
   labels: {
     settings: string;
+    /** Optional what's-new entry (account menu, above the tour). */
+    whatsNew?: string;
     /** Optional product tour entry label */
     tutorial?: string;
     theme: string;
     themeSystem: string;
     themeLight: string;
     themeDark: string;
+    /** Opens the floating appearance editor. */
+    themeEditor?: string;
     local: string;
     signedIn: string;
     signedOut: string;
@@ -103,9 +108,13 @@ export interface UserMenuProps {
   onRefreshProviderBalance?: () => void;
   onSettings: () => void;
   onAccountSettings: () => void;
+  /** Re-open the current version's update notes. */
+  onWhatsNew?: () => void;
   /** Open optional in-app product tour */
   onTutorial?: () => void;
   onTheme: (preference: ThemePreference) => void;
+  /** Open the homepage appearance editor (theme + interface tabs). */
+  onThemeEditor?: () => void;
   onLogin: () => void;
   onLogout: () => void;
   savedAccounts?: SavedAccount[];
@@ -123,7 +132,7 @@ export function remainingPercent(account: AccountStatus | null): number | null {
 const THEME_OPTIONS: ThemePreference[] = ["system", "light", "dark"];
 const FLYOUT_GAP = 4;
 const FLYOUT_MIN_W = 148;
-const FLYOUT_EST_H = 120;
+const FLYOUT_EST_H = 172;
 
 function computeThemeFlyoutStyle(
   anchor: DOMRect,
@@ -174,8 +183,10 @@ export function UserMenu({
   onRefreshProviderBalance,
   onSettings,
   onAccountSettings,
+  onWhatsNew,
   onTutorial,
   onTheme,
+  onThemeEditor,
   onLogin,
   onLogout,
   savedAccounts = [],
@@ -200,6 +211,10 @@ export function UserMenu({
   useEffect(() => {
     if (!open) setThemeSubOpen(false);
   }, [open]);
+
+  useEffect(() => {
+    if (closeImmediately && open) onClose();
+  }, [closeImmediately, onClose, open]);
 
   const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current != null) {
@@ -252,7 +267,7 @@ export function UserMenu({
   useLayoutEffect(() => {
     if (!open || !themeSubOpen || !themeFlyoutRef.current) return;
     updateFlyoutPos();
-  }, [open, themeSubOpen, updateFlyoutPos, themePreference]);
+  }, [open, themeSubOpen, updateFlyoutPos, themePreference, labels.themeEditor]);
 
   const panelPresence = useOpenPresence(
     open,
@@ -266,9 +281,9 @@ export function UserMenu({
     roots: [rootRef, themeFlyoutRef],
     onClose,
     placement: "up",
-    fitContent: true,
+    width: 0,
+    fitContent: false,
     matchTriggerWidth: true,
-    minWidth: 220,
     estHeight: savedAccounts.length > 1 ? 360 : 260,
     gap: 6,
     // CSS owns transform (rise from the footer). Do not apply placeAbove -100%.
@@ -366,6 +381,26 @@ export function UserMenu({
                 </button>
               );
             })}
+            {labels.themeEditor && onThemeEditor ? (
+              <>
+                <div className="user-menu__flyout-sep" role="separator" />
+                <button
+                  type="button"
+                  className="user-menu__item user-menu__item--flyout"
+                  role="menuitem"
+                  onClick={() => {
+                    onThemeEditor();
+                    setThemeSubOpen(false);
+                    onClose();
+                  }}
+                >
+                  <span className="user-menu__check" aria-hidden />
+                  <span className="user-menu__item-label">
+                    {labels.themeEditor}
+                  </span>
+                </button>
+              </>
+            ) : null}
           </div>,
           document.body,
         )
@@ -666,6 +701,21 @@ export function UserMenu({
                 </kbd>
               ) : null}
             </button>
+
+            {onWhatsNew && labels.whatsNew ? (
+              <button
+                type="button"
+                className="user-menu__item"
+                role="menuitem"
+                onClick={() => {
+                  onClose();
+                  onWhatsNew();
+                }}
+              >
+                <IconSparkles size={16} />
+                <span>{labels.whatsNew}</span>
+              </button>
+            ) : null}
 
             {onTutorial && labels.tutorial ? (
               <button

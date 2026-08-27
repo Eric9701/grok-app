@@ -1,3 +1,59 @@
+.sw-terminal__xterm .xterm-scrollable-element > .shadow,
+.sw-terminal__xterm .xterm-scrollable-element > .shadow.top,
+.sw-terminal__xterm .xterm-scrollable-element > .shadow.left,
+.sw-terminal__xterm .xterm-scrollable-element > .shadow.top-left-corner,
+.sw-terminal__xterm .xterm-scrollable-element > .shadow.top.left {
+  display: none !important;
+  opacity: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  pointer-events: none !important;
+}
+
+.sw-terminal__xterm .xterm-scrollable-element > .scrollbar,
+.sw-terminal__xterm .xterm-scrollable-element > .scrollbar > .slider {
+  box-shadow: none !important;
+}
+
+/* The outer aside owns wallpaper frost; inner shells share that plate. */
+html[data-wallpaper="1"]
+  .aside
+  :is(
+    .aside__inner,
+    .rp-chrome,
+    .rp,
+    .rp.sw,
+    .sw__content,
+    .sw__empty,
+    .sw__persist-host,
+    .sw__files-host,
+    .sw-files,
+    .sw-files .rp-split,
+    .sw-files .rp-split__preview,
+    .sw-files .rp-split__tree,
+    .sw-browser,
+    .sw-browser__host,
+    .sw-terminal,
+    .sw-terminal--pty,
+    .sw-skills,
+    .sw-review,
+    .sw-review__split,
+    .sw-plan,
+    .rp-split__preview,
+    .rp-split__tree,
+    .rp-editor,
+    .rp-md-editor,
+    .rp-preview-office,
+    .rp-code,
+    .rp-code__scroll,
+    .rp-files-toolbar,
+    .rp-preview-browser,
+    .embedded-browser,
+    .embedded-browser__bar
+  ) {
+  background: var(--rp-surface, transparent) !important;
+}
+
 .sw-terminal__xterm .xterm-scrollable-element > .scrollbar.horizontal {
   display: none !important;
   height: 0 !important;
@@ -74,11 +130,26 @@
   justify-content: space-between;
   margin-bottom: 6px;
   padding: 2px 8px 4px;
+  gap: 8px;
 }
 
 .sw-env-menu__title {
   font-size: 13px;
   font-weight: 600;
+}
+
+.sw-env-menu__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sw-env-menu__pin,
+.sw-env-menu__close {
+  width: 24px;
+  height: 24px;
 }
 
 .sw-env-menu__body {
@@ -185,7 +256,7 @@
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-card, var(--bg-elevated, #121212));
+  background: var(--rp-surface, transparent);
   color: var(--text-primary, #e6e6e6);
 }
 
@@ -196,7 +267,7 @@
   padding: 8px 168px 6px 10px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
-  background: color-mix(in srgb, var(--bg-card, #141414) 92%, var(--bg-elevated, #1a1a1a));
+  background: var(--rp-surface, transparent);
   position: relative;
 }
 
@@ -379,7 +450,7 @@
   display: flex;
   flex: 1;
   min-height: 0;
-  background: var(--bg-card, #121212);
+  background: var(--rp-surface, transparent);
 }
 
 /* Left: stacked file blocks */
@@ -611,4 +682,3 @@
 .sw-review-more:hover {
   text-decoration: underline;
 }
-

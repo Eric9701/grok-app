@@ -23,6 +23,7 @@ import type { WorktreeLayout } from "@/lib/gitWorktree";
 import type { ArchiveAgePlan } from "@/lib/sessionArchiveAge";
 import type { ShortcutRemapMap } from "@/lib/shortcutRemap";
 import type { VoiceSessionChipInput } from "@/lib/voiceCommandCenter";
+import { useWhatsNew } from "@/hooks/useWhatsNew";
 
 const DoctorModal = lazy(async () => {
   const m = await import("@/components/DoctorModal");
@@ -35,6 +36,10 @@ const ProjectRulesModal = lazy(async () => {
 const ProductTutorial = lazy(async () => {
   const m = await import("@/components/ProductTutorial");
   return { default: m.ProductTutorial };
+});
+const WhatsNewModal = lazy(async () => {
+  const m = await import("@/components/WhatsNewModal");
+  return { default: m.WhatsNewModal };
 });
 const VoiceOverlay = lazy(async () => {
   const m = await import("@/components/VoiceOverlay");
@@ -111,6 +116,9 @@ export type WorkbenchChromeOverlaysProps = {
   closeShortcuts: () => void;
   showProductTutorial: boolean;
   closeProductTutorial: () => void;
+  /** Workbench gate is ready (not setup / loading). */
+  gateReady: boolean;
+  setupOpen?: boolean;
   liveVoiceOpen: boolean;
   voiceLocale: Locale;
   voiceProjectPath: string | null | undefined;
@@ -130,6 +138,12 @@ export type WorkbenchChromeOverlaysProps = {
 };
 
 export function WorkbenchChromeOverlays(p: WorkbenchChromeOverlaysProps) {
+  const whatsNew = useWhatsNew({
+    locale: p.locale,
+    gateReady: p.gateReady,
+    setupOpen: p.setupOpen,
+    tutorialOpen: p.showProductTutorial,
+  });
   return (
     <>
       {p.showDoctor ? (
@@ -234,6 +248,17 @@ export function WorkbenchChromeOverlays(p: WorkbenchChromeOverlaysProps) {
             onClose={p.closeProductTutorial}
             onSkip={p.closeProductTutorial}
             onDone={p.closeProductTutorial}
+          />
+        </Suspense>
+      ) : null}
+      {whatsNew.open ? (
+        <Suspense fallback={null}>
+          <WhatsNewModal
+            open={whatsNew.open}
+            locale={p.locale}
+            version={whatsNew.version}
+            notes={whatsNew.notes}
+            onClose={whatsNew.close}
           />
         </Suspense>
       ) : null}

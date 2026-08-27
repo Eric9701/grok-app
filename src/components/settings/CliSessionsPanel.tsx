@@ -1,5 +1,7 @@
 /**
  * List / import / open / delete Grok Build CLI sessions from active GROK_HOME.
+ * Settings page shows a compact row; the full list opens in a GlassModal so
+ * long catalogs do not stretch the settings scroll surface.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconCopy, IconSearch, IconTrash } from "@/components/icons";
@@ -22,6 +24,7 @@ export function CliSessionsPanel({
   onImported?: () => void;
   onOpenSession?: (appSessionId: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<api.CliSessionSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -61,13 +64,16 @@ export function CliSessionsPanel({
     }
   }, []);
 
+  // Load only while the browser is open — keeps the settings page short.
   useEffect(() => {
+    if (!open) return;
     void refresh();
-  }, [refresh, sessionDataMode]);
+  }, [open, refresh, sessionDataMode]);
 
   // When the search box is non-empty, call host `cli_sessions_search`
   // (`grok sessions search` + local first-prompt fallback). Debounced.
   useEffect(() => {
+    if (!open) return;
     const q = filterQuery.trim();
     if (!q) {
       setSearchHits(null);
@@ -106,7 +112,7 @@ export function CliSessionsPanel({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [filterQuery, sessionDataMode, listEpoch, t]);
+  }, [filterQuery, sessionDataMode, listEpoch, t, open]);
 
   const filtered = useMemo(() => {
     const q = filterQuery.trim();
@@ -236,238 +242,264 @@ export function CliSessionsPanel({
     (deleteConfirm?.kind === "one" &&
       busyId === deleteConfirm.row.agentSessionId);
 
+  const closeBrowser = () => {
+    if (deleteBusy || busyId) return;
+    setOpen(false);
+  };
+
   return (
-    <div
-      className="settings-row settings-row--stack"
-      id="settings-anchor-cliSessions"
-    >
-      <div className="settings-row__text">
-        <div className="settings-row__label">{t("settings.cliSessions")}</div>
-        <div className="settings-row__desc">{t("settings.cliSessionsDesc")}</div>
+    <>
+      <div
+        className="settings-row"
+        id="settings-anchor-cliSessions"
+      >
+        <div className="settings-row__text">
+          <div className="settings-row__label">{t("settings.cliSessions")}</div>
+          <div className="settings-row__desc">{t("settings.cliSessionsDesc")}</div>
+        </div>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => setOpen(true)}
+        >
+          {t("settings.cliSessionsManage")}
+        </button>
       </div>
-      <div className="settings-cli-sessions">
-        {isIndependent ? (
-          <div className="settings-cli-sessions__note" role="note">
-            {t("settings.cliSessionsIndependentNote")}
+
+      <GlassModal
+        open={open}
+        onClose={closeBrowser}
+        title={t("settings.cliSessions")}
+        size="lg"
+        className="settings-cli-sessions-modal"
+        wrapBody
+        closeLabel={t("common.close")}
+        closeOnOverlay={!deleteBusy && !busyId}
+      >
+        <div className="settings-cli-sessions settings-cli-sessions--modal">
+          {isIndependent ? (
+            <div className="settings-cli-sessions__note" role="note">
+              {t("settings.cliSessionsIndependentNote")}
+            </div>
+          ) : null}
+          <div className="settings-cli-sessions__path" title={sourceHome}>
+            {t("settings.cliSessionsSource", { path: sourceHome })}
           </div>
-        ) : null}
-        <div className="settings-cli-sessions__path" title={sourceHome}>
-          {t("settings.cliSessionsSource", { path: sourceHome })}
-        </div>
-        <div className="settings-cli-sessions__actions">
-          <button
-            type="button"
-            className="btn btn--ghost"
-            disabled={loading || !!busyId}
-            onClick={() => void refresh()}
-          >
-            {t("resources.refresh")}
-          </button>
-          <button
-            type="button"
-            className="btn btn--solid"
-            disabled={loading || !!busyId || pending === 0}
-            onClick={() => void importAll()}
-          >
-            {busyId === "__all__"
-              ? t("settings.cliSessionsImporting")
-              : t("settings.cliSessionsImportAll", { n: String(pending) })}
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost btn--danger"
-            disabled={loading || !!busyId || pending === 0}
-            onClick={() =>
-              setDeleteConfirm({ kind: "unlinked", count: pending })
-            }
-          >
-            {busyId === "__delete_unlinked__"
-              ? t("settings.cliSessionsDeleting")
-              : t("settings.cliSessionsDeleteUnlinked", {
-                  n: String(pending),
-                })}
-          </button>
-        </div>
-        <div className="settings-cli-sessions__filter">
-          <IconSearch size={14} />
-          <input
-            type="search"
-            value={filterQuery}
-            onChange={(e) => {
-              setFilterQuery(e.target.value);
-              // Clear stale host error when the user edits the query.
-              if (error) setError(null);
-            }}
-            placeholder={t("settings.cliSessionsFilterPlaceholder")}
-            aria-label={t("settings.cliSessionsFilterPlaceholder")}
-          />
-        </div>
-        {searchNote && filterQuery.trim() ? (
-          <div className="settings-cli-sessions__search-note" role="status">
-            {searching
-              ? t("settings.cliSessionsSearching")
-              : searchNote}
+          <div className="settings-cli-sessions__actions">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={loading || !!busyId}
+              onClick={() => void refresh()}
+            >
+              {t("resources.refresh")}
+            </button>
+            <button
+              type="button"
+              className="btn btn--solid"
+              disabled={loading || !!busyId || pending === 0}
+              onClick={() => void importAll()}
+            >
+              {busyId === "__all__"
+                ? t("settings.cliSessionsImporting")
+                : t("settings.cliSessionsImportAll", { n: String(pending) })}
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost btn--danger"
+              disabled={loading || !!busyId || pending === 0}
+              onClick={() =>
+                setDeleteConfirm({ kind: "unlinked", count: pending })
+              }
+            >
+              {busyId === "__delete_unlinked__"
+                ? t("settings.cliSessionsDeleting")
+                : t("settings.cliSessionsDeleteUnlinked", {
+                    n: String(pending),
+                  })}
+            </button>
           </div>
-        ) : searching && filterQuery.trim() ? (
-          <div className="settings-cli-sessions__search-note" role="status">
-            {t("settings.cliSessionsSearching")}
+          <div className="settings-cli-sessions__filter">
+            <IconSearch size={14} />
+            <input
+              type="search"
+              value={filterQuery}
+              onChange={(e) => {
+                setFilterQuery(e.target.value);
+                // Clear stale host error when the user edits the query.
+                if (error) setError(null);
+              }}
+              placeholder={t("settings.cliSessionsFilterPlaceholder")}
+              aria-label={t("settings.cliSessionsFilterPlaceholder")}
+            />
           </div>
-        ) : null}
-        {error ? (
-          <div className="settings-cli-sessions__err" role="alert">
-            {error}
-          </div>
-        ) : null}
-        {status ? (
-          <div className="settings-cli-sessions__ok" role="status">
-            {status}
-          </div>
-        ) : null}
-        {loading && rows.length === 0 && !filterQuery.trim() ? (
-          <div className="settings-cli-sessions__empty">
-            {t("settings.cliSessionsLoading")}
-          </div>
-        ) : rows.length === 0 && !filterQuery.trim() ? (
-          <div className="settings-cli-sessions__empty">
-            {t("settings.cliSessionsEmpty")}
-          </div>
-        ) : searching && filtered.length === 0 ? (
-          <div className="settings-cli-sessions__empty">
-            {t("settings.cliSessionsSearching")}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="settings-cli-sessions__empty">
-            {filterQuery.trim()
-              ? t("settings.cliSessionsSearchEmpty")
-              : t("settings.cliSessionsFilterEmpty")}
-          </div>
-        ) : (
-          <ul className="settings-cli-sessions__list">
-            {filtered.slice(0, 40).map((r) => {
-              const busy = busyId === r.agentSessionId;
-              const shortId =
-                r.agentSessionId.length > 14
-                  ? `${r.agentSessionId.slice(0, 8)}…${r.agentSessionId.slice(-4)}`
-                  : r.agentSessionId;
-              const firstPrompt =
-                "firstPrompt" in r
-                  ? (r as { firstPrompt?: string | null }).firstPrompt
-                  : undefined;
-              const remoteOnly = !r.dir;
-              return (
-                <li
-                  key={r.agentSessionId}
-                  className={
-                    "settings-cli-sessions__item" +
-                    (r.alreadyLinked
-                      ? " settings-cli-sessions__item--linked"
-                      : "")
-                  }
-                >
-                  <div className="settings-cli-sessions__meta">
-                    <div className="settings-cli-sessions__title-row">
-                      <div className="settings-cli-sessions__title">
-                        {r.title}
+          {searchNote && filterQuery.trim() ? (
+            <div className="settings-cli-sessions__search-note" role="status">
+              {searching
+                ? t("settings.cliSessionsSearching")
+                : searchNote}
+            </div>
+          ) : searching && filterQuery.trim() ? (
+            <div className="settings-cli-sessions__search-note" role="status">
+              {t("settings.cliSessionsSearching")}
+            </div>
+          ) : null}
+          {error ? (
+            <div className="settings-cli-sessions__err" role="alert">
+              {error}
+            </div>
+          ) : null}
+          {status ? (
+            <div className="settings-cli-sessions__ok" role="status">
+              {status}
+            </div>
+          ) : null}
+          {loading && rows.length === 0 && !filterQuery.trim() ? (
+            <div className="settings-cli-sessions__empty">
+              {t("settings.cliSessionsLoading")}
+            </div>
+          ) : rows.length === 0 && !filterQuery.trim() ? (
+            <div className="settings-cli-sessions__empty">
+              {t("settings.cliSessionsEmpty")}
+            </div>
+          ) : searching && filtered.length === 0 ? (
+            <div className="settings-cli-sessions__empty">
+              {t("settings.cliSessionsSearching")}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="settings-cli-sessions__empty">
+              {filterQuery.trim()
+                ? t("settings.cliSessionsSearchEmpty")
+                : t("settings.cliSessionsFilterEmpty")}
+            </div>
+          ) : (
+            <ul className="settings-cli-sessions__list">
+              {filtered.slice(0, 40).map((r) => {
+                const busy = busyId === r.agentSessionId;
+                const shortId =
+                  r.agentSessionId.length > 14
+                    ? `${r.agentSessionId.slice(0, 8)}…${r.agentSessionId.slice(-4)}`
+                    : r.agentSessionId;
+                const firstPrompt =
+                  "firstPrompt" in r
+                    ? (r as { firstPrompt?: string | null }).firstPrompt
+                    : undefined;
+                const remoteOnly = !r.dir;
+                return (
+                  <li
+                    key={r.agentSessionId}
+                    className={
+                      "settings-cli-sessions__item" +
+                      (r.alreadyLinked
+                        ? " settings-cli-sessions__item--linked"
+                        : "")
+                    }
+                  >
+                    <div className="settings-cli-sessions__meta">
+                      <div className="settings-cli-sessions__title-row">
+                        <div className="settings-cli-sessions__title">
+                          {r.title}
+                        </div>
+                        {r.alreadyLinked ? (
+                          <span className="settings-cli-sessions__badge">
+                            {t("settings.cliSessionsLinked")}
+                          </span>
+                        ) : null}
                       </div>
-                      {r.alreadyLinked ? (
-                        <span className="settings-cli-sessions__badge">
-                          {t("settings.cliSessionsLinked")}
-                        </span>
+                      {firstPrompt ? (
+                        <div
+                          className="settings-cli-sessions__prompt"
+                          title={firstPrompt}
+                        >
+                          {firstPrompt}
+                        </div>
                       ) : null}
-                    </div>
-                    {firstPrompt ? (
-                      <div
-                        className="settings-cli-sessions__prompt"
-                        title={firstPrompt}
-                      >
-                        {firstPrompt}
+                      <div className="settings-cli-sessions__sub">
+                        {r.cwd ? `${r.cwd} · ` : ""}
+                        {r.numMessages
+                          ? t("settings.cliSessionsMsgs", {
+                              n: String(r.numMessages),
+                            })
+                          : null}
                       </div>
-                    ) : null}
-                    <div className="settings-cli-sessions__sub">
-                      {r.cwd ? `${r.cwd} · ` : ""}
-                      {r.numMessages
-                        ? t("settings.cliSessionsMsgs", {
-                            n: String(r.numMessages),
-                          })
-                        : null}
+                      <div className="settings-cli-sessions__id-row">
+                        <span
+                          className="settings-cli-sessions__id"
+                          title={r.agentSessionId}
+                        >
+                          {t("settings.cliSessionsAgentId", { id: shortId })}
+                        </span>
+                        <button
+                          type="button"
+                          className="settings-cli-sessions__copy"
+                          title={t("settings.cliSessionsCopyId")}
+                          aria-label={t("settings.cliSessionsCopyId")}
+                          onClick={() => void copyAgentId(r.agentSessionId)}
+                        >
+                          <IconCopy size={12} />
+                          <span>
+                            {copiedId === r.agentSessionId
+                              ? t("settings.cliSessionsCopied")
+                              : t("settings.cliSessionsCopyId")}
+                          </span>
+                        </button>
+                      </div>
                     </div>
-                    <div className="settings-cli-sessions__id-row">
-                      <span
-                        className="settings-cli-sessions__id"
-                        title={r.agentSessionId}
-                      >
-                        {t("settings.cliSessionsAgentId", { id: shortId })}
-                      </span>
+                    <div className="settings-cli-sessions__row-actions">
+                      {r.alreadyLinked ? (
+                        <button
+                          type="button"
+                          className="btn btn--solid"
+                          disabled={!!busyId || !r.appSessionId}
+                          onClick={() => void resumeOrImportOpen(r)}
+                        >
+                          {busy
+                            ? t("settings.cliSessionsImporting")
+                            : t("settings.cliSessionsOpen")}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn--solid"
+                          disabled={!!busyId}
+                          onClick={() => void resumeOrImportOpen(r)}
+                        >
+                          {busy
+                            ? t("settings.cliSessionsImporting")
+                            : t("settings.cliSessionsImportOpen")}
+                        </button>
+                      )}
                       <button
                         type="button"
-                        className="settings-cli-sessions__copy"
-                        title={t("settings.cliSessionsCopyId")}
-                        aria-label={t("settings.cliSessionsCopyId")}
-                        onClick={() => void copyAgentId(r.agentSessionId)}
+                        className="btn btn--ghost btn--sm btn--danger"
+                        disabled={!!busyId || remoteOnly}
+                        title={
+                          remoteOnly
+                            ? t("settings.cliSessionsDeleteRemoteOnly")
+                            : t("settings.cliSessionsDeleteConfirmMsg", {
+                                title: r.title,
+                              })
+                        }
+                        aria-label={t("settings.cliSessionsDelete")}
+                        onClick={() =>
+                          setDeleteConfirm({ kind: "one", row: r })
+                        }
                       >
-                        <IconCopy size={12} />
+                        <IconTrash size={13} />
                         <span>
-                          {copiedId === r.agentSessionId
-                            ? t("settings.cliSessionsCopied")
-                            : t("settings.cliSessionsCopyId")}
+                          {busy
+                            ? t("settings.cliSessionsDeleting")
+                            : t("settings.cliSessionsDelete")}
                         </span>
                       </button>
                     </div>
-                  </div>
-                  <div className="settings-cli-sessions__row-actions">
-                    {r.alreadyLinked ? (
-                      <button
-                        type="button"
-                        className="btn btn--solid"
-                        disabled={!!busyId || !r.appSessionId}
-                        onClick={() => void resumeOrImportOpen(r)}
-                      >
-                        {busy
-                          ? t("settings.cliSessionsImporting")
-                          : t("settings.cliSessionsOpen")}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn--solid"
-                        disabled={!!busyId}
-                        onClick={() => void resumeOrImportOpen(r)}
-                      >
-                        {busy
-                          ? t("settings.cliSessionsImporting")
-                          : t("settings.cliSessionsImportOpen")}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm btn--danger"
-                      disabled={!!busyId || remoteOnly}
-                      title={
-                        remoteOnly
-                          ? t("settings.cliSessionsDeleteRemoteOnly")
-                          : t("settings.cliSessionsDeleteConfirmMsg", {
-                              title: r.title,
-                            })
-                      }
-                      aria-label={t("settings.cliSessionsDelete")}
-                      onClick={() =>
-                        setDeleteConfirm({ kind: "one", row: r })
-                      }
-                    >
-                      <IconTrash size={13} />
-                      <span>
-                        {busy
-                          ? t("settings.cliSessionsDeleting")
-                          : t("settings.cliSessionsDelete")}
-                      </span>
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </GlassModal>
 
       <GlassModal
         open={!!deleteConfirm}
@@ -522,6 +554,6 @@ export function CliSessionsPanel({
               })}
         </p>
       </GlassModal>
-    </div>
+    </>
   );
 }

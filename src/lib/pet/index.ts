@@ -127,7 +127,10 @@ export {
   PET_COMPOSING_HOLD_MS,
   PET_EXPRESSIONS,
   bloubNotifFill,
+  bloubSettleState,
   bloubShapeId,
+  bloubShouldLoop,
+  bloubStateNeedsLivePaint,
   isPetExpression,
   normalizePetExpression,
   petIsComposing,
@@ -139,6 +142,7 @@ export {
 export { petDoneTaskIds, shouldTriggerPetSpin } from "./petCelebrate";
 
 export {
+  petLocalLookAxes,
   petLookIsNear,
   petPaintMinMs,
 } from "./petMarkPaint";
@@ -151,7 +155,6 @@ export {
 } from "./petFaceMirror";
 
 export {
-  PET_HOVER_LISTEN_MS,
   PET_REST_MOODS,
   isPetRestMood,
   pickRestEmote,

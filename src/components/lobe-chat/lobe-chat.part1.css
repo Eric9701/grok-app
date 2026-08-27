@@ -80,7 +80,7 @@
 [data-theme="dark"] .lobe-chat {
   --chat-code-bg: color-mix(in srgb, var(--bg-code, #0a0a0a) 55%, #2a2a2e);
   --chat-code-fg: var(--text-primary, #e8e8ea);
-  --chat-inline-code-bg: rgba(255, 255, 255, 0.08);
+  --chat-inline-code-bg: rgba(255, 255, 255, 0.14);
   --chat-inline-code-fg: var(--chat-code-fg);
 }
 
@@ -90,7 +90,7 @@
   --chat-code-fg: var(--text-primary, #1d1d1f);
   --chat-code-bar: color-mix(in srgb, var(--chat-code-bg) 92%, #000 8%);
   --chat-code-border: var(--border-subtle, rgba(0, 0, 0, 0.08));
-  --chat-inline-code-bg: rgba(0, 0, 0, 0.06);
+  --chat-inline-code-bg: rgba(0, 0, 0, 0.09);
   --chat-inline-code-fg: var(--chat-code-fg);
   --chat-bubble: var(--bg-user-bubble, rgba(0, 0, 0, 0.05));
   --chat-card: var(--bg-card, #f5f5f7);
@@ -117,6 +117,8 @@
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  container-type: inline-size;
+  container-name: chat-scroll;
   /* none: kill elastic rubber-band at the locked bottom (macOS trackpad
    * overscroll looked like "can pull a little then snap back + flash"). */
   overscroll-behavior: none;
@@ -125,10 +127,44 @@
    * programmatic scrollTop during stream growth and feels like bounce. */
   overflow-anchor: none;
   /* Reserve gutter so image max-width / text wrap don't thrash when the
-   * scrollbar appears mid-load (classic width↔height oscillation). */
+   * scrollbar appears mid-load (classic width↔height oscillation).
+   * Must beat `*:not(textarea) { scrollbar-width: none }` or the gutter
+   * collapses to 0 and the thumb covers cards when the aside squeezes
+   * this column to ~chat-width-max. */
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--scrollbar-thumb, rgba(128, 128, 128, 0.35)) transparent
+    !important;
+  -ms-overflow-style: auto !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar {
+  display: block !important;
+  width: var(--scrollbar-size, 8px) !important;
+  height: var(--scrollbar-size, 8px) !important;
+  background: transparent !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar-track,
+.lobe-chat__scroll::-webkit-scrollbar-track-piece,
+.lobe-chat__scroll::-webkit-scrollbar-corner {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb, rgba(128, 128, 128, 0.35)) !important;
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  background-clip: padding-box !important;
+  min-height: 28px;
 }
 
 /* Scroll-perf: while a gesture/fling is in motion the virtualizer flags the
@@ -156,10 +192,28 @@
   max-width: var(--chat-width-max, 800px);
   margin: 0 auto;
   padding: 20px 20px 32px;
+  /*
+   * Extra end pad only when the reading column fills the scrollport
+   * (aside squeeze). Wide panes already gap the centered 800px column
+   * from the far-right thumb — (100cqi - max) / 2 eats the extra.
+   */
+  padding-inline-end: max(
+    20px,
+    calc(
+      20px + var(--scrollbar-size, 8px) + 6px -
+        max(0px, (100cqi - var(--chat-width-max, 800px)) / 2)
+    )
+  );
   display: flex;
   flex-direction: column;
   gap: var(--chat-list-gap, 4px);
   contain: layout style;
+}
+
+html[data-chat-width="full"] .lobe-chat__inner,
+.lobe-chat[data-chat-width="full"] .lobe-chat__inner {
+  /* --chat-width-max: none makes the calc above invalid. Always full-bleed. */
+  padding-inline-end: calc(20px + var(--scrollbar-size, 8px) + 6px);
 }
 
 /* ── Message rows ── */
@@ -216,8 +270,9 @@
 .lobe-chat-bubble {
   max-width: min(100%, 36rem);
   padding: var(--chat-bubble-pad-y, 10px) var(--chat-bubble-pad-x, 14px);
+  position: relative;
   border-radius: 14px;
-  background: var(--chat-bubble);
+  background: transparent;
   color: var(--chat-text);
   font-size: var(--chat-fs);
   line-height: var(--chat-lh);
@@ -225,6 +280,25 @@
   word-break: break-word;
   border: none;
   box-shadow: none;
+}
+
+.lobe-chat-bubble::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--chat-bubble) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lobe-chat-bubble > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Plain / skill-mixed user body — same newline policy as the composer */
@@ -241,7 +315,16 @@
 
 .lobe-chat-bubble--interjection {
   border: 1px solid color-mix(in srgb, var(--chat-link) 24%, transparent);
-  background: color-mix(in srgb, var(--chat-link) 8%, var(--chat-bubble));
+  background: transparent;
+}
+
+.lobe-chat-bubble--interjection::before {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--chat-link) 8%, var(--chat-bubble))
+      var(--ui-opacity-mix, 100%),
+    transparent
+  );
 }
 
 .lobe-chat-interjection-tag {
@@ -509,6 +592,18 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   display: none;
 }
 
+.chat-md .katex {
+  font-size: 1.08em;
+  color: inherit;
+}
+
+.chat-md .katex-display {
+  margin: 0.7em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.1em 0;
+}
+
 .chat-md__link {
   color: var(--chat-link);
   text-decoration: none;
@@ -519,53 +614,53 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   text-underline-offset: 2px;
 }
 
-/* File path / name links (blue + doc icon) */
-.chat-md__file-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--chat-link);
-  text-decoration: none;
-  font-size: var(--chat-fs);
-  line-height: var(--chat-lh);
-  vertical-align: baseline;
-  max-width: 100%;
-}
-.chat-md__file-link:hover {
-  color: var(--chat-link-hover);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.chat-md__file-link span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Inline code / tags — always readable on both themes */
+/* Inline code / tags — chip language, slightly stronger than body copy */
 .chat-md__inline-code,
 .chat-md :not(pre) > code {
   display: inline;
-  padding: 0.12em 0.45em;
+  padding: 0.12em 0.5em;
   border-radius: 6px;
   background: var(--chat-inline-code-bg);
   border: 1px solid var(--chat-code-border);
   font-family: var(--chat-mono);
   font-size: 0.9em;
+  font-weight: 500;
   color: var(--chat-inline-code-fg);
   box-shadow: none;
   outline: none;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 /* ── Code / path block (theme-aware chrome) ── */
 .chat-code {
+  position: relative;
   margin: 0.75em 0;
   border-radius: var(--chat-r);
-  background: var(--chat-code-bg);
+  background: transparent;
   border: 1px solid var(--chat-code-border);
   color: var(--chat-code-fg);
   overflow: hidden;
   box-shadow: none;
+}
+
+.chat-code::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--chat-code-bg) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chat-code > * {
+  position: relative;
+  z-index: 1;
 }
 
 .chat-code__bar {
@@ -575,7 +670,11 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   gap: 8px;
   min-height: 32px;
   padding: 4px 10px 0 12px;
-  background: var(--chat-code-bar);
+  background: color-mix(
+    in srgb,
+    var(--chat-code-bar) 35%,
+    transparent
+  );
   border-bottom: 1px solid var(--chat-code-border);
   color: var(--chat-text-2);
 }
@@ -697,6 +796,7 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
  * - Never force columns narrower than their content (nowrap + min-width)
  */
 .chat-md__table-wrap {
+  position: relative;
   display: block;
   width: 100%;
   max-width: 100%;
@@ -706,7 +806,26 @@ html[data-msg-actions="always"] .lobe-chat-item__actions {
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--chat-code-border);
   border-radius: var(--chat-r);
-  background: var(--chat-code-bg);
+  background: transparent;
+}
+
+.chat-md__table-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--chat-code-bg) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chat-md__table-wrap > * {
+  position: relative;
+  z-index: 1;
 }
 
 .chat-md table {

@@ -1,3 +1,6 @@
+import { globSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import * as ts from "typescript";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createT, loadAllLocaleCatalogs } from "@/i18n";
 import {
@@ -21,6 +24,52 @@ describe("settingsCatalog", () => {
 
   it("has no structural invariants broken", () => {
     expect(catalogInvariants()).toEqual([]);
+  });
+
+  it("mounts every searchable anchor in production", () => {
+    const srcRoot = resolve(__dirname, "..");
+    const mountedAnchors = new Set<string>();
+    for (const file of globSync("**/*.{ts,tsx}", {
+      cwd: srcRoot,
+      exclude: [
+        "**/*.test.*",
+        "**/*.guard.test.*",
+        "lib/settingsCatalog/entries/**",
+      ],
+    })) {
+      const source = readFileSync(resolve(srcRoot, file), "utf8");
+      const sourceFile = ts.createSourceFile(
+        file,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+      );
+      const collectIdValues = (node: ts.Node) => {
+        if (ts.isStringLiteralLike(node)) {
+          mountedAnchors.add(node.text);
+        } else if (ts.isJsxExpression(node) && node.expression) {
+          collectIdValues(node.expression);
+        } else if (ts.isConditionalExpression(node)) {
+          collectIdValues(node.whenTrue);
+          collectIdValues(node.whenFalse);
+        } else if (ts.isParenthesizedExpression(node)) {
+          collectIdValues(node.expression);
+        }
+      };
+      const visit = (node: ts.Node) => {
+        if (ts.isJsxAttribute(node) && node.name.getText(sourceFile) === "id") {
+          if (node.initializer) collectIdValues(node.initializer);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sourceFile);
+    }
+    const missing = SETTINGS_ENTRIES.filter(
+      ({ anchorId }) => !mountedAnchors.has(anchorId),
+    ).map(({ id, anchorId }) => `${id}: ${anchorId}`);
+
+    expect(missing).toEqual([]);
   });
 
   it("registers three distinct static skin-share anchors", () => {
@@ -254,6 +303,7 @@ describe("settingsCatalog", () => {
     expect(appearance).toContain("settings.codeFontScale");
     expect(appearance).toContain("settings.chatDensity");
     expect(appearance).toContain("settings.chatWidth");
+    expect(appearance).toContain("settings.msgRailSide");
     expect(appearance).toContain("settings.sidebarDensity");
     expect(appearance).toContain("settings.zenMode");
     expect(appearance).toContain("settings.messageActions");
@@ -264,6 +314,7 @@ describe("settingsCatalog", () => {
     expect(appearance).toContain("settings.sessionMuteSummary");
     expect(appearance).toContain("settings.sessionUnreadSummary");
     expect(appearance).toContain("settings.backBottomAlways");
+    expect(appearance).toContain("settings.selectionToolbar");
     const rim = keywordKeysForSection("remote_im");
     expect(rim).toContain("settings.nav.remoteIm");
     expect(rim).toContain("settings.tab.remoteIm");
@@ -340,6 +391,18 @@ describe("settingsCatalog", () => {
     expect(wallpaperHits.some((h) => h.entry.id === "appearance.wallpaper")).toBe(
       true,
     );
+    const textColor = searchSettingsEntries("文字颜色", tZh, tEn);
+    expect(textColor.some((h) => h.entry.id === "appearance.textColor")).toBe(
+      true,
+    );
+    const fontShadow = searchSettingsEntries("text shadow", tZh, tEn);
+    expect(fontShadow.some((h) => h.entry.id === "appearance.fontShadow")).toBe(
+      true,
+    );
+    const chromeReset = searchSettingsEntries("恢复默认", tZh, tEn);
+    expect(
+      chromeReset.some((h) => h.entry.id === "appearance.chromeReset"),
+    ).toBe(true);
     const schedule = searchSettingsEntries("schedule", tZh, tEn);
     expect(
       schedule.some((h) => h.entry.id === "appearance.themeSchedule"),
@@ -395,6 +458,10 @@ describe("settingsCatalog", () => {
     expect(widthEn.some((h) => h.entry.id === "appearance.chatWidth")).toBe(
       true,
     );
+    const rail = searchSettingsEntries("进度条", tZh, tEn);
+    expect(rail.some((h) => h.entry.id === "appearance.msgRailSide")).toBe(
+      true,
+    );
     const sidebar = searchSettingsEntries("侧栏", tZh, tEn);
     const sidebarHits =
       sidebar.length > 0
@@ -444,6 +511,16 @@ describe("settingsCatalog", () => {
     const backBottomZh = searchSettingsEntries("回到底部", tZh, tEn);
     expect(
       backBottomZh.some((h) => h.entry.id === "appearance.backBottomAlways"),
+    ).toBe(true);
+    const selectionToolbar = searchSettingsEntries("selection toolbar", tZh, tEn);
+    expect(
+      selectionToolbar.some((h) => h.entry.id === "appearance.selectionToolbar"),
+    ).toBe(true);
+    const selectionToolbarZh = searchSettingsEntries("选中文字", tZh, tEn);
+    expect(
+      selectionToolbarZh.some(
+        (h) => h.entry.id === "appearance.selectionToolbar",
+      ),
     ).toBe(true);
     const toolCollapse = searchSettingsEntries("tool steps", tZh, tEn);
     expect(

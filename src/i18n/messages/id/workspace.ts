@@ -445,6 +445,8 @@ export const idWorkspace = {
   "side.toggle": "Tampilkan/sembunyikan bilah sisi",
   "side.env": "Lingkungan",
   "side.envTitle": "Lingkungan",
+  "side.env.pin": "Sematkan",
+  "side.env.unpin": "Lepas sematan",
   "side.envSoon": "Detail lingkungan dan status git akan muncul di sini.",
   "side.placeholder.file": "Workbench berkas",
   "side.placeholder.browser": "Tab peramban",

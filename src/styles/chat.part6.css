@@ -369,35 +369,6 @@
   filter: brightness(1.06);
 }
 
-.entry-grid {
-  display: grid;
-  gap: 10px;
-  margin: var(--space-4) 0;
-}
-
-.entry-card {
-  text-align: left;
-  padding: 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-main);
-}
-
-.entry-card:hover {
-  border-color: var(--border-strong);
-  background: var(--bg-hover);
-}
-
-.entry-card__t {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.entry-card__d {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
 .field {
   display: flex;
   flex-direction: column;
@@ -567,6 +538,7 @@
  * browser stays flush to the 1px border line.
  */
 .aside {
+  --rp-surface: transparent;
   width: var(--aside-width, 360px);
   min-width: 0;
   border-left: 1px solid var(--border-subtle);
@@ -580,6 +552,13 @@
   position: relative;
   /* Above .main (z-index: 2) so the straddle handle receives hits over the seam */
   z-index: 3;
+}
+
+/* mac in-flow: same window-vibrancy tint as the left rail (ChatGPT chrome). */
+.platform-mac .aside:not(.aside--overlay) {
+  background: var(--bg-sidebar);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .aside.is-resizing {
@@ -598,7 +577,7 @@
 
 .aside.aside--overlay {
   position: absolute;
-  top: var(--titlebar-height, 40px);
+  top: 0;
   right: 0;
   bottom: 0;
   z-index: 41;
@@ -617,27 +596,13 @@
   pointer-events: none;
 }
 
-/* Clip only the pane whose box is interpolating. Overflow-hidden on a
- * stable aside (file preview / native browser) during sidebar motion
- * changes clientWidth and kicks webview setPosition every frame.
+/* Clip only the right pane whose box is interpolating. Overflow-hidden on
+ * a stable aside (file preview / native browser) during sidebar motion changes
+ * clientWidth and kicks webview setPosition every frame.
  * Do not `contain: layout` the aside — persist-host height:100% then
  * resolves against the full pane and the native webview covers chrome. */
-.workbench--pane-motion .sidebar,
 .workbench--aside-motion .aside {
   overflow: hidden;
-}
-
-/*
- * Click / shortcut collapse is a clip + fade, not a live resize.
- * Inner rail stays at the last open width so labels do not wrap.
- * Drag keeps `.is-resizing` and still reflows.
- */
-.workbench--sidebar-motion .sidebar:not(.is-resizing) .sidebar__clip {
-  width: var(--sidebar-rail-min, 268px);
-  min-width: var(--sidebar-rail-min, 268px);
-  max-width: none;
-  flex-shrink: 0;
-  box-sizing: border-box;
 }
 
 .workbench--aside-motion .aside:not(.is-resizing) .aside__inner {
@@ -705,42 +670,31 @@
   opacity: 0;
 }
 
-/* When left sidebar fully closed, reserve mac traffic-light inset on main */
-.platform-mac .main--sidebar-hidden .main__top {
-  padding-left: var(--titlebar-safe-left, 96px);
-}
-
-.workbench--sidebar-motion .main__top {
-  transition: padding-left var(--motion-pane) var(--motion-pane-ease);
-}
-
-.main__pane-toggle.is-on {
-  color: var(--text-primary);
-  background: var(--bg-active);
-}
-
 /* ===== Composer model / access menus (Codex-style sheet) ===== */
 .cmm {
   position: relative;
   flex-shrink: 0;
 }
 
-/* Flat control (no capsule border) — hover wash only, Codex-style */
+/* Flat control (no capsule border) — hover wash matches .chrome-btn. */
 .cmm__trigger {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   height: 28px;
   padding: 0 8px;
+  position: relative;
   border-radius: 8px;
   background: transparent;
   border: none;
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
   /* Custom provider model ids are long; allow more room before ellipsis. */
   max-width: min(320px, 42vw);
-  transition: background 120ms ease, color 120ms ease;
 }
 
 /* Model menu: room for long request model ids (e.g. deepseek-v4-flash). */
@@ -748,11 +702,7 @@
   max-width: min(360px, 48vw);
 }
 
-.cmm__trigger:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
+.cmm__trigger:hover,
 .cmm.is-open .cmm__trigger {
   background: var(--bg-hover);
   color: var(--text-primary);
@@ -766,7 +716,7 @@
 
 .cmm--danger .cmm__trigger:hover,
 .cmm--danger.is-open .cmm__trigger {
-  background: color-mix(in srgb, var(--danger, #e07040) 10%, transparent);
+  background: var(--danger-muted);
   color: var(--danger, #e07040);
 }
 

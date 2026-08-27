@@ -233,6 +233,40 @@ html[data-theme="light"] .ui-check.is-mixed .ui-check__box {
   width: 100%;
 }
 
+.settings-color-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-color-picker__swatch {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+}
+
+.settings-color-picker__swatch input[type="color"] {
+  position: absolute;
+  inset: -4px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.settings-color-picker__hex {
+  width: 7.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .settings-row__controls--grow .settings-input,
 .settings-row__controls--grow .font-select {
   flex: 1 1 12rem;

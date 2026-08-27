@@ -12,15 +12,20 @@ import {
   isNearBottom,
   nextStickPinState,
   pinnedFollowDelayMs,
+  pinnedFollowDelayForLayout,
   shouldBumpStickOnBusyEdge,
   stabilizeStickUserId,
   shouldClampPinnedOverscroll,
   shouldClampPinnedStreamDrift,
+  shouldEscapePinnedScroll,
   shouldReleaseStickOnDistanceFromBottom,
   shouldReleaseStickOnScrollUp,
+  shouldReleaseStickOnSlowScrollUp,
   shouldSnapPinnedLayoutToBottom,
   STICK_MEDIA_FOLLOW_DELAY_MS,
   STICK_MEDIA_HEIGHT_PX,
+  markProgrammaticStickScroll,
+  takeProgrammaticStickScroll,
 } from "./stickToBottom";
 
 describe("distanceFromBottom", () => {
@@ -91,6 +96,26 @@ describe("pinnedFollowDelayMs", () => {
 
   it("treats non-finite as immediate", () => {
     expect(pinnedFollowDelayMs(Number.NaN)).toBe(0);
+  });
+});
+
+describe("pinnedFollowDelayForLayout", () => {
+  it("follows immediately when the viewport width is interpolating", () => {
+    expect(
+      pinnedFollowDelayForLayout({
+        heightDelta: 400,
+        viewportWidthChanged: true,
+      }),
+    ).toBe(0);
+  });
+
+  it("keeps the media delay when only height jumped", () => {
+    expect(
+      pinnedFollowDelayForLayout({
+        heightDelta: 400,
+        viewportWidthChanged: false,
+      }),
+    ).toBe(STICK_MEDIA_FOLLOW_DELAY_MS);
   });
 });
 
@@ -412,6 +437,173 @@ describe("shouldReleaseStickOnScrollUp", () => {
         clientHeight: ch,
       }),
     ).toBe(true);
+  });
+
+  it("minDeltaPx 0.5 would treat thinking/tool reflow as a leave", () => {
+    // Hook used to pass minDeltaPx: 0.5. A 6px leftover after auto-collapse
+    // or spacer remeasure then dropped pin for the rest of the turn.
+    expect(
+      shouldReleaseStickOnScrollUp({
+        pinned: true,
+        scrollTop: 594,
+        previousScrollTop: 600,
+        scrollHeight: sh,
+        clientHeight: ch,
+        minDeltaPx: 0.5,
+      }),
+    ).toBe(true);
+    expect(
+      shouldReleaseStickOnScrollUp({
+        pinned: true,
+        scrollTop: 594,
+        previousScrollTop: 600,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("shouldReleaseStickOnSlowScrollUp", () => {
+  // Viewport 400, content 1000 → max scrollTop = 600.
+  const sh = 1000;
+  const ch = 400;
+
+  it("releases once pixel-mode ticks walk 10px off the locked bottom", () => {
+    // Three 4px ticks: 600 → 596 → 592 → 588. Last event is 4px.
+    expect(
+      shouldReleaseStickOnSlowScrollUp({
+        pinned: true,
+        scrollTop: 588,
+        previousScrollTop: 592,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not release a 4px tick still inside the 10px band", () => {
+    expect(
+      shouldReleaseStickOnSlowScrollUp({
+        pinned: true,
+        scrollTop: 596,
+        previousScrollTop: 600,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not treat stream/phase growth as a leave", () => {
+    // Thinking finished / tools started: content grew 80px, follow has not
+    // landed yet (560 is already 40px off). A 4px spacer tick must not unpin.
+    expect(
+      shouldReleaseStickOnSlowScrollUp({
+        pinned: true,
+        scrollTop: 556,
+        previousScrollTop: 560,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not release when scrollTop did not move up", () => {
+    expect(
+      shouldReleaseStickOnSlowScrollUp({
+        pinned: true,
+        scrollTop: 600,
+        previousScrollTop: 600,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("shouldEscapePinnedScroll", () => {
+  const sh = 1200;
+  const ch = 600;
+
+  it("keeps following after thinking/tool/body phase jitter", () => {
+    // 6–8px leftover from auto-collapse / virtual remeasure / markdown settle.
+    expect(
+      shouldEscapePinnedScroll({
+        pinned: true,
+        scrollTop: 592,
+        previousScrollTop: 600,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false);
+    expect(
+      shouldEscapePinnedScroll({
+        pinned: true,
+        scrollTop: 594,
+        previousScrollTop: 600,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps following when the next round grows while still off hard bottom", () => {
+    // Body finished, next thinking row mounted: scrollHeight jumped, we are
+    // 40px off until follow. Layout tick of 4px must not drop pin.
+    expect(
+      shouldEscapePinnedScroll({
+        pinned: true,
+        scrollTop: 556,
+        previousScrollTop: 560,
+        scrollHeight: 1040,
+        clientHeight: 400,
+      }),
+    ).toBe(false);
+  });
+
+  it("still escapes a real flick off the bottom", () => {
+    expect(
+      shouldEscapePinnedScroll({
+        pinned: true,
+        scrollTop: 550,
+        previousScrollTop: 600,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }),
+    ).toBe(true);
+  });
+
+  it("still escapes slow trackpad once 10px off the locked bottom", () => {
+    expect(
+      shouldEscapePinnedScroll({
+        pinned: true,
+        scrollTop: 588,
+        previousScrollTop: 592,
+        scrollHeight: 1000,
+        clientHeight: 400,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not escape a shrink clamp that parks on the new max", () => {
+    expect(
+      shouldEscapePinnedScroll({
+        pinned: true,
+        scrollTop: 400,
+        previousScrollTop: 600,
+        scrollHeight: 1000,
+        clientHeight: ch,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("programmatic stick scroll ignore", () => {
+  it("hands the written top to the next scroll event once", () => {
+    const el = { id: "vp" } as unknown as Element;
+    markProgrammaticStickScroll(el, 592);
+    expect(takeProgrammaticStickScroll(el)).toBe(592);
+    expect(takeProgrammaticStickScroll(el)).toBeUndefined();
   });
 });
 

@@ -31,12 +31,18 @@ describe("PetOverlay drag hit target", () => {
   it("keeps celebrate spin after drag and bubble changes", () => {
     expect(src).toContain("spinSignal");
     expect(src).toContain("shouldTriggerPetSpin");
+    expect(src).toContain("petDoneTaskIds");
     expect(src).toContain("pet.menu.spin");
   });
 
   it("exposes a rest-face emote from the pet menu", () => {
     expect(src).toContain("emoteSignal");
     expect(src).toContain("pet.menu.emote");
+  });
+
+  it("rebuilds copy after the locale catalog loads", () => {
+    expect(src).toContain("localeCatalogRev");
+    expect(src).toMatch(/createT\(locale\),\s*\[locale, localeCatalogRev\]/);
   });
 
   it("nudges on Wayland instead of startDragging after slop", () => {

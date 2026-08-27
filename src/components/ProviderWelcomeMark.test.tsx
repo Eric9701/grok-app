@@ -4,6 +4,7 @@ import {
   DeepSeekFullMark,
   OpenCodeWordmark,
   VolcanoArkWelcomeMark,
+  ZhipuWelcomeMark,
 } from "./ProviderWelcomeMark";
 
 describe("DeepSeekFullMark", () => {
@@ -61,5 +62,22 @@ describe("VolcanoArkWelcomeMark", () => {
       <VolcanoArkWelcomeMark title="火山方舟" />,
     );
     expect(html).toContain('aria-label="火山方舟"');
+  });
+});
+
+describe("ZhipuWelcomeMark", () => {
+  it("renders brand icon plus 智谱 label", () => {
+    const html = renderToStaticMarkup(<ZhipuWelcomeMark />);
+    expect(html).toContain("zhipu-welcome-mark");
+    expect(html).toContain("zhipu-welcome-mark__text");
+    expect(html).toContain("智谱");
+    expect(html).toContain("provider-brand-icon--zhipu");
+    expect(html).toContain("zhipu-mark__tile");
+    expect(html).toContain("zhipu-mark__z");
+  });
+
+  it("carries an accessible label", () => {
+    const html = renderToStaticMarkup(<ZhipuWelcomeMark title="智谱" />);
+    expect(html).toContain('aria-label="智谱"');
   });
 });

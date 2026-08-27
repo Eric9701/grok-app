@@ -583,6 +583,22 @@ pub fn path_for_file_manager(path: &Path) -> String {
     }
 }
 
+/// Path handed to editors / terminals / git GUIs.
+///
+/// Same as [`path_for_file_manager`], but **always** strips Windows
+/// extended-length prefixes (`\\?\` / `\\?\UNC\` / `//?/`) even when this
+/// binary is not built for Windows. VS Code stores a verbatim `\\?\`
+/// argument as `file://?/` and breaks `fs.realpathSync` (#928).
+pub fn path_for_editor(path: &Path) -> String {
+    let s = path_for_file_manager(path);
+    let stripped = strip_extended_path_prefix(&s);
+    if stripped.contains(':') && stripped.contains('\\') {
+        stripped.replace('/', "\\")
+    } else {
+        stripped
+    }
+}
+
 /// Percent-encode a local path for a `file://` URI (Linux ShowItems).
 fn file_uri_from_path(path: &str) -> String {
     // file:// + absolute path; encode non-unreserved octets.
@@ -712,6 +728,48 @@ mod tests {
             r"C:\Users\a\b.png"
         );
         assert_eq!(strip_extended_path_prefix("/Users/a/b"), "/Users/a/b");
+        assert_eq!(
+            strip_extended_path_prefix("//?/D:/Work/MyProject"),
+            r"D:\Work\MyProject"
+        );
+    }
+
+    #[test]
+    fn path_for_editor_strips_windows_extended_prefix() {
+        use std::path::Path;
+        // Non-existent Windows extended paths still strip — editors must never
+        // receive `\\?\` (#928). Host OS does not matter.
+        assert_eq!(
+            path_for_editor(Path::new(r"\\?\D:\Work\MyProject")),
+            r"D:\Work\MyProject"
+        );
+        assert_eq!(
+            path_for_editor(Path::new(r"\\?\UNC\server\share\repo")),
+            r"\\server\share\repo"
+        );
+        assert_eq!(
+            path_for_editor(Path::new("//?/D:/Work/MyProject")),
+            r"D:\Work\MyProject"
+        );
+        assert_eq!(
+            path_for_editor(Path::new(r"D:\Work\MyProject")),
+            r"D:\Work\MyProject"
+        );
+    }
+
+    #[test]
+    fn path_for_editor_keeps_unix_paths() {
+        let p = std::env::current_dir().expect("cwd");
+        let got = path_for_editor(&p);
+        assert!(
+            !got.starts_with(r"\\?\"),
+            "unix/editor path leaked extended prefix: {got}"
+        );
+        #[cfg(not(target_os = "windows"))]
+        {
+            assert!(got.starts_with('/'), "expected absolute unix path, got {got}");
+            assert!(!got.contains('\\'));
+        }
     }
 
     #[test]

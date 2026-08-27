@@ -35,7 +35,7 @@ export const esSettingsPet = {
   "settings.pet.identityDesc": "Forma, cara en reposo, color del cuerpo y de los ojos.",
   "settings.pet.shape": "Forma",
   "settings.pet.expression": "Expresión",
-  "settings.pet.expressionDesc": "Cara en reposo. La forma elegida se mantiene al trabajar; un chat terminado sin leer muestra un punto en la esquina.",
+  "settings.pet.expressionDesc": "Cara en reposo. Escribir, un turno disparado y un chat terminado siguen morphando por el catálogo, incluidas las cintas de colores.",
   "settings.pet.expression.neutre": "Neutral",
   "settings.pet.expression.attentif": "Atento",
   "settings.pet.expression.surpris": "Sorprendido",

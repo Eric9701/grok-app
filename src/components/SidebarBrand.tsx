@@ -3,7 +3,7 @@
  * provider brand when Appearance → “Replace brand logo” is on.
  *
  * Wordmark brands (DeepSeek, OpenCode) carry their own name — no extra label.
- * Icon-only brands (Volcengine Ark, Amux) render the mark + a text label.
+ * Icon-only brands (Volcengine Ark, Amux, Zhipu) render the mark + a text label.
  * All swappable marks share {@link SIDEBAR_BRAND_LOGO_HEIGHT} for size parity.
  */
 
@@ -59,7 +59,7 @@ export const SidebarBrand = memo(function SidebarBrand({
         />
       );
     }
-    // Icon-only (Volcengine Ark, Amux): mark + label — volcano has no wordmark.
+    // Icon-only (Volcengine Ark, Amux, Zhipu): mark + label.
     const display = (label || brandId).trim() || brandId;
     return (
       <>

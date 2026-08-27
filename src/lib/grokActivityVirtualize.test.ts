@@ -10,6 +10,7 @@ import {
   grokActivityVirtualMaxHeightPx,
   liveActivityFollowKey,
   resolveActivityStepExpandDesired,
+  scrollDeltaToBringChildIntoContainer,
   shouldCapMappedGrokActivitySteps,
   shouldVirtualizeActivityWithExpand,
   shouldVirtualizeGrokActivitySteps,
@@ -51,6 +52,32 @@ describe("grokActivityVirtualize", () => {
     ).toBe("th-1");
     expect(liveActivityFollowKey([{ key: "only" }])).toBe("only");
     expect(liveActivityFollowKey([])).toBeNull();
+  });
+
+  it("live follow only moves the nested scroller, never an ancestor", () => {
+    // Child clipped below the capped steps box → scroll that box down.
+    expect(
+      scrollDeltaToBringChildIntoContainer(
+        { top: 100, bottom: 300 },
+        { top: 280, bottom: 340 },
+      ),
+    ).toBe(40);
+    // Child clipped above → scroll that box up (negative delta).
+    expect(
+      scrollDeltaToBringChildIntoContainer(
+        { top: 100, bottom: 300 },
+        { top: 60, bottom: 90 },
+      ),
+    ).toBe(-40);
+    // Already visible → 0. scrollIntoView(nearest) would still walk the
+    // chat ancestor and unpin stick when the next thinking/tool/body round
+    // starts below a still-visible live step.
+    expect(
+      scrollDeltaToBringChildIntoContainer(
+        { top: 100, bottom: 300 },
+        { top: 120, bottom: 160 },
+      ),
+    ).toBe(0);
   });
 
   it("virtualizes when count exceeds threshold", () => {

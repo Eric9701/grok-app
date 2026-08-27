@@ -22,6 +22,8 @@ export const taSlash = {
   "slash.kind.action": "செயல்",
   "slash.kind.prompt": "வினவல்",
   "slash.kind.skill": "திறன்",
+  "slash.kind.plugin": "செருகுநிரல்",
+  "slash.pluginDesc": "{n} திறன்கள்",
   "slash.goal": "இலக்கு பணி",
   "slash.goalDesc": "ஃபினிட் செயலிஜெக்டிவ் · பல சுற்று முடியும் வரை · டைமர் அல்ல",
   "slash.goalClear": "தெளிவான இலக்கு பணி",

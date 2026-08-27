@@ -445,6 +445,8 @@ export const ptBRWorkspace = {
   "side.toggle": "Mostrar/ocultar barra lateral",
   "side.env": "Ambiente",
   "side.envTitle": "Ambiente",
+  "side.env.pin": "Fixar",
+  "side.env.unpin": "Desafixar",
   "side.envSoon": "Os detalhes do ambiente e o status do git aparecerão aqui.",
   "side.placeholder.file": "Bancada de arquivos",
   "side.placeholder.browser": "Aba do navegador",

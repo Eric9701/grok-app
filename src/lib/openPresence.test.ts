@@ -64,6 +64,10 @@ describe("floating pop CSS", () => {
     resolve(__dirname, "../styles/side-workbench.part2.css"),
     "utf8",
   );
+  const envDock = readFileSync(
+    resolve(__dirname, "../styles/sw-env-dock.css"),
+    "utf8",
+  );
   const settings = readFileSync(
     resolve(__dirname, "../styles/settings.part1.css"),
     "utf8",
@@ -104,8 +108,12 @@ describe("floating pop CSS", () => {
     expect(sidebar).toMatch(/translateY\(16px\) scaleY\(0\.92\)/);
     expect(sidebar).toMatch(/\.user-menu__flyout\.is-open/);
     expect(env).toMatch(/\.sw-env-menu\.menu-panel\.is-open/);
+    expect(envDock).toMatch(/\.sw-env-dock \.sw-env-menu\.is-open:not\(\.is-parked\)/);
+    expect(envDock).toMatch(/translateX\(100%\) scale\(0\.8\) rotateY\(-22deg\)/);
+    expect(envDock).not.toMatch(/\.menu-panel/);
     expect(sidebar).toMatch(/var\(--motion-normal\) var\(--motion-pane-ease\)/);
     expect(env).toMatch(/var\(--motion-normal\) var\(--motion-pane-ease\)/);
+    expect(envDock).toMatch(/var\(--motion-pane\) var\(--motion-pane-ease\)/);
   });
 
   it("switches settings atomically without a presence or paint gap", () => {
@@ -125,16 +133,16 @@ describe("floating pop CSS", () => {
     expect(settings).not.toMatch(/settings-stage-(?:enter|leave)/);
   });
 
-  it("uses the same CSS frost on workbench sidebar and settings nav", () => {
-    const blur =
-      /backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)\s*saturate\(var\(--sidebar-saturate\)\)/;
+  it("uses native vibrancy for mac workbench panes but keeps overlay drawer frost", () => {
     expect(workbenchCss).toMatch(
-      /\.platform-mac \.sidebar\s*\{[^}]*backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)/,
+      /\.platform-mac \.sidebar:not\(\.sidebar--overlay\):not\(\.sidebar--phone-drawer\)\s*\{[^}]*backdrop-filter:\s*none/s,
     );
     expect(workbenchCss).toMatch(
-      /\.platform-mac \.settings-page__nav\s*\{[^}]*backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)/,
+      /\.platform-mac \.sidebar\.sidebar--overlay,\s*\.platform-mac \.sidebar\.sidebar--phone-drawer\s*\{[^}]*backdrop-filter:\s*blur\(var\(--sidebar-blur\)\)/s,
     );
-    expect(workbenchCss).toMatch(blur);
+    expect(workbenchCss).toMatch(
+      /\.platform-mac \.settings-page__nav\s*\{[^}]*background:\s*var\(--bg-sidebar-solid[^}]*backdrop-filter:\s*none/,
+    );
   });
 
   it("keeps the workbench fully painted behind the direct settings swap", () => {
@@ -153,11 +161,23 @@ describe("floating pop CSS", () => {
     );
   });
 
-  it("closes the account portal immediately when settings takes over", () => {
-    expect(appWorkbench).toMatch(/closeImmediately=\{settingsOpen\}/);
+  it("closes the account portal immediately when its sidebar disappears", () => {
+    expect(appWorkbench).toMatch(
+      /closeImmediately=\{settingsOpen \|\| layout\.sidebarCollapsed\}/,
+    );
+    expect(appWorkbench).not.toMatch(
+      /useEffect\(\(\) => \{\s*if \(!layout\.sidebarCollapsed\) return;\s*setShowUserMenu\(false\);\s*\}, \[layout\.sidebarCollapsed\]\);/,
+    );
+    expect(userMenu).toMatch(
+      /useEffect\(\(\) => \{\s*if \(closeImmediately && open\) onClose\(\);\s*\}, \[closeImmediately, onClose, open\]\);/,
+    );
     expect(userMenu).toMatch(
       /useOpenPresence\(\s*open,\s*true,\s*closeImmediately \? 0 : OPEN_PRESENCE_MS,\s*\)/,
     );
+    expect(userMenu).toMatch(
+      /placement:\s*"up",\s*width:\s*0,\s*fitContent:\s*false,\s*matchTriggerWidth:\s*true,/,
+    );
+    expect(userMenu).not.toMatch(/minWidth:\s*220/);
     expect(userMenu).toMatch(
       /const panel\s*=\s*!closeImmediately\s*&&\s*panelPresence\.mounted/,
     );

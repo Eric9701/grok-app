@@ -231,7 +231,10 @@ export function Tip({
   const tipStyle: CSSProperties | undefined = pos
     ? {
         top: pos.top,
-        left: pos.left,
+        // Park off-screen until measured. WKWebView still rasters
+        // visibility:hidden rounded tiles; on light wallpaper that first
+        // EST_W paint is a leftover white square over the composer.
+        left: settled ? pos.left : -10000,
         maxWidth: pos.maxWidth,
         // No translate: top/left are already the tip box origin after clamp.
         transform: "none",

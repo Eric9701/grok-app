@@ -247,7 +247,8 @@ export function getMarkdownFileLabels(locale: Locale): FilePathCardLabels {
 
 function isSimplePlainText(text: string): boolean {
   if (!text || text.length > 500) return false;
-  if (/[\n#*_`$\[\]|~<>]|^\s*[-*+]\s|^\s*\d+\.\s/m.test(text)) {
+  // `$` / `\` keep math (`$E=mc^2$`, `\(x\)`) on the ReactMarkdown path.
+  if (/[\n#*_`$\\[\]|~<>]|^\s*[-*+]\s|^\s*\d+\.\s/m.test(text)) {
     return false;
   }
   return true;

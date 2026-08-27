@@ -35,7 +35,7 @@ export const taSettingsPet = {
   "settings.pet.identityDesc": "வாழும் அடையாளத்தின் வடிவம், ஓய்வு முகம், உடல் நிறம் மற்றும் கண் நிறம்.",
   "settings.pet.shape": "வடிவம்",
   "settings.pet.expression": "முகம்",
-  "settings.pet.expressionDesc": "ஓய்வு முகம். பணி நடக்கும்போதும் தேர்ந்தெடுத்த வடிவம் இருக்கும்; முடிந்த unread அரட்டை மூலையில் சிறிய புள்ளியைக் காட்டும்.",
+  "settings.pet.expressionDesc": "ஓய்வு முகம். தட்டச்சு, தொடங்கிய திருப்பம், முடிந்த உரையாடல் ஆகியவை பட்டியல் உருமாற்றங்களை இன்னும் இயக்கும் — வண்ணப் பட்டைகள் உட்பட.",
   "settings.pet.expression.neutre": "நடுநிலை",
   "settings.pet.expression.attentif": "கவனம்",
   "settings.pet.expression.surpris": "வியப்பு",

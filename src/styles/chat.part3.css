@@ -87,10 +87,29 @@
   min-height: var(--attach-h);
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
+  background: transparent;
   overflow: hidden;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
   box-sizing: border-box;
+}
+
+.att-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.att-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .att-card--image {
@@ -106,7 +125,15 @@
 
 .att-card--dir {
   border-color: rgba(80, 180, 120, 0.3);
-  background: color-mix(in srgb, rgba(80, 180, 120, 0.08) 100%, var(--bg-elevated));
+}
+
+.att-card--dir::before {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, rgba(80, 180, 120, 0.08) 100%, var(--bg-elevated))
+      var(--ui-opacity-mix, 100%),
+    transparent
+  );
 }
 
 .att-card__btn {
@@ -206,12 +233,6 @@
   white-space: nowrap;
   line-height: 1.2;
   text-align: left;
-}
-
-/* Path available via tooltip */
-.att-card__path,
-.att-card__sub {
-  display: none;
 }
 
 /* Markdown inline images — STABLE CHAT FRAME
@@ -516,12 +537,32 @@
   display: inline-flex;
   max-width: min(100%, 28rem);
   margin: 4px 0;
+  position: relative;
   border-radius: 10px;
   border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
+  background: transparent;
   overflow: hidden;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
   vertical-align: middle;
+}
+
+.file-path-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.file-path-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .file-path-card__main {
@@ -584,17 +625,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.35;
-}
-
-/* Path never shown on card */
-.file-path-card__sub,
-.file-path-card__path {
-  display: none !important;
-}
-
-.file-path-card--missing {
-  opacity: 0.72;
-  border-style: dashed;
 }
 
 /* Details dialog for file / URL cards */
@@ -764,10 +794,6 @@ html[data-composer-min-rows="8"] .composer__input {
   opacity: 0.45;
 }
 
-.composer__voice-live.is-on {
-  color: var(--accent, #5b8def);
-}
-
 @keyframes composer-voice-pulse {
   0%,
   100% {
@@ -785,6 +811,7 @@ html[data-composer-min-rows="8"] .composer__input {
   gap: 5px;
   height: 28px;
   padding: 0 8px;
+  position: relative;
   border-radius: 8px;
   background: transparent;
   border: none;
@@ -792,7 +819,9 @@ html[data-composer-min-rows="8"] .composer__input {
   color: var(--text-secondary);
   max-width: 140px;
   flex-shrink: 0;
-  transition: background 120ms ease, color 120ms ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .chip__label {

@@ -15,13 +15,35 @@ use crate::provider_headers::{
 pub use crate::provider_headers::ProviderHeaderEntry;
 
 /// One selectable request model under a custom provider channel.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderModelEntry {
     /// Upstream request body model id.
     pub id: String,
     /// Composer chip / menu display label.
     pub name: String,
+    /// Per-model context window (tokens). Missing → channel `context_window`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    /// Per-model image-pixel capability. Missing → channel `app_supports_vision`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_vision: Option<bool>,
+    /// Per-model video-input capability. Missing → unset (not a channel flag).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_video: Option<bool>,
+    /// Per-model reasoning ladder. Empty → channel `app_efforts`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub efforts: Vec<ProviderEffortEntry>,
+}
+
+impl ProviderModelEntry {
+    pub fn named(id: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            ..Default::default()
+        }
+    }
 }
 
 /// One selectable reasoning-effort option for a custom channel.
@@ -218,7 +240,7 @@ pub struct RemoteModelsResult {
     pub models: Vec<RemoteModel>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteModel {
     pub id: String,
@@ -226,6 +248,12 @@ pub struct RemoteModel {
     /// Capability advertised by the live `/models` response. `None` means the
     /// endpoint did not make a claim, which must not be treated as supported.
     pub supports_backend_search: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub supports_vision: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub supports_video: Option<bool>,
 }
 
 /// Process-only native Grok Build relay binding. Deliberately not Debug or
@@ -908,6 +936,10 @@ pub fn normalize_provider_models(models: &[ProviderModelEntry]) -> Vec<ProviderM
                 name.to_string()
             },
             id,
+            context_window: m.context_window.filter(|n| *n > 0),
+            supports_vision: m.supports_vision,
+            supports_video: m.supports_video,
+            efforts: normalize_provider_efforts(&m.efforts),
         });
     }
     out
@@ -931,14 +963,10 @@ fn decode_app_models(
         return Vec::new();
     }
     let name = fallback_display.trim();
-    vec![ProviderModelEntry {
-        id: id.to_string(),
-        name: if name.is_empty() {
-            id.to_string()
-        } else {
-            name.to_string()
-        },
-    }]
+    vec![ProviderModelEntry::named(
+        id,
+        if name.is_empty() { id } else { name },
+    )]
 }
 
 /// Ensure `active_model` is in `models`; pick first when missing.
@@ -1614,26 +1642,35 @@ pub fn upsert_custom_provider(input: UpsertProviderInput) -> Result<ProvidersLis
     };
     let model = resolve_active_model(&models, &model);
     let app_models_json = encode_app_models(&models);
+    let active_model = models.iter().find(|m| m.id == model);
 
     let prev_app_efforts = existing
         .and_then(|s| s.fields.get(APP_EFFORTS_KEY))
         .cloned();
     let efforts = if let Some(ref list) = input.efforts {
         normalize_provider_efforts(list)
+    } else if let Some(m) = active_model.filter(|m| !m.efforts.is_empty()) {
+        normalize_provider_efforts(&m.efforts)
     } else {
         decode_app_efforts(prev_app_efforts.as_deref())
     };
     let app_efforts_json = encode_app_efforts(&efforts);
 
     // Context window: `Some(0)` clears → None; `Some(n>0)` sets;
-    // `None` keeps the existing value on edit (create-only → None).
+    // `None` prefers the active model's window, else keeps the existing
+    // channel value on edit (create-only → None).
     let resolved_context_window: Option<u64> = match input.context_window {
         Some(0) => None,
         Some(n) => Some(n),
-        None => existing
-            .and_then(|s| s.fields.get("context_window"))
-            .and_then(|v| v.parse::<u64>().ok())
-            .filter(|n| *n > 0),
+        None => active_model
+            .and_then(|m| m.context_window)
+            .filter(|n| *n > 0)
+            .or_else(|| {
+                existing
+                    .and_then(|s| s.fields.get("context_window"))
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .filter(|n| *n > 0)
+            }),
     };
 
     // Appended system-prompt rules: `Some("")` clears; `None` keeps the value
@@ -1649,9 +1686,13 @@ pub fn upsert_custom_provider(input: UpsertProviderInput) -> Result<ProvidersLis
 
     let supports_vision = match input.supports_vision {
         Some(v) => v,
-        None => existing
-            .map(|s| supports_vision_from_fields(&s.fields))
-            .unwrap_or(false),
+        None => active_model
+            .and_then(|m| m.supports_vision)
+            .unwrap_or_else(|| {
+                existing
+                    .map(|s| supports_vision_from_fields(&s.fields))
+                    .unwrap_or(false)
+            }),
     };
 
     let extra_headers = match input.extra_headers {
@@ -1978,6 +2019,7 @@ fn parse_remote_models_response(
             .map(str::trim)
             .filter(|s| !s.is_empty());
         let Some(id) = id else { continue };
+        let (supports_vision, supports_video) = remote_modalities(&item);
         models.push(RemoteModel {
             id: id.to_string(),
             owned_by: item
@@ -1987,10 +2029,117 @@ fn parse_remote_models_response(
             supports_backend_search: item
                 .get("supports_backend_search")
                 .and_then(|x| x.as_bool()),
+            context_window: remote_context_window(&item),
+            supports_vision,
+            supports_video,
         });
     }
     models.sort_by(|a, b| a.id.cmp(&b.id));
     Ok(RemoteModelsResult { endpoint, models })
+}
+
+fn json_positive_u64(v: &serde_json::Value, keys: &[&str]) -> Option<u64> {
+    for key in keys {
+        let Some(raw) = v.get(*key) else { continue };
+        let n = if let Some(n) = raw.as_u64() {
+            n
+        } else if let Some(f) = raw.as_f64() {
+            if f.is_finite() && f > 0.0 {
+                f as u64
+            } else {
+                continue;
+            }
+        } else if let Some(s) = raw.as_str() {
+            match s.replace('_', "").replace(',', "").parse::<u64>() {
+                Ok(n) => n,
+                Err(_) => continue,
+            }
+        } else {
+            continue;
+        };
+        if n > 0 {
+            return Some(n);
+        }
+    }
+    None
+}
+
+fn remote_context_window(item: &serde_json::Value) -> Option<u64> {
+    const KEYS: &[&str] = &[
+        "context_window",
+        "contextWindow",
+        "context_length",
+        "contextLength",
+        "max_model_len",
+        "max_context_length",
+    ];
+    if let Some(n) = json_positive_u64(item, KEYS) {
+        return Some(n);
+    }
+    if let Some(arch) = item.get("architecture") {
+        if let Some(n) = json_positive_u64(arch, KEYS) {
+            return Some(n);
+        }
+    }
+    if let Some(top) = item.get("top_provider") {
+        if let Some(n) = json_positive_u64(top, KEYS) {
+            return Some(n);
+        }
+    }
+    None
+}
+
+fn collect_modality_tokens(item: &serde_json::Value) -> String {
+    let mut bits = String::new();
+    let push = |out: &mut String, s: &str| {
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(&s.to_ascii_lowercase());
+    };
+    if let Some(s) = item.get("architecture").and_then(|a| a.get("modality")).and_then(|x| x.as_str()) {
+        push(&mut bits, s);
+    }
+    if let Some(arr) = item
+        .get("architecture")
+        .and_then(|a| a.get("input_modalities"))
+        .and_then(|x| x.as_array())
+    {
+        for v in arr {
+            if let Some(s) = v.as_str() {
+                push(&mut bits, s);
+            }
+        }
+    }
+    for key in ["supports_vision", "vision", "supports_image", "supports_video"] {
+        if item.get(key).and_then(|x| x.as_bool()) == Some(true) {
+            push(&mut bits, key);
+        }
+    }
+    bits
+}
+
+fn remote_modalities(item: &serde_json::Value) -> (Option<bool>, Option<bool>) {
+    let tokens = collect_modality_tokens(item);
+    if tokens.is_empty() {
+        return (None, None);
+    }
+    let vision = if tokens.contains("image")
+        || tokens.contains("vision")
+        || tokens.contains("multimodal")
+    {
+        Some(true)
+    } else if item.get("supports_vision").and_then(|x| x.as_bool()) == Some(false) {
+        Some(false)
+    } else {
+        None
+    };
+    let video = if tokens.contains("video") {
+        Some(true)
+    } else {
+        None
+    };
+    (vision, video)
 }
 
 // ── Per-model connection probe (mirrors ZCode "测试模型") ─────────────────────
@@ -2729,23 +2878,19 @@ mod tests {
                 id: "grok-4.6".into(),
                 owned_by: None,
                 supports_backend_search: Some(true),
+                ..Default::default()
             },
             RemoteModel {
                 id: "grok-4.5".into(),
                 owned_by: None,
                 supports_backend_search: None,
+                ..Default::default()
             },
         ];
-        let selected = vec![ProviderModelEntry {
-            id: "grok-4.6".into(),
-            name: "Grok 4.6".into(),
-        }];
+        let selected = vec![ProviderModelEntry::named("grok-4.6", "Grok 4.6")];
         assert!(validate_grok_build_proxy_models(&remote, &selected).is_ok());
 
-        let unsupported = vec![ProviderModelEntry {
-            id: "grok-4.5".into(),
-            name: "Grok 4.5".into(),
-        }];
+        let unsupported = vec![ProviderModelEntry::named("grok-4.5", "Grok 4.5")];
         assert!(validate_grok_build_proxy_models(&remote, &unsupported)
             .unwrap_err()
             .contains("supports_backend_search=true"));
@@ -2754,14 +2899,8 @@ mod tests {
     #[test]
     fn native_proxy_spawn_uses_real_model_and_process_only_binding() {
         let models = encode_app_models(&[
-            ProviderModelEntry {
-                id: "grok-4.6".into(),
-                name: "Grok 4.6".into(),
-            },
-            ProviderModelEntry {
-                id: "grok-4.5".into(),
-                name: "Grok 4.5".into(),
-            },
+            ProviderModelEntry::named("grok-4.6", "Grok 4.6"),
+            ProviderModelEntry::named("grok-4.5", "Grok 4.5"),
         ]);
         let text = set_models_default(
             &append_section(
@@ -2807,10 +2946,7 @@ mod tests {
                 api_backend: "responses".into(),
                 provider_mode: PROVIDER_MODE_GENERIC.into(),
                 is_default: true,
-                models: vec![ProviderModelEntry {
-                    id: "m".into(),
-                    name: "m".into(),
-                }],
+                models: vec![ProviderModelEntry::named("m", "m")],
                 efforts: vec![],
                 context_window: None,
                 base_url_full_path: false,
@@ -2866,34 +3002,16 @@ mod tests {
     #[test]
     fn app_models_roundtrip_and_normalize() {
         let list = normalize_provider_models(&[
-            ProviderModelEntry {
-                id: " deepseek-v4-flash ".into(),
-                name: "DeepSeek V4".into(),
-            },
-            ProviderModelEntry {
-                id: "deepseek-v4-flash".into(),
-                name: "dup".into(),
-            },
-            ProviderModelEntry {
-                id: "".into(),
-                name: "skip".into(),
-            },
-            ProviderModelEntry {
-                id: "other".into(),
-                name: "  ".into(),
-            },
+            ProviderModelEntry::named(" deepseek-v4-flash ", "DeepSeek V4"),
+            ProviderModelEntry::named("deepseek-v4-flash", "dup"),
+            ProviderModelEntry::named("", "skip"),
+            ProviderModelEntry::named("other", "  "),
         ]);
         assert_eq!(
             list,
             vec![
-                ProviderModelEntry {
-                    id: "deepseek-v4-flash".into(),
-                    name: "DeepSeek V4".into(),
-                },
-                ProviderModelEntry {
-                    id: "other".into(),
-                    name: "other".into(),
-                },
+                ProviderModelEntry::named("deepseek-v4-flash", "DeepSeek V4"),
+                ProviderModelEntry::named("other", "other"),
             ]
         );
         let json = encode_app_models(&list);
@@ -2904,16 +3022,70 @@ mod tests {
     }
 
     #[test]
+    fn app_models_preserves_per_model_caps_and_efforts() {
+        let list = normalize_provider_models(&[ProviderModelEntry {
+            id: "vision".into(),
+            name: "Vision".into(),
+            context_window: Some(128_000),
+            supports_vision: Some(true),
+            supports_video: Some(true),
+            efforts: vec![ProviderEffortEntry {
+                id: "high".into(),
+                name: "high".into(),
+                is_default: true,
+            }],
+        }]);
+        assert_eq!(list[0].context_window, Some(128_000));
+        assert_eq!(list[0].supports_vision, Some(true));
+        assert_eq!(list[0].supports_video, Some(true));
+        assert_eq!(list[0].efforts[0].id, "high");
+        let json = encode_app_models(&list);
+        let decoded = decode_app_models(Some(&json), "fallback", "Fallback");
+        assert_eq!(decoded, list);
+        let legacy = decode_app_models(
+            Some(r#"[{"id":"plain","name":"Plain"}]"#),
+            "fallback",
+            "Fallback",
+        );
+        assert_eq!(legacy[0].id, "plain");
+        assert_eq!(legacy[0].context_window, None);
+        assert!(legacy[0].efforts.is_empty());
+    }
+
+    #[test]
+    fn parse_remote_models_reads_openrouter_caps() {
+        let body = r#"{
+            "data": [
+                {
+                    "id": "stealth/ox-alpha",
+                    "owned_by": "openrouter",
+                    "context_length": 1048576,
+                    "architecture": {
+                        "modality": "text+image->text",
+                        "input_modalities": ["text", "image"]
+                    }
+                },
+                {
+                    "id": "video-model",
+                    "context_window": 32000,
+                    "architecture": { "input_modalities": ["text", "video"] }
+                }
+            ]
+        }"#;
+        let got = parse_remote_models_response("https://ex/v1/models".into(), body).unwrap();
+        let ox = got.models.iter().find(|m| m.id == "stealth/ox-alpha").unwrap();
+        assert_eq!(ox.context_window, Some(1_048_576));
+        assert_eq!(ox.supports_vision, Some(true));
+        let vid = got.models.iter().find(|m| m.id == "video-model").unwrap();
+        assert_eq!(vid.context_window, Some(32_000));
+        assert_eq!(vid.supports_video, Some(true));
+    }
+
+    #[test]
     fn quote_unquote_roundtrip_json_payload() {
         let models = vec![
-            ProviderModelEntry {
-                id: "deepseek-v4-flash".into(),
-                name: "DeepSeek V4 Flash".into(),
-            },
-            ProviderModelEntry {
-                id: "deepseek-v4-pro".into(),
-                name: "DeepSeek V4 Pro".into(),
-            },
+            ProviderModelEntry::named("deepseek-v4-flash", "DeepSeek V4 Flash"),
+            ProviderModelEntry::named("deepseek-v4-pro", "DeepSeek V4 Pro"),
         ];
         let efforts = vec![
             ProviderEffortEntry {
@@ -3137,10 +3309,10 @@ api_backend = \"responses\"";
             provider_mode: Some(PROVIDER_MODE_GENERIC.into()),
             set_as_default: Some(false),
             create_only: Some(true),
-            models: Some(vec![ProviderModelEntry {
-                id: "custom-reasoner".into(),
-                name: "Custom Reasoner".into(),
-            }]),
+            models: Some(vec![ProviderModelEntry::named(
+                "custom-reasoner",
+                "Custom Reasoner",
+            )]),
             efforts: Some(vec![ProviderEffortEntry {
                 id: "xhigh".into(),
                 name: "Extra high".into(),

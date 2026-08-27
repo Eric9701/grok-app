@@ -65,6 +65,10 @@ import {
   loadChatWidth,
 } from "@/lib/chatWidthPref";
 import {
+  applyMsgRailSide,
+  loadMsgRailSide,
+} from "@/lib/msgRailSidePref";
+import {
   dropGateClocks,
   gateClockKey,
   resumeGateClock,
@@ -237,9 +241,14 @@ import {
   type PermissionPolicyId,
 } from "@/lib/grokCatalog";
 import {
+  materializeActiveModelChannel,
+  resolveProviderEfforts,
+  withModelContextWindow,
+} from "@/lib/providerModelConfig";
+import {
   mapPermissionButtons,
 } from "@/lib/permissionOptions";
-import { dropAskUserClocks } from "@/components/AskUserModal";
+import { dropAskUserClocks } from "@/lib/askUserClocks";
 import { type PaletteActionDef } from "@/lib/paletteActions";
 import {
   canOfferContinueCwd,
@@ -354,6 +363,7 @@ import {
 } from "@/lib/attachmentsPro";
 import { fileKey as clipboardFileKey, readClipboardMediaFiles } from "@/lib/clipboardPaste";
 import {
+  applyPluginAtSlash,
   applySkillAtSlash,
   isDraftEmpty,
   detectSlashQueryFromEditor,
@@ -556,7 +566,6 @@ import {
 
 import type { ComposerModelPick } from "@/lib/composerModelGroups";
 import {
-  alignGrokPresetEfforts,
   resolveProviderBrandId,
 } from "@/lib/providerPresets";
 import {
@@ -641,6 +650,7 @@ import {
   DeepSeekFullMark,
   OpenCodeWordmark,
   VolcanoArkWelcomeMark,
+  ZhipuWelcomeMark,
 } from "@/components/ProviderWelcomeMark";
 import {
   WindowControls,
@@ -752,6 +762,7 @@ export function AppWorkbench() {
     wallpaperRecord,
     wallpaperUrl,
     wallpaperScrim,
+    wallpaperBlur,
     applyThemeChoice,
     applyThemeScheduleChoice,
     applySkinChoice,
@@ -759,6 +770,7 @@ export function AppWorkbench() {
     applyWallpaperAdjustChoice,
     applyWallpaperMediaSize,
     applyWallpaperScrimChoice,
+    applyWallpaperBlurChoice,
   } = useThemeShell();
   const {
     showMessageTimestamps,
@@ -2269,6 +2281,8 @@ export function AppWorkbench() {
       asideOpen: true,
       asideWidth: asideOpenW,
     }).asideOverlay;
+  // Overlay floats the aside over chat; only explicit expand hides the column.
+  const sidePaneCoversMain = hideChatForSideExpand;
   const { paneMotionClass } = usePaneSplitMotion({
     sidebarCollapsed: layout.sidebarCollapsed,
     asideCollapsed: layout.asideCollapsed,
@@ -2276,6 +2290,7 @@ export function AppWorkbench() {
     sidebarOverlay,
     asideOverlay,
     asideInFlow: !phoneLayout && !hideChatForSideExpand && !asideOverlay,
+    sideExpanded: hideChatForSideExpand,
   });
   const [account, setAccount] = useState<api.AccountStatus | null>(null);
   voiceSignedInRef.current = !!account?.profile?.signedIn;
@@ -2430,6 +2445,9 @@ export function AppWorkbench() {
   // Chat transcript reading width (Appearance) — html[data-chat-width].
   useEffect(() => {
     applyChatWidth(loadChatWidth());
+  }, []);
+  useEffect(() => {
+    applyMsgRailSide(loadMsgRailSide());
   }, []);
 
   /**
@@ -3321,7 +3339,6 @@ export function AppWorkbench() {
     connectHost.setSessionJsonSchema = setSessionJsonSchema;
     connectHost.setActiveProject = setActiveProject;
     connectHost.setExpandedProjects = setExpandedProjects;
-    connectHost.setHistoryOpen = setHistoryOpen;
     connectHost.refreshSessions = refreshSessions;
     const host = sessionNavHostRef.current;
     host.chrome.goToChat = () => {
@@ -5847,6 +5864,7 @@ export function AppWorkbench() {
     attachments,
     chatAttachments,
     quotes,
+    skillInfos,
     editSubmitting,
     editingUserMessageId,
     isPlaceholderTitle,
@@ -6550,6 +6568,8 @@ export function AppWorkbench() {
             name: s.name,
             description: s.description ?? "",
             source: s.source,
+            path: s.path ?? null,
+            pluginName: s.pluginName ?? null,
             // Host omits or defaults invocable; explicit false stays false.
             userInvocable: s.userInvocable !== false,
             enabled: s.enabled !== false,
@@ -6588,6 +6608,11 @@ export function AppWorkbench() {
   );
   const resolveSlashDescription = useCallback(
     (item: SlashItem) => {
+      if (item.kind === "plugin") {
+        return tr("slash.pluginDesc", {
+          n: String(item.aliases?.length ?? 0),
+        });
+      }
       if (item.descriptionKey) {
         try {
           return tr(item.descriptionKey as MessageKey);
@@ -9133,7 +9158,13 @@ export function AppWorkbench() {
         return;
       }
 
-      if (item.kind === "skill") {
+      if (item.kind === "skill" || item.kind === "plugin") {
+        const applyAtSlash =
+          item.kind === "plugin" ? applyPluginAtSlash : applySkillAtSlash;
+        const token =
+          item.kind === "plugin"
+            ? `[[plugin:${item.name}]] `
+            : `[[skill:${item.name}]] `;
         setDraft((d) => {
           // Prefer live range (DOM/draft poll), then re-detect on this draft.
           const range =
@@ -9141,20 +9172,17 @@ export function AppWorkbench() {
               ? q
               : null) ?? detectSlashRangeOnStored(d);
           if (range && d.slice(range.start, range.end).startsWith("/")) {
-            const next = applySkillAtSlash(
+            const next = applyAtSlash(
               d,
               range.start,
               range.end,
               item.name,
             );
-            // Caret after `[[skill:name]] ` — not document start (panel click blurs).
-            requestComposerStoredCaret(
-              range.start + `[[skill:${item.name}]] `.length,
-            );
+            requestComposerStoredCaret(range.start + token.length);
             return next;
           }
           const needsSpace = d.length > 0 && !/\s$/.test(d);
-          const next = `${d}${needsSpace ? " " : ""}[[skill:${item.name}]] `;
+          const next = `${d}${needsSpace ? " " : ""}${token}`;
           requestComposerStoredCaret("end");
           return next;
         });
@@ -9644,13 +9672,8 @@ export function AppWorkbench() {
     if (providerActiveSource !== "custom" || !activeCustomProvider) {
       return null;
     }
-    const aligned = alignGrokPresetEfforts({
-      providerId: activeCustomProvider.id,
-      baseUrl: activeCustomProvider.baseUrl,
-      efforts: activeCustomProvider.efforts,
-    });
     return effortOptionsFromProvider(
-      aligned ?? activeCustomProvider.efforts,
+      resolveProviderEfforts(activeCustomProvider),
     );
   }, [providerActiveSource, activeCustomProvider]);
 
@@ -9745,17 +9768,19 @@ export function AppWorkbench() {
             return;
           }
           // Switch request model on the channel when needed (keeps multi-model catalog).
+          const models =
+            provider.models?.length
+              ? provider.models
+              : [{ id: provider.model, name: provider.model }];
+          const catalog = models.some((m) => m.id === pick.modelId)
+            ? models
+            : [...models, { id: pick.modelId, name: pick.modelId }];
+          const appliedLive = materializeActiveModelChannel({
+            provider,
+            modelId: pick.modelId,
+            models: catalog,
+          });
           if (provider.model.trim() !== pick.modelId.trim()) {
-            const models =
-              provider.models?.length
-                ? provider.models
-                : [{ id: provider.model, name: provider.model }];
-            const catalog = models.some((m) => m.id === pick.modelId)
-              ? models
-              : [
-                  ...models,
-                  { id: pick.modelId, name: pick.modelId },
-                ];
             await api.providersUpsert({
               id: provider.id,
               model: pick.modelId,
@@ -9763,10 +9788,12 @@ export function AppWorkbench() {
               name: provider.name,
               apiBackend: provider.apiBackend,
               models: catalog,
-              efforts: provider.efforts,
-              // Preserve channel context window (Host also keeps on omit; pass
-              // explicitly so load/fillback never drops a 1M custom cap).
-              contextWindow: provider.contextWindow ?? undefined,
+              efforts: appliedLive.efforts ?? provider.efforts,
+              contextWindow:
+                appliedLive.contextWindow ??
+                provider.contextWindow ??
+                undefined,
+              supportsVision: appliedLive.supportsVision,
               setAsDefault: false,
             });
           }
@@ -9785,15 +9812,9 @@ export function AppWorkbench() {
             }
           }
           await refreshProviderRoute();
-          // Map effort into the picked channel's catalog (Grok ↔ DeepSeek tiers).
-          const alignedPick = alignGrokPresetEfforts({
-            providerId: provider.id,
-            baseUrl: provider.baseUrl,
-            efforts: provider.efforts,
-          });
+          // Map effort into the picked model's catalog (Grok ↔ DeepSeek tiers).
           const nextEfforts =
-            effortOptionsFromProvider(alignedPick ?? provider.efforts) ??
-            GROK_BUILD_EFFORTS;
+            effortOptionsFromProvider(appliedLive.efforts) ?? GROK_BUILD_EFFORTS;
           const clampedCustom = mapEffortToTargetCatalog(
             effort,
             nextEfforts,
@@ -9843,7 +9864,11 @@ export function AppWorkbench() {
           baseUrl: activeCustomProvider.baseUrl,
           name: activeCustomProvider.name,
           apiBackend: activeCustomProvider.apiBackend,
-          models: activeCustomProvider.models,
+          models: withModelContextWindow(
+            activeCustomProvider.models,
+            activeCustomProvider.model,
+            tokens,
+          ),
           efforts: activeCustomProvider.efforts,
           setAsDefault: false,
           contextWindow: tokens,
@@ -9889,7 +9914,8 @@ export function AppWorkbench() {
   /**
    * Preset provider wordmark on the welcome composer.
    * DeepSeek → full DeepSeek wordmark; OpenCode → theme-aware wordmark;
-   * Volcengine Ark → logo + “火山方舟”; every other channel keeps SuperGrok.
+   * Volcengine Ark → logo + “火山方舟”; Zhipu → logo + “智谱”;
+   * every other channel keeps SuperGrok.
    */
   const welcomeProviderBrandNode = useMemo(() => {
     if (!customRouteActive) return null;
@@ -9905,6 +9931,9 @@ export function AppWorkbench() {
     }
     if (brand === "volcano-ark") {
       return <VolcanoArkWelcomeMark title="火山方舟" />;
+    }
+    if (brand === "zhipu") {
+      return <ZhipuWelcomeMark title="智谱" />;
     }
     return null;
   }, [customRouteActive, activeCustomProvider]);
@@ -13678,6 +13707,7 @@ export function AppWorkbench() {
         applyWallpaperChoice={applyWallpaperChoice}
         applyWallpaperMediaSize={applyWallpaperMediaSize}
         applyWallpaperScrimChoice={applyWallpaperScrimChoice}
+        applyWallpaperBlurChoice={applyWallpaperBlurChoice}
         archivedGroups={archivedGroups}
         askUserTimeoutSec={askUserTimeoutSec}
         auditLedgerRetentionDays={auditLedgerRetentionDays}
@@ -13870,6 +13900,7 @@ export function AppWorkbench() {
         voiceKeepAgentsOnEnd={voiceKeepAgentsOnEnd}
         wallpaperRecord={wallpaperRecord}
         wallpaperScrim={wallpaperScrim}
+        wallpaperBlur={wallpaperBlur}
         wallpaperUrl={wallpaperUrl}
         winTaskbarOverlay={winTaskbarOverlay}
         windowAlwaysOnTop={windowAlwaysOnTop}
@@ -13881,7 +13912,7 @@ export function AppWorkbench() {
         className={
           "workbench" +
           (phoneLayout ? " workbench--phone" : "") +
-          (hideChatForSideExpand ? " workbench--side-expanded" : "") +
+          (sidePaneCoversMain ? " workbench--side-expanded" : "") +
           (sideDockActive ? " workbench--side-dock" : "") +
           paneMotionClass
         }
@@ -13894,6 +13925,13 @@ export function AppWorkbench() {
               phoneLayout || layout.sidebarCollapsed || sidebarOverlay
                 ? "0px"
                 : `${layout.sidebarWidth}px`,
+            ["--sw-aside-occupied"]:
+              !phoneLayout &&
+              asideOverlay &&
+              !layout.asideCollapsed &&
+              !sidePaneCoversMain
+                ? `${asideOpenW}px`
+                : "0px",
             // Bottom strip reserved only while dock toggle is on.
             // Floor avoids first-frame cover before ResizeObserver measures.
             ["--sw-dock-composer-h"]: sideDockActive
@@ -13911,28 +13949,17 @@ export function AppWorkbench() {
             onClick={closePhoneDrawer}
           />
         ) : null}
-        {!phoneLayout &&
-        ((sidebarOverlay && !layout.sidebarCollapsed) ||
-          (asideOverlay && !layout.asideCollapsed)) ? (
+        {!phoneLayout && sidebarOverlay && !layout.sidebarCollapsed ? (
           <button
             type="button"
             className="workbench-pane-scrim"
-            aria-label={
-              sidebarOverlay && !layout.sidebarCollapsed
-                ? tr("phone.drawerClose")
-                : tr("main.rightPaneHide")
-            }
+            aria-label={tr("phone.drawerClose")}
             onClick={() => {
-              if (sidebarOverlay && !layout.sidebarCollapsed) {
-                closeSidebarPane();
-              }
-              if (asideOverlay && !layout.asideCollapsed) {
-                closeAsidePane();
-              }
+              closeSidebarPane();
             }}
           />
         ) : null}
-        {/* LEFT — fully hideable (not icon-rail); open via top-bar icon when closed */}
+        {/* LEFT — fully hideable (not icon-rail); fixed toggle reopens it */}
         <WorkbenchSidebar
           tr={tr}
           locale={locale}
@@ -13944,7 +13971,6 @@ export function AppWorkbench() {
           sidebarOpenW={sidebarOpenW}
           sidebarPaint={sidebarPaint}
           beginSidebarResize={beginSidebarResize}
-          closeSidebarPane={closeSidebarPane}
           dragRegion={dragRegion}
           titlebarMax={titlebarMax}
           replaceProviderBrandLogo={replaceProviderBrandLogo}
@@ -13958,7 +13984,7 @@ export function AppWorkbench() {
           onNavigateRemoteIm={() => navigateSettings("remote_im", "im")}
           showUserMenu={showUserMenu}
           setShowUserMenu={setShowUserMenu}
-          closeImmediately={settingsOpen}
+          closeImmediately={settingsOpen || layout.sidebarCollapsed}
           theme={theme}
           themePreference={themePreference}
           account={account}
@@ -14053,7 +14079,7 @@ export function AppWorkbench() {
           layout={layout}
           phoneLayout={phoneLayout}
           dragZone={dragZone}
-          hideChatForSideExpand={hideChatForSideExpand}
+          sidePaneCoversMain={sidePaneCoversMain}
           toast={toast}
           dragRegion={dragRegion}
           titlebarMax={titlebarMax}
@@ -14065,6 +14091,7 @@ export function AppWorkbench() {
           openPhoneDrawer={openPhoneDrawer}
           closePhoneDrawer={closePhoneDrawer}
           openSidebarPane={openSidebarPane}
+          sidebarToggleUnread={unreadSessionIds.size > 0}
           openSessionMenu={openSessionMenu}
           onOpenPhoneAccount={() => setPhoneAccountOpen(true)}
           bottomTerminalOpen={bottomTerminal.state.open}
@@ -14085,7 +14112,6 @@ export function AppWorkbench() {
           sideWorkbench={sideWorkbench}
           setSideWorkbench={setSideWorkbench}
           openAsidePane={openAsidePane}
-          closeAsidePane={closeAsidePane}
           showToast={showToast}
         >
           {mainPane === "kanban" ? (
@@ -14459,8 +14485,12 @@ export function AppWorkbench() {
             openSideSkillsPanel={openSideSkillsPanel}
             openWorktreeCreate={openWorktreeCreate}
             openWorktreeGc={openWorktreeGc}
+            askUser={askUser}
+            askUserTimeoutSec={askUserTimeoutSec}
+            clearPendingGates={clearPendingGates}
             perm={perm}
             permBarRef={permBarRef}
+            setAskUser={setAskUser}
             permCountdownStartedAt={permCountdownStartedAt}
             permissionTimeoutSec={permissionTimeoutSec}
             phoneLayout={phoneLayout}
@@ -14583,7 +14613,7 @@ export function AppWorkbench() {
           locale={locale}
           layout={layout}
           phoneLayout={phoneLayout}
-          hideChatForSideExpand={hideChatForSideExpand}
+          sidePaneCoversMain={sidePaneCoversMain}
           asideOverlay={asideOverlay}
           resizingAside={resizingAside}
           asideOpenW={asideOpenW}
@@ -14604,6 +14634,7 @@ export function AppWorkbench() {
           sessionChanges={
             sessionChangesById[session.sessionId || ""] ?? []
           }
+          sessionId={session.sessionId}
           plan={plan}
           planFocusKey={planFocusKey}
           composerMode={mode}
@@ -14620,7 +14651,7 @@ export function AppWorkbench() {
           onCloseActiveRequestConsumed={() =>
             setCloseActiveSideRequest(null)
           }
-          onCloseSide={closeAsidePane}
+          onToggleSide={layout.asideCollapsed ? openAsidePane : closeAsidePane}
           onExpandedChange={(expanded) => {
             if (phoneLayout) return;
             if (!expanded) setSideDockComposer(false);
@@ -14884,6 +14915,8 @@ export function AppWorkbench() {
           markProductTutorialDone();
           setShowProductTutorial(false);
         }}
+        gateReady={appGate === "ready"}
+        setupOpen={appGate === "setup"}
         liveVoiceOpen={liveVoiceOpen}
         voiceLocale={resolveLocale(locale)}
         voiceProjectPath={effectiveProjectPath}
@@ -14949,10 +14982,7 @@ export function AppWorkbench() {
         account={account}
         agentDashboardOpen={agentDashboardOpen}
         agentDashboardRows={agentDashboardRows}
-        askUser={askUser}
-        askUserTimeoutSec={askUserTimeoutSec}
         batchAgentsOpen={batchAgentsOpen}
-        clearPendingGates={clearPendingGates}
         clearSessionMaxTurnsModal={clearSessionMaxTurnsModal}
         clearSessionRulesModal={clearSessionRulesModal}
         clearSessionSysPromptModal={clearSessionSysPromptModal}
@@ -15047,7 +15077,6 @@ export function AppWorkbench() {
         sessionTaskBoard={sessionTaskBoard}
         sessions={sessions}
         setAgentDashboardOpen={setAgentDashboardOpen}
-        setAskUser={setAskUser}
         setBatchAgentsOpen={setBatchAgentsOpen}
         setForkCliSession={setForkCliSession}
         setForkConfirm={setForkConfirm}

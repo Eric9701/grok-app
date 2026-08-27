@@ -22,6 +22,8 @@ export const zhTWSlash = {
   "slash.kind.action": "操作",
   "slash.kind.prompt": "提示",
   "slash.kind.skill": "技能",
+  "slash.kind.plugin": "外掛",
+  "slash.pluginDesc": "{n} 個技能",
   "slash.goal": "目標任務",
   "slash.goalDesc": "有限目標 · 多輪做完即停 · 不是定時任務",
   "slash.goalClear": "關閉目標任務",

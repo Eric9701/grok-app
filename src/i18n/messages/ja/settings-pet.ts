@@ -35,7 +35,7 @@ export const jaSettingsPet = {
   "settings.pet.identityDesc": "ペットの形、待機の表情、体の色、目の色。",
   "settings.pet.shape": "形",
   "settings.pet.expression": "表情",
-  "settings.pet.expressionDesc": "待機中の顔。作業中も選んだ形のままです。完了して未読のチャットは隅に小さな点を出します。",
+  "settings.pet.expressionDesc": "待機中の顔。入力中・ターン開始・完了時はカタログの変形（カラフルな帯を含む）を再生します。",
   "settings.pet.expression.neutre": "ふつう",
   "settings.pet.expression.attentif": "集中",
   "settings.pet.expression.surpris": "驚き",

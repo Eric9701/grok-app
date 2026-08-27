@@ -445,6 +445,8 @@ export const itWorkspace = {
   "side.toggle": "Mostra/nascondi barra laterale",
   "side.env": "Ambiente",
   "side.envTitle": "Ambiente",
+  "side.env.pin": "Fissa",
+  "side.env.unpin": "Rimuovi",
   "side.envSoon": "Qui compariranno i dettagli dell’ambiente e lo stato git.",
   "side.placeholder.file": "Workbench file",
   "side.placeholder.browser": "Scheda browser",

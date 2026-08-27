@@ -53,21 +53,21 @@ describe("resolveLivingMood", () => {
     ).toBe("idle");
   });
 
-  it("idle hover looks curious then attentive", () => {
+  it("idle hover faces the pointer immediately (listening), not curious first", () => {
+    expect(
+      resolveLivingMood({
+        sessionVerb: "idle",
+        now,
+        hovering: true,
+        hoverMs: 0,
+      }),
+    ).toBe("listening");
     expect(
       resolveLivingMood({
         sessionVerb: "idle",
         now,
         hovering: true,
         hoverMs: 200,
-      }),
-    ).toBe("curious");
-    expect(
-      resolveLivingMood({
-        sessionVerb: "idle",
-        now,
-        hovering: true,
-        hoverMs: 1800,
       }),
     ).toBe("listening");
     expect(

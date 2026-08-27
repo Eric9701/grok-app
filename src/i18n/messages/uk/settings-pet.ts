@@ -35,7 +35,7 @@ export const ukSettingsPet = {
   "settings.pet.identityDesc": "Форма, вираз спокою, колір тіла та очей живої марки.",
   "settings.pet.shape": "Форма",
   "settings.pet.expression": "Вираз",
-  "settings.pet.expressionDesc": "Обличчя в спокої. Обрана форма лишається під час роботи; непрочитаний завершений чат показує крапку в кутку.",
+  "settings.pet.expressionDesc": "Обличчя в спокої. Набір тексту, запущений хід і завершений чат досі грають морфи каталогу, включно з кольоровими стрічками.",
   "settings.pet.expression.neutre": "Спокійне",
   "settings.pet.expression.attentif": "Уважне",
   "settings.pet.expression.surpris": "Здивоване",

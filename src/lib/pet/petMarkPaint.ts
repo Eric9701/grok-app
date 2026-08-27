@@ -21,10 +21,11 @@ export function petPaintMinMs(input: {
   spinning: boolean;
   morphing: boolean;
   trackingLook: boolean;
+  catalogLive?: boolean;
   idleMs: number;
 }): number {
-  if (input.spinning) return PET_PAINT_SPIN_MS;
-  if (input.morphing || input.trackingLook) return PET_PAINT_LIVE_MS;
+  if (input.spinning || input.morphing) return PET_PAINT_SPIN_MS;
+  if (input.trackingLook || input.catalogLive) return PET_PAINT_LIVE_MS;
   if (input.idleMs >= PET_PAINT_REST_AFTER_MS) return PET_PAINT_REST_MS;
   return PET_PAINT_IDLE_MS;
 }
@@ -53,4 +54,52 @@ export function petLookIsNear(input: {
     return Math.hypot(input.dx, input.dy) <= Math.max(1, input.localR) * PET_LOOK_NEAR_SCALE;
   }
   return true;
+}
+
+export type PetLookBox = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+/**
+ * Radius-normalized look axes while the pointer is inside the local hover
+ * ring. `null` when the event is stale or the pointer is outside that ring.
+ *
+ * Overlay (`fromScreen`): `dx`/`dy` are already mark-relative pixels.
+ * In-window: `dx`/`dy` are client coordinates and need `box`.
+ */
+export function petLocalLookAxes(input: {
+  fromScreen: boolean;
+  at: number;
+  now: number;
+  dx: number;
+  dy: number;
+  localR: number;
+  box?: PetLookBox | null;
+}): { nx: number; ny: number } | null {
+  if (
+    !petLookIsNear({
+      fromScreen: input.fromScreen,
+      at: input.at,
+      now: input.now,
+      dx: input.dx,
+      dy: input.dy,
+      localR: input.localR,
+    })
+  ) {
+    return null;
+  }
+  if (input.fromScreen) {
+    const r = Math.max(1, input.localR);
+    return { nx: input.dx / r, ny: input.dy / r };
+  }
+  const box = input.box;
+  if (!box || !(box.width > 0) || !(box.height > 0)) return null;
+  const radius = Math.max(1, Math.min(box.width, box.height) / 2);
+  const nx = (input.dx - (box.left + box.width / 2)) / radius;
+  const ny = (input.dy - (box.top + box.height / 2)) / radius;
+  if (Math.hypot(nx, ny) > PET_LOOK_NEAR_SCALE) return null;
+  return { nx, ny };
 }

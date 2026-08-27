@@ -1,27 +1,17 @@
 #!/usr/bin/env bash
 # Generate Tauri app icons + tray icons from two separate sources.
 # Do NOT mix pipelines:
-#   App dock / .exe / .icns  ←  icon (1).png | icon-source.png | icon.png
+#   App dock / .exe / .icns  ←  AppIcon.appiconset (authored sizes; never resample)
 #   Menu bar / system tray  ←  docs/svg/logo.svg  (macOS template + Windows badges)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ICONS="$ROOT/src-tauri/icons"
 SVG="$ROOT/docs/svg/logo.svg"
-# Prefer explicit master artwork; fall back to existing icon.png / icon-source.png
-SRC_APP=""
-for candidate in \
-  "$ICONS/icon (1).png" \
-  "$ICONS/icon-source.png" \
-  "$ICONS/icon.png"
-do
-  if [[ -f "$candidate" ]]; then
-    SRC_APP="$candidate"
-    break
-  fi
-done
+PROD_SET="$ICONS/AppIcon.appiconset"
+DEV_SET="$ICONS/dev/AppIcon.appiconset"
 
-if [[ -z "$SRC_APP" ]]; then
-  echo "Missing app icon source: icon (1).png, icon-source.png, or icon.png" >&2
+if [[ ! -d "$PROD_SET" ]]; then
+  echo "Missing production appiconset: $PROD_SET" >&2
   exit 1
 fi
 if [[ ! -f "$SVG" ]]; then
@@ -29,7 +19,6 @@ if [[ ! -f "$SVG" ]]; then
   exit 1
 fi
 
-command -v sips >/dev/null || { echo "sips required (macOS)" >&2; exit 1; }
 if ! command -v magick >/dev/null 2>&1 && ! command -v convert >/dev/null 2>&1; then
   echo "ImageMagick (magick/convert) required for SVG → tray PNG" >&2
   exit 1
@@ -37,45 +26,11 @@ fi
 IM=magick
 command -v magick >/dev/null 2>&1 || IM=convert
 
-# Keep a stable master copy for regenerations (skip no-op self-copy)
-if [[ "$(cd "$(dirname "$SRC_APP")" && pwd)/$(basename "$SRC_APP")" != "$ICONS/icon-source.png" ]]; then
-  cp "$SRC_APP" "$ICONS/icon-source.png"
+# App icons: pack authored 16/32/64/128/256/512/1024 rasters. No sips -z.
+python3 "$ROOT/scripts/pack_appiconset.py" "$PROD_SET" --dest "$ICONS" --ico "$ICONS/icon.ico"
+if [[ -d "$DEV_SET" ]]; then
+  python3 "$ROOT/scripts/pack_appiconset.py" "$DEV_SET" --dest "$ICONS/dev"
 fi
-MASTER="$ICONS/icon-source.png"
-
-# App icons (full-color artwork)
-sips -z 512 512 "$MASTER" --out "$ICONS/icon.png" >/dev/null
-sips -z 32 32 "$MASTER" --out "$ICONS/32x32.png" >/dev/null
-sips -z 64 64 "$MASTER" --out "$ICONS/64x64.png" >/dev/null
-sips -z 128 128 "$MASTER" --out "$ICONS/128x128.png" >/dev/null
-sips -z 256 256 "$MASTER" --out "$ICONS/128x128@2x.png" >/dev/null
-
-# .icns via iconutil
-ICONSET="$ICONS/AppIcon.iconset"
-rm -rf "$ICONSET"
-mkdir -p "$ICONSET"
-for pair in \
-  "16 icon_16x16.png" \
-  "32 icon_16x16@2x.png" \
-  "32 icon_32x32.png" \
-  "64 icon_32x32@2x.png" \
-  "128 icon_128x128.png" \
-  "256 icon_128x128@2x.png" \
-  "256 icon_256x256.png" \
-  "512 icon_256x256@2x.png" \
-  "512 icon_512x512.png" \
-  "1024 icon_512x512@2x.png"
-do
-  set -- $pair
-  sips -z "$1" "$1" "$MASTER" --out "$ICONSET/$2" >/dev/null
-done
-iconutil -c icns "$ICONSET" -o "$ICONS/icon.icns"
-rm -rf "$ICONSET"
-
-# Windows .ico: crop the macOS dock-grid margin so taskbar / Start glyphs
-# fill the frame. Do not rewrite icon-source.png or the .icns set.
-# PIL writes the multi-size ICO (no ImageMagick on this path).
-python3 "$ROOT/scripts/windows_ico_fill.py" "$MASTER" "$ICONS/icon.ico"
 
 # ── Tray / menu-bar from logo.svg ───────────────────────────────────────────
 # tray-icon crate sizes the NSImage to 18pt tall. Embed 36px (@2x) so retina
@@ -151,7 +106,7 @@ PY
 # follow the *taskbar* theme (see tray.rs + SystemUsesLightTheme).
 python3 "$ROOT/scripts/tray_win_badge.py" "$ICONS/tray-32.png" "$ICONS"
 
-echo "OK — app icons from: $SRC_APP"
+echo "OK — app icons from: $PROD_SET (no resample)"
 echo "OK — tray icons from: $SVG (36px @2x for 18pt menu bar)"
 echo "OK — Windows tray badges: tray-win-light.png / tray-win-dark.png"
 echo "Remember: dock uses icon*.png/icns/ico; tray uses tray-*.png only."

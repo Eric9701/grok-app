@@ -10,6 +10,7 @@
   /* Keep size & subtree; only block interaction while covered by aside */
   pointer-events: none;
   user-select: none;
+  visibility: hidden;
 }
 
 /*
@@ -85,37 +86,44 @@ body > .composer-wrap.composer-wrap--side-dock {
     0 4px 14px rgba(0, 0, 0, 0.1);
 }
 
-/* Expanded overlay is a mode switch, not a split open — do not interpolate width. */
-.workbench--side-expanded .aside {
-  transition: none;
-}
-
 /* Side pane: full free area when no dock; bottom inset only with --sw-dock-composer-h */
 .workbench--side-expanded .aside:not(.aside--hidden) {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
-  left: var(--sw-sidebar-occupied, 0px);
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
+  left: auto;
   z-index: 40;
   border-left: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
-/*
- * Expanded free area: theme-solid surfaces only.
- * Wallpaper mode uses color-mix(... transparent) !important on .aside — beat it
- * so the expanded side (chrome + body) never shows custom wallpaper through.
- */
-.workbench--side-expanded .aside:not(.aside--hidden),
-html[data-wallpaper="1"] .workbench--side-expanded .aside:not(.aside--hidden),
-html[data-wallpaper="1"][data-wallpaper-clear="1"]
-  .workbench--side-expanded
-  .aside:not(.aside--hidden),
-html[data-wallpaper="1"].platform-mac[data-theme="light"]
+/* Interpolate the right-aligned pane without scaling or distorting its text. */
+.workbench--side-expand-motion .aside:not(.is-resizing) {
+  transition:
+    width var(--motion-pane) var(--motion-pane-ease),
+    min-width var(--motion-pane) var(--motion-pane-ease),
+    max-width var(--motion-pane) var(--motion-pane-ease),
+    flex-basis var(--motion-pane) var(--motion-pane-ease),
+    transform var(--motion-pane) var(--motion-pane-ease),
+    box-shadow var(--motion-pane) ease,
+    border-color var(--motion-pane) ease;
+}
+
+.workbench--side-expand-motion .aside:not(.is-resizing) .aside__inner {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+/* Let the chat column yield while the full-width pane contracts. */
+.workbench--side-expand-motion .main {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Without a wallpaper, expanded panes keep the normal solid theme surface. */
+html:not([data-wallpaper="1"])
   .workbench--side-expanded
   .aside:not(.aside--hidden) {
   background: var(--bg-aside) !important;
@@ -124,16 +132,22 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   box-shadow: none !important;
 }
 
-.workbench--side-expanded .aside .aside__inner {
+html:not([data-wallpaper="1"])
+  .workbench--side-expanded
+  .aside
+  .aside__inner {
   background: var(--bg-aside) !important;
 }
 
-/* Top tab strip: solid chrome (not glass mix over wallpaper) */
-.workbench--side-expanded .aside .rp-chrome,
-.workbench--side-expanded .aside .rp-chrome.sw-chrome {
-  background: var(--bg-card) !important;
+/* Shared right-pane chrome: same plate as the aside in rail and cover modes. */
+html:not([data-wallpaper="1"]) .aside .rp-chrome {
+  background: var(--rp-surface, transparent) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+html[data-wallpaper="1"] .aside .rp-chrome {
+  background: var(--rp-surface, transparent) !important;
 }
 
 /* Expanded pane starts at x=0 when the sidebar is hidden/overlayed. */
@@ -146,20 +160,31 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   padding-left: var(--titlebar-safe-left, 96px);
 }
 
-/* Content shell under chrome — solid fill; terminal keeps its own veil layer */
-.workbench--side-expanded .aside .rp.sw,
-.workbench--side-expanded .aside .sw__content,
-.workbench--side-expanded .aside .sw__empty,
-.workbench--side-expanded .aside .sw__persist-host,
-.workbench--side-expanded .aside .sw-browser,
-.workbench--side-expanded .aside .sw-browser__host {
-  background: var(--bg-aside) !important;
+/* Content shells share the aside plate (files / browser / empty / persist). */
+html:not([data-wallpaper="1"])
+  .workbench--side-expanded
+  .aside
+  :is(
+    .rp.sw,
+    .sw__content,
+    .sw__empty,
+    .sw__persist-host,
+    .sw-browser,
+    .sw-browser__host,
+    .sw__files-host,
+    .sw-files,
+    .sw-skills,
+    .sw-review,
+    .sw-plan,
+    .sw-terminal,
+    .sw-terminal--pty
+  ) {
+  background: var(--rp-surface, transparent) !important;
 }
 
-/* Files still use card surfaces; ensure no transparent hole under expand */
 .workbench--side-expanded .aside .sw__files-host,
 .workbench--side-expanded .aside .sw-files {
-  background: var(--bg-card) !important;
+  background: var(--rp-surface, transparent) !important;
 }
 
 .workbench--side-expanded.workbench--side-dock .aside:not(.aside--hidden) {
@@ -305,8 +330,7 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   display: none !important;
 }
 
-/* Files workspace must fill host so .rp-split can grow.
- * Solid theme surfaces — not transparent glass (wallpaper would show through). */
+/* Files workspace fills the host and shares the aside plate. */
 .sw__files-host,
 .sw-files {
   display: flex;
@@ -316,24 +340,23 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   min-width: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-card);
+  background: var(--rp-surface, transparent);
 }
 
 .sw-files .rp-split {
   flex: 1 1 auto;
   min-height: 0;
-  background: var(--bg-card);
+  background: var(--rp-surface, transparent);
 }
 
-/* Preview + tree: opaque tokens for light/dark (override translucent color-mix). */
 .sw-files .rp-split__preview {
-  background: var(--bg-card);
+  background: var(--rp-surface, transparent);
 }
 
 /* Divider is only the shared .rp-split__resizer line — no tree border-left
  * (avoids the double vertical line between preview and file tree). */
 .sw-files .rp-split__tree {
-  background: var(--bg-elevated, var(--bg-card));
+  background: var(--rp-surface, transparent);
   border-left: none;
 }
 
@@ -343,13 +366,8 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   width: 1px;
 }
 
-.sw-files .rp-tree-search {
-  background: var(--bg-elevated, var(--bg-card));
-  border-bottom: 1px solid var(--border-subtle);
-}
-
 .sw-files .rp-files-toolbar {
-  background: var(--bg-card);
+  background: var(--rp-surface, transparent);
 }
 
 .sw__files-host .rp--embedded,
@@ -357,7 +375,7 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
-  background: var(--bg-card);
+  background: var(--rp-surface, transparent);
 }
 
 /*
@@ -390,11 +408,12 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   cursor: pointer;
   box-sizing: border-box;
   white-space: nowrap;
+  transform: translateZ(0);
 }
 
 .sw-picker__item:hover,
 .sw-picker__item:focus-visible {
-  background: var(--bg-hover, color-mix(in srgb, var(--text-primary) 8%, transparent));
+  background: var(--bg-hover, var(--menu-hover));
   outline: none;
 }
 
@@ -426,8 +445,7 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
 
 /*
  * Empty-state card (center of side pane when no tabs).
- * Soft frosted glass — translucent but not see-through (≈88% card + light blur).
- * Intentionally wider — not the dropdown content-width rule.
+ * Follows card opacity (--ui-opacity-mix). The + dropdown (.sw-plus-menu) does not.
  */
 .sw-picker--empty {
   width: min(280px, calc(100% - 32px));
@@ -435,15 +453,31 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   max-width: min(300px, calc(100% - 24px));
   padding: 8px;
   border-radius: 12px;
+  position: relative;
   border: 1px solid var(--glass-border, var(--border-subtle));
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.sw-picker--empty::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background: color-mix(
     in srgb,
-    var(--bg-elevated, var(--bg-card)) 88%,
+    var(--bg-elevated, var(--bg-card)) var(--ui-opacity-mix, 100%),
     transparent
   );
-  backdrop-filter: blur(20px) saturate(1.45);
-  -webkit-backdrop-filter: blur(20px) saturate(1.45);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sw-picker--empty > * {
+  position: relative;
+  z-index: 1;
 }
 
 .sw-picker--empty .sw-picker__item {
@@ -475,7 +509,8 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   width: max-content;
   min-width: 0;
   max-width: min(var(--menu-max-width, 360px), calc(100vw - 16px));
-  background: var(--menu-context-bg, var(--bg-elevated, var(--bg-card)));
+  /* Solid menu plate — not the card opacity slider. */
+  background: var(--menu-context-bg, var(--bg-elevated, var(--bg-card))) !important;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border: 1px solid var(--menu-context-border, var(--border-subtle));
@@ -504,7 +539,7 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
   height: 36px;
   padding: 0 10px;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-card);
+  background: var(--rp-surface, transparent);
   flex-shrink: 0;
   box-sizing: border-box;
 }
@@ -837,11 +872,11 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
 
 /*
  * Interactive PTY terminal — edge-to-edge fill.
- * SINGLE 50% veil on this root (not ancestors, not xterm canvas).
- * FitAddon floors rows → leftover px at bottom; CSS veil covers that strip.
+ * Host shares the aside plate (not a second 50% veil). Canvas stays
+ * transparent so FitAddon leftover px match the rest of the pane.
  */
 .sw-terminal--pty {
-  --sw-term-veil: #00000080;
+  --sw-term-veil: var(--rp-surface, transparent);
   /* Inner text inset; FitAddon subtracts .xterm padding. Host stays 0. */
   --sw-term-pad: 5px;
   flex: 1 1 auto;
@@ -861,7 +896,7 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"]
 }
 
 html[data-theme="light"] .sw-terminal--pty {
-  --sw-term-veil: #ffffff80;
+  --sw-term-veil: var(--rp-surface, transparent);
 }
 
 /* Cwd / empty honesty strip above xterm (not a second chrome bar). */
@@ -971,21 +1006,3 @@ html[data-theme="light"] .sw-terminal--pty {
   background: transparent !important;
   box-shadow: none !important;
 }
-
-.sw-terminal__xterm .xterm-scrollable-element > .shadow,
-.sw-terminal__xterm .xterm-scrollable-element > .shadow.top,
-.sw-terminal__xterm .xterm-scrollable-element > .shadow.left,
-.sw-terminal__xterm .xterm-scrollable-element > .shadow.top-left-corner,
-.sw-terminal__xterm .xterm-scrollable-element > .shadow.top.left {
-  display: none !important;
-  opacity: 0 !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  pointer-events: none !important;
-}
-
-.sw-terminal__xterm .xterm-scrollable-element > .scrollbar,
-.sw-terminal__xterm .xterm-scrollable-element > .scrollbar > .slider {
-  box-shadow: none !important;
-}
-

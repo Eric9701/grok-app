@@ -68,10 +68,28 @@ export interface ThemeSkinMeta {
 
 export const SKIN_STORAGE_KEY = "grok-app.skin";
 export const WALLPAPER_STORAGE_KEY = "grok-app.wallpaper";
-/** Scrim strength over wallpaper only (0 = clear wallpaper, 100 = full dim). */
+/** Scrim opacity over wallpaper only (0 = clear veil, 100 = full dim). */
 export const WALLPAPER_SCRIM_STORAGE_KEY = "grok-app.wallpaper-scrim";
+/** Wallpaper media / overlay blur (0 = sharp, 100 = full built-in blur). */
+export const WALLPAPER_BLUR_STORAGE_KEY = "grok-app.wallpaper-blur";
+/** Chat composer + workspace bar opacity (0–100). Independent of wallpaper scrim. */
+export const COMPOSER_OPACITY_STORAGE_KEY = "grok-app.composer-opacity";
+/** File cards / code / user bubbles / resource controls (0–100). Independent of scrim. */
+export const UI_OPACITY_STORAGE_KEY = "grok-app.ui-opacity";
+/** Settings overlay fill over wallpaper (0–100). Independent of scrim. */
+export const SETTINGS_OPACITY_STORAGE_KEY = "grok-app.settings-opacity";
 /** Default matches the built-in gradient at full opacity. */
 export const DEFAULT_WALLPAPER_SCRIM = 100;
+/**
+ * Settings overlay never drops below this mix / blur floor.
+ * Workbench panes still follow the raw slider (0% stays fully clear).
+ */
+export const SETTINGS_WALLPAPER_FLOOR_PCT = 20;
+/** Default matches previous full-scrim blur (22px / 14px). */
+export const DEFAULT_WALLPAPER_BLUR = 100;
+export const DEFAULT_COMPOSER_OPACITY = 100;
+export const DEFAULT_UI_OPACITY = 100;
+export const DEFAULT_SETTINGS_OPACITY = 100;
 export const DEFAULT_SKIN: ThemeSkinId = "default";
 
 /** Accept common image types + short-loop video for wallpaper upload. */
@@ -236,14 +254,150 @@ export function saveWallpaperScrim(
 }
 
 /**
- * Apply scrim strength as CSS vars on the root.
- * Scales theme-specific full-window veils, pane/settings fills, and background
- * blurs. Light keeps a weaker veil and clearer main pane than dark so a white
+ * 20% opacity floor; remaining 80% tracks t in [0, 1].
+ * Used by independent UI-surface / settings-overlay sliders (not wallpaper scrim).
+ */
+export function wallpaperFlooredMixPct(t: number): string {
+  const clamped = Math.max(0, Math.min(1, t));
+  return `${Math.round(SETTINGS_WALLPAPER_FLOOR_PCT + (100 - SETTINGS_WALLPAPER_FLOOR_PCT) * clamped)}%`;
+}
+
+export function parseComposerOpacity(raw: unknown): number {
+  const n =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+        ? Number(raw)
+        : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_COMPOSER_OPACITY;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+export function loadComposerOpacity(
+  storage: SkinStorage = localStorage,
+): number {
+  try {
+    return parseComposerOpacity(storage.getItem(COMPOSER_OPACITY_STORAGE_KEY));
+  } catch {
+    return DEFAULT_COMPOSER_OPACITY;
+  }
+}
+
+export function saveComposerOpacity(
+  storage: SkinStorage,
+  value: number,
+): void {
+  storage.setItem(
+    COMPOSER_OPACITY_STORAGE_KEY,
+    String(parseComposerOpacity(value)),
+  );
+}
+
+/** Direct mix % — not combined with wallpaper scrim. */
+export function applyComposerOpacityToDocument(
+  value: number,
+  root: SkinRoot = document.documentElement,
+): void {
+  if (!root.style?.setProperty) return;
+  root.style.setProperty(
+    "--composer-opacity-mix",
+    `${parseComposerOpacity(value)}%`,
+  );
+}
+
+export function parseUiOpacity(raw: unknown): number {
+  const n =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+        ? Number(raw)
+        : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_UI_OPACITY;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+export function loadUiOpacity(storage: SkinStorage = localStorage): number {
+  try {
+    return parseUiOpacity(storage.getItem(UI_OPACITY_STORAGE_KEY));
+  } catch {
+    return DEFAULT_UI_OPACITY;
+  }
+}
+
+export function saveUiOpacity(storage: SkinStorage, value: number): void {
+  storage.setItem(UI_OPACITY_STORAGE_KEY, String(parseUiOpacity(value)));
+}
+
+/** 20% floor + 80% × slider; not combined with wallpaper scrim. */
+export function applyUiOpacityToDocument(
+  value: number,
+  root: SkinRoot = document.documentElement,
+): void {
+  if (!root.style?.setProperty) return;
+  root.style.setProperty(
+    "--ui-opacity-mix",
+    wallpaperFlooredMixPct(parseUiOpacity(value) / 100),
+  );
+}
+
+export function parseSettingsOpacity(raw: unknown): number {
+  const n =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+        ? Number(raw)
+        : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_SETTINGS_OPACITY;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+export function loadSettingsOpacity(
+  storage: SkinStorage = localStorage,
+): number {
+  try {
+    return parseSettingsOpacity(storage.getItem(SETTINGS_OPACITY_STORAGE_KEY));
+  } catch {
+    return DEFAULT_SETTINGS_OPACITY;
+  }
+}
+
+export function saveSettingsOpacity(
+  storage: SkinStorage,
+  value: number,
+): void {
+  storage.setItem(
+    SETTINGS_OPACITY_STORAGE_KEY,
+    String(parseSettingsOpacity(value)),
+  );
+}
+
+/**
+ * Settings overlay mix: 20% floor + 80% × slider; not combined with scrim.
+ * Dark and light share the same mix so 100% is fully opaque on both.
+ */
+export function applySettingsOpacityToDocument(
+  value: number,
+  root: SkinRoot = document.documentElement,
+): void {
+  if (!root.style?.setProperty) return;
+  const mix = wallpaperFlooredMixPct(parseSettingsOpacity(value) / 100);
+  root.style.setProperty("--wallpaper-overlay-mix", mix);
+  root.style.setProperty("--wallpaper-light-overlay-mix", mix);
+  root.style.setProperty("--wallpaper-overlay-veil-opacity", "0");
+}
+
+/**
+ * Apply scrim opacity as CSS vars on the root (veil + pane tint only).
+ * Blur is independent — see {@link applyWallpaperBlurToDocument}.
+ * Light keeps a weaker veil and clearer main pane than dark so a white
  * scrim does not wash the wallpaper gray.
  *
- * Derived mix/%/px vars avoid flaky `calc(% * var)` inside `color-mix`
+ * Derived mix/% vars avoid flaky `calc(% * var)` inside `color-mix`
  * in some WebViews. At 0, also sets `data-wallpaper-clear` so CSS can force
  * fully transparent pane fills (some engines leave a residual from 0% mix).
+ * Right rail mix tracks the left sidebar curve. Chat cards keep a 20% floor
+ * via {@link wallpaperFlooredMixPct}. Settings overlay mix is independent —
+ * see {@link applySettingsOpacityToDocument}.
  */
 export function applyWallpaperScrimToDocument(
   value: number,
@@ -257,37 +411,82 @@ export function applyWallpaperScrimToDocument(
     root.removeAttribute("data-wallpaper-clear");
   }
   if (!root.style?.setProperty) return;
+  const sidebarMix = `${Math.round(58 * t)}%`;
+  const lightSidebarMix = `${Math.round(72 * t)}%`;
   root.style.setProperty("--wallpaper-scrim-opacity", t.toFixed(3));
-  root.style.setProperty(
-    "--wallpaper-mix-sidebar",
-    `${Math.round(58 * t)}%`,
-  );
+  root.style.setProperty("--wallpaper-mix-sidebar", sidebarMix);
   root.style.setProperty("--wallpaper-mix-main", `${Math.round(70 * t)}%`);
-  root.style.setProperty("--wallpaper-mix-aside", `${Math.round(70 * t)}%`);
+  root.style.setProperty("--wallpaper-mix-aside", sidebarMix);
   root.style.setProperty(
     "--wallpaper-mix-settings",
     `${Math.round(78 * t)}%`,
   );
+  root.style.setProperty("--wallpaper-mix-card", wallpaperFlooredMixPct(t));
   root.style.setProperty(
     "--wallpaper-light-scrim-opacity",
     `${(0.45 * t).toFixed(3)}`,
   );
-  root.style.setProperty(
-    "--wallpaper-light-mix-sidebar",
-    `${Math.round(72 * t)}%`,
-  );
+  root.style.setProperty("--wallpaper-light-mix-sidebar", lightSidebarMix);
   root.style.setProperty(
     "--wallpaper-light-mix-main",
     `${Math.round(24 * t)}%`,
   );
-  root.style.setProperty(
-    "--wallpaper-light-mix-aside",
-    `${Math.round(32 * t)}%`,
-  );
+  root.style.setProperty("--wallpaper-light-mix-aside", lightSidebarMix);
   root.style.setProperty(
     "--wallpaper-light-mix-settings",
     `${Math.round(72 * t)}%`,
   );
+  root.style.setProperty(
+    "--wallpaper-sidebar-shadow-alpha",
+    `${(0.56 * (1 - t)).toFixed(3)}`,
+  );
+}
+
+/** Clamp wallpaper blur strength to 0–100 (integer). */
+export function parseWallpaperBlur(raw: unknown): number {
+  const n =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+        ? Number(raw)
+        : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_WALLPAPER_BLUR;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+export function loadWallpaperBlur(
+  storage: SkinStorage = localStorage,
+): number {
+  try {
+    const raw = storage.getItem(WALLPAPER_BLUR_STORAGE_KEY);
+    if (raw == null || raw === "") {
+      // Migrate: blur used to track scrim 1:1 before the split.
+      return loadWallpaperScrim(storage);
+    }
+    return parseWallpaperBlur(raw);
+  } catch {
+    return DEFAULT_WALLPAPER_BLUR;
+  }
+}
+
+export function saveWallpaperBlur(
+  storage: SkinStorage,
+  value: number,
+): void {
+  storage.setItem(WALLPAPER_BLUR_STORAGE_KEY, String(parseWallpaperBlur(value)));
+}
+
+/**
+ * Apply wallpaper blur as CSS px vars (media frost + overlay-drawer blur).
+ * Independent of scrim opacity.
+ */
+export function applyWallpaperBlurToDocument(
+  value: number,
+  root: SkinRoot = document.documentElement,
+): void {
+  const next = parseWallpaperBlur(value);
+  const t = next / 100;
+  if (!root.style?.setProperty) return;
   root.style.setProperty(
     "--wallpaper-sidebar-blur",
     `${(22 * t).toFixed(1)}px`,
@@ -296,10 +495,11 @@ export function applyWallpaperScrimToDocument(
     "--wallpaper-settings-blur",
     `${(14 * t).toFixed(1)}px`,
   );
-  root.style.setProperty(
-    "--wallpaper-sidebar-shadow-alpha",
-    `${(0.56 * (1 - t)).toFixed(3)}`,
+  const overlayBlurPx = Math.max(
+    14 * (SETTINGS_WALLPAPER_FLOOR_PCT / 100),
+    14 * t,
   );
+  root.style.setProperty("--wallpaper-overlay-blur", `${overlayBlurPx.toFixed(1)}px`);
 }
 
 /**

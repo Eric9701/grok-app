@@ -4,16 +4,21 @@ import {
   AMUX_MODELS,
   DEEPSEEK_EFFORTS,
   DEEPSEEK_MODELS,
-  GROK_CHANNEL_EFFORTS,
   GROK_OFFICIAL_EFFORTS,
+  OPENROUTER_EFFORTS,
   OPENROUTER_MODELS,
   PROVIDER_PRESETS,
   VOLCANO_ARK_MODELS,
   YUN_API_MODELS,
+  ZHIPU_ENDPOINTS,
+  ZHIPU_MODELS,
   alignGrokPresetEfforts,
+  applyPresetEndpoint,
   defaultCustomChannelEfforts,
   findProviderPreset,
   isLegacyGrokChannelEffortIds,
+  matchPresetEndpoint,
+  resolveMatchedProviderPreset,
   resolveProviderApiKeyUrl,
   resolveProviderBrandId,
 } from "./providerPresets";
@@ -44,8 +49,8 @@ describe("providerPresets", () => {
     expect(amux!.baseUrl).toBe("https://api.amux.ai/v1");
     expect(amux!.apiBackend).toBe("responses");
     expect(AMUX_MODELS).toEqual([
-      { id: "grok-4.6", name: "Grok 4.6" },
-      { id: "grok-4.5", name: "Grok 4.5" },
+      { id: "grok-4.6", name: "Grok 4.6", supportsVision: true },
+      { id: "grok-4.5", name: "Grok 4.5", supportsVision: true },
     ]);
     expect(amux!.models).toEqual(AMUX_MODELS);
     expect(amux!.efforts.map((e) => e.id)).toEqual([
@@ -78,8 +83,8 @@ describe("providerPresets", () => {
     expect(yun).toBeDefined();
     expect(yun!.baseUrl).toBe("https://api.yunyi.ai/v1");
     expect(YUN_API_MODELS).toEqual([
-      { id: "grok-4.6", name: "Grok 4.6" },
-      { id: "grok-4.5", name: "Grok 4.5" },
+      { id: "grok-4.6", name: "Grok 4.6", supportsVision: true },
+      { id: "grok-4.5", name: "Grok 4.5", supportsVision: true },
     ]);
     expect(yun!.apiKeyUrl).toBe(
       "https://api.yunyi.ai/register/?aff_code=W0iw",
@@ -90,7 +95,7 @@ describe("providerPresets", () => {
     expect(yun!.efforts.find((e) => e.isDefault)?.id).toBe("xhigh");
   });
 
-  it("ships OpenRouter with Ox Alpha, chat_completions, vision, and 1M context", () => {
+  it("ships OpenRouter with GLM-5.3 Flash, chat_completions, vision, and 1M context", () => {
     const p = findProviderPreset("openrouter");
     expect(p).toBeDefined();
     expect(findProviderPreset("OpenRouter")?.id).toBe("openrouter");
@@ -102,13 +107,20 @@ describe("providerPresets", () => {
     expect(p!.contextWindow).toBe(1_048_576);
     expect(p!.brandId).toBe("openrouter");
     expect(OPENROUTER_MODELS).toEqual([
-      { id: "stealth/ox-alpha", name: "Ox Alpha" },
+      {
+        id: "z-ai/glm-5.3-flash",
+        name: "GLM-5.3 Flash",
+        contextWindow: 1_048_576,
+        supportsVision: true,
+        supportsVideo: true,
+        efforts: OPENROUTER_EFFORTS,
+      },
     ]);
     expect(p!.models).toEqual(OPENROUTER_MODELS);
     expect(p!.efforts.map((e) => e.id)).toEqual(
-      GROK_CHANNEL_EFFORTS.map((e) => e.id),
+      OPENROUTER_EFFORTS.map((e) => e.id),
     );
-    expect(p!.efforts.find((e) => e.isDefault)?.id).toBe("medium");
+    expect(p!.efforts.find((e) => e.isDefault)?.id).toBe("max");
     expect(p!.apiKeyUrl).toBe("https://openrouter.ai/settings/keys");
     expect(
       resolveProviderApiKeyUrl({
@@ -166,8 +178,8 @@ describe("providerPresets", () => {
     expect(p!.supportsVision).toBe(true);
     expect(p!.brandId).toBeUndefined();
     expect(AI98PRO_MODELS).toEqual([
-      { id: "grok-4.6", name: "Grok 4.6" },
-      { id: "grok-4.5", name: "Grok 4.5" },
+      { id: "grok-4.6", name: "Grok 4.6", supportsVision: true },
+      { id: "grok-4.5", name: "Grok 4.5", supportsVision: true },
     ]);
     expect(p!.models).toEqual(AI98PRO_MODELS);
     expect(p!.efforts.map((e) => e.id)).toEqual(
@@ -187,7 +199,7 @@ describe("providerPresets", () => {
     ).toBe("https://ai98pro.xyz");
   });
 
-  it("resolves brand logos for DeepSeek/OpenRouter/Amux/OpenCode Go/Volcano Ark", () => {
+  it("resolves brand logos for DeepSeek/OpenRouter/Amux/OpenCode Go/Volcano Ark/Zhipu", () => {
     expect(resolveProviderBrandId({ providerId: "deepseek" })).toBe(
       "deepseek",
     );
@@ -220,6 +232,74 @@ describe("providerPresets", () => {
         baseUrl: "https://ark.cn-beijing.volces.com/api/plan/v3",
       }),
     ).toBe("volcano-ark");
+    expect(resolveProviderBrandId({ providerId: "zhipu" })).toBe("zhipu");
+    expect(resolveProviderBrandId({ providerId: "zhi-p" })).toBe("zhipu");
+    expect(
+      resolveProviderBrandId({
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      }),
+    ).toBe("zhipu");
+    expect(
+      resolveProviderBrandId({
+        baseUrl: "https://api.z.ai/api/coding/paas/v4",
+      }),
+    ).toBe("zhipu");
+  });
+
+  it("ships one 智谱 chip with four CN/intl × API/Coding Plan endpoints", () => {
+    const zp = findProviderPreset("zhipu");
+    expect(zp).toBeDefined();
+    expect(zp!.name).toBe("智谱");
+    expect(zp!.brandId).toBe("zhipu");
+    expect(zp!.apiBackend).toBe("chat_completions");
+    expect(zp!.baseUrlFullPath).toBe(true);
+    expect(zp!.baseUrl).toBe("https://open.bigmodel.cn/api/paas/v4");
+    expect(ZHIPU_MODELS.map((m) => m.id)).toEqual(["glm-5.3-flash"]);
+    expect(ZHIPU_MODELS[0]?.efforts?.map((e) => e.id)).toEqual([
+      "low",
+      "high",
+      "max",
+    ]);
+    expect(ZHIPU_ENDPOINTS.map((e) => e.id)).toEqual([
+      "cn-api",
+      "cn-coding",
+      "intl-api",
+      "intl-coding",
+    ]);
+    expect(ZHIPU_ENDPOINTS.map((e) => e.baseUrl)).toEqual([
+      "https://open.bigmodel.cn/api/paas/v4",
+      "https://open.bigmodel.cn/api/coding/paas/v4",
+      "https://api.z.ai/api/paas/v4",
+      "https://api.z.ai/api/coding/paas/v4",
+    ]);
+    expect(
+      applyPresetEndpoint(zp!, "cn-coding").baseUrl,
+    ).toBe("https://open.bigmodel.cn/api/coding/paas/v4");
+    expect(
+      applyPresetEndpoint(zp!, "intl-api").baseUrl,
+    ).toBe("https://api.z.ai/api/paas/v4");
+    expect(
+      matchPresetEndpoint(zp!, "https://api.z.ai/api/coding/paas/v4/")?.id,
+    ).toBe("intl-coding");
+    expect(resolveMatchedProviderPreset({ providerId: "zhi-p" })?.id).toBe(
+      "zhipu",
+    );
+    expect(
+      resolveMatchedProviderPreset({
+        baseUrl: "https://open.bigmodel.cn/api/coding/paas/v4",
+      })?.id,
+    ).toBe("zhipu");
+    expect(
+      resolveProviderApiKeyUrl({
+        baseUrl: "https://api.z.ai/api/paas/v4",
+      }),
+    ).toBe("https://z.ai/manage-apikey/apikey-list");
+    expect(
+      resolveProviderApiKeyUrl({
+        providerId: "zhipu",
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      }),
+    ).toContain("open.bigmodel.cn");
   });
 
   it("defaults blank custom channels to Grok low/medium/high/max (ladder order)", () => {

@@ -22,6 +22,8 @@ export const ukSlash = {
   "slash.kind.action": "Дія",
   "slash.kind.prompt": "Запит",
   "slash.kind.skill": "Навичка",
+  "slash.kind.plugin": "Плагін",
+  "slash.pluginDesc": "{n} навичок",
   "slash.goal": "Цільове завдання",
   "slash.goalDesc": "Скінченна ціль · кілька раундів до завершення · не таймер",
   "slash.goalClear": "Очистити цільове завдання",
