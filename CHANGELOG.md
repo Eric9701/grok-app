@@ -9,85 +9,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 CI Release body = this section only (via `scripts/changelog-for-release.py`; no repeated download/install boilerplate).  
 See `docs/llm-wiki/release.md`.
 
+**What's New popup:** each bullet's **first sentence** is what users see. Keep that sentence to one short line (added / fixed / improved — no paths, no implementation, no issue piles). A second short sentence is allowed for GitHub / this file only. Do **not** rewrite already-shipped `## [X.Y.Z]` sections.
+
 ## [Unreleased]
 
+> **Highlight:** Settings opacity, plugin packs, LaTeX, and a less blocking ask bar.
+>
+> **中文 · 亮点：** 设置页透明度、斜杠选插件、对话公式，提问不再挡住会话。
+
 ### Added
-- **Settings page opacity slider**: Settings → Appearance → Theme can set how opaque the settings overlay is over wallpaper. 100% is fully solid. The lowest setting still keeps a 20% fill; the remaining 80% follows the slider. Independent of wallpaper overlay. Not packed into `.grokskin`.
-- **What's new after an update (#922)**: the first launch of a newer version opens a GlassModal of that version's CHANGELOG (Added / Changed / Fixed). The account menu and Settings → About can reopen it. First install does not auto-show; setup wizard and the product tour are not blocked.
-- **Slash can pick a whole plugin (#929)**: `/` and `+` list plugin packs as well as skills. Choosing a pack inserts a plugin chip; send expands to that pack's enabled, user-invocable skills. A single skill from the pack can still be chosen on its own.
-- **LaTeX in chat (#932)**: assistant markdown renders `$…$` / `$$…$$` (and `\(` `\[`) with KaTeX, matching Grok Build CLI. Incomplete math is closed while streaming.
-- **Selection toolbar setting (#933)**: Settings → Appearance → Interface can hide the copy / add-to-chat bar that appears after highlighting transcript text. Right-click still works. On by default.
-- **Progress rail side**: Settings → Appearance → Interface can put the conversation ticks on the left or right.
-- **Custom appearance chrome**: Settings → Appearance → Theme can set a text color (default follows Light / Dark near-black / near-white) and an optional text shadow (off by default). Restore defaults asks for confirmation and resets both. These fields travel with `.grokskin` import / export.
+- Settings overlay opacity can be adjusted. Appearance → Theme; 20% floor; not in `.grokskin`.
+- After an update, the app shows this version's notes. Reopen from the account menu or Settings → About.
+- Slash menu can pick a whole plugin pack. A single skill from the pack can still be chosen.
+- Chat can render LaTeX. Matches Grok Build CLI `$…$` / `$$…$$`.
+- The text-selection toolbar can be hidden. Right-click still works.
+- The progress rail can sit on the left or right.
+- Text color and shadow can be customized. These fields travel with `.grokskin`.
 
 **中文 · 新增**
-- **设置页透明度滑块**：设置 → 外观 → 主题可调设置页在壁纸上的不透明度。100% 全实色。最低仍保留 20% 底色，其余 80% 跟滑块。不与壁纸遮罩合并。不进 `.grokskin`。
-- **更新公告（#922）**：装上新版本后第一次打开，弹出这一版 CHANGELOG（新增 / 变更 / 修复）。账户菜单和设置 → 关于可再打开。全新安装不自动弹；不挡设置向导和产品导览。
-- **斜杠可选整个插件（#929）**：`/` 和 `+` 里插件包和 skill 都是条目。选插件插入插件 chip，发送时带上该包里已启用、可调用的 skill。仍可只选其中一条。
-- **对话 LaTeX（#932）**：助手 Markdown 用 KaTeX 渲染 `$…$` / `$$…$$`（以及 `\(` `\[`），与 Grok Build CLI 一致。流式输出时会补上未闭合的公式。
-- **选中文字工具栏（#933）**：设置 → 外观 → 界面可关掉划选文字后的复制 / 加入输入框。右键菜单仍可用。默认开。
-- **进度条左右**：设置 → 外观 → 界面可把对话刻度放到左侧或右侧。
-- **自定义外观**：设置 → 外观 → 主题可改文字颜色（默认跟随浅/深色近黑/近白）和字体阴影（默认关）。「恢复默认」需二次确认，会把这两项恢复出厂。这两项会随 `.grokskin` 导入导出。
+- 设置页可调节不透明度。外观 → 主题；最低约 20%；不进皮肤包。
+- 更新后会弹出本版说明。账户菜单和设置 → 关于可再打开。
+- 斜杠菜单可以选整个插件。仍可只选其中一条 skill。
+- 对话支持 LaTeX 公式。与 Grok Build CLI 的 `$…$` / `$$…$$` 一致。
+- 可隐藏划词工具栏。右键菜单仍可用。
+- 对话进度条可改到左侧或右侧。
+- 可自定义文字颜色和阴影。这两项会随皮肤包导入导出。
 
 ### Changed
-- **OpenRouter preset model is GLM-5.3 Flash**: gallery fill uses `z-ai/glm-5.3-flash` instead of `stealth/ox-alpha` (Ox Alpha). Reasoning is GLM `low` / `high` / `max` (default `max`). Existing saved OpenRouter channels are unchanged until re-added.
-- **Zhipu GLM preset**: one gallery chip copies the saved 智谱 channel (`glm-5.3-flash`, low/high/max). Clicking it picks among four endpoints (China API, China Coding Plan, international API, international Coding Plan). The same four tags sit above Base URL on the form so the gallery does not need four chips. The official Z.AI tile (dark square + white Z, inverted in dark theme) shows in the provider list, footer avatar, empty-chat welcome banner, and — when Replace brand logo is on — the sidebar top-left.
-- **Custom provider form puts identity first**: name, Base URL, API key, then models. Extra headers / appended prompt / provider mode sit lower. Field comments move into `?` tips. Each model row has a settings gear for context window, image/video modalities, and that model's reasoning ladder. Fetching `/models` writes advertised context and modalities onto matching rows. Channel `app_efforts` / `context_window` / `app_supports_vision` still receive the **active** model's values so Grok Build spawn does not change.
-- **Environment info can pin to a dock**: the panel stays a dropdown by default. A pin control in the header switches to the chat-column card (316px stage gutter; parks when the right rail opens). Unpinning restores the dropdown.
-- **Titlebar chips (#924)**: disconnected status and Open Location match the 28px flat chrome-btn / chip language (no stroke, transparent rest, hover wash).
-- **Plan bar overlay (#925)**: the plan/goal card floats over the transcript (42rem) instead of reserving a full-width strip; list padding follows measured height. Stream-perf drops the blur.
-- **Inline code on wallpaper (#926)**: chat `code` chips use a deeper well so tokens stay readable on wallpaper.
-- **Conversation progress rail**: growing ticks on the left (or right) of the transcript; arrows show on hover and hide when the side gutter is under 48px.
-- **Agent question no longer covers the transcript (#891)**: `_x.ai/ask_user_question` sits above the composer like the permission bar. Chat stays scrollable. Collapse to a chip (not Dismiss) keeps the draft. The question is the title; options sit on the left with Dismiss / Submit on the right (Submit pinned to the bottom of the card). Short chips stay in a row. Selection uses the theme accent fill; Enter submits except while an IME is committing a candidate.
-- **Dock icons from authored black / white appiconsets**: production `icon.icns` / `icon.ico` pack the black 16–1024 rasters; `pnpm dev` packs the white set into `icons/dev`. Pixel sizes are not resampled (`scripts/pack_appiconset.py`).
-- **Linux AppImage runtime packages (#899)**: README documents the host apt line for a clean Debian/Ubuntu (`libegl1`, `libgles2`, `libwebkit2gtk-4.1-0`, `libayatana-appindicator3-1`) when the official AppImage exits with `libEGL.so.1: cannot open shared object file`. Distinct from the Wayland black-window / `EGL_BAD_PARAMETER` notes.
-- **Settings overlay wallpaper floor (#927)**: settings still samples wallpaper. Mix is an independent slider (20% floor + 80% range). Overlay blur still never drops below 20%. Workbench panes still follow the wallpaper slider (0% stays fully clear). `data-wallpaper-clear` no longer punches settings transparent.
-- **Wallpaper and pane surfaces (#883–#890, #892–#894, #900)**: bottom terminal uses a 1px seam plus theme glass; plan pane reuses sidebar frost; dark wallpaper composer glass; exposed chrome contrast; settings cards stay opaque and share `UiSwitch` / `Select` / `UiCheck`.
-- **Unused AI Elements widgets (#907)**: drop seven unreachable UI files (`button`, `collapsible`, `marker`, `message`, `message-response`, `reasoning`, `shimmer`) and their exclusive deps (`streamdown`, `@radix-ui/react-collapsible`, `@radix-ui/react-slot`, `class-variance-authority`). The `mermaid` pnpm override went with `streamdown`. Chat still uses `MarkdownBody` / Lobe thread.
+- OpenRouter preset is now GLM-5.3 Flash. Saved channels stay until re-added.
+- Zhipu GLM is a single gallery entry with official branding.
+- Custom provider form puts name, URL, and key first.
+- Environment info can pin beside the chat.
+- Plan card and agent questions no longer cover the transcript.
+- Titlebar, wallpaper, and pane contrast were cleaned up.
+- Dock icons use the authored black and white sets.
+- README lists Linux AppImage runtime packages.
+- Unused UI widgets were removed.
+- What's New notes are one short sentence per bullet.
 
 **中文 · 变更**
-- **OpenRouter 预设模型改为 GLM-5.3 Flash**：图库一键填入 `z-ai/glm-5.3-flash`，不再用 `stealth/ox-alpha`（Ox Alpha）。思考档为 GLM 的 `low` / `high` / `max`（默认 `max`）。已经保存的 OpenRouter 通道不会自动改，除非重新添加。
-- **智谱 GLM 预设**：画廊一个入口，带入当前智谱通道（`glm-5.3-flash`，low/high/max）。点开先选四个端点（国内 API / 国内 Coding Plan / 海外 API / 海外 Coding Plan）。表单里 Base URL 上方同一组标签可切换，不再放四个预设芯片。官方 Z.AI 方标（浅色深底白 Z，深色反相）出现在服务商列表、左下角头像、空会话欢迎横幅；打开「替换品牌 Logo」后左上角也会换成智谱。
-- **自定义服务商表单把关键信息放到上面**：名称、Base URL、API Key，然后才是模型。自定义请求头 / 追加提示词 / 提供商模式下移。说明收进问号。每条模型有设置齿轮：上下文窗口、图片/视频、该模型的思考深度。拉取 `/models` 会把接口给出的窗口和模态写到对应条目。通道上的 `app_efforts` / `context_window` / `app_supports_vision` 仍写入**当前模型**的值，Grok Build 启动方式不变。
-- **环境信息可固定为钉板**：默认仍是下拉。标题栏固定按钮切到对话列卡片（主列让出 316px；打开右侧栏会 park）。取消固定后回到下拉。
-- **标题栏芯片（#924）**：「已断开」和「打开位置」对齐 28px 无描边 chip / chrome-btn，hover 只洗一层。
-- **计划顶框浮层（#925）**：计划/目标卡片浮在对话上（42rem），不再占整行；列表按实测高度让位。流式输出关掉 blur。
-- **壁纸上行内代码（#926）**：对话 `code` 加深底板，壁纸上仍能看出是代码。
-- **对话进度条**：刻度默认在左侧（可改右侧）；箭头悬停才显示；侧边空位不足 48px 时隐藏。
-- **Agent 提问不再挡住会话（#891）**：`_x.ai/ask_user_question` 放到输入框上方，和权限条一样。会话可滚动。收成一条不算忽略，草稿还在。问题当标题；选项在左、忽略/提交在右（提交贴容器底）。短芯片横排。选中用主题色填充；回车提交，中文输入法选词回车不提交。
-- **Dock 图标改用已调好的黑 / 白 appiconset**：正式版 `icon.icns` / `icon.ico` 打黑色 16–1024；`pnpm dev` 打白色到 `icons/dev`。按原像素封装，不再缩放（`scripts/pack_appiconset.py`）。
-- **Linux AppImage 运行时包（#899）**：README 补上干净 Debian/Ubuntu 的 apt 行（`libegl1`、`libgles2`、`libwebkit2gtk-4.1-0`、`libayatana-appindicator3-1`）。官方 AppImage 缺 `libEGL.so.1` 会立刻退出；这与 Wayland 黑窗 / `EGL_BAD_PARAMETER` 不是同一类问题。
-- **设置页壁纸遮罩保底 20%（#927）**：设置页仍能透出壁纸。底色 mix 改由独立滑块控制（20% 保底 + 其余 80% 跟滑块）。overlay blur 仍不低于 20%。工作区侧栏 / 主栏 / 右栏继续跟壁纸滑杆，0% 仍全透。`data-wallpaper-clear` 不再把设置页刷成全透明。
-- **壁纸与分栏表面（#883–#890、#892–#894、#900）**：底部终端改为 1px 分隔加主题玻璃；计划面板复用侧栏霜化；深色壁纸输入框补齐玻璃；暴露文字对比统一；设置页卡片不透明并共用 `UiSwitch` / `Select` / `UiCheck`。
-- **未使用的 AI Elements 控件（#907）**：删除 7 个不可达 UI 文件及其独占依赖（`streamdown`、`@radix-ui/react-collapsible`、`@radix-ui/react-slot`、`class-variance-authority`）；`mermaid` override 随 `streamdown` 去掉。聊天仍走 `MarkdownBody` / Lobe 线程。
+- OpenRouter 预设改为 GLM-5.3 Flash。已保存通道不会自动改。
+- 智谱 GLM 改为单入口并带官方标识。
+- 自定义服务商表单把关键信息提前。
+- 环境信息可固定到对话旁。
+- 计划卡片和 Agent 提问不再挡住会话。
+- 标题栏、壁纸和分栏对比已调整。
+- Dock 图标改用成品黑白套件。
+- 补充 Linux AppImage 运行依赖说明。
+- 移除未使用的界面组件。
+- 更新公告每条只保留一句话。
 
 ### Fixed
-- **Chat stick-to-bottom no longer stops at thinking / tool / body round changes (#931)**: phase auto-collapse and the next output round used to drop pin (2–8px layout ticks were treated as a leave; live tool `scrollIntoView` also walked the chat ancestor). Virtual-list pin-snap writes are ignored as user scroll. Follow continues for the rest of the turn; a real flick or slow trackpad still leaves the lock.
-- **Custom effort catalog `low` / `high` / `max` no longer marks both Medium and High**: incomplete ladders map by id (Low / High / Extra high). Only the DeepSeek four-id set (`low` / `high` / `xhigh` / `max`) remaps `high` onto Medium. Default `high` shows as High, with a single check.
-- **Account → Providers left list scrolls when many channels are saved**: pane-fill still locks the page, but the dual-pane grid row is now `minmax(0, 1fr)` so the rail is a real scrollport instead of clipping behind `overflow: hidden`. The rail uses the in-app overlay thumb (native bars stay hidden).
-- **Windows Open in editor no longer hands VS Code `\\?\` paths (#928)**: `open_in_editor` now strips the extended-length prefix the same way Explorer reveal already did, so workspace URIs stay `file:///d:/…`.
-- **Desktop pet morphs again for typing, a triggered turn, and a finished task**: composer typing plays the catalog slanted-`!` alert; a live turn plays orbit/comet belts then holds the thinking dots (so a long job does not spin the triangle forever); a finished turn celebrates with notify + colorful spin, including when the workbench already has that chat in view. Overlay paint throttle and hidden-pause stay.
-- **Pet overlay copy follows the app language (#930)**: the pet webview now gets the same boot locale as the main window and loads the matching catalog.
-- **Composer newline no longer moves the whole typed line down (#923)**: WebKit often reports the caret on the editor root at offset 0 after wrapping. End-of-line Enter inserts an empty next line; mid-line Enter still splits at the caret.
-- **Transcript stays pinned when the chat column width interpolates (#920)**: opening the right pane no longer jumps the thread up then snaps back to the bottom.
-- **Session API second turn no longer deadlocks on already-live connect (#905)**: `connect_inner` held `inner` and then called `snapshot()`, which locks `inner` again (`parking_lot` is not reentrant). The thread never returned, so `connect_lock` stayed busy forever and later `POST /turns` got 503 `retry_later`. Already-live and fork-busy now snapshot from the held lock.
-- **Unsigned-in startup no longer waits 24s on ACP `authenticate` (#898)**: Official route with no `auth.json` / no usable cached token used to send `authenticate(cached_token)` after `initialize`, time out at 12s, retry once, then soft-fail. Workbench still opened idle. Host now skips that RPC when the user is not signed in. Custom routes still skip; the signed-in-but-agent-home-stale path (#528) still re-syncs and retries once.
-- **Sidebar session selection and new-chat fold (#895, #897, #901)**: short titles no longer duplicate; resize during pane motion is replayed; creating a chat no longer forces “Other sessions” open.
-- **Narrow-window plan overlay leftover (#902)**: an open aside overlay now uses the existing full-cover mode instead of a leftover scrim over the main column.
+- Chat stays pinned through thinking, tools, and pane resize.
+- Custom effort catalogs no longer check two rungs at once.
+- The providers list scrolls when there are many channels.
+- Windows editor open no longer passes extended-length paths.
+- Desktop pet motion and language follow the app again.
+- Composer newline no longer drops the whole line.
+- Session API second turn no longer deadlocks.
+- Signed-out startup no longer waits on authenticate.
+- Sidebar selection, new-chat fold, and leftover plan overlay were fixed.
 
 **中文 · 修复**
-- **思考 / 工具 / 正文换轮时聊天不再停住吸底（#931）**：阶段收起和下一轮输出曾把 2–8px 布局抖动当成上滑离底；直播工具的 `scrollIntoView` 还会带动会话祖先滚动。虚拟列表 pin-snap 写入不再当成用户上滑。本轮剩余输出继续跟底；真的上滑或慢速触控板仍可离开。
-- **自定义推理档只配 `low` / `high` / `max` 时不再同时勾中「中」和「高」**：缺档按 id 对号入座（低 / 高 / 极高）。只有 DeepSeek 四档（`low` / `high` / `xhigh` / `max`）才把 `high` 映射到「中」。默认 `high` 显示为「高」，只勾一档。
-- **设置 → 账户 → 服务商左侧列表在条目很多时可以滚动**：页面仍锁定外层滚动，但双栏 grid 行改为 `minmax(0, 1fr)`，左侧轨道成为真正的滚动容器，不再被 `overflow: hidden` 裁切。列表使用应用内 overlay 滑块（原生滚动条仍隐藏）。
-- **Windows「在编辑器中打开」不再把 `\\?\` 路径交给 VS Code（#928）**：`open_in_editor` 与资源管理器揭示一样剥掉扩展前缀，工作区 URI 保持 `file:///d:/…`。
-- **桌宠打字 / 触发回合 / 任务完成的形变回来了**：输入框打字走斜感叹号；一轮任务开始播轨道/彗星彩带，然后停在思考三点（长任务不再无限转三角形）；完成时通知圆点 + 彩带旋转，主窗已经在看这场对话也会庆祝。绘制节流和隐藏暂停保留。
-- **宠物浮层文案跟随应用语言（#930）**：宠物独立 webview 注入与主窗相同的启动语言，并加载对应文案表。
-- **输入框换行不再把整行挪到下一行（#923）**：WebKit 换行后常把光标报到编辑器根节点 offset 0。行尾换行插入空行；行中换行从光标切开。
-- **对话列变窄时仍钉在底部（#920）**：打开右侧栏不再先把会话挤上去再抽回底部。
-- **Session API 第二轮不再在 already-live connect 上死锁（#905）**：`connect_inner` 握着 `inner` 再调 `snapshot()`，而 `snapshot()` 会再锁一次（`parking_lot` 不可重入）。线程回不来，`connect_lock` 一直 busy，后续 `POST /turns` 变成 503 `retry_later`。already-live / fork-busy 改为从已持有的锁做 snapshot。
-- **未登录启动不再为 ACP `authenticate` 空等约 24 秒（#898）**：官方路由在没有 `auth.json` / 没有可用 cached token 时仍会在 `initialize` 后发 `authenticate(cached_token)`，12 秒超时后再试一次，然后 soft-fail；工作台仍会打开。现在未登录就跳过该 RPC。自定义路由仍跳过；已登录但 agent-home 缺 token（#528）仍会同步并重试一次。
-- **侧栏选中、缩放与新建会话折叠（#895、#897、#901）**：短标题不再复制；分栏动画结束后补跑窗口缩放；新建会话不再强制展开「其他会话」。
-- **窄窗口计划面板覆盖残留（#902）**：右侧 overlay 复用已有全覆盖模式，主区不再透出旧 scrim。
+- 修复思考、工具输出和打开侧栏时聊天不跟到底。
+- 修复自定义推理档会同时勾中两档。
+- 修复服务商列表条目多时无法滚动。
+- 修复 Windows 用编辑器打开路径。
+- 修复桌宠动画和语言。
+- 修复输入框换行把整行下移。
+- 修复会话接口第二轮卡住。
+- 修复未登录启动长时间等待。
+- 修复侧栏选中、新建会话折叠和计划面板遮罩。
 
 ## [0.2.26] - 2026-08-24
 

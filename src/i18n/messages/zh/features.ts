@@ -349,7 +349,7 @@ export const zhFeatures = {
   "whatsNew.gotIt": "知道了",
   "whatsNew.empty": "这一版没有随包装入的更新说明。",
   "whatsNew.section.added": "新增",
-  "whatsNew.section.changed": "变更",
+  "whatsNew.section.changed": "优化",
   "whatsNew.section.fixed": "修复",
   "whatsNew.replay": "更新公告",
   "whatsNew.replayDesc": "查看当前版本修了什么、加了什么、优化了什么。",

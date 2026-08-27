@@ -68,12 +68,52 @@ export function changelogLang(locale: string | Locale | null | undefined): Chang
   return "en";
 }
 
-function cleanItem(line: string): string {
-  return line
-    .replace(/^\s*-\s+/, "")
+function stripIssueRefs(text: string): string {
+  return text
+    // (#123), (#123, #456), （#123）, （#123、#456）
+    .replace(/\s*[(（]\s*#[0-9]+(?:\s*[,，、]\s*#[0-9]+)*\s*[)）]/g, "")
+    .replace(/\s*#[0-9]+\b/g, "")
+    // leftover empty parens after a hash-only strip, e.g. （） / (,)
+    .replace(/\s*[(（]\s*[,，、]?\s*[)）]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** First sentence; keep `5.3` / `file.json` from splitting the lead line. */
+export function firstSentence(text: string): string {
+  const t = text.trim();
+  if (!t) return "";
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i]!;
+    if (ch === "。" || ch === "！" || ch === "？") {
+      return t.slice(0, i + 1).trim();
+    }
+    if (ch === "." || ch === "!" || ch === "?") {
+      const prev = t[i - 1];
+      const next = t[i + 1];
+      if (prev && /\d/.test(prev) && next && /\d/.test(next)) continue;
+      if (next === undefined || /\s/.test(next)) {
+        return t.slice(0, i + 1).trim();
+      }
+    }
+  }
+  return t;
+}
+
+/**
+ * What's New modal line: leading `**title**` if present, else the first sentence.
+ * CHANGELOG may keep a second short sentence; the popup must not show it.
+ */
+export function changelogPopupItem(line: string): string {
+  const raw = line.replace(/^\s*-\s+/, "").trim();
+  if (!raw) return "";
+  const boldLead = raw.match(/^\*\*(.+?)\*\*/);
+  const lead = boldLead ? boldLead[1] : raw;
+  const cleaned = lead
     .replace(/\*\*(.+?)\*\*/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
+  return firstSentence(stripIssueRefs(cleaned));
 }
 
 function extractVersionBody(
@@ -93,11 +133,11 @@ function pickHighlight(body: string, lang: ChangelogLang): string | null {
   if (lang === "zh") {
     const m = body.match(/\*\*中文\s*·\s*亮点[：:]\*\*\s*(.+)/);
     const t = m?.[1]?.trim() ?? "";
-    return t || null;
+    return firstSentence(stripIssueRefs(t)) || null;
   }
   const m = body.match(/\*\*Highlight:\*\*\s*(.+)/);
   const t = m?.[1]?.trim() ?? "";
-  return t || null;
+  return firstSentence(stripIssueRefs(t)) || null;
 }
 
 function parseSectionItems(block: string, lang: ChangelogLang): string[] {
@@ -109,7 +149,7 @@ function parseSectionItems(block: string, lang: ChangelogLang): string[] {
   for (const raw of source.split("\n")) {
     const line = raw.trim();
     if (!line.startsWith("- ")) continue;
-    const item = cleanItem(line);
+    const item = changelogPopupItem(line);
     if (item) items.push(item);
   }
   return items;

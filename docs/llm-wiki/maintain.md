@@ -105,7 +105,7 @@ New Issue
 - **#1** locale-aware session titles — **merge** (correct i18n for LLM rename)  
 - **#2** Grok Build underscore permission optionIds — **merge** (fixes shell tool allow failures)
 
-After merge: thank author on PR; close linked Issues; mention in CHANGELOG under next version; **then clean branches** (next section).
+After merge: thank author on PR; close linked Issues; mention in CHANGELOG under next version (one short sentence per bullet for the What's New popup; see [release.md](./release.md)); **then clean branches** (next section).
 
 ---
 

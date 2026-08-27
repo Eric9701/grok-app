@@ -69,7 +69,7 @@ Default is the real **Grok Build** CLI (`grok agent stdio`).
 
 Full process for humans and AI maintainers: **[docs/llm-wiki/release.md](./docs/llm-wiki/release.md)**.
 
-1. Write bilingual notes under `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` (what changed — list form).
+1. Write bilingual notes under `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`. The in-app What's New popup shows **only the first sentence** of each bullet — keep that sentence to one short line (added / fixed / improved). CHANGELOG may add at most one extra sentence. Do not rewrite already-shipped version sections. See `docs/llm-wiki/release.md`.
 2. Commit on a clean `main`.
 3. Run `./scripts/release-tag.sh X.Y.Z` (optionally `--push`).
 4. CI builds **macOS ARM + Intel + Windows + Linux** and sets the **GitHub Release body** from that CHANGELOG section via `scripts/changelog-for-release.py` (changes only; install notes stay in README).
