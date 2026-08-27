@@ -325,7 +325,8 @@ describe("shipped CHANGELOG.md", () => {
       ...(zh?.highlight ? [zh.highlight] : []),
       ...(zh?.sections.flatMap((s) => s.items) ?? []),
     ];
-    expect(items.length).toBeGreaterThan(0);
+    // Empty Unreleased is expected after cutting a version section.
+    if (items.length === 0) return;
     expect(notes?.sections.map((s) => s.items.length)).toEqual(
       zh?.sections.map((s) => s.items.length),
     );

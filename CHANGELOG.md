@@ -13,6 +13,8 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.27] - 2026-08-27
+
 > **Highlight:** Settings opacity, plugin packs, LaTeX, and a less blocking ask bar.
 >
 > **中文 · 亮点：** 设置页透明度、斜杠选插件、对话公式，提问不再挡住会话。
