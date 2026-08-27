@@ -33,6 +33,7 @@ pub async fn skills_list(
                 source: s.source,
                 path: s.path,
                 user_invocable: s.user_invocable,
+                plugin_name: None,
             })
             .collect();
         (
