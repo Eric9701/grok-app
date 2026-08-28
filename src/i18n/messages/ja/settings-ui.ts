@@ -16,6 +16,7 @@ export const jaSettingsUi = {
   "settings.tab.interface": "インターフェイス",
   "settings.tab.cli": "CLI",
   "settings.tab.connection": "接続",
+  "settings.tab.ssh": "SSH",
   "settings.tab.network": "ネットワーク",
   "settings.proxyMode": "プロキシ",
   "settings.proxyModeDesc": "アプリとエージェントプロセスがネットワークへ出る方法です。システムは OS のプロキシ（ループバック PAC を含む）に従い、手動は URL を固定し、直接接続はプロキシを使いません。可能なら TUN よりシステム HTTP または手動の http://127.0.0.1:7890 を使ってください。",

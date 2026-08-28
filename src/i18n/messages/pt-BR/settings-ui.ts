@@ -16,6 +16,7 @@ export const ptBRSettingsUi = {
   "settings.tab.interface": "Interface",
   "settings.tab.cli": "CLI",
   "settings.tab.connection": "Conexão",
+  "settings.tab.ssh": "SSH",
   "settings.tab.network": "Rede",
   "settings.proxyMode": "Proxy",
   "settings.proxyModeDesc": "Como o app e os processos do agente alcançam a rede. Sistema segue o proxy do SO (incluindo PAC de loopback); Manual fixa uma URL; Direto força sem proxy. Prefira HTTP do sistema ou Manual http://127.0.0.1:7890 a TUN quando possível.",

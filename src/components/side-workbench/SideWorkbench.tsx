@@ -42,6 +42,7 @@ import { SideTabBody } from "./SideTabBody";
 export type SideWorkbenchProps = {
   locale: Locale | string;
   projectPath?: string | null;
+  sshAlias?: string | null;
   projectName?: string | null;
   isGitProject?: boolean;
   state?: SideWorkbenchState;
@@ -78,6 +79,7 @@ export type SideWorkbenchProps = {
 export function SideWorkbench({
   locale,
   projectPath = null,
+  sshAlias = null,
   projectName = null,
   isGitProject = false,
   state: controlled,
@@ -376,9 +378,10 @@ export function SideWorkbench({
                 aria-hidden={active.kind !== "file"}
               >
                 <FilesWorkspace
-                  key={projectPath || "orphan"}
+                  key={`${sshAlias || ""}:${projectPath || "orphan"}`}
                   locale={locale}
                   projectPath={projectPath}
+                  sshAlias={sshAlias}
                   projectName={projectName}
                   treeVisible={state.treeVisible}
                   onTreeVisibleChange={(v) =>
@@ -433,6 +436,7 @@ export function SideWorkbench({
                 skills={skillInfos}
                 loading={skillsLoading}
                 hostError={skillsLoadError}
+                sshAlias={sshAlias}
                 onSelectSkill={(skill) => onSelectSkill?.(skill)}
               />
             ) : null}
@@ -456,6 +460,7 @@ export function SideWorkbench({
                       locale={locale}
                       tab={tab}
                       projectPath={projectPath}
+                      sshAlias={sshAlias}
                       active={paneActive && isActive}
                     />
                   </div>

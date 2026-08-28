@@ -196,6 +196,35 @@ describe("settingsCatalog", () => {
     ).toBe(true);
   });
 
+  it("runtime has an SSH tab for OpenSSH hosts", () => {
+    const runtime = SETTINGS_NAV.find((n) => n.id === "runtime");
+    expect(runtime?.tabs.map((t) => t.id)).toEqual([
+      "cli",
+      "connection",
+      "ssh",
+      "network",
+      "pool",
+      "tools",
+      "privacy",
+    ]);
+    expect(parseSettingsHash("#/settings/runtime/ssh")).toEqual({
+      section: "runtime",
+      tab: "ssh",
+    });
+    expect(buildSettingsHash({ section: "runtime", tab: "ssh" })).toBe(
+      "#/settings/runtime/ssh",
+    );
+    const entry = SETTINGS_ENTRIES.find((e) => e.id === "runtime.sshHosts");
+    expect(entry?.tab).toBe("ssh");
+    expect(entry?.anchorId).toBe("settings-anchor-sshHosts");
+    const tZh = createT("zh");
+    const tEn = createT("en");
+    const hits = searchSettingsEntries("ssh", tZh, tEn);
+    expect(hits.some((h) => h.entry.id === "runtime.sshHosts")).toBe(true);
+    const zhHits = searchSettingsEntries("测试连接", tZh, tEn);
+    expect(zhHits.some((h) => h.entry.id === "runtime.sshHosts")).toBe(true);
+  });
+
   it("isSettingsSectionId", () => {
     expect(isSettingsSectionId("runtime")).toBe(true);
     expect(isSettingsSectionId("pet")).toBe(true);

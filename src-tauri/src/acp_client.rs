@@ -373,6 +373,8 @@ pub struct AcpClient {
     /// Agent `initialize` advertisement for rewind RPCs.
     /// `None` = unknown (try RPC); `Some(false)` = skip; `Some(true)` = call.
     rewind_supported: ParkingMutex<Option<bool>>,
+    /// OpenSSH alias this process was spawned with. Remote cwd is not local.
+    ssh_alias: Option<String>,
 }
 
 /// Options applied at agent process start (CLI flags).
@@ -416,6 +418,9 @@ pub struct SpawnOptions {
     /// When true, `session/new` injects empty `mcpServers` (official side jobs
     /// must not re-inject the `official-aux` MCP that shells out to `grok -p`).
     pub empty_mcp_servers: bool,
+    /// OpenSSH Host alias. When set, spawn `ssh -T` and run grok on that host
+    /// (remote cwd). Do not treat `cwd` as a local `std::fs` path.
+    pub ssh_alias: Option<String>,
 }
 
 /// Pure helper: top-level CLI args for `--fork-session`.
@@ -1216,7 +1221,7 @@ impl AcpClient {
         // API mode: if an ACP server address is configured, connect over TCP
         // instead of spawning a local CLI. The server drives an agent running
         // elsewhere (WSL/SSH/container) but speaks the identical ACP protocol.
-        // Priority: TCP > WSL spawn > native spawn.
+        // Priority: TCP > SSH wrap > WSL spawn > native spawn.
         let settings_early = crate::store::load_settings();
         if let Some(addr) = settings_early
             .acp_server_addr
@@ -1227,14 +1232,27 @@ impl AcpClient {
             return Self::connect_tcp(addr, cwd).await;
         }
 
-        let wsl_launch = crate::wsl_backend::resolve_wsl_launch(&settings_early);
+        let ssh_alias = opts
+            .ssh_alias
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && crate::ssh_remote::is_safe_ssh_alias(s))
+            .map(|s| s.to_string());
+
+        let wsl_launch = if ssh_alias.is_some() {
+            None
+        } else {
+            crate::wsl_backend::resolve_wsl_launch(&settings_early)
+        };
         let cli_path = if let Some(ref w) = wsl_launch {
             crate::wsl_backend::wsl_display_path(w)
+        } else if ssh_alias.is_some() {
+            std::path::PathBuf::from("grok")
         } else {
             cli_path
         };
 
-        if wsl_launch.is_none() && !cli_path.exists() {
+        if ssh_alias.is_none() && wsl_launch.is_none() && !cli_path.exists() {
             return Err(AgentError::new(
                 AgentErrorCode::CliNotFound,
                 format!("CLI not found: {}", cli_path.display()),
@@ -1251,7 +1269,9 @@ impl AcpClient {
         // 0.2.x-specific; an older CLI rejects it and dies, which the user only
         // ever sees as AGENT_CRASHED with no hint that the CLI is the problem.
         // Unknown/unparseable versions pass through — fail open, not closed.
-        let version_raw = if let Some(ref w) = wsl_launch {
+        let version_raw = if ssh_alias.is_some() {
+            None
+        } else if let Some(ref w) = wsl_launch {
             crate::wsl_backend::read_wsl_version(w)
         } else {
             crate::cli_probe::read_version_of(&cli_path)
@@ -1302,7 +1322,8 @@ impl AcpClient {
         let _ = std::fs::create_dir_all(&grok_home);
         // Prep agent-home when independent *or* custom (shared+custom still uses agent-home).
         // Side-channel with explicit home: never touch main agent-home auth.
-        let agent_home_prep = home_override.is_none()
+        let agent_home_prep = ssh_alias.is_none()
+            && home_override.is_none()
             && crate::paths::needs_agent_home_spawn_prep(session_data_mode, custom_route);
         // Preference syncs write independent-only; for shared+custom force independent
         // so agent-home receives permission / feature pins the relay process needs.
@@ -1322,12 +1343,19 @@ impl AcpClient {
         // Composer may hold a catalog id while the active channel is a custom
         // provider — resolve to the route id Grok Build actually understands.
         // Override home (official aux): pass model id through as catalog id.
-        let grok_build_proxy = if home_override.is_none() {
-            crate::providers::active_grok_build_proxy_spawn(opts.model_id.as_deref().unwrap_or(""))
-        } else {
+        let grok_build_proxy = if ssh_alias.is_some() || home_override.is_some() {
             None
+        } else {
+            crate::providers::active_grok_build_proxy_spawn(opts.model_id.as_deref().unwrap_or(""))
         };
-        let spawn_model = if let Some(ref native) = grok_build_proxy {
+        let spawn_model = if ssh_alias.is_some() {
+            let m = opts.model_id.as_deref().unwrap_or("").trim();
+            if m.is_empty() || crate::providers::is_custom_provider_id(m) {
+                crate::providers::OFFICIAL_CATALOG_MODEL.to_string()
+            } else {
+                m.to_string()
+            }
+        } else if let Some(ref native) = grok_build_proxy {
             native.model.clone()
         } else if home_override.is_some() {
             let m = opts.model_id.as_deref().unwrap_or("").trim();
@@ -1372,7 +1400,9 @@ impl AcpClient {
         let auto_wake_enabled = settings.auto_wake_enabled;
         let two_pass_compaction = settings.two_pass_compaction_enabled;
         let memory_enabled = settings.experimental_memory;
-        let use_leader = settings.use_leader;
+        // SSH Wave 4 always asks for --leader. The remote script fail-opens to
+        // --no-leader if `~/.grok/leader.sock` never appears.
+        let use_leader = ssh_alias.is_some() || settings.use_leader;
         let plan_enabled = settings.plan_enabled;
         let disable_web = settings.disable_web_search;
         // Session override wins when set; else global Settings.
@@ -1455,8 +1485,13 @@ impl AcpClient {
         }
 
         // Native: `grok …`; WSL: `wsl.exe [-d] --cd <linux_cwd> -- <linux_cli> …`
+        // SSH: collect grok flags first, then wrap as one remote `ssh -T` script.
+        // OpenSSH joins the remote command into a single `-c` string — extra
+        // argv after `bash -lc` is not a real argv array on the host.
         // (env vars set on the Windows process and forwarded via WSLENV).
-        let mut cmd = if let Some(ref w) = wsl_launch {
+        let mut cmd = if ssh_alias.is_some() {
+            Command::new("grok")
+        } else if let Some(ref w) = wsl_launch {
             let linux_cwd = crate::wsl_backend::windows_path_to_wsl(&cwd).map_err(|e| {
                 AgentError::new(
                     AgentErrorCode::CliNotFound,
@@ -1571,10 +1606,13 @@ impl AcpClient {
         cmd.arg("agent");
         cmd.arg(leader_spawn_flag(use_leader));
         // Agent option: `--agent-profile <PATH>` (before `stdio`). Path only —
-        // does not rewrite app agent-home or shared ~/.grok.
-        if let Some(ref profile_path) = agent_profile {
-            cmd.arg("--agent-profile");
-            cmd.arg(profile_path);
+        // does not rewrite app agent-home or shared ~/.grok. Skip on SSH — the
+        // path is local and would not exist on the host.
+        if ssh_alias.is_none() {
+            if let Some(ref profile_path) = agent_profile {
+                cmd.arg("--agent-profile");
+                cmd.arg(profile_path);
+            }
         }
         if !spawn_model.is_empty() {
             cmd.args(["--model", &spawn_model]);
@@ -1596,7 +1634,20 @@ impl AcpClient {
             cmd.arg(a);
         }
         cmd.arg("stdio");
-        if wsl_launch.is_none() {
+        if let Some(ref alias) = ssh_alias {
+            let grok_args: Vec<String> = cmd
+                .as_std()
+                .get_args()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect();
+            cmd = crate::ssh_remote::start_ssh_acp_command(
+                alias,
+                cwd.to_string_lossy().as_ref(),
+                &grok_args,
+            )
+            .map_err(|e| AgentError::new(AgentErrorCode::ConnectFailed, e))?;
+        }
+        if ssh_alias.is_none() && wsl_launch.is_none() {
             cmd.current_dir(&cwd);
         }
         cmd.stdin(Stdio::piped())
@@ -1604,13 +1655,15 @@ impl AcpClient {
             .stderr(Stdio::piped())
             .kill_on_drop(true);
         crate::process_util::apply_no_window_tokio(&mut cmd);
-        if wsl_launch.is_none() {
+        if ssh_alias.is_none() && wsl_launch.is_none() {
             crate::process_util::ensure_home_env_tokio(&mut cmd);
             if let Some(path) = crate::process_util::enriched_path_env() {
                 cmd.env("PATH", path);
             }
         }
-        cmd.env("GROK_HOME", &grok_home);
+        if ssh_alias.is_none() {
+            cmd.env("GROK_HOME", &grok_home);
+        }
         if let Some(ref native) = grok_build_proxy {
             apply_grok_build_proxy_env(&mut cmd, native);
         }
@@ -1642,8 +1695,9 @@ impl AcpClient {
             crate::wsl_backend::apply_wslenv(&mut cmd);
         }
         tracing::info!(
-            "acp: spawn home={} mode={} model={} effort={:?} native_grok_proxy={} sandbox={:?} max_turns={:?} fork_session={} no_ask_user={} leader={} subagents={} memory={} compaction_mode={} compaction_detail={} compaction_flags={} agent_profile={:?} agents_json={}",
+            "acp: spawn home={} ssh={:?} mode={} model={} effort={:?} native_grok_proxy={} sandbox={:?} max_turns={:?} fork_session={} no_ask_user={} leader={} subagents={} memory={} compaction_mode={} compaction_detail={} compaction_flags={} agent_profile={:?} agents_json={}",
             grok_home.display(),
+            ssh_alias,
             session_data_mode,
             spawn_model,
             opts.effort,
@@ -1667,10 +1721,12 @@ impl AcpClient {
         );
 
         let mut child = cmd.spawn().map_err(|e| {
-            AgentError::new(
-                AgentErrorCode::CliNotFound,
-                format!("failed to spawn grok agent stdio: {e}"),
-            )
+            let code = if ssh_alias.is_some() {
+                AgentErrorCode::ConnectFailed
+            } else {
+                AgentErrorCode::CliNotFound
+            };
+            AgentError::new(code, format!("failed to spawn grok agent stdio: {e}"))
         })?;
 
         let stdin = child
@@ -1705,6 +1761,7 @@ impl AcpClient {
             sandbox_profile: ParkingMutex::new(sandbox.map(|sb| sb.profile.clone())),
             custom_route,
             rewind_supported: ParkingMutex::new(None),
+            ssh_alias: ssh_alias.clone(),
         });
 
         client.start_read_loop(Box::new(stdout));
@@ -1801,6 +1858,7 @@ impl AcpClient {
             // Remote ACP: treat as official-class for reuse (no local auth strip).
             custom_route: false,
             rewind_supported: ParkingMutex::new(None),
+            ssh_alias: None,
         });
         client.start_read_loop(Box::new(read_half));
         Ok((client, event_rx))
@@ -2954,7 +3012,7 @@ impl AcpClient {
         cwd: &str,
     ) -> Result<(String, bool), AgentError> {
         let cwd = cwd.to_string();
-        if !std::path::Path::new(&cwd).is_dir() {
+        if !crate::ssh_remote::acp_session_cwd_ok(self.ssh_alias.as_deref(), &cwd) {
             return Err(AgentError::new(
                 AgentErrorCode::AgentCrashed,
                 format!("project cwd is not a directory: {cwd}"),
@@ -2965,8 +3023,13 @@ impl AcpClient {
         // MCP/OAuth: connect builder skips network refresh + CLI list, and a
         // hard budget falls back to `[]` so session/new|load always proceeds.
         // Official aux side-channel uses empty inject (no nested official-aux MCP).
-        let mcp_servers = if self.empty_mcp_servers {
-            info!("acp session open empty mcpServers (side-channel)");
+        // SSH: do not scan the remote path as a local project.
+        let mcp_servers = if self.empty_mcp_servers || self.ssh_alias.is_some() {
+            if self.ssh_alias.is_some() {
+                info!("acp session open empty mcpServers (ssh remote)");
+            } else {
+                info!("acp session open empty mcpServers (side-channel)");
+            }
             serde_json::json!([])
         } else {
             let project_cwd = cwd.clone();

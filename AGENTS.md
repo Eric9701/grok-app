@@ -6,6 +6,7 @@
    - [media-delivery.md](docs/llm-wiki/media-delivery.md) — local file previews: loopback HTTP + path resolve (not raw `media://` in product paths)  
    - [i18n.md](docs/llm-wiki/i18n.md) — all UI strings via `src/i18n/`  
    - [settings-ia.md](docs/llm-wiki/settings-ia.md) — **settings IA**: tabs, search registry (`settingsCatalog`), deep links; every new setting must be registered  
+   - [ssh-remote.md](docs/llm-wiki/ssh-remote.md) — **SSH remote hosts** (wave 1: list/test/probe; no tmux; later waves open folders / remote agent)  
    - [dialogs.md](docs/llm-wiki/dialogs.md) — **no `window.confirm` / `prompt` / `alert`**; **no OS-default controls**; reuse `Select` / `ContextMenu` / panel CSS; **no transparent menus**; **no stacking bugs**
    - [catalog.md](docs/llm-wiki/catalog.md) — models / effort / YOLO  
    - [automations.md](docs/llm-wiki/automations.md) — automation design (Build `/loop` / scheduler; non-blocking)  
@@ -47,4 +48,10 @@
 6. **Branch hygiene** — after work lands on `main` (merge, squash, or batch integrate), promptly and safely delete finished remote/local branches and idle worktrees. Confirm with `git fetch --prune`, ancestor / `gh pr` / feature-on-main checks; never delete open-PR heads, unique WIP, or worktree-checked-out branches without removing the worktree first. Details: [docs/llm-wiki/maintain.md](docs/llm-wiki/maintain.md#branch-hygiene-merged--finished-work).
 
 7. **App shell + AppWorkbench growth freeze** — do **not** add new `useState` / large feature blocks to `src/App.tsx` or `src/app/AppWorkbench.tsx`. Combined line count of App shell + AppWorkbench may only decrease (see `docs/plans/CODE-QUALITY-PROGRESS.md` and `docs/plans/HANDOFF-appworkbench-decomposition.md`). New product state and UI must land in domain modules (`src/providers/`, `src/hooks/`, `src/components/`, `src/lib/`).
+
+8. **Change / new-feature bar** — when asked to add or change product behavior, finish all three. Shipping a button or a stub that does not actually work is not done.
+
+   1. **Interaction Logic** — the full click/keyboard/busy/error/empty path, not only the visible control.
+   2. **Visual Consistency** — same chrome, spacing, menus, and states as the rest of the app. Do not invent a parallel skin.
+   3. **Feature Parity** — same capability as the existing product surface it sits next to (local session, CLI, the other row in the same list). A control that looks like rewind/rollback/fork but does nothing is a Feature Parity miss — same class as the current rewind bug.
 

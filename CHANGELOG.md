@@ -13,7 +13,17 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Added
+- **SSH remote hosts**: Settings → Runtime → SSH lists `~/.ssh/config` Host aliases. Test connection, then watch a host to list remote Grok sessions in the sidebar, open/resume them, start a new chat in a remote folder, and run `grok agent stdio` on the host via OpenSSH. macOS/Linux reuse a ControlMaster; Windows opens a fresh connection per action. Persistence is `grok agent leader`, not tmux. Remote paths are never treated as local disk.
+
+**中文 · 新增**
+- **SSH 远端主机**：设置 → 运行时 → SSH 读取 `~/.ssh/config` 的 Host。测通后 Watch，侧栏列出远端 Grok 会话，可打开/续跑、在远端文件夹开新对话，并通过 OpenSSH 在主机上跑 `grok agent stdio`。macOS/Linux 复用 ControlMaster；Windows 每次单独连。断线续跑用 `grok agent leader`，不是 tmux。远端路径不当本地磁盘。
+
 ### Fixed
+- Last chat lines stay above the floating composer. Scrolling down at the bottom no longer bounces the tail under the input.
+- Rewind on the last user bubble undoes that turn. Local journal still truncates if agent rewind fails.
+- First send on a new chat is not dropped when the agent is parked as viewed-only.
+- SSH path chips in chat open the files tree like local projects.
 - Long live thinking stays scrolled to the latest tokens inside the capped thought box.
 - Wallpaper frost no longer pops off when a chat starts streaming. Empty home and a live turn keep the same blur.
 - Overlay at 0% no longer clears wallpaper blur. The two sliders stay independent.
@@ -25,6 +35,10 @@ See `docs/llm-wiki/release.md`.
 - Bottom overscroll no longer rebounds above hidden chat content.
 
 **中文 · 修复**
+- 修复对话最后几行压在输入框上。滚到最底再往下滚不会把尾巴弹回输入框下面。
+- 修复点最后一条用户消息无法回退。Agent rewind 失败时仍截断本地记录。
+- 修复新会话第一轮发出去没有真正开跑。
+- 修复 SSH 会话里点路径 chip 不能跳到侧栏文件树。
 - 修复思考过长时看不到最新内容。展开的思考区跟到最新字，上翻不会被拽回。
 - 修复进会话、开始直播时壁纸突然变清楚并弹一下。空会话和直播回合共用同一层模糊。
 - 修复遮罩透明度拉到 0% 时把壁纸模糊也关掉。两根滑块互不影响。

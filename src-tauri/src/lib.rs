@@ -63,6 +63,8 @@ mod cli_worktrees;
 
 mod wsl_backend;
 
+mod ssh_remote;
+
 mod side_browser_blob;
 mod side_browser_host;
 
@@ -1020,6 +1022,23 @@ pub fn run() {
 
             commands::wsl_status,
 
+            ssh_remote::ssh_list_hosts,
+
+            ssh_remote::ssh_test_host,
+
+            ssh_remote::ssh_watch_start,
+
+            ssh_remote::ssh_watch_stop,
+
+            ssh_remote::ssh_list_dir,
+            ssh_remote::ssh_read_file,
+            ssh_remote::ssh_write_file,
+
+            ssh_remote::ssh_list_sessions,
+            ssh_remote::ssh_open_session,
+            ssh_remote::ssh_delete_sessions,
+            ssh_remote::ssh_browser_prepare,
+
             commands::cli_repair_agent_sidecar,
 
             commands::acp_test_connection,
@@ -1059,6 +1078,8 @@ pub fn run() {
             commands::general_workspace_path,
 
             commands::project_add,
+
+            commands::project_add_ssh,
 
             commands::project_add_dialog,
 

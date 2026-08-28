@@ -225,26 +225,37 @@ impl SessionManager {
         let mut agent_error: Option<String> = None;
 
         // Agent path only when this is the live session with a real ACP client.
+        // Never abort the whole command on agent rewind failure — local
+        // journal truncate is the UI source of truth (Feature Parity).
         if live_match && backend != "mock_acp" && !AcpClient::use_mock() {
-            if let Some(client) = acp {
-                let sid = agent_sid.ok_or("chat has no agent session id")?;
-                match client
-                    .rewind_execute_for(&sid, target_prompt_index, restore_files)
-                    .await
+            if let (Some(client), Some(sid)) = (acp, agent_sid) {
+                match tokio::time::timeout(
+                    std::time::Duration::from_secs(8),
+                    client.rewind_execute_for(&sid, target_prompt_index, restore_files),
+                )
+                .await
                 {
-                    Ok(_) => {
+                    Ok(Ok(_)) => {
                         tracing::info!(
                             target: "session",
                             "rewind_to_prompt_index: agent rewound target={target_prompt_index}"
                         );
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         agent_ok = false;
                         agent_error = Some(e.clone());
                         tracing::warn!(
                             target: "session",
                             error = %e,
                             "agent rewind failed; applying local journal truncate only"
+                        );
+                    }
+                    Err(_) => {
+                        agent_ok = false;
+                        agent_error = Some("agent rewind timed out".into());
+                        tracing::warn!(
+                            target: "session",
+                            "agent rewind timed out; applying local journal truncate only"
                         );
                     }
                 }

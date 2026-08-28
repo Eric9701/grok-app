@@ -16,6 +16,7 @@ export const ruSettingsUi = {
   "settings.tab.interface": "Интерфейс",
   "settings.tab.cli": "CLI",
   "settings.tab.connection": "Подключение",
+  "settings.tab.ssh": "SSH",
   "settings.tab.network": "Сеть",
   "settings.proxyMode": "Прокси",
   "settings.proxyModeDesc": "Как приложение и процессы агента выходят в сеть. «Системный» следует прокси ОС (включая loopback PAC); «Вручную» фиксирует URL; «Напрямую» отключает прокси. По возможности предпочитайте системный HTTP или ручной http://127.0.0.1:7890 вместо TUN.",

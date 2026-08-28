@@ -55,11 +55,17 @@ describe("chat answer overlap guard", () => {
       innerStart,
       src.indexOf(".lobe-chat-item {", innerStart),
     );
-    expect(innerBlock).toMatch(/padding:\s*20px 20px 32px/);
+    expect(innerBlock).toMatch(/padding:\s*20px 20px 8px/);
     expect(innerBlock).toMatch(
       /padding-inline-end:\s*max\(\s*20px,\s*calc\([\s\S]*100cqi\s*-\s*var\(--chat-width-max/,
     );
     expect(innerBlock).toContain('html[data-chat-width="full"] .lobe-chat__inner');
+    // Composer clearance must be a real box in scrollHeight, not only
+    // padding-bottom (WKWebView drops that from scrollHeight → last lines
+    // park under the floating composer).
+    expect(innerBlock).toMatch(
+      /\.lobe-chat__end-pad\s*\{[^}]*height:\s*calc\(\s*var\(--composer-float-pad/,
+    );
   });
 
   it("gives answer paragraphs an explicit unitless line-height", () => {

@@ -103,7 +103,7 @@ import {
   weaveToolsIntoAssistantSegments,
   truncateBeforeLastUser,
   truncateThroughUserPrompt,
-  canRewindToUserPrompt,
+  rewindKeepPromptIndex,
   canRegenerateAssistant,
   userPromptIndexOf,
   userPromptIndexContaining,
@@ -526,7 +526,10 @@ import {
   canOfferResumeWithCodeRestore,
   canRestoreCodeOnResume,
 } from "@/lib/sessionResumeRestore";
-import { isProjectPathMissing } from "@/lib/projectPath";
+import {
+  isProjectFolderMissing,
+  isProjectWarmable,
+} from "@/lib/projectPath";
 import {
   normalizeProjectColor,
   type ProjectColorToken,
@@ -1910,6 +1913,27 @@ export function AppWorkbench() {
   const html5DragDepthRef = useRef(0);
   const [, setSetup] = useState({ cli: false, auth: false, project: false });
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const newRemoteChat = useCallback(
+    async (alias: string, cwd: string) => {
+      const path = cwd.trim();
+      if (!path) return;
+      try {
+        const added = (await api.projectAddSsh(alias, path, true)) as Project;
+        setProjects(mapProjectsList((await api.projectsList()) as Project[]));
+        const full: Project = {
+          ...added,
+          trusted: true,
+          pathOk: true,
+          sshAlias: added.sshAlias?.trim() || alias,
+        };
+        await newChat(full);
+      } catch (e) {
+        setLocalError(String(e));
+      }
+    },
+    [newChat],
+  );
   const ensureConnectedRef = useRef<() => Promise<string | null>>(
     async () => null,
   );
@@ -3357,7 +3381,7 @@ export function AppWorkbench() {
         setLocalError(tr("project.trustFirst", { name: project.name }));
         return true;
       }
-      if (project && isProjectPathMissing(project.pathOk)) {
+      if (project && isProjectFolderMissing(project)) {
         setLocalError(tr("project.pathMissing", { name: project.name }));
         return true;
       }
@@ -3536,8 +3560,7 @@ export function AppWorkbench() {
     host.connect.release = (sessionId) =>
       releaseSessionConnection([queueSessionKey(sessionId)]);
     host.connect.workspacePath = () => generalWorkspacePath || undefined;
-    host.connect.isProjectWarmable = (project) =>
-      !project || (project.trusted && !isProjectPathMissing(project.pathOk));
+    host.connect.isProjectWarmable = (project) => isProjectWarmable(project);
   }
 
   const searchPaletteHostRef = useRef({
@@ -4032,7 +4055,7 @@ export function AppWorkbench() {
           });
           return false;
         }
-        if (proj && isProjectPathMissing(proj.pathOk)) {
+        if (proj && isProjectFolderMissing(proj)) {
           const detail = tr("project.pathMissing", { name: proj.name });
           setLocalError(detail);
           recordAutomationRun({
@@ -4122,6 +4145,7 @@ export function AppWorkbench() {
           projectPath: proj?.path || generalWorkspacePath || undefined,
           sessionId: sessionId ?? undefined,
           mode: "agent",
+          sshAlias: proj?.sshAlias ?? null,
         });
         setLiveHost(snap);
         liveHostRef.current = snap;
@@ -6532,7 +6556,9 @@ export function AppWorkbench() {
     let cancelled = false;
     setSkillsLoading(true);
     void api
-      .skillsList(activeProject?.path ?? null)
+      .skillsList(activeProject?.path ?? null, {
+        sshAlias: activeProject?.sshAlias ?? null,
+      })
       .then((res) => {
         if (cancelled) return;
         const err = (res.error ?? "").trim();
@@ -6561,7 +6587,7 @@ export function AppWorkbench() {
     return () => {
       cancelled = true;
     };
-  }, [activeProject?.path, skillsReloadToken]);
+  }, [activeProject?.path, activeProject?.sshAlias, skillsReloadToken]);
 
   const slashCatalog = useMemo(
     () => buildSlashCatalog(skillInfos),
@@ -8759,6 +8785,8 @@ export function AppWorkbench() {
         setRewindError(null);
         if (!result.agentOk) {
           showToast(tr("session.rewindLocalOnly"), 4200);
+        } else {
+          showToast(tr("session.rewindOk"));
         }
         await refreshSessions();
       } catch (e) {
@@ -8774,8 +8802,64 @@ export function AppWorkbench() {
     [canRewindSession, session.sessionId, session.state, showToast, tr],
   );
 
+  const runRewindDropLastUser = useCallback(
+    async (sessionId: string) => {
+      if (!api.isTauri()) {
+        const msg = tr("error.needTauri");
+        setRewindError(msg);
+        showToast(msg);
+        return;
+      }
+      if (!canRewindSession) {
+        const msg = tr("session.rewindBusy");
+        setRewindError(msg);
+        showToast(msg);
+        return;
+      }
+      setRewindError(null);
+      setRewindBusy(true);
+      try {
+        if (
+          (session.sessionId === sessionId ||
+            viewingSessionIdRef.current === sessionId) &&
+          session.state !== "ready"
+        ) {
+          try {
+            await ensureConnected();
+          } catch {
+            /* local-only path */
+          }
+        }
+        await api.sessionRewindDropLastUser(sessionId);
+        if (viewingSessionIdRef.current === sessionId) {
+          const stored = await api.sessionMessages(sessionId);
+          const mapped = mapStoredMessagesToChat(stored);
+          const woven = weaveToolsIntoAssistantSegments(mapped);
+          messagesBySessionRef.current.set(sessionId, woven);
+          setMessages(woven);
+        } else {
+          messagesBySessionRef.current.delete(sessionId);
+        }
+        setRewindTimeline(null);
+        setRewindConfirm(null);
+        setRewindRestoreFiles(false);
+        setRewindError(null);
+        showToast(tr("session.rewindOk"));
+        await refreshSessions();
+      } catch (e) {
+        const msg = tr("session.rewindFailed") + ": " + String(e);
+        setRewindError(msg);
+        showToast(msg, 4500);
+      } finally {
+        setRewindBusy(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canRewindSession, session.sessionId, session.state, showToast, tr],
+  );
+
   const confirmRewindToPrompt = useCallback(
-    (sessionId: string, targetPromptIndex: number, preview?: string) => {
+    (sessionId: string, targetPromptIndex: number | null, preview?: string) => {
       setCtxMenu(null);
       // GlassModal with restore-files checkbox (default off) — not bare setAppDialog.
       // Close the timeline first so two overlays cannot swallow the confirm click.
@@ -8851,15 +8935,16 @@ export function AppWorkbench() {
         return;
       }
       const idx = userPromptIndexOf(messages, msg.id);
-      if (idx < 0) return;
-      if (!canRewindToUserPrompt(messages, idx)) {
+      if (idx < 0) {
+        showToast(tr("session.rewindFailed"));
         return;
       }
+      const keep = rewindKeepPromptIndex(messages, idx);
       const preview = (msg.content || "")
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 80);
-      confirmRewindToPrompt(sid, idx, preview);
+      confirmRewindToPrompt(sid, keep, preview);
     },
     [
       canRewindSession,
@@ -8887,7 +8972,10 @@ export function AppWorkbench() {
           updatedAt: new Date().toISOString(),
         } satisfies SessionRow);
       const idx = userPromptIndexContaining(messages, msg.id);
-      if (idx < 0) return;
+      if (idx < 0) {
+        showToast(tr("session.forkFailed"));
+        return;
+      }
       confirmForkSession(row, idx);
     },
     [
@@ -11175,6 +11263,7 @@ export function AppWorkbench() {
             projectPath: proj.path || undefined,
             sessionId: createdId,
             mode: "agent",
+            sshAlias: proj.sshAlias ?? null,
           });
           if (
             snap.lastError ||
@@ -12839,7 +12928,8 @@ export function AppWorkbench() {
           if (
             decision.shouldReveal &&
             decision.revealPath &&
-            api.isTauri()
+            api.isTauri() &&
+            !activeProject?.sshAlias
           ) {
             void api.pathReveal(decision.revealPath).catch(() => {
               /* reveal is best-effort fallback */
@@ -13959,6 +14049,8 @@ export function AppWorkbench() {
             projectReorder={projectReorder}
             openProjectMenu={openProjectMenu}
             newChat={newChat}
+            onNewRemoteConversation={newRemoteChat}
+            onImportedSessionsChanged={() => void refreshSessions()}
             relocateProject={relocateProject}
             trustProject={trustProject}
             viewingSessionId={session.sessionId}
@@ -14105,7 +14197,7 @@ export function AppWorkbench() {
               />            </Suspense>
           ) : (
           <>
-          {activeProject && isProjectPathMissing(activeProject.pathOk) && (
+          {activeProject && isProjectFolderMissing(activeProject) && (
             <div className="conn-bar">
               <span style={{ fontSize: 12, opacity: 0.9, marginRight: 8 }}>
                 {tr("project.pathMissingShort")}
@@ -14121,7 +14213,7 @@ export function AppWorkbench() {
             </div>
           )}
           {activeProject &&
-            !isProjectPathMissing(activeProject.pathOk) &&
+            !isProjectFolderMissing(activeProject) &&
             !activeProject.trusted && (
             <div className="conn-bar">
               <button
@@ -14328,6 +14420,8 @@ export function AppWorkbench() {
             attachments={attachments}
             availableModels={availableModels}
             bindSessionProject={bindSessionProject}
+            setProjects={setProjects}
+            setLocalError={setLocalError}
             canGuideQueuedMessage={canGuideQueuedMessage}
             channelEffortOptions={channelEffortOptions}
             chatAttachments={chatAttachments}
@@ -14501,6 +14595,7 @@ export function AppWorkbench() {
               <BottomTerminal
                 locale={locale}
                 projectPath={effectiveProjectPath}
+                sshAlias={activeProject?.sshAlias ?? null}
                 state={bottomTerminal.state}
                 onAddTab={bottomTerminal.addTab}
                 onCloseTab={bottomTerminal.closeTab}
@@ -14525,6 +14620,7 @@ export function AppWorkbench() {
           asidePaint={asidePaint}
           beginAsideResize={beginAsideResize}
           effectiveProjectPath={effectiveProjectPath}
+          sshAlias={activeProject?.sshAlias ?? null}
           projectName={
             activeProject
               ? projectDisplayName(activeProject, tr)
@@ -14949,6 +15045,7 @@ export function AppWorkbench() {
         runForkSession={runForkSession}
         runMcpDoctor={runMcpDoctor}
         runResumeWithCodeRestore={runResumeWithCodeRestore}
+        runRewindDropLastUser={runRewindDropLastUser}
         runRewindToPrompt={runRewindToPrompt}
         saveSessionMaxTurnsModal={saveSessionMaxTurnsModal}
         saveSessionNoteModal={saveSessionNoteModal}

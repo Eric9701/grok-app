@@ -23,6 +23,7 @@ import {
   truncateThroughUserPrompt,
   endIndexThroughUserPrompt,
   canRewindToUserPrompt,
+  rewindKeepPromptIndex,
   userPromptIndexOf,
   userPromptIndexContaining,
   countUserPrompts,
@@ -207,6 +208,9 @@ describe("session projection", () => {
     expect(userPromptIndexOf(msgs, "u2")).toBe(1);
     expect(userPromptIndexOf(msgs, "a1")).toBe(-1);
     expect(countUserPrompts(msgs)).toBe(2);
+    expect(rewindKeepPromptIndex(msgs, 0)).toBe(0);
+    expect(rewindKeepPromptIndex(msgs, 1)).toBe(0);
+    expect(rewindKeepPromptIndex(msgs.slice(0, 3), 0)).toBe(null);
   });
 
   it("userPromptIndexContaining maps assistant/tool to the parent user turn", () => {

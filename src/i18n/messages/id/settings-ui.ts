@@ -16,6 +16,7 @@ export const idSettingsUi = {
   "settings.tab.interface": "Antarmuka",
   "settings.tab.cli": "CLI",
   "settings.tab.connection": "Koneksi",
+  "settings.tab.ssh": "SSH",
   "settings.tab.network": "Jaringan",
   "settings.proxyMode": "Proksi",
   "settings.proxyModeDesc": "Cara aplikasi dan proses agen menjangkau jaringan. Sistem mengikuti proksi OS (termasuk PAC loopback); Manual mengunci URL; Langsung memaksa tanpa proksi. Utamakan HTTP sistem atau Manual http://127.0.0.1:7890 daripada TUN jika memungkinkan.",

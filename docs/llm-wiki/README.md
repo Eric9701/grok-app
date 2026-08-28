@@ -12,6 +12,7 @@ Agent 与贡献者的**可执行知识库**。改产品行为或 UI 文案前，
 | [slash-composer.md](./slash-composer.md) | 斜杠面板、技能标签、Goal 模式、Doctor |
 | [session-continuity.md](./session-continuity.md) | Agent 续会话（load/bootstrap）、自动压缩归属 |
 | [session-api.md](./session-api.md) | **本机会话接口**：列表 + session id 续跑（#626 第一刀；非新建、非打断） |
+| [ssh-remote.md](./ssh-remote.md) | **SSH 远端工作区**：OpenSSH Host、Watch、远端会话/文件/终端/Skills/localhost 转发；远端路径不当本地盘 |
 | [account.md](./account.md) | 官方登录 / 会员额度 / 热力图 / 调用日志 |
 | [providers.md](./providers.md) | 自定义中转、agent GROK_HOME、编辑器探测 |
 | [model-routing.md](./model-routing.md) | **模型分层**：识图 / 搜索 / 摘要 / 提示建议辅槽；省 Grok / 还原官方默认 |
