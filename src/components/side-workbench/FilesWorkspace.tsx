@@ -1,7 +1,8 @@
 /**
  * Files workbench (Phase 1): dual-row chrome under shared SideTabBar —
- * breadcrumb + tree toggle +「打开」; one shared tree; multi-file preview
- * driven by parent SideTab file paths. Preview | tree split (not exclusive stack).
+ * editor actions (or breadcrumb) + tree toggle +「打开」; one shared tree;
+ * multi-file preview driven by parent SideTab file paths.
+ * Preview | tree split (not exclusive stack).
  */
 
 import {
@@ -27,6 +28,7 @@ import { VirtualList } from "@/components/VirtualList";
 import { Tip } from "@/components/ui/tooltip";
 import { GlassModal } from "@/components/GlassModal";
 import { FileKindMark } from "@/components/resource-viewer/FileKindMark";
+import { ResourceEditorActions } from "@/components/resource-viewer/ResourceEditorActions";
 import { ResourcePreviewBody } from "@/components/resource-viewer/ResourcePreviewBody";
 import {
   clampTreeWidth,
@@ -153,6 +155,7 @@ export function FilesWorkspace({
 
   const {
     activeTab,
+    activeTabEditable,
     openFile,
     openAbsoluteFile,
     updateActiveDraft,
@@ -536,6 +539,11 @@ export function FilesWorkspace({
     previewTab.tabKind !== "url" &&
     !previewTab.loading &&
     !previewDirty;
+  const showEditorChrome =
+    !!previewTab &&
+    previewTab.tabKind !== "url" &&
+    !!activeTabEditable &&
+    previewTab.draftText != null;
 
   if (!projectPath) {
     return (
@@ -550,36 +558,56 @@ export function FilesWorkspace({
 
   return (
     <div className="sw-files rp--embedded" data-testid="files-workspace">
-      {/* Row 2 (image-5/6): crumbs LEFT · tree + 打开 RIGHT */}
+      {/* Dual-row chrome: editor actions (or crumbs) LEFT · tree + 打开 RIGHT */}
       <div className="rp-files-toolbar" data-testid="files-toolbar">
-        <div
-          className="rp-files-toolbar__crumbs"
-          title={activeTab?.relativePath || projectName || ""}
-        >
-          {crumbs.length === 0 ? (
-            <span className="rp-files-toolbar__muted">
-              {projectName || tr("resources.files")}
-            </span>
-          ) : (
-            crumbs.map((c, i) => (
-              <span key={`${c}-${i}`} className="rp-files-toolbar__crumb-wrap">
-                {i > 0 ? (
-                  <span className="rp-files-toolbar__sep" aria-hidden>
-                    ›
-                  </span>
-                ) : null}
-                <span
-                  className={
-                    "rp-files-toolbar__crumb" +
-                    (i === crumbs.length - 1 ? " is-current" : "")
-                  }
-                >
-                  {c}
-                </span>
+        {showEditorChrome ? (
+          <ResourceEditorActions
+            tr={tr}
+            editMode={!!previewTab?.editMode}
+            saving={!!previewTab?.saving}
+            dirty={previewDirty}
+            onToggleEdit={toggleActiveEditMode}
+            onSave={() => void saveActiveFile()}
+            onRevert={() => revertActiveDraft()}
+            align="start"
+            className="rp-files-toolbar__editor"
+            title={previewTab?.relativePath || projectName || ""}
+            testIds={{
+              edit: "files-editor-edit",
+              save: "files-editor-save",
+              revert: "files-editor-revert",
+            }}
+          />
+        ) : (
+          <div
+            className="rp-files-toolbar__crumbs"
+            title={activeTab?.relativePath || projectName || ""}
+          >
+            {crumbs.length === 0 ? (
+              <span className="rp-files-toolbar__muted">
+                {projectName || tr("resources.files")}
               </span>
-            ))
-          )}
-        </div>
+            ) : (
+              crumbs.map((c, i) => (
+                <span key={`${c}-${i}`} className="rp-files-toolbar__crumb-wrap">
+                  {i > 0 ? (
+                    <span className="rp-files-toolbar__sep" aria-hidden>
+                      ›
+                    </span>
+                  ) : null}
+                  <span
+                    className={
+                      "rp-files-toolbar__crumb" +
+                      (i === crumbs.length - 1 ? " is-current" : "")
+                    }
+                  >
+                    {c}
+                  </span>
+                </span>
+              ))
+            )}
+          </div>
+        )}
         <div className="rp-files-toolbar__actions">
           <Tip
             label={
@@ -733,6 +761,7 @@ export function FilesWorkspace({
                 runRejectHunk={NOOP_ASYNC}
                 requestBatchAcceptHunks={NOOP}
                 requestBatchRejectHunks={NOOP}
+                hideToolbar={showEditorChrome}
               />
             );
           })()}

@@ -430,6 +430,22 @@
   box-sizing: border-box;
 }
 
+.rp-editor__toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rp-editor__toolbar-actions--split {
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.rp-editor__toolbar-actions--start {
+  flex: 1 1 auto;
+}
+
 .rp-editor__toolbar-spacer {
   flex: 1;
   min-width: 8px;
