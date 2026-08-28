@@ -292,6 +292,39 @@ fn pending_prompt_ids_for(pending: &HashMap<u64, Pending>, target: Option<&str>)
     Vec::new()
 }
 
+/// Whether any prompt captured by a fallback is still awaiting its RPC result.
+///
+/// A fallback must stay bound to the prompt ids that existed when the matching
+/// `prompt_complete` notification arrived. Looking up the session again later
+/// can adopt a newer turn that started during the grace window.
+fn has_pending_prompt_ids(pending: &HashMap<u64, Pending>, prompt_ids: &[u64]) -> bool {
+    prompt_ids.iter().any(|id| {
+        pending
+            .get(id)
+            .is_some_and(|p| p.method == "session/prompt")
+    })
+}
+
+/// Remove only the prompt waiters captured by one fallback generation.
+fn take_pending_prompt_ids(
+    pending: &mut HashMap<u64, Pending>,
+    prompt_ids: &[u64],
+) -> Vec<(u64, Pending)> {
+    prompt_ids
+        .iter()
+        .filter_map(|id| {
+            let is_prompt = pending
+                .get(id)
+                .is_some_and(|p| p.method == "session/prompt");
+            if is_prompt {
+                pending.remove(id).map(|p| (*id, p))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 /// Pure decision for the `prompt_complete` fallback: release the waiter only
 /// when the agent has been quiet for `grace` since its last session update.
 fn prompt_fallback_due(last_update: Option<Instant>, grace: Duration, now: Instant) -> bool {
@@ -2133,11 +2166,6 @@ impl AcpClient {
         }
     }
 
-    /// Whether a `session/prompt` request is still awaiting its RPC result.
-    fn has_pending_prompt_for(&self, session_id: Option<&str>) -> bool {
-        !pending_prompt_ids_for(&self.pending.lock(), session_id).is_empty()
-    }
-
     fn touch_last_update(&self, session_id: Option<&str>, at: Instant) {
         if let Some(sid) = session_id.filter(|s| !s.is_empty()) {
             self.last_update_by_session
@@ -2176,12 +2204,19 @@ impl AcpClient {
     ) {
         let this = Arc::clone(self);
         let sid = session_id.as_deref().map(|s| s.to_string());
+        // Capture this completion notification's exact RPC generation. A real
+        // result may remove it before the timer wakes; a newer prompt in the
+        // same session must never be adopted by this stale fallback.
+        let prompt_ids = pending_prompt_ids_for(&self.pending.lock(), sid.as_deref());
+        if prompt_ids.is_empty() {
+            return;
+        }
         tokio::spawn(async move {
             let grace = Duration::from_millis(PROMPT_COMPLETE_FALLBACK_GRACE_MS);
             loop {
                 tokio::time::sleep(grace).await;
                 // Real RPC result landed (or the turn was cancelled) — nothing to free.
-                if !this.has_pending_prompt_for(sid.as_deref()) {
+                if !has_pending_prompt_ids(&this.pending.lock(), &prompt_ids) {
                     return;
                 }
                 let last = this.last_update_for(sid.as_deref());
@@ -2192,21 +2227,18 @@ impl AcpClient {
                     "acp prompt_complete fallback re-armed: agent still streaming after early complete"
                 );
             }
-            this.complete_pending_prompt_fallback(&sid, &stop_reason);
+            this.complete_pending_prompt_fallback(&prompt_ids, &stop_reason);
         });
     }
 
     /// If agent never returned a session/prompt result after prompt_complete, free waiters.
-    fn complete_pending_prompt_fallback(&self, session_id: &Option<String>, stop_reason: &str) {
-        let mut pending = self.pending.lock();
-        let prompt_ids = pending_prompt_ids_for(&pending, session_id.as_deref());
-        for id in prompt_ids {
-            if let Some(p) = pending.remove(&id) {
-                info!(
-                    "acp completing session/prompt id={id} via delayed prompt_complete fallback (no RPC result yet)"
-                );
-                let _ = p.tx.send(Ok(json!({ "stopReason": stop_reason })));
-            }
+    fn complete_pending_prompt_fallback(&self, prompt_ids: &[u64], stop_reason: &str) {
+        let prompts = take_pending_prompt_ids(&mut self.pending.lock(), prompt_ids);
+        for (id, p) in prompts {
+            info!(
+                "acp completing session/prompt id={id} via delayed prompt_complete fallback (no RPC result yet)"
+            );
+            let _ = p.tx.send(Ok(json!({ "stopReason": stop_reason })));
         }
     }
 
@@ -6106,6 +6138,41 @@ mod prompt_fallback_tests {
     fn exactly_at_grace_boundary_completes() {
         let now = Instant::now();
         assert!(prompt_fallback_due(Some(now - grace()), grace(), now));
+    }
+
+    #[test]
+    fn completed_turn_fallback_cannot_adopt_immediate_next_prompt() {
+        let mut pending = HashMap::new();
+        let (first_tx, _first_rx) = oneshot::channel();
+        pending.insert(
+            4,
+            Pending {
+                method: "session/prompt".into(),
+                tx: first_tx,
+                session_id: Some("sidA".into()),
+            },
+        );
+
+        // Turn A emits prompt_complete, so its fallback captures only id=4.
+        let captured = pending_prompt_ids_for(&pending, Some("sidA"));
+        assert_eq!(captured, vec![4]);
+
+        // Turn A's real RPC result lands, then the user immediately starts B.
+        pending.remove(&4);
+        let (second_tx, _second_rx) = oneshot::channel();
+        pending.insert(
+            5,
+            Pending {
+                method: "session/prompt".into(),
+                tx: second_tx,
+                session_id: Some("sidA".into()),
+            },
+        );
+
+        // The stale fallback exits and cannot remove the newer waiter.
+        assert!(!has_pending_prompt_ids(&pending, &captured));
+        assert!(take_pending_prompt_ids(&mut pending, &captured).is_empty());
+        assert!(pending.contains_key(&5));
     }
 }
 
