@@ -19,6 +19,12 @@ See `docs/llm-wiki/release.md`.
 **中文 · 新增**
 - **SSH 远端主机**：设置 → 运行时 → SSH 读取 `~/.ssh/config` 的 Host。测通后 Watch，侧栏列出远端 Grok 会话，可打开/续跑、在远端文件夹开新对话，并通过 OpenSSH 在主机上跑 `grok agent stdio`。macOS/Linux 复用 ControlMaster；Windows 每次单独连。断线续跑用 `grok agent leader`，不是 tmux。远端路径不当本地磁盘。
 
+### Changed
+- Message action buttons stay visible. Appearance still has On hover.
+
+**中文 · 变更**
+- 消息操作按钮默认始终显示。外观里仍可改回悬停显示。
+
 ### Fixed
 - Last chat lines stay above the floating composer. Scrolling down at the bottom no longer bounces the tail under the input.
 - Rewind on the last user bubble undoes that turn. Local journal still truncates if agent rewind fails.
