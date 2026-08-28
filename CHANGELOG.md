@@ -14,6 +14,7 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Fixed
+- Long live thinking stays scrolled to the latest tokens inside the capped thought box.
 - Wallpaper frost no longer pops off when a chat starts streaming. Empty home and a live turn keep the same blur.
 - Overlay at 0% no longer clears wallpaper blur. The two sliders stay independent.
 - Windows taskbar keeps the Grok mark after an update.
@@ -24,6 +25,7 @@ See `docs/llm-wiki/release.md`.
 - Bottom overscroll no longer rebounds above hidden chat content.
 
 **中文 · 修复**
+- 修复思考过长时看不到最新内容。展开的思考区跟到最新字，上翻不会被拽回。
 - 修复进会话、开始直播时壁纸突然变清楚并弹一下。空会话和直播回合共用同一层模糊。
 - 修复遮罩透明度拉到 0% 时把壁纸模糊也关掉。两根滑块互不影响。
 - 修复 Windows 更新后任务栏变成空白文档图标。
