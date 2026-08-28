@@ -13,12 +13,6 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
-### Changed
-- Composer model chip is one control for model + effort. Advanced opens a hub; hover a row to pick on the side. Empty and active chats share the same width.
-
-**中文 · 变更**
-- 输入框模型按钮改为模型+推理一颗芯片。高级是悬停侧出的设置层。空对话和进行中对话同一列宽。
-
 ### Added
 - **SSH remote hosts**: Settings → Runtime → SSH lists `~/.ssh/config` Host aliases. Test connection, then watch a host to list remote Grok sessions in the sidebar, open/resume them, start a new chat in a remote folder, and run `grok agent stdio` on the host via OpenSSH. macOS/Linux reuse a ControlMaster; Windows opens a fresh connection per action. Persistence is `grok agent leader`, not tmux. Remote paths are never treated as local disk.
 
@@ -26,9 +20,11 @@ See `docs/llm-wiki/release.md`.
 - **SSH 远端主机**：设置 → 运行时 → SSH 读取 `~/.ssh/config` 的 Host。测通后 Watch，侧栏列出远端 Grok 会话，可打开/续跑、在远端文件夹开新对话，并通过 OpenSSH 在主机上跑 `grok agent stdio`。macOS/Linux 复用 ControlMaster；Windows 每次单独连。断线续跑用 `grok agent leader`，不是 tmux。远端路径不当本地磁盘。
 
 ### Changed
+- Composer model chip is one control for model + effort. Advanced opens a hub; hover a row to pick on the side. Empty and active chats share the same width.
 - Message action buttons stay visible. Appearance still has On hover.
 
 **中文 · 变更**
+- 输入框模型按钮改为模型+推理一颗芯片。高级是悬停侧出的设置层。空对话和进行中对话同一列宽。
 - 消息操作按钮默认始终显示。外观里仍可改回悬停显示。
 
 ### Fixed
