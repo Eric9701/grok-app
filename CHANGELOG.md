@@ -31,6 +31,7 @@ See `docs/llm-wiki/release.md`.
 - First send on a new chat is not dropped when the agent is parked as viewed-only.
 - SSH path chips in chat open the files tree like local projects.
 - Long live thinking stays scrolled to the latest tokens inside the capped thought box.
+- After a turn finishes, the view stays on the latest stream instead of jumping to the top.
 - Wallpaper frost no longer pops off when a chat starts streaming. Empty home and a live turn keep the same blur.
 - Overlay at 0% no longer clears wallpaper blur. The two sliders stay independent.
 - Windows taskbar keeps the Grok mark after an update.
@@ -46,6 +47,7 @@ See `docs/llm-wiki/release.md`.
 - 修复新会话第一轮发出去没有真正开跑。
 - 修复 SSH 会话里点路径 chip 不能跳到侧栏文件树。
 - 修复思考过长时看不到最新内容。展开的思考区跟到最新字，上翻不会被拽回。
+- 修复任务结束后对话跳回顶部。视口留在流式输出的结尾。
 - 修复进会话、开始直播时壁纸突然变清楚并弹一下。空会话和直播回合共用同一层模糊。
 - 修复遮罩透明度拉到 0% 时把壁纸模糊也关掉。两根滑块互不影响。
 - 修复 Windows 更新后任务栏变成空白文档图标。
