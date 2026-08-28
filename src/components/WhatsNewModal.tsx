@@ -1,5 +1,6 @@
 /**
  * Per-version update notes — GlassModal, CHANGELOG.md source.
+ * Items are already first-sentence / bold-lead lines from `changelogPopupItem`.
  */
 
 import { useMemo } from "react";

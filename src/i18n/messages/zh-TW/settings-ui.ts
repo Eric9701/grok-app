@@ -369,6 +369,7 @@ export const zhTWSettingsUi = {
   "settings.wallpaperScrimDesc": "調節蓋在壁紙上的半透明層（全窗遮罩 + 面板底色）。數值越低壁紙越清晰。與模糊互不影響。",
   "settings.wallpaperBlur": "遮罩模糊",
   "settings.wallpaperBlurDesc": "調節壁紙本身的模糊程度。數值越低壁紙越清晰。與透明度互不影響。",
+  "settings.wallpaperBlurMacHint": "macOS 27 及以上有 bug，建議不要開啟。",
   "settings.surfaceOpacity": "介面透明度",
   "settings.surfaceOpacityDesc": "與桌布遮罩獨立，不合併計算。輸入框依滑桿值生效；卡片和設定頁有 20% 保底，不會全透明。",
   "settings.composerOpacity": "輸入框透明度",

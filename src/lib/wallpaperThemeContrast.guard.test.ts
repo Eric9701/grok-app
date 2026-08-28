@@ -94,6 +94,20 @@ describe("wallpaper theme contrast CSS", () => {
     );
   });
 
+  it("extends the wallpaper scrim across the right rail instead of dumping it", () => {
+    const gradient = css.match(
+      /html\[data-wallpaper="1"\] \.app-shell::after\s*\{[^}]*background:\s*linear-gradient\(([\s\S]*?)\);\s*\}/s,
+    )?.[1];
+    expect(gradient).toBeTruthy();
+    expect(gradient).toMatch(/^\s*90deg,/);
+    expect(gradient).not.toMatch(/105deg/);
+    expect(gradient).not.toMatch(/calc\(12% \*/);
+    expect(gradient).not.toMatch(/calc\(28% \*/);
+    expect(gradient).toMatch(
+      /calc\(62% \* var\(--wallpaper-theme-scrim-opacity/,
+    );
+  });
+
   it("keeps wallpaper chrome washes opaque so they do not sample the scrim", () => {
     expect(css).toMatch(
       /html\[data-wallpaper="1"\] \.main\s*\{[^}]*--bg-hover:\s*color-mix\(\s*in srgb,\s*var\(--bg-elevated\) 90%,\s*var\(--text-primary\) 10%\s*\)/s,
@@ -387,6 +401,12 @@ describe("wallpaper theme contrast CSS", () => {
     );
     expect(css).toMatch(
       /html\[data-wallpaper="1"\] \.sidebar\.sidebar--overlay,\s*html\[data-wallpaper="1"\] \.sidebar\.sidebar--phone-drawer\s*\{[^}]*backdrop-filter:\s*blur\(var\(--wallpaper-sidebar-blur, 22px\)\)/s,
+    );
+    expect(css).toMatch(
+      /html\.platform-win\[data-wallpaper="1"\] \.app-wallpaper-media\s*\{[^}]*filter:\s*none/s,
+    );
+    expect(css).toMatch(
+      /html\.platform-win\[data-wallpaper="1"\]\s+\.app-wallpaper-media\.is-ready\s+\.app-wallpaper-media__el\s*\{[^}]*filter:\s*blur\(var\(--wallpaper-sidebar-blur, 22px\)\)/s,
     );
     expect(css).not.toMatch(
       /html\[data-wallpaper="1"\]\s+\.sidebar:not\(\.sidebar--overlay\):not\(\.sidebar--phone-drawer\)::before/,

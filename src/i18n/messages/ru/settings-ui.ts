@@ -369,6 +369,7 @@ export const ruSettingsUi = {
   "settings.wallpaperScrimDesc": "Насколько сильно вуаль закрывает обои (на всё окно + оттенок панелей). Ниже = обои виднее. Не зависит от размытия.",
   "settings.wallpaperBlur": "Размытие оверлея",
   "settings.wallpaperBlurDesc": "Насколько размыты сами обои. Ниже = резче. Не зависит от непрозрачности.",
+  "settings.wallpaperBlurMacHint": "В macOS 27 и новее есть ошибка. Размытие лучше не включать.",
   "settings.surfaceOpacity": "Непрозрачность поверхностей",
   "settings.surfaceOpacityDesc": "Не зависит от вуали обоев. Поле ввода следует ползунку напрямую. Карточки и страница настроек сохраняют минимум 20%.",
   "settings.composerOpacity": "Непрозрачность поля ввода",

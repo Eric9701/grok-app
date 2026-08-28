@@ -37,6 +37,7 @@ import {
 import {
   CHAT_DEFAULT_ROW_ESTIMATE_PX,
   CHAT_VIRTUALIZE_THRESHOLD,
+  chatOpenPinWindow,
   computeChatVirtualWindow,
   cumulativeOffsets,
   resolveChatOverscanPx,
@@ -59,6 +60,7 @@ import {
 import {
   distanceFromBottom,
   markProgrammaticStickScroll,
+  shouldForcePinnedSnapOnOpen,
   STICK_ESCAPE_MIN_DELTA_PX,
 } from "@/lib/stickToBottom";
 import { createScrollVelocityTracker } from "@/lib/scrollVelocity";
@@ -190,6 +192,33 @@ export function useChatMessageVirtualizer(
    * scrollHeight drift caused by the freshly mounted rows.
    */
   const pinnedPreCommitBottomDistRef = useRef(0);
+  /**
+   * Next pin-window commit after a conversation switch must land on the tail
+   * even if leftover scrollTop is far from the new bottom.
+   */
+  const forceOpenSnapRef = useRef(false);
+  const conversationKeyRef = useRef(conversationKey);
+  if (conversationKeyRef.current !== conversationKey) {
+    conversationKeyRef.current = conversationKey;
+    heightsRef.current.clear();
+    heightsVersionRef.current = 0;
+    offsetsCacheRef.current = null;
+    pendingAnchorOffsetRef.current = 0;
+    pinnedPreCommitBottomDistRef.current = 0;
+    forceOpenSnapRef.current = true;
+    if (sharedRowObserverRef.current) {
+      sharedRowObserverRef.current.disconnect();
+      sharedRowObserverRef.current = null;
+    }
+    observedElementsRef.current.clear();
+    observedIndicesRef.current.clear();
+    const nextWin = virtualized
+      ? chatOpenPinWindow(itemCount)
+      : full(itemCount);
+    winRef.current = nextWin;
+    committedWinRef.current = nextWin;
+    setWin(nextWin);
+  }
 
   /**
    * Mirror scrollingRef onto the viewport as data-scrolling so CSS can turn
@@ -227,21 +256,6 @@ export function useChatMessageVirtualizer(
     },
     [viewportRef],
   );
-
-  // Drop height cache on conversation change.
-  useEffect(() => {
-    heightsRef.current.clear();
-    heightsVersionRef.current = 0;
-    offsetsCacheRef.current = null;
-    pendingAnchorOffsetRef.current = 0;
-    if (sharedRowObserverRef.current) {
-      sharedRowObserverRef.current.disconnect();
-      sharedRowObserverRef.current = null;
-    }
-    observedElementsRef.current.clear();
-    observedIndicesRef.current.clear();
-    setWin(full(itemCount));
-  }, [conversationKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getHeight = useCallback((index: number) => {
     const key = getKeyRef.current(index);
@@ -298,7 +312,7 @@ export function useChatMessageVirtualizer(
       return;
     }
     const t0 = performance.now();
-    const pin = !!isPinnedRef.current;
+    const pin = !!isPinnedRef.current || forceOpenSnapRef.current;
 
     if (pin && scrollingRef.current) {
       scrollingRef.current = false;
@@ -449,11 +463,13 @@ export function useChatMessageVirtualizer(
     // up" from "mounted rows shifted scrollHeight", and judging on post-commit
     // numbers made >10px measurement drift refuse the snap (bottom bounce).
     if (pin) {
-      pinnedPreCommitBottomDistRef.current = distanceFromBottom(
-        el.scrollTop,
-        el.scrollHeight,
-        el.clientHeight,
-      );
+      pinnedPreCommitBottomDistRef.current = forceOpenSnapRef.current
+        ? 0
+        : distanceFromBottom(
+            el.scrollTop,
+            el.scrollHeight,
+            el.clientHeight,
+          );
     }
 
     winRef.current = adjustedNext;
@@ -578,21 +594,36 @@ export function useChatMessageVirtualizer(
   // the bottom before paint, so a commit whose mounted heights differ from
   // the cached estimates is displacement-neutral (no bottom bounce).
   useLayoutEffect(() => {
-    if (!virtualized || !isPinnedRef.current) return;
+    if (!virtualized) return;
+    const forceOpen = shouldForcePinnedSnapOnOpen({
+      pinned: true,
+      forceOpenSnap: forceOpenSnapRef.current,
+    });
+    if (!isPinnedRef.current && !forceOpen) return;
     const v = viewportRef.current;
     if (!v) return;
     // User already left the bottom (trackpad ticks). Snapping here is the
     // "wheel turns, screen does not move" freeze until a hard flick. Judged
     // on the distance captured before the commit: post-commit numbers
     // conflate user motion with scrollHeight drift from fresh row mounts.
-    const dist = pinnedPreCommitBottomDistRef.current;
-    if (dist >= STICK_ESCAPE_MIN_DELTA_PX) return;
+    let dist = pinnedPreCommitBottomDistRef.current;
+    if (forceOpen) {
+      dist = 0;
+    } else if (dist >= STICK_ESCAPE_MIN_DELTA_PX) {
+      return;
+    }
     const top = Math.max(0, v.scrollHeight - v.clientHeight);
     const desired = Math.max(0, top - dist);
-    if (Math.abs(v.scrollTop - desired) <= 0.5) return;
-    ignoreScrollAdjustRef.current = true;
-    markProgrammaticStickScroll(v, desired);
-    v.scrollTop = desired;
+    if (Math.abs(v.scrollTop - desired) > 0.5) {
+      ignoreScrollAdjustRef.current = true;
+      markProgrammaticStickScroll(v, desired);
+      v.scrollTop = desired;
+    }
+    // Placeholder windows use totalHeight 0; keep the flag until the real
+    // spacer commit so leftover distance cannot skip the tail snap.
+    if (forceOpen && win.totalHeight > 0) {
+      forceOpenSnapRef.current = false;
+    }
   }, [
     virtualized,
     win.start,

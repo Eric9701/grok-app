@@ -340,9 +340,7 @@ export function AppearanceSection() {
                       >
                         <span
                           className="settings-skin-card__swatch"
-                          style={{
-                            background: `linear-gradient(135deg, ${pack.swatch} 0%, ${pack.swatchAlt} 100%)`,
-                          }}
+                          style={{ background: pack.swatch }}
                           aria-hidden
                         />
                         <span className="settings-skin-card__name">
@@ -622,6 +620,9 @@ export function AppearanceSection() {
                                   onWallpaperBlur(Number(e.target.value));
                                 }}
                               />
+                              <p className="settings-wallpaper__scrim-hint">
+                                {t("settings.wallpaperBlurMacHint")}
+                              </p>
                             </div>
                           ) : null}
                         </div>

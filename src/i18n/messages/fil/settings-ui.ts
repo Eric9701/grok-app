@@ -369,6 +369,7 @@ export const filSettingsUi = {
   "settings.wallpaperScrimDesc": "Gaano kalakas takpan ng veil ang wallpaper (buong window + pane tint). Mas mababa = mas malinaw. Hiwalay sa blur.",
   "settings.wallpaperBlur": "Blur ng overlay",
   "settings.wallpaperBlurDesc": "Gaano kalabo ang wallpaper media. Mas mababa = mas matalas. Hiwalay sa opacity.",
+  "settings.wallpaperBlurMacHint": "May bug ang macOS 27 pataas. Iwanang naka-off ang overlay blur.",
   "settings.surfaceOpacity": "Opacity ng ibabaw",
   "settings.surfaceOpacityDesc": "Hiwalay sa overlay ng wallpaper. Direktang sinusundan ng composer ang slider. May 20% floor ang mga card at ang page ng Settings.",
   "settings.composerOpacity": "Opacity ng composer",

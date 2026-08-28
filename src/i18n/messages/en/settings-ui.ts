@@ -369,6 +369,7 @@ export const enSettingsUi = {
   "settings.wallpaperScrimDesc": "How strongly the dimming veil covers the wallpaper (full-window veil + pane tint). Lower = clearer wallpaper. Independent of blur.",
   "settings.wallpaperBlur": "Overlay blur",
   "settings.wallpaperBlurDesc": "How much the wallpaper media is frosted. Lower = sharper wallpaper. Independent of opacity.",
+  "settings.wallpaperBlurMacHint": "macOS 27 and later has a bug. Leave overlay blur off.",
   "settings.surfaceOpacity": "Surface opacity",
   "settings.surfaceOpacityDesc": "Independent of wallpaper overlay. Composer uses the slider value directly. Cards and the settings page keep a 20% floor so they never go fully clear.",
   "settings.composerOpacity": "Composer opacity",

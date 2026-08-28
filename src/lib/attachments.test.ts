@@ -6,6 +6,7 @@ import {
   buildInlineMediaPathMap,
   extractMediaPathsFromContent,
   extractSessionRelativeMediaRefs,
+  shouldReserveCitedMediaCard,
   filterAttachmentsNotInlined,
   filterEchoedUserAttachments,
   mediaTailFromPath,
@@ -309,6 +310,29 @@ also /tmp/other.png and /tmp/clip.mp4 and not a file.`;
         "videos/1.mp4",
       ),
     ).toBe("/Users/me/agent-home/sessions/abc/019f/videos/1.mp4");
+  });
+
+  it("reserves chat-card occupancy for cited media ticks", () => {
+    expect(shouldReserveCitedMediaCard("puppy-soda-pixel.png")).toBe(true);
+    expect(shouldReserveCitedMediaCard("images/1.jpg")).toBe(true);
+    expect(shouldReserveCitedMediaCard("videos/1.mp4")).toBe(true);
+    expect(shouldReserveCitedMediaCard("gallery.html")).toBe(false);
+    expect(shouldReserveCitedMediaCard("/images/cms.png")).toBe(false);
+    expect(shouldReserveCitedMediaCard("https://x.com/a.png")).toBe(false);
+  });
+
+  it("extracts backtick pixel basenames from a directory-listing reply", () => {
+    const content =
+      "根目录文件\n- 7 张像素风格图片：`eight-snakes-knitting-pixel.png`、`four-hedgehogs-mushrooms-pixel.png`、`kitten-watermelon-pixel.png`、`monkey-apple-pixel.png`、`piglet-peach-pixel.png`、`puppy-soda-pixel.png`、`two-rabbits-sugarcane-pixel.png`\n- `gallery.html`";
+    expect(extractSessionRelativeMediaRefs(content)).toEqual([
+      "eight-snakes-knitting-pixel.png",
+      "four-hedgehogs-mushrooms-pixel.png",
+      "kitten-watermelon-pixel.png",
+      "monkey-apple-pixel.png",
+      "piglet-peach-pixel.png",
+      "puppy-soda-pixel.png",
+      "two-rabbits-sugarcane-pixel.png",
+    ]);
   });
 
   it("applyResolvedSessionMedia attaches cards for short paths", () => {

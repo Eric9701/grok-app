@@ -29,6 +29,8 @@
 
 文件：`CHANGELOG.md`（[Keep a Changelog](https://keepachangelog.com/) + SemVer）。
 
+应用内 **What's New 弹窗**（`WhatsNewModal`）从该文件解析当前版本的 Added / Changed / Fixed，**每条只展示第一句**（`src/lib/whatsNew.ts` → `changelogPopupItem`）。GitHub Release 正文仍用整段章节（含第二句补充）。
+
 每个正式版在 tag **之前**必须有：
 
 ```markdown
@@ -37,9 +39,11 @@
 > 中英文对照。English first，再写 **中文 · …** 摘要。
 >
 > **Highlight:** 一句话亮点。
+>
+> **中文 · 亮点：** 一句话亮点。
 
 ### Added
-- …
+- User-facing first sentence. Optional extra clause for GitHub.
 
 ### Changed
 - …
@@ -47,11 +51,8 @@
 ### Fixed
 - …
 
-### Notes
-- 非官方、CLI 依赖等说明
-
 **中文 · 新增**
-- …
+- 用户能看懂的第一句。可选一句补充。
 
 **中文 · 变更**
 - …
@@ -60,12 +61,51 @@
 - …
 ```
 
-规则：
+### 弹窗 vs CHANGELOG（强制，从本规则落地后的版本起）
+
+弹窗是用户能看到的更新日志，必须短。CHANGELOG 可以稍细，但也不要长篇。
+
+| 表面 | 长度 | 写什么 | 不写什么 |
+|------|------|--------|----------|
+| **What's New 弹窗** | **每条最多一句**（解析器取条目开头的 `**标题**`，否则取第一句） | 新增了什么 / 修复了什么 / 优化了什么 | 设置路径长链、实现细节、issue/PR 堆砌、复述代码 |
+| **CHANGELOG.md / GitHub Release** | 第一句 = 弹窗文案；**最多再跟一句**补充 | 入口或范围（如「外观 → 主题」） | 段落、PR 叙述、把调试过程贴进列表 |
+| **已发布 `## [X.Y.Z]`** | — | **不回溯改写** | 不要为了新文风去改旧版本章节 |
+
+写作清单：
+
+1. 第一句必须**单独成意**。用户只读这一句也知道本版加了、修了、优化了什么。  
+2. 中文约一行、英文约一行；不要逗号从句叠罗汉。  
+3. 同一件事只留一条。相关小改合并，不要按 commit / PR 逐条记账。  
+4. Issue 号（若需要）放第二句，不要放进第一句。  
+5. Highlight 也是一句，不是摘要段。  
+6. 分类只用 Added / Changed / Fixed（弹窗中文对应 **新增 / 优化 / 修复**）。  
+7. 仍要中英对照，条目数量与顺序锁步。
+
+反例（弹窗会变成墙）：
+
+```markdown
+- **Chat stick-to-bottom no longer stops at thinking / tool / body round changes (#931)**: phase auto-collapse and the next output round used to drop pin (2–8px layout ticks were treated as a leave; …).
+```
+
+正例：
+
+```markdown
+- Chat stays pinned through thinking, tools, and pane resize.
+- 修复思考、工具输出和打开侧栏时聊天不跟到底。
+```
+
+需要给维护者多写一点时，第二句才写补充：
+
+```markdown
+- Settings overlay opacity can be adjusted. Appearance → Theme; 20% floor; not in `.grokskin`.
+- 设置页可调节不透明度。外观 → 主题；最低约 20%；不进皮肤包。
+```
+
+其它发版规则：
 
 1. **没有对应 `## [X.Y.Z]` 章节 → 禁止 tag**（`release-tag.sh` 与 CI 都会 fail）。  
-2. 列表要**可验收**：用户/AI 读完知道本版改了什么，不要空话。  
-3. 发版当天把 `[Unreleased]` 里准备进本版的条目**挪进** `## [X.Y.Z]`。  
-4. 后续每次功能合并，Agent 应在 PR/提交中**同步改 Unreleased 或即将发的版本节**。  
+2. 发版当天把 `[Unreleased]` 里准备进本版的条目**挪进** `## [X.Y.Z]`。  
+3. 后续每次功能合并，Agent 应在 PR/提交中**同步改 Unreleased 或即将发的版本节**，并遵守上面的短句规则。  
 
 生成 Release 预览（本地）：
 
@@ -223,7 +263,9 @@ pnpm build:win   # tauri + cargo-xwin + makensis
 - 不把 `secrets.json` / `auth.json` / 真实 API key 打进仓库  
 - 不把 `dist-installers/`、`src-tauri/target/` 提交进 git  
 - 不用 `window.confirm` 等（产品规则见 dialogs.md）  
-- 不手写覆盖 CI 生成的 Release body（改脚本 + CHANGELOG）
+- 不手写覆盖 CI 生成的 Release body（改脚本 + CHANGELOG）  
+- 不把设置路径、实现细节、issue 堆砌写进 What's New **第一句**（弹窗只展示这一句）  
+- 不回溯改写已发布的 `## [X.Y.Z]` 章节来套新文风
 
 ## 相关路径速查
 

@@ -50,6 +50,7 @@ import {
   resolveChatImageThumb,
 } from "@/lib/imageThumbClient";
 import { isFusedQueryKeyPath } from "@/lib/pathNormalize";
+import { pathBasename } from "@/lib/attachments";
 import { useImageViewerOptional } from "@/components/ImageViewer";
 import { IconCopy, IconExternalLink, IconFolder } from "@/components/icons";
 import { ContextMenu, type ContextMenuItem } from "@/components/ContextMenu";
@@ -248,7 +249,11 @@ export function ImageUi({
       const ar = nw / nh;
       if (!(ar > 0) || !Number.isFinite(ar)) return;
       // Persist for scroll remounts + next launch (path / media URL aliases).
-      setImageAspect(src, path || localPath, ar, localPath ? [localPath] : []);
+      const extras: string[] = [];
+      if (localPath) extras.push(localPath);
+      const base = pathBasename(localPath || path || src);
+      if (base) extras.push(base);
+      setImageAspect(src, path || localPath, ar, extras);
       const locked = lockedArRef.current;
       // Cached / already-shown size: ignore tiny decode differences (no reflow).
       if (

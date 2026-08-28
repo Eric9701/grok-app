@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import {
   flushImageAspectCache,
   getImageAspect,
+  imageAspectBasenameKey,
   imageAspectCacheKey,
   resetImageAspectCacheForTests,
   setImageAspect,
@@ -93,5 +94,19 @@ describe("get/setImageAspect", () => {
     setImageAspect("/a.png", "/a.png", 0, [], s);
     setImageAspect("/a.png", "/a.png", NaN, [], s);
     expect(getImageAspect("/a.png", "/a.png", s)).toBeNull();
+  });
+
+  it("stores a basename alias so tick citations hit the same occupancy box", () => {
+    const s = memStorage();
+    const path = "/Users/ronglecat/Documents/workspace/grok/puppy-soda-pixel.png";
+    setImageAspect(path, path, 1.2, [], s);
+    flushImageAspectCache(s);
+    expect(imageAspectBasenameKey(path)).toBe("bn:puppy-soda-pixel.png");
+    expect(getImageAspect("puppy-soda-pixel.png", undefined, s)).toBeCloseTo(
+      1.2,
+    );
+    expect(
+      getImageAspect("puppy-soda-pixel.png", "puppy-soda-pixel.png", s),
+    ).toBeCloseTo(1.2);
   });
 });

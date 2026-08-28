@@ -369,6 +369,7 @@ export const jaSettingsUi = {
   "settings.wallpaperScrimDesc": "壁紙を覆う減光ベールの強さです（全ウィンドウ + ペインのティント）。低いほど壁紙がはっきりします。ぼかしとは独立です。",
   "settings.wallpaperBlur": "オーバーレイのぼかし",
   "settings.wallpaperBlurDesc": "壁紙メディアのぼかし量です。低いほどシャープになります。不透明度とは独立です。",
+  "settings.wallpaperBlurMacHint": "macOS 27 以降には不具合があります。ぼかしはオフのままにしてください。",
   "settings.surfaceOpacity": "面の不透明度",
   "settings.surfaceOpacityDesc": "壁紙オーバーレイとは独立です。入力欄はスライダー値をそのまま使います。カードと設定ページは最低 20% を保ちます。",
   "settings.composerOpacity": "入力欄の不透明度",

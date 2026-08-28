@@ -22,8 +22,10 @@ import {
 import {
   STICK_ESCAPE_MIN_DELTA_PX,
   STICK_ESCAPE_WHEEL_DELTA,
+  STICK_OPEN_FOLLOW_MS,
   STICK_TO_BOTTOM_THRESHOLD_PX,
   bottomScrollTop,
+  isConversationOpenFollowActive,
   isHardBottom,
   isHeightDeltaNoise,
   isNearBottom,
@@ -95,6 +97,24 @@ export function useStickToBottom(
   thresholdRef.current = thresholdPx;
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  /**
+   * Keep following journal hydrate / image decode after a chat switch.
+   * Wheel escape still wins (see isConversationOpenFollowActive).
+   */
+  const openFollowUntilRef = useRef(0);
+  const conversationKeyRef = useRef(conversationKey);
+  if (conversationKeyRef.current !== conversationKey) {
+    conversationKeyRef.current = conversationKey;
+    escapedRef.current = false;
+    isPinnedRef.current = true;
+    userIntentDownRef.current = false;
+    lastScrollTopRef.current = 0;
+    const now =
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    openFollowUntilRef.current = now + STICK_OPEN_FOLLOW_MS;
+  }
   const showBackRef = useRef(false);
   const showBackListenersRef = useRef<Set<(val: boolean) => void>>(new Set());
   const scrollDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -454,14 +474,35 @@ export function useStickToBottom(
     };
   }, [enabled, conversationKey, syncShowBack, applyScrollTop]);
 
-  // Conversation switch → re-pin and jump to bottom.
-  useEffect(() => {
+  // Conversation switch → re-pin and jump to bottom before paint so the
+  // virtual list's layout effect sees pin=true (otherwise it windows from
+  // leftover scrollTop / the previous chat's browse range). Extra frames +
+  // a short follow window cover journal hydrate and image/PDF decode.
+  useLayoutEffect(() => {
     if (!enabled) return;
     escapedRef.current = false;
     isPinnedRef.current = true;
     userIntentDownRef.current = false;
-    const id = requestAnimationFrame(() => scrollToBottom("instant"));
-    return () => cancelAnimationFrame(id);
+    const now =
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    openFollowUntilRef.current = now + STICK_OPEN_FOLLOW_MS;
+    scrollToBottom("instant");
+    let cancelled = false;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      if (cancelled) return;
+      scrollToBottom("instant");
+      raf2 = requestAnimationFrame(() => {
+        if (!cancelled && !escapedRef.current) scrollToBottom("instant");
+      });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
   }, [conversationKey, enabled, scrollToBottom]);
 
   // User sent / turn became busy → force follow even if they had scrolled up.
@@ -561,9 +602,22 @@ export function useStickToBottom(
       // screenshots is one snap, not one per file. Width interpolation
       // (aside / env gutter) must follow this frame or the column jumps
       // up until the motion ends, then snaps back.
+      // Opening a chat: image cards / journal rows often land after the
+      // first pin. Follow immediately only while still pinned — never
+      // re-engage if the user already scrolled into history.
+      const opening = isConversationOpenFollowActive({
+        now:
+          typeof performance !== "undefined" &&
+          typeof performance.now === "function"
+            ? performance.now()
+            : Date.now(),
+        until: openFollowUntilRef.current,
+        escaped: escapedRef.current,
+      });
       const delay = pinnedFollowDelayForLayout({
         heightDelta: difference,
         viewportWidthChanged: widthMoved,
+        conversationOpening: opening && isPinnedRef.current,
       });
       if (delay <= 0) {
         if (mediaFollowTimer != null) {

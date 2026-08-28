@@ -229,6 +229,24 @@ html[data-chat-width="full"] .lobe-chat__inner,
   padding-inline-end: calc(20px + var(--scrollbar-size, 8px) + 6px);
 }
 
+/* Historical open: paint media off-screen until cards have a real box,
+ * then scroll-to-bottom once and reveal. */
+.lobe-chat[data-open-hold="1"] .lobe-chat__inner {
+  visibility: hidden;
+}
+.lobe-chat[data-open-hold="1"] .lobe-msg-rail,
+.lobe-chat[data-open-hold="1"] .lobe-chat-back-bottom {
+  visibility: hidden;
+}
+.lobe-chat__open-hold {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  min-height: 0;
+  background: var(--chat-bg);
+}
+
 /* ── Message rows ── */
 .lobe-chat-item {
   position: relative;

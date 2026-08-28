@@ -10,6 +10,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -99,8 +100,17 @@ import type { ModelOption } from "@/lib/grokCatalog";
 import { useStickToBottom } from "@/hooks/useStickToBottom";
 import {
   shouldBumpStickOnBusyEdge,
+  shouldFollowPinnedMediaReveal,
   stabilizeStickUserId,
+  transcriptStickIdentity,
 } from "@/lib/stickToBottom";
+import {
+  isTranscriptOpenMediaPending,
+  shouldHoldTranscriptOpenReveal,
+  transcriptOpenRevealHasMedia,
+  transcriptOpenRevealSettleMs,
+  TRANSCRIPT_OPEN_REVEAL_TIMEOUT_MS,
+} from "@/lib/transcriptOpenReveal";
 import { useChatMessageVirtualizer } from "@/hooks/useChatMessageVirtualizer";
 import {
   estimateChatRowHeight,
@@ -1916,7 +1926,11 @@ export function ConversationThread({
     for (const m of messages) if (m.role === "user") n += 1;
     return n;
   }, [messages]);
-  const conversationKeyForStick = sessionKey ?? "chat";
+  const conversationKeyForStick = transcriptStickIdentity({
+    sessionKey: sessionKey ?? "chat",
+    hasMessages: messages.length > 0,
+    journalReady: !!journalHydrated && !journalLoading,
+  });
   const lastUserIdForStick = useMemo(() => {
     const conversationChanged =
       stickUserRef.current.conversationKey !== conversationKeyForStick;
@@ -1985,7 +1999,7 @@ export function ConversationThread({
     isPinnedRef,
     subscribeShowBack,
   } = useStickToBottom({
-    conversationKey: sessionKey ?? "chat",
+    conversationKey: conversationKeyForStick,
     forceStickKey,
   });
 
@@ -2291,6 +2305,12 @@ export function ConversationThread({
    * parent setState on every scroll frame; #280).
    */
   const railCursorRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setLocateTargetId(null);
+    setActiveNodeId(null);
+    railCursorRef.current = null;
+  }, [sessionKey]);
 
   const onRailScrollActiveChange = useCallback((id: string) => {
     // Ignore free-scroll updates while a programmatic jump is in flight.
@@ -2807,9 +2827,45 @@ export function ConversationThread({
     getEstimateHeight,
     viewportRef: scrollRef,
     isPinnedRef,
-    conversationKey: sessionKey ?? "chat",
+    conversationKey: conversationKeyForStick,
     forceIndices: forceVirtualIndices,
   });
+
+  const openMediaCount = useMemo(() => {
+    let n = 0;
+    for (const m of messages) {
+      const atts = m.attachments;
+      if (!atts) continue;
+      for (const a of atts) {
+        if (!a.isDir) n += 1;
+      }
+    }
+    return n;
+  }, [messages]);
+  const openMediaCountRef = useRef(0);
+  const openMediaIdentityRef = useRef(conversationKeyForStick);
+  useLayoutEffect(() => {
+    if (openMediaIdentityRef.current !== conversationKeyForStick) {
+      openMediaIdentityRef.current = conversationKeyForStick;
+      openMediaCountRef.current = 0;
+    }
+    const prev = openMediaCountRef.current;
+    openMediaCountRef.current = openMediaCount;
+    if (
+      !shouldFollowPinnedMediaReveal({
+        pinned: isPinnedRef.current,
+        prevMediaCount: prev,
+        nextMediaCount: openMediaCount,
+      })
+    ) {
+      return;
+    }
+    scrollToBottom("instant");
+    const raf = requestAnimationFrame(() => {
+      if (isPinnedRef.current) scrollToBottom("instant");
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [conversationKeyForStick, openMediaCount, scrollToBottom, isPinnedRef]);
 
   const parentPromptIndexMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -2843,8 +2899,106 @@ export function ConversationThread({
     return slice;
   }, [transcriptMessages, virtualized, virtStart, virtEnd]);
 
+  const revealedOpenKeyRef = useRef<string | null>(null);
+  const [openRevealTick, setOpenRevealTick] = useState(0);
+  const holdingOpenReveal = shouldHoldTranscriptOpenReveal({
+    hasExistingSession: !!hasExistingSession,
+    hasMessages: messages.length > 0,
+    streaming: turnBusyForStick,
+    alreadyRevealed:
+      revealedOpenKeyRef.current === conversationKeyForStick,
+  });
+  void openRevealTick;
+
+  useEffect(() => {
+    if (turnBusyForStick && messages.length > 0) {
+      revealedOpenKeyRef.current = conversationKeyForStick;
+    }
+  }, [turnBusyForStick, conversationKeyForStick, messages.length]);
+
+  useEffect(() => {
+    if (!holdingOpenReveal) return;
+    const root = contentRef.current;
+    if (!root) {
+      revealedOpenKeyRef.current = conversationKeyForStick;
+      setOpenRevealTick((n) => n + 1);
+      return;
+    }
+
+    let cancelled = false;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+    let hadMedia = transcriptOpenRevealHasMedia(root);
+
+    const finish = () => {
+      if (cancelled) return;
+      cancelled = true;
+      if (settleTimer != null) clearTimeout(settleTimer);
+      isPinnedRef.current = true;
+      scrollToBottom("instant");
+      requestAnimationFrame(() => {
+        scrollToBottom("instant");
+        revealedOpenKeyRef.current = conversationKeyForStick;
+        setOpenRevealTick((n) => n + 1);
+      });
+    };
+
+    const consider = () => {
+      if (cancelled) return;
+      if (transcriptOpenRevealHasMedia(root)) hadMedia = true;
+      if (isTranscriptOpenMediaPending(root)) {
+        if (settleTimer != null) {
+          clearTimeout(settleTimer);
+          settleTimer = null;
+        }
+        return;
+      }
+      if (settleTimer != null) return;
+      settleTimer = setTimeout(
+        finish,
+        transcriptOpenRevealSettleMs(hadMedia),
+      );
+    };
+
+    const mo = new MutationObserver(consider);
+    mo.observe(root, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["class", "src"],
+    });
+    const onMediaEvent = () => consider();
+    root.addEventListener("load", onMediaEvent, true);
+    root.addEventListener("error", onMediaEvent, true);
+    root.addEventListener("loadedmetadata", onMediaEvent, true);
+    const poll = window.setInterval(consider, 80);
+    const timeout = window.setTimeout(finish, TRANSCRIPT_OPEN_REVEAL_TIMEOUT_MS);
+    consider();
+
+    return () => {
+      cancelled = true;
+      if (settleTimer != null) clearTimeout(settleTimer);
+      mo.disconnect();
+      root.removeEventListener("load", onMediaEvent, true);
+      root.removeEventListener("error", onMediaEvent, true);
+      root.removeEventListener("loadedmetadata", onMediaEvent, true);
+      window.clearInterval(poll);
+      window.clearTimeout(timeout);
+    };
+  }, [
+    holdingOpenReveal,
+    conversationKeyForStick,
+    scrollToBottom,
+    isPinnedRef,
+    contentRef,
+  ]);
+
   return (
-    <div className="lobe-chat" data-slot="lobe-chat">
+    <div
+      className="lobe-chat"
+      data-slot="lobe-chat"
+      data-open-hold={holdingOpenReveal ? "1" : undefined}
+      aria-busy={holdingOpenReveal ? true : undefined}
+    >
       <div
         ref={scrollRef}
         className="lobe-chat__scroll"
@@ -3007,6 +3161,14 @@ export function ConversationThread({
           />
         </div>
       </div>
+
+      {holdingOpenReveal ? (
+        <div className="lobe-chat-empty lobe-chat__open-hold" data-kind="loading">
+          <Spinner className="lobe-chat-empty__spinner" size={22} />
+          <h3 className="lobe-chat-empty__title">{tr("main.loadingTitle")}</h3>
+          <p className="lobe-chat-empty__desc">{tr("main.loadingHint")}</p>
+        </div>
+      ) : null}
 
       <MessageNodeRail
         nodes={messageNodes}

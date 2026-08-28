@@ -369,6 +369,7 @@ export const ukSettingsUi = {
   "settings.wallpaperScrimDesc": "Наскільки сильно завіса покриває шпалери (на все вікно + тонування скла). Нижче = чіткіші шпалери. Не залежить від розмиття.",
   "settings.wallpaperBlur": "Розмиття накладки",
   "settings.wallpaperBlurDesc": "Наскільки розмиті самі шпалери. Нижче = різкіше. Не залежить від непрозорості.",
+  "settings.wallpaperBlurMacHint": "У macOS 27 і новіших є вада. Розмиття краще не вмикати.",
   "settings.surfaceOpacity": "Непрозорість поверхонь",
   "settings.surfaceOpacityDesc": "Незалежно від вуалі шпалер. Поле введення йде за повзунком. Картки й сторінка налаштувань тримають мінімум 20%.",
   "settings.composerOpacity": "Непрозорість поля введення",

@@ -26,6 +26,7 @@
    - Never tag without `## [X.Y.Z]` in `CHANGELOG.md`.  
    - GitHub Release body = `scripts/changelog-for-release.py` (**version changes only**; install/`xattr` live in README).  
    - Do not hand-edit Release notes only on GitHub; change the script + CHANGELOG.  
+   - **What's New popup / CHANGELOG copy**: popup shows **one short sentence per bullet** (added / fixed / improved — no paths, no implementation, no issue piles). CHANGELOG may add **at most one extra sentence**. Do **not** rewrite already-shipped `## [X.Y.Z]` sections. Details: [release.md](docs/llm-wiki/release.md).  
    - **Contributors**: every release refresh circular-avatar galleries via `python3 scripts/update-contributors.py` (README.md / README_EN.md / README_ZH.md / README_RU.md markers). No square table + contrib.rocks dual track.
 
 1c. **Open-source surface** — public docs: `README.md` / `README_EN.md`, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`. Do not commit secrets, `auth.json`, or local agent homes.

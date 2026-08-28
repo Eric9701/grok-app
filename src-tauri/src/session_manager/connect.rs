@@ -16,7 +16,9 @@ use crate::process_limits::{can_spawn_process, normalize_max_concurrent, process
 use crate::session_fsm::{SessionFsm, SessionState};
 use crate::store::{self};
 
-use super::fork_trim::{child_trim_plan, fork_trimmed_outcome, ChildTrimPlan};
+use super::fork_trim::{
+    apply_child_rewind_fail_safe, child_trim_plan, fork_trimmed_outcome, ChildTrimPlan,
+};
 use super::*;
 
 /// Drops `connect_lock` holder diagnostics when the lock guard goes out of
@@ -1250,11 +1252,6 @@ impl SessionManager {
         )
         .await;
 
-        // One-shot flags: clear whether fork succeeded or fell through to new/load.
-        if meta.fork_agent_session {
-            let _ = store::clear_session_fork_agent_session(&meta.id);
-        }
-
         match open_result {
             Ok((mut agent_sid, resumed)) => {
                 let plan = child_trim_plan(rewind_index, resumed);
@@ -1286,9 +1283,31 @@ impl SessionManager {
                                     target: "session",
                                     session = %meta.id,
                                     agent = %agent_sid,
+                                    prompt_index,
                                     error = %e,
-                                    "child rewind failed; session/new + bootstrap (will not keep untrimmed fork)"
+                                    "child rewind failed; will not keep untrimmed fork"
                                 );
+                                let fail_safe =
+                                    apply_child_rewind_fail_safe(&meta.id, prompt_index);
+                                match &fail_safe {
+                                    Ok(fs) => tracing::info!(
+                                        target: "session",
+                                        session = %meta.id,
+                                        prompt_index,
+                                        before = fs.before_len,
+                                        after = fs.after_len,
+                                        persisted = fs.persisted,
+                                        need_bootstrap = fs.need_bootstrap,
+                                        "rewind-fail child journal re-cut before session/new"
+                                    ),
+                                    Err(trim_err) => tracing::warn!(
+                                        target: "session",
+                                        session = %meta.id,
+                                        prompt_index,
+                                        error = %trim_err,
+                                        "rewind-fail child journal re-cut failed; refusing bootstrap"
+                                    ),
+                                }
                                 match Self::with_handshake_budget(
                                     client.open_session_at(None, false, &cwd_str),
                                 )
@@ -1296,7 +1315,8 @@ impl SessionManager {
                                 {
                                     Ok((new_sid, _)) => {
                                         agent_sid = new_sid;
-                                        need_bootstrap = journal_has_history;
+                                        need_bootstrap =
+                                            fail_safe.map(|fs| fs.need_bootstrap).unwrap_or(false);
                                         skip_set_mode = false;
                                     }
                                     Err(new_err) => {
@@ -1308,6 +1328,11 @@ impl SessionManager {
                                         );
                                         Self::kill_acp_bounded(&client).await;
                                         self.unregister_pending_child(&process_id);
+                                        if meta.fork_agent_session {
+                                            let _ = store::clear_session_fork_after_connect_failure(
+                                                &meta.id,
+                                            );
+                                        }
                                         {
                                             let mut guard = self.inner.lock();
                                             if let Some(s) = guard.as_mut() {
@@ -1409,6 +1434,11 @@ impl SessionManager {
                 Ok(self.snapshot())
             }
             Err(e) => {
+                // Failed open must drop the one-shot so the next connect does
+                // not retry session/fork forever. Success clears via live meta.
+                if meta.fork_agent_session {
+                    let _ = store::clear_session_fork_after_connect_failure(&meta.id);
+                }
                 tracing::warn!(
                     target: "session",
                     session = %meta.id,

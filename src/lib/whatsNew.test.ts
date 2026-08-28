@@ -5,7 +5,9 @@ import {
   WHATS_NEW_FIRST_SEEN_KEY,
   WHATS_NEW_SEEN_KEY,
   changelogLang,
+  changelogPopupItem,
   ensureFirstSeenVersion,
+  firstSentence,
   loadSeenVersion,
   markWhatsNewSeen,
   parseChangelogNotes,
@@ -86,9 +88,9 @@ describe("parseChangelogNotes", () => {
       "changed",
       "fixed",
     ]);
-    expect(notes?.sections[0]?.items).toEqual(["Cat zoom: Cats zoom now."]);
-    expect(notes?.sections[1]?.items[0]).toContain("Windows paths");
-    expect(notes?.sections[2]?.items[0]).toContain("Crash");
+    expect(notes?.sections[0]?.items).toEqual(["Cat zoom"]);
+    expect(notes?.sections[1]?.items[0]).toBe("Windows paths");
+    expect(notes?.sections[2]?.items[0]).toBe("Crash");
     expect(notes?.sections.flatMap((s) => s.items).join(" ")).not.toContain(
       "Dev only",
     );
@@ -97,13 +99,73 @@ describe("parseChangelogNotes", () => {
   it("extracts Chinese highlight and sections for zh catalogs", () => {
     const notes = parseChangelogNotes(FIXTURE, "1.2.3", "zh");
     expect(notes?.highlight).toBe("快猫。");
-    expect(notes?.sections[0]?.items).toEqual(["猫咪变焦：猫咪会变焦了。"]);
-    expect(notes?.sections[1]?.items[0]).toContain("Windows 路径");
-    expect(notes?.sections[2]?.items[0]).toContain("崩溃");
+    expect(notes?.sections[0]?.items).toEqual(["猫咪变焦"]);
+    expect(notes?.sections[1]?.items[0]).toBe("Windows 路径");
+    expect(notes?.sections[2]?.items[0]).toBe("崩溃");
   });
 
   it("returns null when the version section is missing", () => {
     expect(parseChangelogNotes(FIXTURE, "9.9.9", "en")).toBeNull();
+  });
+});
+
+describe("changelogPopupItem", () => {
+  it("keeps only the first sentence", () => {
+    expect(
+      changelogPopupItem(
+        "- Chat can render LaTeX. KaTeX for `$…$`, matching Grok Build CLI.",
+      ),
+    ).toBe("Chat can render LaTeX.");
+    expect(
+      changelogPopupItem(
+        "- 对话支持 LaTeX 公式。KaTeX 渲染 `$…$`，与 Grok Build CLI 一致。",
+      ),
+    ).toBe("对话支持 LaTeX 公式。");
+  });
+
+  it("does not split version-like decimals", () => {
+    expect(
+      changelogPopupItem(
+        "- OpenRouter preset is now GLM-5.3 Flash. Saved channels stay until re-added.",
+      ),
+    ).toBe("OpenRouter preset is now GLM-5.3 Flash.");
+  });
+
+  it("uses the leading bold title and drops issue numbers", () => {
+    expect(
+      changelogPopupItem(
+        "- **Windows Open in editor no longer hands VS Code paths (#928)**: strips `\\\\?\\`.",
+      ),
+    ).toBe("Windows Open in editor no longer hands VS Code paths");
+    expect(
+      changelogPopupItem(
+        "- **从账户导入 Grok Build CLI 对话**到侧栏；空侧栏在有本地记录时提供同一入口。",
+      ),
+    ).toBe("从账户导入 Grok Build CLI 对话");
+  });
+
+  it("drops fullwidth issue parens instead of leaving () or (,)", () => {
+    expect(
+      changelogPopupItem(
+        "- **「上下文已自动压缩」卡片留在压缩发生的时间点（#855）**：后续工具不再堆到输入框。",
+      ),
+    ).toBe("「上下文已自动压缩」卡片留在压缩发生的时间点");
+    expect(
+      changelogPopupItem(
+        "- **Windows 权限卡点击无响应（#878, #880）**：按钮可点。",
+      ),
+    ).toBe("Windows 权限卡点击无响应");
+    expect(
+      changelogPopupItem("- 长会话上下滚动卡死（#881、#882）。再写一句补充。"),
+    ).toBe("长会话上下滚动卡死。");
+  });
+});
+
+describe("firstSentence", () => {
+  it("returns the whole string when there is no terminator", () => {
+    expect(firstSentence("Settings overlay opacity")).toBe(
+      "Settings overlay opacity",
+    );
   });
 });
 
@@ -220,11 +282,12 @@ describe("whatsNew seen / auto-show", () => {
 });
 
 describe("shipped CHANGELOG.md", () => {
+  const md = readFileSync(resolve(__dirname, "../../CHANGELOG.md"), "utf8");
+  const pkg = JSON.parse(
+    readFileSync(resolve(__dirname, "../../package.json"), "utf8"),
+  ) as { version: string };
+
   it("has a section for the package version or Unreleased notes", () => {
-    const md = readFileSync(resolve(__dirname, "../../CHANGELOG.md"), "utf8");
-    const pkg = JSON.parse(
-      readFileSync(resolve(__dirname, "../../package.json"), "utf8"),
-    ) as { version: string };
     const notes =
       parseChangelogNotes(md, pkg.version, "en") ??
       parseChangelogNotes(md, "Unreleased", "en");
@@ -232,5 +295,44 @@ describe("shipped CHANGELOG.md", () => {
     expect((notes?.sections.length ?? 0) + (notes?.highlight ? 1 : 0)).toBeGreaterThan(
       0,
     );
+  });
+
+  it("does not put CHANGELOG detail sentences into the 0.2.26 popup", () => {
+    const notes = parseChangelogNotes(md, "0.2.26", "en");
+    const first = notes?.sections.find((s) => s.id === "added")?.items[0];
+    expect(first).toBe(
+      "Import Grok Build CLI sessions from Account → Recent sessions",
+    );
+    expect(first).not.toContain("untrusted");
+  });
+
+  it("does not leave empty issue parentheses on 0.2.26 Chinese notes", () => {
+    const zh = parseChangelogNotes(md, "0.2.26", "zh");
+    const items = zh?.sections.flatMap((s) => s.items) ?? [];
+    expect(items.some((item) => item.includes("上下文已自动压缩"))).toBe(true);
+    for (const item of items) {
+      expect(item).not.toMatch(/[(（]\s*[,，、]?\s*[)）]/);
+      expect(item).not.toMatch(/#[0-9]/);
+    }
+  });
+
+  it("keeps Unreleased popup lines to one short sentence", () => {
+    const notes = parseChangelogNotes(md, "Unreleased", "en");
+    const zh = parseChangelogNotes(md, "Unreleased", "zh");
+    const items = [
+      ...(notes?.highlight ? [notes.highlight] : []),
+      ...(notes?.sections.flatMap((s) => s.items) ?? []),
+      ...(zh?.highlight ? [zh.highlight] : []),
+      ...(zh?.sections.flatMap((s) => s.items) ?? []),
+    ];
+    // Empty Unreleased is expected after cutting a version section.
+    if (items.length === 0) return;
+    expect(notes?.sections.map((s) => s.items.length)).toEqual(
+      zh?.sections.map((s) => s.items.length),
+    );
+    for (const item of items) {
+      expect(item.length).toBeLessThanOrEqual(90);
+      expect(item).not.toMatch(/\s#[0-9]+\b/);
+    }
   });
 });

@@ -323,6 +323,11 @@ virtual window (`chatVirtualList` + `useChatMessageVirtualizer`):
   and “Back to bottom” keep working.
 - **Pinned** (following stream): always mount the tail; adaptive overscan builds
   upward (viewport-scaled, clamped).
+- **Session open**: existing idle chats hold the transcript behind the
+  loading overlay until mounted image/video cards have a measurable box
+  (pending imgs, pending video posters). Then one instant scroll-to-bottom
+  and reveal. Live streaming is never gated. Video occupancy is the reserved
+  poster box (click-to-play does not load the file). Timeout 8s.
 - **Escaped** (user scrolled up): window by `scrollTop`; height remeasure of rows
   above the viewport adjusts `scrollTop` so content does not jump.
 - Force-mounted nearby only while escaped (find match, streaming assistant, last

@@ -369,6 +369,7 @@ export const itSettingsUi = {
   "settings.wallpaperScrimDesc": "Quanto forte il velo copre lo sfondo (finestra intera + tinta del riquadro). Più basso = sfondo più visibile. Indipendente dalla sfocatura.",
   "settings.wallpaperBlur": "Sfocatura overlay",
   "settings.wallpaperBlurDesc": "Quanto viene sfocato il media dello sfondo. Più basso = più nitido. Indipendente dall’opacità.",
+  "settings.wallpaperBlurMacHint": "macOS 27 e successivi hanno un bug. Meglio lasciare la sfocatura disattivata.",
   "settings.surfaceOpacity": "Opacità delle superfici",
   "settings.surfaceOpacityDesc": "Indipendente dal velo dello sfondo. Il composer segue il cursore. Le schede e Impostazioni tengono un minimo del 20%.",
   "settings.composerOpacity": "Opacità del composer",
