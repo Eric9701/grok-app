@@ -457,7 +457,7 @@ html[data-wallpaper="1"].platform-mac[data-theme="light"] .main {
 }
 
 /* Composer + workspace bar: independent slider, never merged with scrim. */
-html[data-wallpaper="1"] :is(.composer, .composer__context-bar) {
+html[data-wallpaper="1"] :is(.composer, .composer__chip-shell) {
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
