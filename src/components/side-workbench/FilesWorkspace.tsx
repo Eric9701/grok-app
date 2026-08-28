@@ -205,8 +205,9 @@ export function FilesWorkspace({
             : projectPath;
           const listing = await api.sshListDir(sshAlias, dir);
           if (!listing.ok) {
-            setError(listing.error || tr("resources.openFailed"));
-            return [];
+            const msg = listing.error || tr("resources.openFailed");
+            setError(msg);
+            throw new Error(msg);
           }
           return (listing.entries || []).map((e) => {
             const rel = relative ? `${relative.replace(/\/+$/, "")}/${e.name}` : e.name;
@@ -236,7 +237,7 @@ export function FilesWorkspace({
         }));
       } catch (e) {
         setError(String(e));
-        return [];
+        throw e;
       }
     },
     [projectPath, sshAlias, tr],
@@ -382,9 +383,13 @@ export function FilesWorkspace({
           (norm.startsWith(`${root}/`) ? norm.slice(root.length + 1) : norm)
         : norm;
       {
-        const top = await loadDir("");
-        if (cancelled) return;
-        setRoot(top);
+        try {
+          const top = await loadDir("");
+          if (cancelled) return;
+          setRoot(top);
+        } catch {
+          if (cancelled) return;
+        }
       }
 
       const base = norm.split("/").pop() || norm;
@@ -421,10 +426,14 @@ export function FilesWorkspace({
         let loadedRel = "";
         for (const key of dirKeys) {
           if (cancelled) return;
-          const kids = await loadDir(key);
-          if (cancelled) return;
-          setRoot((r) => replaceResourceTreeChildren(r, key, kids));
-          loadedRel = key;
+          try {
+            const kids = await loadDir(key);
+            if (cancelled) return;
+            setRoot((r) => replaceResourceTreeChildren(r, key, kids));
+            loadedRel = key;
+          } catch {
+            if (cancelled) return;
+          }
         }
         void loadedRel;
       }
