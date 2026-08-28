@@ -3000,6 +3000,11 @@ export function ConversationThread({
           ) : null}
 
           {/* Plan UI lives only in PlanStatusBar (top) + ResourceViewer Plan mode. */}
+          <div
+            className="lobe-chat__end-pad"
+            data-testid="chat-end-pad"
+            aria-hidden="true"
+          />
         </div>
       </div>
 
