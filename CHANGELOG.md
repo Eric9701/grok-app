@@ -13,6 +13,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Changed
+- Composer model chip is one control for model + effort. Advanced opens a hub; hover a row to pick on the side. Empty and active chats share the same width.
+
+**中文 · 变更**
+- 输入框模型按钮改为模型+推理一颗芯片。高级是悬停侧出的设置层。空对话和进行中对话同一列宽。
+
 ### Added
 - **SSH remote hosts**: Settings → Runtime → SSH lists `~/.ssh/config` Host aliases. Test connection, then watch a host to list remote Grok sessions in the sidebar, open/resume them, start a new chat in a remote folder, and run `grok agent stdio` on the host via OpenSSH. macOS/Linux reuse a ControlMaster; Windows opens a fresh connection per action. Persistence is `grok agent leader`, not tmux. Remote paths are never treated as local disk.
 
