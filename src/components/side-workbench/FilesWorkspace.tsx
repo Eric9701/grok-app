@@ -58,13 +58,13 @@ import {
   saveTreeExpanded,
   sessionChangePathsKey,
 } from "@/lib/resourceTree";
-import { sshChatRelative } from "@/lib/sshChatPath";
 import { isResourceDraftDirty } from "@/lib/resourceEdit";
 import {
   pathBaseName,
   type SessionFileChange,
 } from "@/lib/sessionChanges";
-import { joinRemoteRelative } from "@/lib/sshRemoteSessionDisplay";
+import { sshChatRelative, sshRemoteDirToList } from "@/lib/sshChatPath";
+import { sshListDirShouldSetPaneError } from "@/lib/sshListDirHonesty";
 
 export type FilesWorkspaceProps = {
   locale: Locale | string;
@@ -200,15 +200,24 @@ export function FilesWorkspace({
       if (!projectPath || !api.isTauri()) return [];
       try {
         if (sshAlias) {
-          const dir = relative
-            ? joinRemoteRelative(projectPath, relative)
-            : projectPath;
+          const dir = sshRemoteDirToList(projectPath, relative);
+          if (!dir) {
+            setError(tr("resources.openFailed"));
+            return [];
+          }
           const listing = await api.sshListDir(sshAlias, dir);
           if (!listing.ok) {
-            const msg = listing.error || tr("resources.openFailed");
-            setError(msg);
-            throw new Error(msg);
+            if (
+              sshListDirShouldSetPaneError({
+                relative,
+                result: listing,
+              })
+            ) {
+              setError(listing.error || tr("resources.openFailed"));
+            }
+            return [];
           }
+          setError(null);
           return (listing.entries || []).map((e) => {
             const rel = relative ? `${relative.replace(/\/+$/, "")}/${e.name}` : e.name;
             const ext = e.isDir

@@ -18,7 +18,7 @@
    - [setup.md](docs/llm-wiki/setup.md) — first-run gate (CLI required, account optional)  
    - [icons.md](docs/llm-wiki/icons.md) — app dock icons vs tray/status-bar icons (never mix)  
    - [remote-im.md](docs/llm-wiki/remote-im.md) — **Remote IM** GUI 配置全渠道 · Bridge · Grok Build；goal 见 `docs/plans/GOAL-remote-im.md`  
-   - [maintain.md](docs/llm-wiki/maintain.md) — **open-source maintenance**: Issues triage, PR review, community intake, ship loop, **branch hygiene**
+   - [maintain.md](docs/llm-wiki/maintain.md) — **open-source maintenance**: Issues triage, PR review, community intake, ship loop, **branch hygiene**, commit-then-push, local CI before PR
    - [chatcut.md](docs/llm-wiki/chatcut.md) — **ChatCut Codex plugin**: adapter, MCP surface header, Resources browser handoff, re-pull migration
    - [appearance-skins.md](docs/llm-wiki/appearance-skins.md) — **appearance packs**: `.grokskin` layout, K19 allowlist, `grok://` + `grok-app:`, never auto-apply
 
@@ -26,7 +26,7 @@
    - Never tag without `## [X.Y.Z]` in `CHANGELOG.md`.  
    - GitHub Release body = `scripts/changelog-for-release.py` (**version changes only**; install/`xattr` live in README).  
    - Do not hand-edit Release notes only on GitHub; change the script + CHANGELOG.  
-   - **What's New popup / CHANGELOG copy**: popup shows **one short sentence per bullet** (added / fixed / improved — no paths, no implementation, no issue piles). CHANGELOG may add **at most one extra sentence**. Do **not** rewrite already-shipped `## [X.Y.Z]` sections. Details: [release.md](docs/llm-wiki/release.md).  
+   - **What's New popup / CHANGELOG copy**: popup shows **one short sentence per bullet** (added / fixed / improved — no paths, no implementation, no issue piles). **First sentence ≤ 90 characters** (`src/lib/whatsNew.test.ts`). CHANGELOG may add **at most one extra sentence**. Do **not** rewrite already-shipped `## [X.Y.Z]` sections. Details: [release.md](docs/llm-wiki/release.md).  
    - **Contributors**: every release refresh circular-avatar galleries via `python3 scripts/update-contributors.py` (README.md / README_EN.md / README_ZH.md / README_RU.md markers). No square table + contrib.rocks dual track.
 
 1c. **Open-source surface** — public docs: `README.md` / `README_EN.md`, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`. Do not commit secrets, `auth.json`, or local agent homes.

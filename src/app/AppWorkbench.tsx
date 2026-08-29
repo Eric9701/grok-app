@@ -705,6 +705,8 @@ import { useCompactDialog } from "@/hooks/useCompactDialog";
 import { useQueueEditDialog } from "@/hooks/useQueueEditDialog";
 import { useVoiceDictation } from "@/hooks/useVoiceDictation";
 import { useComposerSend } from "@/hooks/useComposerSend";
+import { useComposerEndPad } from "@/hooks/useComposerEndPad";
+import { useRewindComposerRestore } from "@/hooks/useRewindComposerRestore";
 import { useSessionCatalog } from "@/hooks/useSessionCatalog";
 import {
   createSessionNavHost,
@@ -8718,6 +8720,13 @@ export function AppWorkbench() {
     ],
   );
 
+  const { captureRewindComposerRestore, applyRewindComposerRestore } =
+    useRewindComposerRestore({
+      viewingSessionIdRef, composerInputRef, messagesRef, messagesBySessionRef,
+      setDraft, setAttachments, setChatAttachments, setQuotes,
+      setEditingUserMessageId, setEditAttachments,
+    });
+
   /**
    * Apply rewind: truncate local journal (+ agent when live), refresh messages UI.
    * `restoreFiles` is opt-in (safe default off) — reverts workspace files when agent supports it.
@@ -8743,6 +8752,7 @@ export function AppWorkbench() {
       setRewindError(null);
       setRewindBusy(true);
       try {
+        const restore = captureRewindComposerRestore(sessionId, targetPromptIndex);
         // Prefer live connect so agent rewind can run; local truncate still works if not.
         if (
           (session.sessionId === sessionId ||
@@ -8783,6 +8793,7 @@ export function AppWorkbench() {
         setRewindConfirm(null);
         setRewindRestoreFiles(false);
         setRewindError(null);
+        applyRewindComposerRestore(sessionId, restore);
         if (!result.agentOk) {
           showToast(tr("session.rewindLocalOnly"), 4200);
         } else {
@@ -8799,7 +8810,7 @@ export function AppWorkbench() {
     },
     // ensureConnected / refreshSessions via closure
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canRewindSession, session.sessionId, session.state, showToast, tr],
+    [applyRewindComposerRestore, captureRewindComposerRestore, canRewindSession, session.sessionId, session.state, showToast, tr],
   );
 
   const runRewindDropLastUser = useCallback(
@@ -8819,6 +8830,7 @@ export function AppWorkbench() {
       setRewindError(null);
       setRewindBusy(true);
       try {
+        const restore = captureRewindComposerRestore(sessionId, null);
         if (
           (session.sessionId === sessionId ||
             viewingSessionIdRef.current === sessionId) &&
@@ -8844,6 +8856,7 @@ export function AppWorkbench() {
         setRewindConfirm(null);
         setRewindRestoreFiles(false);
         setRewindError(null);
+        applyRewindComposerRestore(sessionId, restore);
         showToast(tr("session.rewindOk"));
         await refreshSessions();
       } catch (e) {
@@ -8855,7 +8868,7 @@ export function AppWorkbench() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canRewindSession, session.sessionId, session.state, showToast, tr],
+    [applyRewindComposerRestore, captureRewindComposerRestore, canRewindSession, session.sessionId, session.state, showToast, tr],
   );
 
   const confirmRewindToPrompt = useCallback(
@@ -9938,31 +9951,12 @@ export function AppWorkbench() {
     return null;
   }, [customRouteActive, activeCustomProvider]);
 
-  // Floating composer height → chat bottom pad so messages can scroll under it.
-  // ResizeObserver covers typing growth; no draft subscription (would thrash shell).
-  useEffect(() => {
-    if (mainPane !== "chat") return;
-    const el = composerWrapRef.current;
-    if (!el) return;
-    const measure = () => {
-      const h = Math.ceil(el.getBoundingClientRect().height);
-      if (h <= 0) return;
-      // Ignore 1px subpixel flicker — pad thrash reflows chat scrollHeight
-      // and looks like the transcript bouncing while you type/scroll.
-      setComposerFloatPad((prev) => (Math.abs(prev - h) <= 1 ? prev : h));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [
-    mainPane,
-    attachments.length,
-    showComposerPlus,
-    messages.length,
-    welcomeSession,
-    welcomeBrandKind,
-  ]);
+  useComposerEndPad(
+    composerWrapRef,
+    setComposerFloatPad,
+    mainPane === "chat",
+    `${attachments.length}:${showComposerPlus}:${messages.length}:${welcomeSession}:${String(welcomeBrandKind)}`,
+  );
 
   const sidebarPaint =
     layout.sidebarCollapsed || sidebarOverlay

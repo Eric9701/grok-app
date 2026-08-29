@@ -21,7 +21,6 @@ import {
   shouldBumpStickOnBusyEdge,
   stabilizeStickUserId,
   shouldClampPinnedOverscroll,
-  shouldPreventPinnedBottomWheel,
   shouldClampPinnedStreamDrift,
   shouldEscapePinnedScroll,
   shouldForcePinnedSnapOnOpen,
@@ -39,6 +38,10 @@ import {
   STICK_OPEN_FOLLOW_MS,
   markProgrammaticStickScroll,
   takeProgrammaticStickScroll,
+  isStickViewportUnreliable,
+  shouldRestorePinnedFollowOnViewportReady,
+  shouldIgnoreProgrammaticStickLeave,
+  STICK_MIN_VIEWPORT_HEIGHT_PX,
 } from "./stickToBottom";
 
 describe("bottom overscroll rebound", () => {
@@ -144,61 +147,6 @@ describe("bottomScrollTop", () => {
 
   it("is 0 when content shorter than viewport", () => {
     expect(bottomScrollTop(200, 400)).toBe(0);
-  });
-});
-
-describe("shouldPreventPinnedBottomWheel", () => {
-  const sh = 1000;
-  const ch = 400;
-  const maxTop = 600;
-
-  it("blocks downward wheel only when pinned on the hard bottom", () => {
-    expect(
-      shouldPreventPinnedBottomWheel({
-        pinned: true,
-        escaped: false,
-        deltaY: 40,
-        scrollTop: maxTop,
-        scrollHeight: sh,
-        clientHeight: ch,
-      }),
-    ).toBe(true);
-  });
-
-  it("never blocks scrolling up into history", () => {
-    expect(
-      shouldPreventPinnedBottomWheel({
-        pinned: true,
-        escaped: false,
-        deltaY: -40,
-        scrollTop: maxTop,
-        scrollHeight: sh,
-        clientHeight: ch,
-      }),
-    ).toBe(false);
-  });
-
-  it("does not block when the user has left the bottom", () => {
-    expect(
-      shouldPreventPinnedBottomWheel({
-        pinned: false,
-        escaped: true,
-        deltaY: 40,
-        scrollTop: 200,
-        scrollHeight: sh,
-        clientHeight: ch,
-      }),
-    ).toBe(false);
-    expect(
-      shouldPreventPinnedBottomWheel({
-        pinned: true,
-        escaped: false,
-        deltaY: 40,
-        scrollTop: 200,
-        scrollHeight: sh,
-        clientHeight: ch,
-      }),
-    ).toBe(false);
   });
 });
 
@@ -940,6 +888,56 @@ describe("programmatic stick scroll ignore", () => {
     markProgrammaticStickScroll(el, 592);
     expect(takeProgrammaticStickScroll(el)).toBe(592);
     expect(takeProgrammaticStickScroll(el)).toBeUndefined();
+  });
+});
+
+describe("unreliable viewport / programmatic leave", () => {
+  it("treats hidden and tiny clientHeight as unreliable", () => {
+    expect(isStickViewportUnreliable({ clientHeight: 800 })).toBe(false);
+    expect(isStickViewportUnreliable({ clientHeight: 0 })).toBe(true);
+    expect(
+      isStickViewportUnreliable({
+        clientHeight: STICK_MIN_VIEWPORT_HEIGHT_PX - 1,
+      }),
+    ).toBe(true);
+    expect(
+      isStickViewportUnreliable({ clientHeight: 800, hidden: true }),
+    ).toBe(true);
+    expect(
+      isStickViewportUnreliable({ clientHeight: 800, hidden: false }),
+    ).toBe(false);
+  });
+
+  it("restores tail follow only when coming back while still pinned", () => {
+    expect(
+      shouldRestorePinnedFollowOnViewportReady({
+        pinned: true,
+        escaped: false,
+        viewportWasUnreliable: true,
+        viewportIsReliable: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRestorePinnedFollowOnViewportReady({
+        pinned: false,
+        escaped: true,
+        viewportWasUnreliable: true,
+        viewportIsReliable: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRestorePinnedFollowOnViewportReady({
+        pinned: true,
+        escaped: false,
+        viewportWasUnreliable: false,
+        viewportIsReliable: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not treat a tagged programmatic scrollTop write as a user leave", () => {
+    expect(shouldIgnoreProgrammaticStickLeave(640)).toBe(true);
+    expect(shouldIgnoreProgrammaticStickLeave(undefined)).toBe(false);
   });
 });
 

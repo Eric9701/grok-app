@@ -150,6 +150,7 @@ const applyReadResult = (
     error: r.error,
   });
   const text = r.text ?? null;
+  setError(null);
   setTabs((prev) =>
     prev.map((t) =>
       t.id === id
@@ -161,6 +162,7 @@ const applyReadResult = (
             relativePath: relativePath || r.relativePath || t.relativePath,
             name: r.name || baseName(relativePath || r.absolutePath || "file"),
             loading: false,
+            error: null,
             tabKind: "file" as const,
             draftText: editable ? text : null,
             baselineText: editable ? text : null,
@@ -511,7 +513,12 @@ const openAbsoluteFile = useCallback(
             ? ""
             : abs.startsWith(`${root}/`)
               ? abs.slice(root.length + 1)
-              : abs.replace(/^\/+/, "");
+              : !abs.startsWith("/")
+                ? abs
+                : "";
+        if (abs.startsWith("/") && rel === "" && abs !== root) {
+          throw new Error("path outside project");
+        }
         r = await api.sshReadFile(sshAlias, projectPath, rel);
       } else {
         r = looksAbs
