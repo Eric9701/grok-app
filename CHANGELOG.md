@@ -13,6 +13,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Changed
+- Missing translations are filled in. SSH, IM security, permission rules, and Doctor checks follow the UI language.
+
+**中文 · 变更**
+- 补上缺的翻译。SSH、IM 安全、权限规则和 Doctor 检查跟界面语言。
+
 ### Fixed
 - CLI update banner and empty side-tab hint follow Appearance text color on wallpaper. They sat outside the old chrome list and used tertiary ink.
 
