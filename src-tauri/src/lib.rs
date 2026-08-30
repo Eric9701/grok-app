@@ -499,7 +499,13 @@ pub fn run() {
                     // Launch first-interaction dead-zone diagnosis: trace every
                     // key-window transition so a lost activation race is visible
                     // in the log (first click / ⌘, eaten = no Focused(true)).
-                    tracing::info!("main window focused={focused}");
+                    // app_active is logged too so a resign-key caused by NSApp
+                    // deactivation can be told apart from a transient key steal.
+                    tracing::info!(
+                        focused,
+                        app_active = ns_app_is_active(),
+                        "main window focused transition"
+                    );
                 }
                 _ => {}
             }
@@ -588,16 +594,14 @@ pub fn run() {
                     // activation race, leaving a key window whose app is still
                     // INACTIVE (macOS cooperative activation silently ignores
                     // activateIgnoringOtherApps from a background process — e.g.
-                    // dev launched from a terminal). isKeyWindow is then true,
-                    // so an is_focused guard would wrongly skip; clicks still
-                    // land (accept_first_mouse) but NO key events reach the app
-                    // while NSApp is inactive — ⌘, stays dead until one click
-                    // activates us. Reassert unconditionally ONCE when the page
-                    // has loaded, then repair the residual stuck state (key
-                    // window + inactive app) with guarded retries. Note: tao's
-                    // set_focus short-circuits while hidden — setup shows the
-                    // window synchronously before any page load can finish,
-                    // which this reassert relies on.
+                    // dev launched from a terminal), or a window that resigns
+                    // key ~1s after being shown. Either way the first click only
+                    // re-keys/activates and is eaten. Reassert once when the
+                    // page has loaded, then a short guardian loop keeps the
+                    // window key until the app is healthy or macOS proves it
+                    // will not activate us. Note: tao's set_focus short-circuits
+                    // while hidden — setup shows the window synchronously before
+                    // any page load can finish, which this reassert relies on.
                     use std::sync::atomic::{AtomicBool, Ordering};
                     static REASSERTED: AtomicBool = AtomicBool::new(false);
                     if payload.event() != tauri::webview::PageLoadEvent::Finished {
@@ -616,38 +620,57 @@ pub fn run() {
                     {
                         let w = window.clone();
                         let _ = window.run_on_main_thread(move || {
+                            force_ns_app_activate();
                             point_keys_at_webview(&w);
                         });
                     }
-                    if !app_active_at_load && cfg!(target_os = "macos") {
-                        // Repair loop for the pathological state: the window
-                        // claims key while NSApp is inactive (cooperative
-                        // activation denied/raced). Retry a few times over ~2s.
-                        // Guard: if the user deliberately switched away, our
-                        // window loses key → bail instead of yanking them back;
-                        // once active, stop immediately.
+                    if cfg!(target_os = "macos") {
+                        // Launch focus guardian: the window can lose key ~1s
+                        // after show/page-load (background-launch cooperative
+                        // activation, or a transient key steal) — the very first
+                        // user click then only re-keys the window and is eaten.
+                        // Keep re-asserting for a few seconds so the first click
+                        // lands on a key window. Stop as soon as the window is
+                        // key AND the app is active; bail when the window stays
+                        // non-key while the app is inactive (user moved on / a
+                        // background launch macOS refuses to activate).
                         let w = window.clone();
                         tauri::async_runtime::spawn(async move {
-                            for attempt in 1..=8u8 {
-                                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-                                if ns_app_is_active() {
+                            let mut app_inactive_ticks = 0u8;
+                            for attempt in 1..=12u8 {
+                                tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+                                let app_active = ns_app_is_active();
+                                let window_key = w.is_focused().unwrap_or(false);
+                                if window_key && app_active {
+                                    tracing::info!(attempt, "launch focus guardian: healthy");
                                     return;
                                 }
-                                if !w.is_focused().unwrap_or(false) {
-                                    tracing::info!(
-                                        attempt,
-                                        "launch activation repair: window lost key (user moved on or pet briefly keyed)"
-                                    );
-                                    return;
+                                if !app_active {
+                                    app_inactive_ticks += 1;
+                                    if app_inactive_ticks >= 4 {
+                                        tracing::info!(
+                                            attempt,
+                                            "launch focus guardian: app stays inactive — macOS refusing background activation, stopping"
+                                        );
+                                        return;
+                                    }
+                                } else {
+                                    app_inactive_ticks = 0;
                                 }
-                                tracing::info!(attempt, "repairing launch activation (key window + inactive app)");
+                                tracing::info!(
+                                    attempt,
+                                    window_key,
+                                    app_active,
+                                    "launch focus guardian: re-focusing"
+                                );
                                 let _ = w.set_focus();
                                 let wr = w.clone();
                                 let _ = w.run_on_main_thread(move || {
+                                    force_ns_app_activate();
                                     point_keys_at_webview(&wr);
                                 });
                             }
-                            tracing::warn!("launch activation repair gave up; first click will activate");
+                            tracing::warn!("launch focus guardian gave up; first click may activate");
                         });
                     }
                 })
@@ -1822,6 +1845,31 @@ fn ns_app_is_active() -> bool {
 fn ns_app_is_active() -> bool {
     true
 }
+
+/// Force NSApp to the front with the modern activation API.
+///
+/// `-[NSApp activateIgnoringOtherApps:]` (what tao's `set_focus` calls) is
+/// deprecated since macOS 14 and cooperative activation silently drops it when
+/// the process was launched from a background context (terminal / LaunchAgent /
+/// SSH). The window then claims key while NSApp stays INACTIVE, so the very
+/// first click only activates the app and is swallowed; the second click finally
+/// reaches the UI. `-[NSRunningApplication activateWithOptions:]` is the
+/// supported replacement and is honored in more launch paths.
+#[cfg(target_os = "macos")]
+fn force_ns_app_activate() {
+    use objc2::{class, msg_send, runtime::AnyObject};
+    unsafe {
+        // NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps
+        const OPTIONS: usize = (1usize << 0) | (1usize << 1);
+        let running: *mut AnyObject = msg_send![class!(NSRunningApplication), currentApplication];
+        if !running.is_null() {
+            let _: bool = msg_send![running, activateWithOptions: OPTIONS];
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn force_ns_app_activate() {}
 
 /// Point the key window's first responder at the WKWebView so key events reach
 /// the DOM (web shortcuts like ⌘,). `makeKeyAndOrderFront` alone can leave the
