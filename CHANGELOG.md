@@ -11,7 +11,11 @@ See `docs/llm-wiki/release.md`.
 
 **What's New popup:** each bullet's **first sentence** is what users see. Keep that sentence to one short line (added / fixed / improved — no paths, no implementation, no issue piles). A second short sentence is allowed for GitHub / this file only. Do **not** rewrite already-shipped `## [X.Y.Z]` sections.
 
-## [Unreleased]
+## [0.2.29] - 2026-08-31
+
+> **Highlight:** One-click CLI install, complete translations, and smoother long chats.
+>
+> **中文 · 亮点：** 一键装 CLI、翻译补全、长对话更顺。
 
 ### Added
 - When the Grok Build CLI is missing, Runtime settings offers a one-click install.
@@ -50,6 +54,8 @@ See `docs/llm-wiki/release.md`.
 - 修复重载后 agent 的提问消失、会话卡在思考中。重新打开会话会把提问恢复出来。
 - 修复回退在 agent 迟迟不应答时转好几分钟。分叉会话也不再占住别的会话的发送。
 - 修复切走的会话还在输出时仍允许回退。原先会截断那条会话的历史。
+
+## [Unreleased]
 
 ## [0.2.28] - 2026-08-29
 
