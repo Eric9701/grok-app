@@ -24,10 +24,10 @@ See `docs/llm-wiki/release.md`.
 - 打开内置浏览器时，队列编辑等毛玻璃弹窗不再被挡住。弹窗打开期间会暂时藏起原生页面（#976）。
 
 ### Changed
-- More UI languages fill in strings that still matched English. Filipino, German, Italian, French, Spanish, Brazilian Portuguese, and Indonesian follow the locale (#972–#975, #977–#978).
+- More UI languages fill in strings that still matched English. Filipino, German, Italian, French, Spanish, Brazilian Portuguese, Indonesian, and Simplified/Traditional Chinese follow the locale (#972–#975, #977–#979).
 
 **中文 · 变更**
-- 更多界面语言补上了原先还跟英文重复的可见文案。Filipino、德、意、法、西、巴西葡、印尼语跟语言走（#972–#975、#977–#978）。
+- 更多界面语言补上了原先还跟英文重复的可见文案。Filipino、德、意、法、西、巴西葡、印尼、简繁中文跟语言走（#972–#975、#977–#979）。
 
 ## [0.2.29] - 2026-08-31
 
