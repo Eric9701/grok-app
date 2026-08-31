@@ -15,9 +15,19 @@ See `docs/llm-wiki/release.md`.
 
 ### Fixed
 - Thinking no longer stays on screen as the final reply. The real answer paints in place; switching chats is not required (#968).
+- Settings search finds Chinese keywords for permission, telemetry, login, and more (#970).
 
 **中文 · 修复**
 - 思考结束后不再把思考过程当成最终回复。正文会直接画出来，不用切走再切回来（#968）。
+- 设置搜索补上了中文关键词，权限、遥测、登录等能搜到了（#970）。
+
+### Changed
+- Filipino UI strings that still matched English are translated (#972).
+- German UI strings that still matched English are translated (#973).
+
+**中文 · 变更**
+- Filipino 界面里原先还跟英文重复的可见文案已补上翻译（#972）。
+- 德语界面里原先还跟英文重复的可见文案已补上翻译（#973）。
 
 ## [0.2.29] - 2026-08-31
 
@@ -62,8 +72,6 @@ See `docs/llm-wiki/release.md`.
 - 修复重载后 agent 的提问消失、会话卡在思考中。重新打开会话会把提问恢复出来。
 - 修复回退在 agent 迟迟不应答时转好几分钟。分叉会话也不再占住别的会话的发送。
 - 修复切走的会话还在输出时仍允许回退。原先会截断那条会话的历史。
-
-## [Unreleased]
 
 ## [0.2.28] - 2026-08-29
 
