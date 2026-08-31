@@ -15,19 +15,19 @@ See `docs/llm-wiki/release.md`.
 
 ### Fixed
 - Thinking no longer stays on screen as the final reply. The real answer paints in place; switching chats is not required (#968).
-- Settings search finds Chinese keywords for permission, telemetry, login, and more (#970).
+- Settings search finds Chinese keywords for permission, telemetry, login, and more. Bilingual keywords stay locked by catalog test (#970).
 
 **中文 · 修复**
 - 思考结束后不再把思考过程当成最终回复。正文会直接画出来，不用切走再切回来（#968）。
-- 设置搜索补上了中文关键词，权限、遥测、登录等能搜到了（#970）。
+- 设置搜索补上了中文关键词，权限、遥测、登录等能搜到了。目录测试会锁住双语关键词（#970）。
 
 ### Changed
-- Filipino UI strings that still matched English are translated (#972).
-- German UI strings that still matched English are translated (#973).
+- Filipino UI strings that still matched English are translated. Doctor, SSH, composer, and pet copy follow the locale (#972).
+- German UI strings that still matched English are translated. Doctor and settings labels follow the locale (#973).
 
 **中文 · 变更**
-- Filipino 界面里原先还跟英文重复的可见文案已补上翻译（#972）。
-- 德语界面里原先还跟英文重复的可见文案已补上翻译（#973）。
+- Filipino 界面里原先还跟英文重复的可见文案已补上翻译。Doctor、SSH、composer、pet 跟语言走（#972）。
+- 德语界面里原先还跟英文重复的可见文案已补上翻译。Doctor 和设置标签跟语言走（#973）。
 
 ## [0.2.29] - 2026-08-31
 
