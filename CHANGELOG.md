@@ -14,12 +14,14 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Fixed
+- Expanded tool steps no longer stack title and command on one line. The last row in a Worked-for list keeps its real height.
 - Thinking no longer stays on screen as the final reply. The real answer paints in place; switching chats is not required (#968).
 - Settings search finds Chinese keywords for permission, telemetry, login, and more. Bilingual keywords stay locked by catalog test (#970).
 - Queue edit and other glass dialogs stay above the embedded browser. Native webviews hide while the modal is open (#976).
 - Doctor and the agent dashboard no longer use native dropdowns. They use the same app Select as settings (#981).
 
 **中文 · 修复**
+- 展开的工具步骤不再把标题和命令叠在同一行。工作列表最后一行会按真实高度排开。
 - 思考结束后不再把思考过程当成最终回复。正文会直接画出来，不用切走再切回来（#968）。
 - 设置搜索补上了中文关键词，权限、遥测、登录等能搜到了。目录测试会锁住双语关键词（#970）。
 - 打开内置浏览器时，队列编辑等毛玻璃弹窗不再被挡住。弹窗打开期间会暂时藏起原生页面（#976）。
