@@ -17,17 +17,19 @@ See `docs/llm-wiki/release.md`.
 - Thinking no longer stays on screen as the final reply. The real answer paints in place; switching chats is not required (#968).
 - Settings search finds Chinese keywords for permission, telemetry, login, and more. Bilingual keywords stay locked by catalog test (#970).
 - Queue edit and other glass dialogs stay above the embedded browser. Native webviews hide while the modal is open (#976).
+- Doctor and the agent dashboard no longer use native dropdowns. They use the same app Select as settings (#981).
 
 **中文 · 修复**
 - 思考结束后不再把思考过程当成最终回复。正文会直接画出来，不用切走再切回来（#968）。
 - 设置搜索补上了中文关键词，权限、遥测、登录等能搜到了。目录测试会锁住双语关键词（#970）。
 - 打开内置浏览器时，队列编辑等毛玻璃弹窗不再被挡住。弹窗打开期间会暂时藏起原生页面（#976）。
+- Doctor 和智能体面板不再用系统原生下拉。跟设置一样走项目 Select（#981）。
 
 ### Changed
-- More UI languages fill in strings that still matched English. Filipino, German, Italian, French, Spanish, Brazilian Portuguese, Indonesian, and Simplified/Traditional Chinese follow the locale (#972–#975, #977–#979).
+- More UI languages fill in strings that still matched English. Remaining locales including Japanese, Korean, Russian, Ukrainian, and Tamil follow the locale (#972–#975, #977–#980).
 
 **中文 · 变更**
-- 更多界面语言补上了原先还跟英文重复的可见文案。Filipino、德、意、法、西、巴西葡、印尼、简繁中文跟语言走（#972–#975、#977–#979）。
+- 更多界面语言补上了原先还跟英文重复的可见文案。含日/韩/俄/乌/泰米尔等剩余语言跟语言走（#972–#975、#977–#980）。
 
 ## [0.2.29] - 2026-08-31
 
