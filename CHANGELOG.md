@@ -24,16 +24,10 @@ See `docs/llm-wiki/release.md`.
 - 打开内置浏览器时，队列编辑等毛玻璃弹窗不再被挡住。弹窗打开期间会暂时藏起原生页面（#976）。
 
 ### Changed
-- Filipino UI strings that still matched English are translated. Doctor, SSH, composer, and pet copy follow the locale (#972).
-- German UI strings that still matched English are translated. Doctor and settings labels follow the locale (#973).
-- Italian UI strings that still matched English are translated. Doctor, automations, and ship labels follow the locale (#974).
-- French UI strings that still matched English are translated. A few remaining labels follow the locale (#975).
+- More UI languages fill in strings that still matched English. Filipino, German, Italian, French, Spanish, Brazilian Portuguese, and Indonesian follow the locale (#972–#975, #977–#978).
 
 **中文 · 变更**
-- Filipino 界面里原先还跟英文重复的可见文案已补上翻译。Doctor、SSH、composer、pet 跟语言走（#972）。
-- 德语界面里原先还跟英文重复的可见文案已补上翻译。Doctor 和设置标签跟语言走（#973）。
-- 意大利语界面里原先还跟英文重复的可见文案已补上翻译。Doctor、自动化、合并标签跟语言走（#974）。
-- 法语界面里原先还跟英文重复的可见文案已补上翻译。剩下几处标签跟语言走（#975）。
+- 更多界面语言补上了原先还跟英文重复的可见文案。Filipino、德、意、法、西、巴西葡、印尼语跟语言走（#972–#975、#977–#978）。
 
 ## [0.2.29] - 2026-08-31
 
