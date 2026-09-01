@@ -78,6 +78,7 @@ mod editors;
 mod error;
 
 mod extensions;
+mod plugin_mcp;
 mod mcp_oauth;
 
 mod fs_browser;
@@ -1362,6 +1363,10 @@ pub fn run() {
             commands::plugin_update,
 
             commands::plugin_validate,
+            commands::plugin_mcp_auth_status,
+            commands::plugin_mcp_auth_save_tokens,
+            commands::plugin_mcp_auth_oauth2,
+            commands::plugin_mcp_auth_logout,
 
             commands::hooks_list,
 

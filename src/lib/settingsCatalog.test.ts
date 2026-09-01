@@ -207,6 +207,22 @@ describe("settingsCatalog", () => {
     ).toBe(true);
   });
 
+  it("indexes local-path plugin install on the plugins tab", () => {
+    const entry = SETTINGS_ENTRIES.find((e) => e.id === "ext.plugins.installPath");
+    expect(entry?.tab).toBe("plugins");
+    expect(entry?.anchorId).toBe("settings-anchor-ext-plugins-install");
+    const tZh = createT("zh");
+    const tEn = createT("en");
+    const hits = searchSettingsEntries("本地路径", tZh, tEn);
+    expect(
+      hits.some(
+        (h) =>
+          h.entry.id === "ext.plugins.installPath" &&
+          h.entry.anchorId === "settings-anchor-ext-plugins-install",
+      ),
+    ).toBe(true);
+  });
+
   it("runtime has an SSH tab for OpenSSH hosts", () => {
     const runtime = SETTINGS_NAV.find((n) => n.id === "runtime");
     expect(runtime?.tabs.map((t) => t.id)).toEqual([
