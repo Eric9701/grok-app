@@ -37,12 +37,12 @@ See `docs/llm-wiki/release.md`.
 
 ### Changed
 - More UI languages fill in strings that still matched English. Remaining locales including Japanese, Korean, Russian, Ukrainian, and Tamil follow the locale (#972–#975, #977–#980).
-- Background git status work is quieter. The dirty chip pauses while the window is hidden, and Host runs status off the async runtime (#988, #990).
+- Background git and worktree Host work stays off the async runtime. Status, diffs, review loads, and worktree ops no longer stall other commands (#988, #990–#993).
 - Opening a chat with media settles with fewer polls. Reveal still waits on load events; the safety net is slower (#989).
 
 **中文 · 变更**
 - 更多界面语言补上了原先还跟英文重复的可见文案。含日/韩/俄/乌/泰米尔等剩余语言跟语言走（#972–#975、#977–#980）。
-- 后台 git status 更省。窗口隐藏时脏标记停轮询，Host 也不再堵在 async 线程上（#988、#990）。
+- 后台 git / worktree 更省。状态、diff、Review 与 worktree 操作不再堵其它 Host 命令（#988、#990–#993）。
 - 打开带媒体的会话少扫 DOM。仍靠加载事件揭开，兜底轮询更慢（#989）。
 
 ## [0.2.29] - 2026-08-31
