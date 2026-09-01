@@ -6,7 +6,7 @@ Install and manage Grok Build plugins from **Settings → Extensions → Plugins
 
 | Action | Where | Effect |
 |--------|--------|--------|
-| Recommended | Plugins → **推荐** | ChatCut only (`https://github.com/ChatCut-Inc/agent-plugin#codex`); **never auto-install**; GlassModal confirm then `plugin install --trust` |
+| Recommended | Plugins → **推荐** | ChatCut (`https://github.com/ChatCut-Inc/agent-plugin#codex`) and **X API** (`https://github.com/RongleCat/x-api`); **never auto-install**; GlassModal confirm then `plugin install --trust` |
 | List installed | Plugins → **已安装** | `grok plugin list --json` + inspect enrich; primary control = enable toggle; update/validate/details/uninstall under expand |
 | Details / uninstall / update | Expanded installed row | CLI; GlassModal confirms uninstall |
 | **Validate** | Path-install **Validate** (local folder only), or installed-row validate | `grok plugin validate [path]`; in-form summary + GlassModal; soft-fail if CLI too old / missing |

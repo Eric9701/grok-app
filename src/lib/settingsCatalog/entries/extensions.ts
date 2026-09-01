@@ -13,6 +13,7 @@ export const EXTENSIONS_ENTRIES: readonly SettingsEntry[] = [
       "ext.lead",
       "ext.plugins.installLabel",
       "ext.plugins.recommendedTitle",
+      "ext.plugins.recommended.xApiName",
       "ext.plugins.installableTitle",
     ],
     keywords: [
@@ -21,6 +22,8 @@ export const EXTENSIONS_ENTRIES: readonly SettingsEntry[] = [
       "extensions",
       "chatcut",
       "codex",
+      "x-api",
+      "x api",
       "插件",
       "扩展",
       "擴展",

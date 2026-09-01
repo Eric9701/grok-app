@@ -13,6 +13,34 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.30] - 2026-09-02
+
+> **Highlight:** Install plugins from a local folder, and add X API from Recommended.
+>
+> **中文 · 亮点：** 设置里可从本地装插件，推荐里可一键加 X API。
+
+### Added
+- Settings can install a plugin from a local folder or git URL.
+- Installed plugins that ship MCP appear under Extensions → MCP.
+- X API is a recommended plugin you can install from Settings.
+- You can authorize the X API plugin from the MCP list.
+
+**中文 · 新增**
+- 设置 → 插件可以从本地文件夹或 git 安装。
+- 带 MCP 的已装插件会出现在扩展 → MCP。
+- 推荐插件里增加了 X API。
+- 可在 MCP 列表里给 X API 授权。
+
+### Changed
+- More UI languages fill in strings that still matched English. Remaining locales including Japanese, Korean, Russian, Ukrainian, and Tamil follow the locale (#972–#975, #977–#980).
+- Background git and worktree Host work stays off the async runtime. Status, diffs, review loads, and worktree ops no longer stall other commands (#988, #990–#993).
+- Opening a chat with media settles with fewer polls. Reveal still waits on load events; the safety net is slower (#989).
+
+**中文 · 变更**
+- 更多界面语言补上了原先还跟英文重复的可见文案。含日/韩/俄/乌/泰米尔等剩余语言跟语言走（#972–#975、#977–#980）。
+- 后台 git / worktree 更省。状态、diff、Review 与 worktree 操作不再堵其它 Host 命令（#988、#990–#993）。
+- 打开带媒体的会话少扫 DOM。仍靠加载事件揭开，兜底轮询更慢（#989）。
+
 ### Fixed
 - Sidebar header is now one row: logo, search, and pane toggle. Search sits next to the toggle on the right (#996).
 - Desktop composer now shows localized labels for all reasoning tiers. The top tier no longer shows a raw internal id (#994).
@@ -23,6 +51,7 @@ See `docs/llm-wiki/release.md`.
 - Queue edit and other glass dialogs stay above the embedded browser. Native webviews hide while the modal is open (#976).
 - Doctor and the agent dashboard no longer use native dropdowns. They use the same app Select as settings (#981).
 - Screen-reader labels for the files pane and setup steps follow the UI language. They no longer stay English (#982).
+- Wallpaper crop in the theme editor matches the main window.
 
 **中文 · 修复**
 - 桌面侧栏顶栏收成一行，搜索与侧栏按钮同在右侧。折叠时仍可在主栏左上角打开侧栏（#996）。
@@ -34,16 +63,7 @@ See `docs/llm-wiki/release.md`.
 - 打开内置浏览器时，队列编辑等毛玻璃弹窗不再被挡住。弹窗打开期间会暂时藏起原生页面（#976）。
 - Doctor 和智能体面板不再用系统原生下拉。跟设置一样走项目 Select（#981）。
 - 文件面板和设置向导的读屏标签跟界面语言走。不再固定英文（#982）。
-
-### Changed
-- More UI languages fill in strings that still matched English. Remaining locales including Japanese, Korean, Russian, Ukrainian, and Tamil follow the locale (#972–#975, #977–#980).
-- Background git and worktree Host work stays off the async runtime. Status, diffs, review loads, and worktree ops no longer stall other commands (#988, #990–#993).
-- Opening a chat with media settles with fewer polls. Reveal still waits on load events; the safety net is slower (#989).
-
-**中文 · 变更**
-- 更多界面语言补上了原先还跟英文重复的可见文案。含日/韩/俄/乌/泰米尔等剩余语言跟语言走（#972–#975、#977–#980）。
-- 后台 git / worktree 更省。状态、diff、Review 与 worktree 操作不再堵其它 Host 命令（#988、#990–#993）。
-- 打开带媒体的会话少扫 DOM。仍靠加载事件揭开，兜底轮询更慢（#989）。
+- 主题编辑器里的壁纸裁切跟主窗口比例一致。
 
 ## [0.2.29] - 2026-08-31
 

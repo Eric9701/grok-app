@@ -100,7 +100,9 @@ import {
 } from "@/lib/pluginMarketplace";
 import {
   CHATCUT_CODEX_INSTALL_SOURCE,
+  X_API_INSTALL_SOURCE,
   isChatCutInstalled,
+  isXApiInstalled,
   pluginDisplayName,
   resolveExtensionsTabId,
 } from "@/lib/pluginRecommended";
@@ -337,8 +339,10 @@ export function ExtensionsPanel({
   const [expandedMcpNames, setExpandedMcpNames] = useState<
     Record<string, boolean>
   >({});
-  /** Confirm Modal for recommended ChatCut install (never auto-install). */
-  const [chatcutInstallOpen, setChatcutInstallOpen] = useState(false);
+  /** Confirm modal for a recommended plugin (never auto-install). */
+  const [recommendedInstall, setRecommendedInstall] = useState<
+    "chatcut" | "x-api" | null
+  >(null);
   /** Marketplace sources live in a modal (not page body). */
   const [sourcesModalOpen, setSourcesModalOpen] = useState(false);
   const [pluginAuthServer, setPluginAuthServer] = useState<string | null>(null);
@@ -1558,6 +1562,7 @@ export function ExtensionsPanel({
     () => isChatCutInstalled(plugins),
     [plugins],
   );
+  const xApiInstalled = useMemo(() => isXApiInstalled(plugins), [plugins]);
 
   const q = extQuery.trim().toLowerCase();
   const filterText = useCallback(
@@ -1654,11 +1659,13 @@ export function ExtensionsPanel({
   const showTabSearch =
     tab === "plugins" || tab === "mcp" || tab === "skills";
 
-  const installChatCut = async () => {
+  const installRecommended = async (kind: "chatcut" | "x-api") => {
     if (!api.isTauri() || actionBusy || cliMissing) return;
-    setChatcutInstallOpen(false);
-    await runPluginAction("install:chatcut", async () => {
-      await api.pluginInstall(CHATCUT_CODEX_INSTALL_SOURCE);
+    setRecommendedInstall(null);
+    const source =
+      kind === "x-api" ? X_API_INSTALL_SOURCE : CHATCUT_CODEX_INSTALL_SOURCE;
+    await runPluginAction(`install:${kind}`, async () => {
+      await api.pluginInstall(source);
     });
   };
 
@@ -2024,8 +2031,8 @@ export function ExtensionsPanel({
           ) : null}
         </section>
 
-        {/* Recommended ChatCut if missing */}
-        {!chatcutInstalled ? (
+        {/* Recommended plugins if missing — never auto-install */}
+        {!chatcutInstalled || !xApiInstalled ? (
           <section
             className="ext-ref-block"
             id="settings-anchor-ext-plugins-recommended"
@@ -2034,31 +2041,60 @@ export function ExtensionsPanel({
               {tr("ext.plugins.recommendedTitle")}
             </div>
             <ul className="ext-ref-featured">
-              <li className="ext-ref-featured__item">
-                <div className="ext-ref-featured__icon" aria-hidden>
-                  <IconPuzzle size={18} />
-                </div>
-                <div className="ext-ref-featured__body">
-                  <div className="ext-ref-featured__title">
-                    {tr("ext.plugins.recommended.chatcutName")}
+              {!chatcutInstalled ? (
+                <li className="ext-ref-featured__item">
+                  <div className="ext-ref-featured__icon" aria-hidden>
+                    <IconPuzzle size={18} />
                   </div>
-                  <div className="ext-ref-featured__desc">
-                    {tr("ext.plugins.recommended.chatcutDesc")}
+                  <div className="ext-ref-featured__body">
+                    <div className="ext-ref-featured__title">
+                      {tr("ext.plugins.recommended.chatcutName")}
+                    </div>
+                    <div className="ext-ref-featured__desc">
+                      {tr("ext.plugins.recommended.chatcutDesc")}
+                    </div>
                   </div>
-                </div>
-                <div className="ext-ref-featured__end">
-                  <button
-                    type="button"
-                    className="btn btn--solid btn--sm"
-                    disabled={!!actionBusy || cliMissing}
-                    onClick={() => setChatcutInstallOpen(true)}
-                  >
-                    {actionBusy === "install:chatcut"
-                      ? tr("ext.plugins.installing")
-                      : tr("ext.plugins.recommended.install")}
-                  </button>
-                </div>
-              </li>
+                  <div className="ext-ref-featured__end">
+                    <button
+                      type="button"
+                      className="btn btn--solid btn--sm"
+                      disabled={!!actionBusy || cliMissing}
+                      onClick={() => setRecommendedInstall("chatcut")}
+                    >
+                      {actionBusy === "install:chatcut"
+                        ? tr("ext.plugins.installing")
+                        : tr("ext.plugins.recommended.install")}
+                    </button>
+                  </div>
+                </li>
+              ) : null}
+              {!xApiInstalled ? (
+                <li className="ext-ref-featured__item">
+                  <div className="ext-ref-featured__icon" aria-hidden>
+                    <IconPlug size={18} />
+                  </div>
+                  <div className="ext-ref-featured__body">
+                    <div className="ext-ref-featured__title">
+                      {tr("ext.plugins.recommended.xApiName")}
+                    </div>
+                    <div className="ext-ref-featured__desc">
+                      {tr("ext.plugins.recommended.xApiDesc")}
+                    </div>
+                  </div>
+                  <div className="ext-ref-featured__end">
+                    <button
+                      type="button"
+                      className="btn btn--solid btn--sm"
+                      disabled={!!actionBusy || cliMissing}
+                      onClick={() => setRecommendedInstall("x-api")}
+                    >
+                      {actionBusy === "install:x-api"
+                        ? tr("ext.plugins.installing")
+                        : tr("ext.plugins.recommended.install")}
+                    </button>
+                  </div>
+                </li>
+              ) : null}
             </ul>
           </section>
         ) : null}
@@ -2859,11 +2895,17 @@ export function ExtensionsPanel({
       </div>
 
       <GlassModal
-        open={chatcutInstallOpen}
+        open={!!recommendedInstall}
         onClose={() => {
-          if (actionBusy !== "install:chatcut") setChatcutInstallOpen(false);
+          const busy =
+            actionBusy === "install:chatcut" || actionBusy === "install:x-api";
+          if (!busy) setRecommendedInstall(null);
         }}
-        title={tr("ext.plugins.recommended.installTitle")}
+        title={
+          recommendedInstall === "x-api"
+            ? tr("ext.plugins.recommended.xApiInstallTitle")
+            : tr("ext.plugins.recommended.installTitle")
+        }
         size="sm"
         closeLabel={tr("common.close")}
         footer={
@@ -2871,18 +2913,29 @@ export function ExtensionsPanel({
             <button
               type="button"
               className="btn btn--ghost"
-              disabled={actionBusy === "install:chatcut"}
-              onClick={() => setChatcutInstallOpen(false)}
+              disabled={
+                actionBusy === "install:chatcut" ||
+                actionBusy === "install:x-api"
+              }
+              onClick={() => setRecommendedInstall(null)}
             >
               {tr("common.cancel")}
             </button>
             <button
               type="button"
               className="btn btn--solid"
-              disabled={actionBusy === "install:chatcut" || cliMissing}
-              onClick={() => void installChatCut()}
+              disabled={
+                actionBusy === "install:chatcut" ||
+                actionBusy === "install:x-api" ||
+                cliMissing ||
+                !recommendedInstall
+              }
+              onClick={() => {
+                if (recommendedInstall) void installRecommended(recommendedInstall);
+              }}
             >
-              {actionBusy === "install:chatcut"
+              {actionBusy === "install:chatcut" ||
+              actionBusy === "install:x-api"
                 ? tr("ext.plugins.installing")
                 : tr("ext.plugins.recommended.install")}
             </button>
@@ -2890,9 +2943,13 @@ export function ExtensionsPanel({
         }
       >
         <p className="app-dialog__msg">
-          {tr("ext.plugins.recommended.installConfirm", {
-            source: CHATCUT_CODEX_INSTALL_SOURCE,
-          })}
+          {recommendedInstall === "x-api"
+            ? tr("ext.plugins.recommended.xApiInstallConfirm", {
+                source: X_API_INSTALL_SOURCE,
+              })
+            : tr("ext.plugins.recommended.installConfirm", {
+                source: CHATCUT_CODEX_INSTALL_SOURCE,
+              })}
         </p>
         <p className="ext-field-hint">{tr("ext.market.installTrustNote")}</p>
       </GlassModal>
