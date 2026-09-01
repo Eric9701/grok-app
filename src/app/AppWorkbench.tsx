@@ -190,6 +190,7 @@ import {
 import {
   armStopLatch,
   createStopLatchState,
+  settleStopLatchAfterSessionStop,
   tickStopLatch,
   STOP_LATCH_MS,
 } from "@/lib/stopLatch";
@@ -198,7 +199,10 @@ import {
   shouldEscapeCloseSettings,
   shouldEscapeStopGeneration,
 } from "@/lib/escapeStop";
-import { endOfTurnMarkerContent } from "@/lib/endOfTurn";
+import {
+  currentTurnHasEndMarker,
+  endOfTurnMarkerContent,
+} from "@/lib/endOfTurn";
 import {
   isMirrorClient,
   mirrorEnsureTransport,
@@ -434,6 +438,7 @@ import {
 import {
   makeQueuedSend,
   queueSessionKey,
+  releaseSendClaimsOnUserStop,
   resolveSendQueueStripState,
   type QueuedSend,
 } from "@/lib/sendQueue";
@@ -5893,6 +5898,12 @@ export function AppWorkbench() {
     executeSendFromQueueRef,
     executeSendLatestRef,
     claimSendForSession,
+    clearStopLatch: () => {
+      if (stopLatchRef.current.phase === "idle") return;
+      const cleared = createStopLatchState();
+      stopLatchRef.current = cleared;
+      setStopLatch(cleared);
+    },
     currentViewFocus,
     patchSessionMessages,
     ensureConnected,
@@ -10058,17 +10069,9 @@ export function AppWorkbench() {
         m.map((x) => ({ ...x, streaming: false })),
       );
       patchSessionMessages(id, (prev) => {
-        if (
-          prev.some(
-            (x) =>
-              x.marker === "turn_end" ||
-              x.marker === "turn_cancelled" ||
-              x.content?.startsWith("turn_end|") ||
-              x.content?.startsWith("turn_cancelled|"),
-          )
-        ) {
-          return prev;
-        }
+        // Only the *current* turn — a prior stop chip must not block this one,
+        // and Host `turn_marker` must not twin a local chip already painted.
+        if (currentTurnHasEndMarker(prev)) return prev;
         return applyTurnMarker(prev, {
           sessionId: id,
           messageId: `end-stop-${reason}-${Date.now()}`,
@@ -10085,6 +10088,18 @@ export function AppWorkbench() {
     // Optimistic unlock: sticky "thinking" + wedged cancel used to keep the
     // UI busy until `sessionStop` returned (or forever on Host hang).
     forceUnlockLocal(sid, "force");
+    // Free the send claim immediately. Otherwise a hung ensureConnected /
+    // sessionSend keeps claimSendForSession false and the next Send no-ops
+    // while the button still looks enabled (Tip still says 发送).
+    {
+      const freed = releaseSendClaimsOnUserStop(
+        sendInFlightBySessionRef.current,
+        sendEpochBySessionRef.current,
+        sid,
+      );
+      sendInFlightRef.current = freed.inFlight;
+      sendEpochRef.current += 1;
+    }
 
     let timeoutSettledSessionId: string | null = sid;
     // Force-unlock again if Host stays busy past STOP_LATCH_MS.
@@ -10132,16 +10147,19 @@ export function AppWorkbench() {
           m.map((x) => ({ ...x, streaming: false })),
         );
       }
-      const cleared = createStopLatchState();
-      stopLatchRef.current = cleared;
-      setStopLatch(cleared);
+      // sessionStop often returns before Host leaves streaming. Keep force_idle
+      // until a Host ready event clears the latch — do not trust the optimistic
+      // local Ready map (that used to drop the latch and re-lock Send).
+      const settled = settleStopLatchAfterSessionStop(stopLatchRef.current);
+      stopLatchRef.current = settled;
+      setStopLatch(settled);
     } catch (e) {
       // Host stop can fail ("no active session") while UI still shows thinking.
       // Always finish local unlock so Stop never leaves a dead busy shell.
       forceUnlockLocal(sid || liveHostRef.current.sessionId, "force");
-      const cleared = createStopLatchState();
-      stopLatchRef.current = cleared;
-      setStopLatch(cleared);
+      const settled = settleStopLatchAfterSessionStop(stopLatchRef.current);
+      stopLatchRef.current = settled;
+      setStopLatch(settled);
       setLocalError(String(e));
     }
   };
