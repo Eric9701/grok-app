@@ -13,6 +13,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Fixed
+- Custom-model chats no longer switch models between turn 1 and turn 2. Picker `app_models` ids resolve to the same config section for spawn and reconnect (#1000).
+
+**中文 · 修复**
+- 自定义模型会话不会再在第一轮与第二轮之间悄悄换模型。选择器里的 `app_models` id 会在启动与重连时解析成同一个配置段（#1000）。
+
 ## [0.2.30] - 2026-09-02
 
 > **Highlight:** Install plugins from a local folder, and add X API from Recommended.
