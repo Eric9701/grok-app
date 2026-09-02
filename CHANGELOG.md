@@ -15,9 +15,11 @@ See `docs/llm-wiki/release.md`.
 
 ### Fixed
 - Custom-model chats no longer switch models between turn 1 and turn 2. Picker `app_models` ids resolve to the same config section for spawn and reconnect (#1000).
+- Windows can add a project by dropping a folder on the sidebar again. Native drag-drop paths are restored; path-less sidebar drops show a clear hint instead of doing nothing (#999).
 
 **中文 · 修复**
 - 自定义模型会话不会再在第一轮与第二轮之间悄悄换模型。选择器里的 `app_models` id 会在启动与重连时解析成同一个配置段（#1000）。
+- Windows 又能把文件夹拖到侧栏加为项目。已恢复原生拖放路径；读不到路径时会提示，不再没反应（#999）。
 
 ## [0.2.30] - 2026-09-02
 
