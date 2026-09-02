@@ -1476,13 +1476,12 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
   const isNodeFocus = focusMessageId === m.id;
   // Phase projection: thought+tools collapse when phase ends (content
   // / next thought), not only when the full answer is done.
-  const timelineUnits = useMemo(
-    () =>
-      buildAssistantTimeline(segs, {
-        streaming: !!m.streaming,
-      }),
-    [segs, m.streaming],
-  );
+  // Do NOT wrap in useMemo here — this sits after role/isError early returns.
+  // A streaming assistant that later flips to isError on the same row id would
+  // skip this hook and trip React #30 (fewer hooks than expected) (#1002).
+  const timelineUnits = buildAssistantTimeline(segs, {
+    streaming: !!m.streaming,
+  });
   // Live chrome follows the *current* episode (trailing thought / phase),
   // not “this message already has some body text”. Grok 4.x think→tool
   // loops keep reasoning after the first status sentence.
