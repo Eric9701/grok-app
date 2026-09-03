@@ -1462,9 +1462,7 @@ impl SessionManager {
                 // session/set_model after session/new. Spawn `--model` alone is not
                 // enough when the composer id is an App `app_models` catalog id that
                 // CLI spawn resolves differently from ACP set_model.
-                if let Err(e) =
-                    Self::with_soft_rpc_budget(client.set_model(&agent_model)).await
-                {
+                if let Err(e) = Self::with_soft_rpc_budget(client.set_model(&agent_model)).await {
                     tracing::warn!("acp set_model after session open soft-fail: {e}");
                 }
                 emit_host_exit_heal(&app, &meta.id);
