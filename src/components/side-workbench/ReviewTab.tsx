@@ -773,7 +773,8 @@ export function ReviewTab({
     () =>
       resolveReviewEmptyState({
         isGitProject,
-        sessionCount: sessionChanges.length,
+        // Pinned turn-chip paths count as session rows for empty honesty (#998).
+        sessionCount: sessionChanges.length + pinnedFocusPaths.length,
         projectPath,
         loading,
         loadErrorKind,
@@ -784,6 +785,7 @@ export function ReviewTab({
     [
       isGitProject,
       sessionChanges.length,
+      pinnedFocusPaths.length,
       projectPath,
       loading,
       loadErrorKind,
@@ -862,94 +864,113 @@ export function ReviewTab({
   );
 
   /**
-   * Turn changed-files chip (#998): focus the file in Review. If session/
-   * workspace lists are still empty, seed a stub row and try gitFileDiff so
-   * the user is not left on “No changes to review”.
+   * Turn changed-files chip (#998): focus the file in Review. Prefer git
+   * diff when available; otherwise read the file and show as a full add so
+   * non-git projects are not stuck on an empty Review.
    */
   useEffect(() => {
     const raw = (focusPath || "").trim();
     // Path alone is enough; token re-fires when the same file is clicked again.
     if (!raw) return;
     const seq = ++focusSeq.current;
-    const want = normalizePath(raw);
-    const rel =
-      pathRelativeToProject(want, projectPath) ||
-      pathBaseName(want) ||
-      want;
-    const key = `s:${rel.toLowerCase()}`;
+    const parts = reviewFocusPathParts(raw, projectPath);
+    const want = parts.path;
+    const rel = parts.relPath;
+    const key = parts.key;
 
-    const focusExisting = (): boolean => {
-      const hit = findEntryForFocusPath(want, filesRef.current);
-      if (!hit) return false;
+    const hit = findEntryForFocusPath(want, filesRef.current);
+    const targetKey = hit?.key ?? key;
+    if (hit?.patch) {
       scrollToFile(hit.key);
-      return true;
-    };
+      return;
+    }
 
-    if (focusExisting()) return;
-
-    // Seed stub so Review is not empty while we load / wait for sessionChanges.
-    const stub: ReviewFileEntry = {
-      key,
-      relPath: rel,
-      path: want,
-      name: pathBaseName(want) || rel,
-      source: "session",
-      kind: "modified",
-      added: 0,
-      removed: 0,
-      patch: null,
-      binary: false,
-      loading: true,
-      error: null,
-    };
-    setFiles((prev) => {
-      if (findEntryForFocusPath(want, prev)) return prev;
-      return [stub, ...prev];
-    });
-    scrollToFile(key);
-
-    const project = (projectPath || "").trim();
-    if (!project || !api.isTauri() || !isGitProject) {
+    if (!hit) {
+      setFiles((prev) => {
+        if (findEntryForFocusPath(want, prev)) return prev;
+        return [
+          {
+            key,
+            relPath: rel,
+            path: want,
+            name: parts.name,
+            source: "session",
+            kind: "modified",
+            added: 0,
+            removed: 0,
+            patch: null,
+            binary: false,
+            loading: true,
+            error: null,
+          },
+          ...prev,
+        ];
+      });
+    } else {
       setFiles((prev) =>
         prev.map((f) =>
-          f.key === key ? { ...f, loading: false } : f,
+          f.key === hit.key ? { ...f, loading: true } : f,
+        ),
+      );
+    }
+    scrollToFile(targetKey);
+
+    const project = (projectPath || "").trim();
+    if (!api.isTauri()) {
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.key === targetKey || f.key === key
+            ? { ...f, loading: false }
+            : f,
         ),
       );
       return;
     }
 
     void (async () => {
+      let patch: string | null = null;
       try {
-        const g = await api.gitFileDiff(project, rel);
-        if (seq !== focusSeq.current) return;
-        const patch =
-          g?.available && typeof g.diff === "string" && g.diff.trim()
-            ? g.diff
-            : null;
-        const delta = patch ? countPatchDelta(patch) : null;
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.key === key
-              ? {
-                  ...f,
-                  loading: false,
-                  patch: patch ?? f.patch,
-                  added: delta?.added ?? f.added,
-                  removed: delta?.removed ?? f.removed,
-                  error: patch ? null : f.error,
-                }
-              : f,
-          ),
-        );
-        scrollToFile(key);
+        if (isGitProject && project) {
+          const g = await api.gitFileDiff(project, rel);
+          if (
+            g?.available &&
+            typeof g.diff === "string" &&
+            g.diff.trim()
+          ) {
+            patch = g.diff;
+          }
+        }
+        if (!patch) {
+          const abs = want.startsWith("/") || /^[A-Za-z]:[\\/]/.test(want);
+          const read = abs
+            ? await api.fsReadAbsolute(want)
+            : project
+              ? await api.fsReadFile(project, rel)
+              : await api.fsOpenPath(want, project || null);
+          const text = typeof read?.text === "string" ? read.text : null;
+          if (text != null) {
+            patch = buildUnifiedDiff(rel || parts.name, "", text);
+          }
+        }
       } catch {
-        if (seq !== focusSeq.current) return;
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.key === key ? { ...f, loading: false } : f,
-          ),
-        );
+        /* soft — leave row without patch */
       }
+      if (seq !== focusSeq.current) return;
+      const delta = patch ? countPatchDelta(patch) : null;
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.key === targetKey || f.key === key
+            ? {
+                ...f,
+                loading: false,
+                patch: patch ?? f.patch,
+                added: delta?.added ?? f.added,
+                removed: delta?.removed ?? f.removed,
+              }
+            : f,
+        ),
+      );
+      scrollToFile(targetKey);
     })();
   }, [
     focusPath,
@@ -1009,24 +1030,8 @@ export function ReviewTab({
     ? tr("side.review.collapseAll")
     : tr("side.review.expandAll");
 
-  if (emptyState.kind === "not_git") {
-    return (
-      <div className="sw-review" data-testid="side-review-tab">
-        <div
-          className="rp__empty-state"
-          data-testid="review-empty"
-          data-empty-kind="not_git"
-        >
-          <div className="rp__empty-title">{tr(emptyState.titleKey as MessageKey)}</div>
-          {emptyState.hintKey ? (
-            <div className="rp__empty-desc">
-              {tr(emptyState.hintKey as MessageKey)}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
+  // Do not full-page bail on not_git — session / pinned turn files (#998) still
+  // render in the stack below. not_git is shown via the shared empty overlay.
 
   return (
     <div className="sw-review" data-testid="side-review-tab">

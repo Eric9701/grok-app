@@ -2323,7 +2323,11 @@ export function AppWorkbench() {
     const result = applySideContextOpen(sideWorkbench, resourceOpenTarget, {
       isGitProject: sideIsGitProject,
     });
-    if (result.noticeKey) {
+    // Turn-chip opens with a path still work without git — skip the scary toast (#998).
+    const skipNotGitToast =
+      resourceOpenTarget.type === "changes" &&
+      !!(resourceOpenTarget.path || "").trim();
+    if (result.noticeKey && !skipNotGitToast) {
       showToast(tr(result.noticeKey), 2400);
     }
     if (result.needAsideOpen) {
