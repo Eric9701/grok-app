@@ -14373,6 +14373,9 @@ export function AppWorkbench() {
             retryAgentConnect={retryAgentConnect}
             runErrorBannerAction={runErrorBannerAction}
             session={session}
+            sessionChanges={
+              sessionChangesById[session.sessionId || ""] ?? []
+            }
             sessionJsonSchema={sessionJsonSchema}
             sessionTranscriptStore={sessionTranscriptStore}
             sessions={sessions}
