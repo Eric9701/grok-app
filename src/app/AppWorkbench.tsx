@@ -600,6 +600,7 @@ import { WorkbenchAppDialogStage } from "@/app/WorkbenchAppDialogStage";
 import { WorkbenchComposerModals } from "@/app/WorkbenchComposerModals";
 import {
   mergeSessionChange,
+  sessionChangesFromMessages,
   summarizeSessionChanges,
   type SessionFileChange,
 } from "@/lib/sessionChanges";
@@ -1095,6 +1096,14 @@ export function AppWorkbench() {
   const [sessionChangesById, setSessionChangesById] = useState<
     Record<string, SessionFileChange[]>
   >({});
+  /**
+   * Turn changed-files chip → Review focus (#998).
+   * Lifted out of SideWorkbench so open races cannot drop the path.
+   */
+  const [reviewFocus, setReviewFocus] = useState<{
+    path: string;
+    token: number;
+  } | null>(null);
   /**
    * Workspace git dirty summary for the active project (composer chip).
    * Null when not a repo, unavailable, clean, or no active project.
@@ -12890,22 +12899,68 @@ export function AppWorkbench() {
     setEditAttachments((prev) => prev.filter((x) => x.path !== att.path));
   }, []);
 
+  /** Ensure Review sees session tool edits even if live merge missed paths (#998). */
+  const seedSessionChangesForReview = useCallback(
+    (focusPath?: string | null) => {
+      const sid = (
+        session.sessionId ||
+        viewingSessionIdRef.current ||
+        ""
+      ).trim();
+      if (!sid) return;
+      const focus = (focusPath || "").trim();
+      setSessionChangesById((prev) => {
+        let list = prev[sid] ?? [];
+        const msgs = messagesBySessionRef.current.get(sid) ?? [];
+        for (const c of sessionChangesFromMessages(msgs)) {
+          list = mergeSessionChange(list, {
+            toolCallId: c.toolCallId,
+            title: c.title,
+            kind: c.toolKind,
+            status: c.status,
+            path: c.path,
+            before: c.before,
+            after: c.after,
+            updatedAt: c.updatedAt,
+          });
+        }
+        if (focus) {
+          list = mergeSessionChange(list, {
+            kind: "write",
+            status: "completed",
+            path: focus,
+          });
+        }
+        return { ...prev, [sid]: list };
+      });
+    },
+    [session.sessionId],
+  );
+
   const onThreadOpenSessionChanges = useCallback(() => {
+    seedSessionChangesForReview(null);
     // Open Review synchronously — do not rely only on openRequest races (#998).
     setSideWorkbench((s) => openSideTab(s, "review"));
     openAsidePane();
     setResourceOpenTarget({ type: "changes" });
-  }, [openAsidePane]);
+  }, [openAsidePane, seedSessionChangesForReview]);
 
   const onThreadOpenModifiedPath = useCallback(
     (path: string) => {
       const p = (path || "").trim();
+      seedSessionChangesForReview(p);
       // Synchronously ensure Review tab exists before aside paint (#998).
       setSideWorkbench((s) => openSideTab(s, "review"));
       openAsidePane();
+      if (p) {
+        setReviewFocus((prev) => ({
+          path: p,
+          token: (prev?.token ?? 0) + 1,
+        }));
+      }
       setResourceOpenTarget({ type: "changes", path: p || undefined });
     },
-    [openAsidePane],
+    [openAsidePane, seedSessionChangesForReview],
   );
 
   const onThreadOpenResource = useCallback(
@@ -14570,6 +14625,8 @@ export function AppWorkbench() {
           sessionChanges={
             sessionChangesById[session.sessionId || ""] ?? []
           }
+          reviewFocusPath={reviewFocus?.path ?? null}
+          reviewFocusToken={reviewFocus?.token ?? 0}
           sessionId={session.sessionId}
           plan={plan}
           planFocusKey={planFocusKey}

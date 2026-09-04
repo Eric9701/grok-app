@@ -213,6 +213,37 @@ describe("sessionChangesFromMessages", () => {
     expect(changes[0]?.path).toBe("/tmp/foo.ts");
     expect(changes[0]?.toolKind).toBe("write");
   });
+
+  it("builds from assistant-woven edit tool segments (#998)", () => {
+    const messages: ChatMessage[] = [
+      {
+        id: "a1",
+        role: "assistant",
+        content: "done",
+        segments: [
+          {
+            kind: "tool",
+            toolCallId: "t1",
+            title: "Write",
+            toolKind: "write",
+            status: "completed",
+            path: ".grok-app-998-mvp-b.txt",
+          },
+          {
+            kind: "tool",
+            toolCallId: "t2",
+            title: "Read",
+            toolKind: "read",
+            status: "completed",
+            path: "README.md",
+          },
+        ],
+      },
+    ];
+    const changes = sessionChangesFromMessages(messages);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]?.path).toBe(".grok-app-998-mvp-b.txt");
+  });
 });
 
 describe("buildUnifiedDiff", () => {

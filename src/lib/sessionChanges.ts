@@ -237,23 +237,47 @@ export function sessionChangesFromMessages(
 ): SessionFileChange[] {
   let list: SessionFileChange[] = [];
   for (const m of messages) {
-    if (!isToolStepMessage(m)) continue;
-    const parsed = m.content?.startsWith("tool_step|")
-      ? parseToolStepContent(m.content)
-      : null;
-    const kind = m.toolKind || parsed?.kind || "";
-    if (!isEditToolKind(kind)) continue;
-    const path = normalizePath(m.toolPath || parsed?.path || "");
-    if (!path) continue;
-    list = mergeSessionChange(list, {
-      toolCallId: m.toolCallId,
-      title: parsed?.title || m.content,
-      kind,
-      status: m.toolStatus || parsed?.status || "completed",
-      path,
-      detail: m.toolDetail || parsed?.detail,
-      updatedAt: m.createdAt,
-    });
+    // Standalone tool_step rows.
+    if (isToolStepMessage(m)) {
+      const parsed = m.content?.startsWith("tool_step|")
+        ? parseToolStepContent(m.content)
+        : null;
+      const kind = m.toolKind || parsed?.kind || "";
+      if (!isEditToolKind(kind)) continue;
+      const path = normalizePath(m.toolPath || parsed?.path || "");
+      if (!path) continue;
+      list = mergeSessionChange(list, {
+        toolCallId: m.toolCallId,
+        title: parsed?.title || m.content,
+        kind,
+        status: m.toolStatus || parsed?.status || "completed",
+        path,
+        detail: m.toolDetail || parsed?.detail,
+        updatedAt: m.createdAt,
+      });
+      continue;
+    }
+    // Assistant-woven tool segments (common live path; #998 empty Review).
+    if (m.role !== "assistant" || !m.segments?.length) continue;
+    for (const seg of m.segments) {
+      if (seg.kind !== "tool") continue;
+      const kind = seg.toolKind || "";
+      if (!isEditToolKind(kind)) continue;
+      const path = resolveSessionChangePath({
+        path: seg.path,
+        input: seg.input,
+      });
+      if (!path) continue;
+      list = mergeSessionChange(list, {
+        toolCallId: seg.toolCallId,
+        title: seg.title,
+        kind,
+        status: seg.status || "completed",
+        path,
+        detail: seg.detail,
+        updatedAt: seg.createdAt || m.createdAt,
+      });
+    }
   }
   return list;
 }

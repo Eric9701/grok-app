@@ -49,6 +49,9 @@ export type WorkbenchResourcesAsideProps = {
   sideDockComposer: boolean;
   onToggleSideDockComposer: () => void;
   sessionChanges: SessionFileChange[];
+  /** Turn file chip focus into Review (#998). */
+  reviewFocusPath?: string | null;
+  reviewFocusToken?: number;
   sessionId: string | null;
   plan: SessionPlanState;
   planFocusKey: number | null;
@@ -93,6 +96,8 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
     sideDockComposer,
     onToggleSideDockComposer,
     sessionChanges,
+    reviewFocusPath = null,
+    reviewFocusToken = 0,
     sessionId,
     plan,
     planFocusKey,
@@ -231,6 +236,8 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
             }
             paneActive={!layout.asideCollapsed}
             sessionChanges={sessionChanges}
+            reviewFocusPath={reviewFocusPath}
+            reviewFocusToken={reviewFocusToken}
             plan={plan}
             planFocusKey={planFocusKey}
             planChrome={{

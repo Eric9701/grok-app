@@ -55,6 +55,9 @@ export type SideWorkbenchProps = {
   onToggleDockComposer?: () => void;
   paneActive?: boolean;
   sessionChanges?: SessionFileChange[];
+  /** Host-lifted focus from turn changed-files chips (#998). */
+  reviewFocusPath?: string | null;
+  reviewFocusToken?: number;
   plan?: PlanReviewState | null;
   planFocusKey?: number | null;
   /** PLAN-MODE-PRO empty-state context for Plan tab. */
@@ -91,6 +94,8 @@ export function SideWorkbench({
   onToggleDockComposer,
   paneActive = true,
   sessionChanges = [],
+  reviewFocusPath: reviewFocusPathProp = null,
+  reviewFocusToken: reviewFocusTokenProp = 0,
   plan = null,
   planFocusKey = null,
   planChrome = null,
@@ -424,8 +429,10 @@ export function SideWorkbench({
                 sessionChanges={sessionChanges}
                 isGitProject={isGitProject}
                 onOpenFile={onTreeFileOpen}
-                focusPath={reviewFocusPath}
-                focusToken={reviewFocusToken}
+                focusPath={reviewFocusPathProp || reviewFocusPath}
+                focusToken={
+                  reviewFocusTokenProp || reviewFocusToken
+                }
               />
             ) : null}
 
