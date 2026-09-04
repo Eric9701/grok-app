@@ -32,6 +32,8 @@ export type SessionChangeEvent = ToolEventPayload & {
   before?: string | null;
   after?: string | null;
   updatedAt?: string;
+  /** Call argument — used when Host omits `path` on write/edit (#998). */
+  input?: string | null;
 };
 
 /** Normalize path separators and strip trailing slashes (except roots). */
@@ -127,6 +129,45 @@ export function isTerminalToolStatus(status: string | null | undefined): boolean
  * Merge one write/edit tool event into the session change list (upsert by path).
  * Non-edit tools and empty paths are ignored.
  */
+/**
+ * Prefer explicit `path`; otherwise promote a single-line file path from
+ * `input` (Host write/edit often put the target only on input).
+ */
+export function resolveSessionChangePath(event: {
+  path?: string | null;
+  input?: string | null;
+}): string {
+  const direct = normalizePath(event.path || "");
+  if (direct) return direct;
+  const candidate = String(event.input || "").trim();
+  if (
+    !candidate ||
+    candidate.includes("\n") ||
+    candidate.includes("://") ||
+    /\s(-{1,2}[A-Za-z]|&&|\||;)/.test(candidate)
+  ) {
+    return "";
+  }
+  const base = candidate.split(/[/\\]/).pop() || "";
+  const looksAbs =
+    candidate.startsWith("/") ||
+    candidate.startsWith("~/") ||
+    /^[A-Za-z]:[\\/]/.test(candidate);
+  const looksRelFile =
+    !candidate.startsWith("-") &&
+    (candidate.includes("/") ||
+      candidate.includes("\\") ||
+      candidate.startsWith(".")) &&
+    /\.[\w]{1,12}$/.test(base);
+  if (!looksAbs && !looksRelFile) return "";
+  if (!/\.[\w]{1,12}$/.test(base) && looksAbs) {
+    // Absolute path without extension still counts (dirs / extensionless files).
+    return normalizePath(candidate);
+  }
+  if (!/\.[\w]{1,12}$/.test(base)) return "";
+  return normalizePath(candidate);
+}
+
 export function mergeSessionChange(
   list: SessionFileChange[],
   event: SessionChangeEvent,
@@ -134,7 +175,7 @@ export function mergeSessionChange(
   const kind = (event.kind || "").trim();
   if (!isEditToolKind(kind)) return list;
 
-  const path = normalizePath(event.path || "");
+  const path = resolveSessionChangePath(event);
   if (!path) return list;
 
   const status = (event.status || "in_progress").toLowerCase() || "in_progress";

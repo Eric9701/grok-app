@@ -118,6 +118,9 @@ export function SideWorkbench({
     sideTabId: string;
   } | null>(null);
   const closeTokenRef = useRef(0);
+  /** Turn changed-files chip → Review scroll target (#998). */
+  const [reviewFocusPath, setReviewFocusPath] = useState<string | null>(null);
+  const [reviewFocusToken, setReviewFocusToken] = useState(0);
   const [bulkCloseConfirm, setBulkCloseConfirm] = useState<{
     next: SideWorkbenchState;
     dirtyCount: number;
@@ -326,6 +329,11 @@ export function SideWorkbench({
       );
     } else if (openRequest.type === "changes" && isGitProject) {
       setState(openSideTab(state, "review"));
+      const focus = (openRequest.path || "").trim();
+      if (focus) {
+        setReviewFocusPath(focus);
+        setReviewFocusToken((n) => n + 1);
+      }
     }
     onOpenRequestConsumed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -415,6 +423,8 @@ export function SideWorkbench({
                 sessionChanges={sessionChanges}
                 isGitProject={isGitProject}
                 onOpenFile={onTreeFileOpen}
+                focusPath={reviewFocusPath}
+                focusToken={reviewFocusToken}
               />
             ) : null}
 

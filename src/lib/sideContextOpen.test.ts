@@ -72,5 +72,17 @@ describe("applySideContextOpen", () => {
     expect(yes.needAsideOpen).toBe(true);
     // Default label is i18n key (not English "Review")
     expect(yes.state.tabs[0]?.name).toBe("side.tab.review");
+    expect(yes.focusPath).toBeUndefined();
+  });
+
+  it("forwards focusPath when opening changes for a specific file (#998)", () => {
+    const r = applySideContextOpen(
+      emptySideWorkbenchState(),
+      { type: "changes", path: "/proj/.grok-app-998-mvp-b.txt" },
+      { isGitProject: true },
+    );
+    expect(r.kind).toBe("review");
+    expect(r.focusPath).toBe("/proj/.grok-app-998-mvp-b.txt");
+    expect(r.state.tabs[0]?.kind).toBe("review");
   });
 });

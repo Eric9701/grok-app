@@ -2299,8 +2299,12 @@ export function AppWorkbench() {
   const dragRegion = tauriDragRegion(platform);
   const [windowMaximized, setWindowMaximized] = useState(false);
 
-  /** Route chat context opens into Side Workbench tabs.
-   * When the aside is mounted, SideWorkbench `openRequest` is the only consumer. */
+  /**
+   * Route chat context opens into Side Workbench tabs.
+   * When the aside is collapsed, open it and keep `resourceOpenTarget` so
+   * SideWorkbench can consume path (e.g. Review focus for #998). Clearing
+   * here dropped path and left Review empty / unfocused.
+   */
   useEffect(() => {
     if (!resourceOpenTarget) return;
     if (!layout.asideCollapsed) return;
@@ -2309,10 +2313,14 @@ export function AppWorkbench() {
     });
     if (result.noticeKey) {
       showToast(tr(result.noticeKey), 2400);
+      setResourceOpenTarget(null);
+      return;
     }
     if (result.needAsideOpen) {
       setSideWorkbench(result.state);
       openAsidePane();
+      // Keep target — SideWorkbench openRequest effect consumes path + clears.
+      return;
     }
     setResourceOpenTarget(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume once per target

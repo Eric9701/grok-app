@@ -74,6 +74,12 @@ export type ReviewTabProps = {
   isGitProject?: boolean;
   /** Open a workspace file in a side file tab (eye icon). */
   onOpenFile?: (path: string, name: string) => void;
+  /**
+   * Scroll/expand this file when opening from a turn changed-files chip (#998).
+   * Bump `focusToken` to re-focus the same path on repeated clicks.
+   */
+  focusPath?: string | null;
+  focusToken?: number;
 };
 
 type ReviewScope = "all" | "session" | "workspace";
@@ -414,6 +420,8 @@ export function ReviewTab({
   sessionChanges = [],
   isGitProject = false,
   onOpenFile,
+  focusPath = null,
+  focusToken = 0,
 }: ReviewTabProps) {
   const tr = useMemo(() => createT(locale as Locale), [locale]);
   const [scope, setScope] = useState<ReviewScope>("all");
@@ -444,9 +452,12 @@ export function ReviewTab({
   const scopeMenuRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const filterInputRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  const focusSeq = useRef(0);
 
   const buildSessionEntries = useCallback((): ReviewFileEntry[] => {
-    return sessionChanges.map((c) => {
+    const entries: ReviewFileEntry[] = sessionChanges.map((c) => {
       const rel = decodeGitPath(sessionRel(c, projectPath));
       const delta = sessionFileLineDelta(c);
       let patch: string | null = null;
@@ -473,7 +484,44 @@ export function ReviewTab({
         session: c,
       };
     });
-  }, [sessionChanges, projectPath]);
+    // Keep a focus stub inside compose so applyComposed cannot wipe it (#998).
+    const focus = (focusPath || "").trim();
+    if (focus) {
+      const want = normalizePath(focus);
+      const rel =
+        decodeGitPath(
+          pathRelativeToProject(want, projectPath) || pathBaseName(want) || want,
+        ) || want;
+      const already = entries.some((e) => {
+        const fp = normalizePath(e.path);
+        const fr = normalizePath(e.relPath).toLowerCase();
+        const wantRel = normalizePath(rel).toLowerCase();
+        return (
+          fp === want ||
+          fr === wantRel ||
+          pathBaseName(fp).toLowerCase() === pathBaseName(want).toLowerCase()
+        );
+      });
+      if (!already) {
+        const stub: ReviewFileEntry = {
+          key: `s:${rel.toLowerCase()}`,
+          relPath: rel,
+          path: want,
+          name: pathBaseName(want) || rel,
+          source: "session",
+          kind: "modified",
+          added: 0,
+          removed: 0,
+          patch: null,
+          binary: false,
+          loading: false,
+          error: null,
+        };
+        entries.unshift(stub);
+      }
+    }
+    return entries;
+  }, [sessionChanges, projectPath, focusPath]);
 
   const applyComposed = useCallback(
     (sessionEntries: ReviewFileEntry[], snap: WorkspaceSnap | null) => {
@@ -593,13 +641,13 @@ export function ReviewTab({
     applyComposed(sessionEntriesRef.current(), workspaceSnap);
   }, [applyComposed, workspaceSnap]);
 
-  // Streamed sessionChanges: local recompose only, debounced — no git IPC.
+  // Streamed sessionChanges / focus stub: local recompose only, debounced — no git IPC.
   useEffect(() => {
     const t = window.setTimeout(() => {
       applyComposed(sessionEntriesRef.current(), workspaceSnapRef.current);
-    }, 400);
+    }, focusPath ? 0 : 400);
     return () => window.clearTimeout(t);
-  }, [sessionChanges, applyComposed]);
+  }, [sessionChanges, applyComposed, focusPath, focusToken]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -778,6 +826,136 @@ export function ReviewTab({
       el?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, []);
+
+  /**
+   * Match a focus path against Review entries (abs, rel, or basename).
+   */
+  const findEntryForFocusPath = useCallback(
+    (raw: string, list: ReviewFileEntry[]): ReviewFileEntry | null => {
+      const want = normalizePath(raw);
+      if (!want) return null;
+      const wantRel = normalizePath(
+        pathRelativeToProject(want, projectPath) || want,
+      ).toLowerCase();
+      const wantBase = pathBaseName(want).toLowerCase();
+      for (const f of list) {
+        const fp = normalizePath(f.path);
+        const fr = normalizePath(f.relPath).toLowerCase();
+        if (fp === want || fr === wantRel) return f;
+        if (wantBase && pathBaseName(fp).toLowerCase() === wantBase) return f;
+        if (wantBase && fr.endsWith("/" + wantBase)) return f;
+        if (wantBase && fr === wantBase) return f;
+      }
+      return null;
+    },
+    [projectPath],
+  );
+
+  /**
+   * Turn changed-files chip (#998): focus the file in Review. If session/
+   * workspace lists are still empty, seed a stub row and try gitFileDiff so
+   * the user is not left on “No changes to review”.
+   */
+  useEffect(() => {
+    const raw = (focusPath || "").trim();
+    if (!raw || !focusToken) return;
+    const seq = ++focusSeq.current;
+    const want = normalizePath(raw);
+    const rel =
+      pathRelativeToProject(want, projectPath) ||
+      pathBaseName(want) ||
+      want;
+    const key = `s:${rel.toLowerCase()}`;
+
+    const focusExisting = (): boolean => {
+      const hit = findEntryForFocusPath(want, filesRef.current);
+      if (!hit) return false;
+      scrollToFile(hit.key);
+      return true;
+    };
+
+    if (focusExisting()) return;
+
+    // Seed stub so Review is not empty while we load / wait for sessionChanges.
+    const stub: ReviewFileEntry = {
+      key,
+      relPath: rel,
+      path: want,
+      name: pathBaseName(want) || rel,
+      source: "session",
+      kind: "modified",
+      added: 0,
+      removed: 0,
+      patch: null,
+      binary: false,
+      loading: true,
+      error: null,
+    };
+    setFiles((prev) => {
+      if (findEntryForFocusPath(want, prev)) return prev;
+      return [stub, ...prev];
+    });
+    scrollToFile(key);
+
+    const project = (projectPath || "").trim();
+    if (!project || !api.isTauri() || !isGitProject) {
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.key === key ? { ...f, loading: false } : f,
+        ),
+      );
+      return;
+    }
+
+    void (async () => {
+      try {
+        const g = await api.gitFileDiff(project, rel);
+        if (seq !== focusSeq.current) return;
+        const patch =
+          g?.available && typeof g.diff === "string" && g.diff.trim()
+            ? g.diff
+            : null;
+        const delta = patch ? countPatchDelta(patch) : null;
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.key === key
+              ? {
+                  ...f,
+                  loading: false,
+                  patch: patch ?? f.patch,
+                  added: delta?.added ?? f.added,
+                  removed: delta?.removed ?? f.removed,
+                  error: patch ? null : f.error,
+                }
+              : f,
+          ),
+        );
+        scrollToFile(key);
+      } catch {
+        if (seq !== focusSeq.current) return;
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.key === key ? { ...f, loading: false } : f,
+          ),
+        );
+      }
+    })();
+  }, [
+    focusPath,
+    focusToken,
+    projectPath,
+    isGitProject,
+    findEntryForFocusPath,
+    scrollToFile,
+  ]);
+
+  // After compose refreshes the list, re-scroll to the focused file.
+  useEffect(() => {
+    const raw = (focusPath || "").trim();
+    if (!raw || !focusToken) return;
+    const hit = findEntryForFocusPath(raw, files);
+    if (hit) scrollToFile(hit.key);
+  }, [files, focusPath, focusToken, findEntryForFocusPath, scrollToFile]);
 
   const toggleExpand = useCallback((key: string) => {
     setExpanded((prev) => {
