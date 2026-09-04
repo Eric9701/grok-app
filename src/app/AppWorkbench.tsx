@@ -604,6 +604,7 @@ import {
   summarizeSessionChanges,
   type SessionFileChange,
 } from "@/lib/sessionChanges";
+import { pinReviewFocusPath } from "@/lib/reviewFocusPaths";
 import {
   gitDirtySummariesEqual,
   summarizeGitDirty,
@@ -1099,10 +1100,12 @@ export function AppWorkbench() {
   /**
    * Turn changed-files chip → Review focus (#998).
    * Lifted out of SideWorkbench so open races cannot drop the path.
+   * `pinnedPaths` always appear in Review even when sessionChanges is empty.
    */
   const [reviewFocus, setReviewFocus] = useState<{
     path: string;
     token: number;
+    pinnedPaths: string[];
   } | null>(null);
   /**
    * Workspace git dirty summary for the active project (composer chip).
@@ -12899,6 +12902,13 @@ export function AppWorkbench() {
     setEditAttachments((prev) => prev.filter((x) => x.path !== att.path));
   }, []);
 
+  /** Active session id for Changes / Review — keep seed + read on the same key. */
+  const reviewSessionId = (
+    session.sessionId ||
+    viewingSessionIdRef.current ||
+    ""
+  ).trim();
+
   /** Ensure Review sees session tool edits even if live merge missed paths (#998). */
   const seedSessionChangesForReview = useCallback(
     (focusPath?: string | null) => {
@@ -12909,29 +12919,36 @@ export function AppWorkbench() {
       ).trim();
       if (!sid) return;
       const focus = (focusPath || "").trim();
+      // Also try the alternate id so display/seed cannot diverge.
+      const alt = (session.sessionId || "").trim();
+      const ids = Array.from(new Set([sid, alt].filter(Boolean)));
       setSessionChangesById((prev) => {
-        let list = prev[sid] ?? [];
-        const msgs = messagesBySessionRef.current.get(sid) ?? [];
-        for (const c of sessionChangesFromMessages(msgs)) {
-          list = mergeSessionChange(list, {
-            toolCallId: c.toolCallId,
-            title: c.title,
-            kind: c.toolKind,
-            status: c.status,
-            path: c.path,
-            before: c.before,
-            after: c.after,
-            updatedAt: c.updatedAt,
-          });
+        let next = prev;
+        for (const id of ids) {
+          let list = next[id] ?? [];
+          const msgs = messagesBySessionRef.current.get(id) ?? [];
+          for (const c of sessionChangesFromMessages(msgs)) {
+            list = mergeSessionChange(list, {
+              toolCallId: c.toolCallId,
+              title: c.title,
+              kind: c.toolKind,
+              status: c.status,
+              path: c.path,
+              before: c.before,
+              after: c.after,
+              updatedAt: c.updatedAt,
+            });
+          }
+          if (focus) {
+            list = mergeSessionChange(list, {
+              kind: "write",
+              status: "completed",
+              path: focus,
+            });
+          }
+          next = { ...next, [id]: list };
         }
-        if (focus) {
-          list = mergeSessionChange(list, {
-            kind: "write",
-            status: "completed",
-            path: focus,
-          });
-        }
-        return { ...prev, [sid]: list };
+        return next;
       });
     },
     [session.sessionId],
@@ -12956,6 +12973,7 @@ export function AppWorkbench() {
         setReviewFocus((prev) => ({
           path: p,
           token: (prev?.token ?? 0) + 1,
+          pinnedPaths: pinReviewFocusPath(prev?.pinnedPaths ?? [], p),
         }));
       }
       setResourceOpenTarget({ type: "changes", path: p || undefined });
@@ -14623,10 +14641,13 @@ export function AppWorkbench() {
           sideDockComposer={sideDockComposer}
           onToggleSideDockComposer={onToggleSideDockComposer}
           sessionChanges={
-            sessionChangesById[session.sessionId || ""] ?? []
+            sessionChangesById[reviewSessionId] ??
+            sessionChangesById[session.sessionId || ""] ??
+            []
           }
           reviewFocusPath={reviewFocus?.path ?? null}
           reviewFocusToken={reviewFocus?.token ?? 0}
+          reviewPinnedPaths={reviewFocus?.pinnedPaths ?? []}
           sessionId={session.sessionId}
           plan={plan}
           planFocusKey={planFocusKey}

@@ -37,6 +37,10 @@ import {
   type SessionFileChange,
 } from "@/lib/sessionChanges";
 import {
+  reviewEntryCoversPath,
+  reviewFocusPathParts,
+} from "@/lib/reviewFocusPaths";
+import {
   buildReviewTree,
   countPatchDelta,
   decodeGitPath,
@@ -80,6 +84,11 @@ export type ReviewTabProps = {
    */
   focusPath?: string | null;
   focusToken?: number;
+  /**
+   * Paths that must always appear in the Review stack (#998).
+   * Survives empty sessionChanges / git wipe races.
+   */
+  pinnedFocusPaths?: readonly string[];
 };
 
 type ReviewScope = "all" | "session" | "workspace";
@@ -422,6 +431,7 @@ export function ReviewTab({
   onOpenFile,
   focusPath = null,
   focusToken = 0,
+  pinnedFocusPaths = [],
 }: ReviewTabProps) {
   const tr = useMemo(() => createT(locale as Locale), [locale]);
   const [scope, setScope] = useState<ReviewScope>("all");
@@ -484,44 +494,36 @@ export function ReviewTab({
         session: c,
       };
     });
-    // Keep a focus stub inside compose so applyComposed cannot wipe it (#998).
-    const focus = (focusPath || "").trim();
-    if (focus) {
-      const want = normalizePath(focus);
-      const rel =
-        decodeGitPath(
-          pathRelativeToProject(want, projectPath) || pathBaseName(want) || want,
-        ) || want;
-      const already = entries.some((e) => {
-        const fp = normalizePath(e.path);
-        const fr = normalizePath(e.relPath).toLowerCase();
-        const wantRel = normalizePath(rel).toLowerCase();
-        return (
-          fp === want ||
-          fr === wantRel ||
-          pathBaseName(fp).toLowerCase() === pathBaseName(want).toLowerCase()
-        );
-      });
-      if (!already) {
-        const stub: ReviewFileEntry = {
-          key: `s:${rel.toLowerCase()}`,
-          relPath: rel,
-          path: want,
-          name: pathBaseName(want) || rel,
-          source: "session",
-          kind: "modified",
-          added: 0,
-          removed: 0,
-          patch: null,
-          binary: false,
-          loading: false,
-          error: null,
-        };
-        entries.unshift(stub);
+    // Pinned + current focus stubs — must survive empty sessionChanges (#998).
+    const pinList = [
+      ...(focusPath ? [focusPath] : []),
+      ...pinnedFocusPaths,
+    ];
+    const seen = new Set<string>();
+    for (const raw of pinList) {
+      const parts = reviewFocusPathParts(raw, projectPath);
+      if (!parts.path || seen.has(parts.key)) continue;
+      seen.add(parts.key);
+      if (entries.some((e) => reviewEntryCoversPath(e, parts.path, projectPath))) {
+        continue;
       }
+      entries.unshift({
+        key: parts.key,
+        relPath: decodeGitPath(parts.relPath) || parts.relPath,
+        path: parts.path,
+        name: decodeGitPath(parts.name) || parts.name,
+        source: "session",
+        kind: "modified",
+        added: 0,
+        removed: 0,
+        patch: null,
+        binary: false,
+        loading: false,
+        error: null,
+      });
     }
     return entries;
-  }, [sessionChanges, projectPath, focusPath]);
+  }, [sessionChanges, projectPath, focusPath, pinnedFocusPaths]);
 
   const applyComposed = useCallback(
     (sessionEntries: ReviewFileEntry[], snap: WorkspaceSnap | null) => {
@@ -641,13 +643,21 @@ export function ReviewTab({
     applyComposed(sessionEntriesRef.current(), workspaceSnap);
   }, [applyComposed, workspaceSnap]);
 
-  // Streamed sessionChanges / focus stub: local recompose only, debounced — no git IPC.
+  // Streamed sessionChanges / pinned focus: local recompose only — no git IPC.
   useEffect(() => {
+    const urgent =
+      !!(focusPath && focusPath.trim()) || pinnedFocusPaths.length > 0;
     const t = window.setTimeout(() => {
       applyComposed(sessionEntriesRef.current(), workspaceSnapRef.current);
-    }, focusPath ? 0 : 400);
+    }, urgent ? 0 : 400);
     return () => window.clearTimeout(t);
-  }, [sessionChanges, applyComposed, focusPath, focusToken]);
+  }, [
+    sessionChanges,
+    applyComposed,
+    focusPath,
+    focusToken,
+    pinnedFocusPaths,
+  ]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -858,7 +868,8 @@ export function ReviewTab({
    */
   useEffect(() => {
     const raw = (focusPath || "").trim();
-    if (!raw || !focusToken) return;
+    // Path alone is enough; token re-fires when the same file is clicked again.
+    if (!raw) return;
     const seq = ++focusSeq.current;
     const want = normalizePath(raw);
     const rel =
@@ -952,7 +963,7 @@ export function ReviewTab({
   // After compose refreshes the list, re-scroll to the focused file.
   useEffect(() => {
     const raw = (focusPath || "").trim();
-    if (!raw || !focusToken) return;
+    if (!raw) return;
     const hit = findEntryForFocusPath(raw, files);
     if (hit) scrollToFile(hit.key);
   }, [files, focusPath, focusToken, findEntryForFocusPath, scrollToFile]);

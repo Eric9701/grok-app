@@ -52,6 +52,8 @@ export type WorkbenchResourcesAsideProps = {
   /** Turn file chip focus into Review (#998). */
   reviewFocusPath?: string | null;
   reviewFocusToken?: number;
+  /** Paths that must appear in Review even if sessionChanges is empty. */
+  reviewPinnedPaths?: readonly string[];
   sessionId: string | null;
   plan: SessionPlanState;
   planFocusKey: number | null;
@@ -98,6 +100,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
     sessionChanges,
     reviewFocusPath = null,
     reviewFocusToken = 0,
+    reviewPinnedPaths = [],
     sessionId,
     plan,
     planFocusKey,
@@ -238,6 +241,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
             sessionChanges={sessionChanges}
             reviewFocusPath={reviewFocusPath}
             reviewFocusToken={reviewFocusToken}
+            reviewPinnedPaths={reviewPinnedPaths}
             plan={plan}
             planFocusKey={planFocusKey}
             planChrome={{

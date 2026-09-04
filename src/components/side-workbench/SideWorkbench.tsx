@@ -58,6 +58,7 @@ export type SideWorkbenchProps = {
   /** Host-lifted focus from turn changed-files chips (#998). */
   reviewFocusPath?: string | null;
   reviewFocusToken?: number;
+  reviewPinnedPaths?: readonly string[];
   plan?: PlanReviewState | null;
   planFocusKey?: number | null;
   /** PLAN-MODE-PRO empty-state context for Plan tab. */
@@ -96,6 +97,7 @@ export function SideWorkbench({
   sessionChanges = [],
   reviewFocusPath: reviewFocusPathProp = null,
   reviewFocusToken: reviewFocusTokenProp = 0,
+  reviewPinnedPaths = [],
   plan = null,
   planFocusKey = null,
   planChrome = null,
@@ -431,8 +433,11 @@ export function SideWorkbench({
                 onOpenFile={onTreeFileOpen}
                 focusPath={reviewFocusPathProp || reviewFocusPath}
                 focusToken={
-                  reviewFocusTokenProp || reviewFocusToken
+                  reviewFocusTokenProp > 0
+                    ? reviewFocusTokenProp
+                    : reviewFocusToken
                 }
+                pinnedFocusPaths={reviewPinnedPaths}
               />
             ) : null}
 
