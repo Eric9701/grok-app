@@ -64,22 +64,15 @@ export function applySideContextOpen(
     });
     return { state: next, needAsideOpen: true, kind: "browser" };
   }
-  // changes → review
+  // changes → review (session tool edits do not require git; #998).
+  // Non-git: still open Review so turn file chips work; soft toast for honesty.
   const focusPath = target.path?.trim() || undefined;
-  if (!opts?.isGitProject) {
-    return {
-      state,
-      needAsideOpen: false,
-      kind: "review",
-      noticeKey: "side.review.notGit",
-      focusPath,
-    };
-  }
   const next = openSideTab(state, "review");
   return {
     state: next,
     needAsideOpen: true,
     kind: "review",
     focusPath,
+    noticeKey: opts?.isGitProject ? undefined : "side.review.notGit",
   };
 }

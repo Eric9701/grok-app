@@ -2313,8 +2313,6 @@ export function AppWorkbench() {
     });
     if (result.noticeKey) {
       showToast(tr(result.noticeKey), 2400);
-      setResourceOpenTarget(null);
-      return;
     }
     if (result.needAsideOpen) {
       setSideWorkbench(result.state);
@@ -12893,14 +12891,19 @@ export function AppWorkbench() {
   }, []);
 
   const onThreadOpenSessionChanges = useCallback(() => {
+    // Open Review synchronously — do not rely only on openRequest races (#998).
+    setSideWorkbench((s) => openSideTab(s, "review"));
     openAsidePane();
     setResourceOpenTarget({ type: "changes" });
   }, [openAsidePane]);
 
   const onThreadOpenModifiedPath = useCallback(
     (path: string) => {
+      const p = (path || "").trim();
+      // Synchronously ensure Review tab exists before aside paint (#998).
+      setSideWorkbench((s) => openSideTab(s, "review"));
       openAsidePane();
-      setResourceOpenTarget({ type: "changes", path });
+      setResourceOpenTarget({ type: "changes", path: p || undefined });
     },
     [openAsidePane],
   );

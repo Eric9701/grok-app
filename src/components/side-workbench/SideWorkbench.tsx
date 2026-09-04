@@ -327,7 +327,8 @@ export function SideWorkbench({
           name: openRequest.title,
         }),
       );
-    } else if (openRequest.type === "changes" && isGitProject) {
+    } else if (openRequest.type === "changes") {
+      // Session tool edits do not require git — always open Review (#998).
       setState(openSideTab(state, "review"));
       const focus = (openRequest.path || "").trim();
       if (focus) {

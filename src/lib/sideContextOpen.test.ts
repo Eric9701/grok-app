@@ -53,15 +53,15 @@ describe("applySideContextOpen", () => {
     expect(r.state.tabs[0]?.kind).toBe("browser");
   });
 
-  it("opens review only when git", () => {
-    const no = applySideContextOpen(
+  it("opens review even when not git (session edits; soft notice)", () => {
+    const noGit = applySideContextOpen(
       emptySideWorkbenchState(),
       { type: "changes" },
       { isGitProject: false },
     );
-    expect(no.state.tabs).toHaveLength(0);
-    expect(no.needAsideOpen).toBe(false);
-    expect(no.noticeKey).toBe("side.review.notGit");
+    expect(noGit.state.tabs[0]?.kind).toBe("review");
+    expect(noGit.needAsideOpen).toBe(true);
+    expect(noGit.noticeKey).toBe("side.review.notGit");
 
     const yes = applySideContextOpen(
       emptySideWorkbenchState(),
@@ -73,6 +73,7 @@ describe("applySideContextOpen", () => {
     // Default label is i18n key (not English "Review")
     expect(yes.state.tabs[0]?.name).toBe("side.tab.review");
     expect(yes.focusPath).toBeUndefined();
+    expect(yes.noticeKey).toBeUndefined();
   });
 
   it("forwards focusPath when opening changes for a specific file (#998)", () => {
