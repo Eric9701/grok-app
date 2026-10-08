@@ -347,7 +347,8 @@ jobs:
             echo "::error::missing signature for $SRC_TAR"
             exit 1
           fi
-          OUT_TAR="Grok_${VER}_${ARCH}.app.tar.gz"
+          PRODUCT="$(python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json", encoding="utf-8"))["productName"])')"
+          OUT_TAR="${PRODUCT}_${VER}_${ARCH}.app.tar.gz"
           OUT_SIG="${OUT_TAR}.sig"
           cp "$SRC_TAR" "$OUT_TAR"
           cp "$SRC_SIG" "$OUT_SIG"
@@ -463,7 +464,7 @@ jobs:
           rm -f SHA256SUMS
           # Re-assert before aliases — Windows setup/portable must be on disk.
           bash "${GITHUB_WORKSPACE}/scripts/assert-release-assets.sh" "$TAG" --repo "$GITHUB_REPOSITORY"
-          # Stable aliases (Grok_mac_x64.dmg, Grok_windows_x64-setup.exe, …)
+          # Stable aliases follow productName (Atlas_mac_x64.dmg, Atlas_windows_x64-setup.exe, …)
           # + downloads.json for grok-app.com. Files stay on GitHub Releases.
           python3 "${GITHUB_WORKSPACE}/scripts/publish-website-downloads.py" \
             --dir /tmp/release-assets \

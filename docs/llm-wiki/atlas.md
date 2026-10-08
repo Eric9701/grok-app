@@ -52,6 +52,16 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 侧栏「Atlas云端」只读展示这条桥上的 `session/prompt` 及完成、失败、取消状态。只有 `online` 显示已连接。桌面聊天不受影响。
 
+## 安装包文件名
+
+Release 门禁认 `src-tauri/tauri.conf.json` 的 `productName`，也就是 **Atlas**。四个平台都要有：
+
+- `Atlas_<版本>_aarch64.dmg`、`Atlas_<版本>_x64.dmg`
+- `Atlas_<版本>_x64-setup.exe`、`Atlas_<版本>_x64-portable.zip`
+- `Atlas_<版本>_amd64.AppImage`、`.deb`、以及 `Atlas_<版本>-1.x86_64.rpm`
+
+同一 tag 上残留的 `Grok_*` 安装包不算数。绿色版 zip 和官网别名（`Atlas_mac_x64.dmg` 等）用同一前缀。
+
 ## 安装 / 更新通道
 
 - **已装 CLI**：`atlas update` / `atlas update --check --json`。

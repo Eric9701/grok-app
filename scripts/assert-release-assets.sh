@@ -32,6 +32,16 @@ TAG="${TAG#v}"
 TAG="v${TAG}"
 VER="${TAG#v}"
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PRODUCT="$(
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["productName"])' \
+    "$ROOT/src-tauri/tauri.conf.json"
+)"
+if [[ -z "$PRODUCT" ]]; then
+  echo "error: productName missing in src-tauri/tauri.conf.json" >&2
+  exit 1
+fi
+
 if [[ -z "$REPO" ]]; then
   echo "error: set GITHUB_REPOSITORY or pass --repo owner/name" >&2
   exit 1
@@ -70,15 +80,16 @@ has() {
   return 1
 }
 
-# Patterns match versioned Tauri / portable names (see docs/llm-wiki/release.md).
+# Names follow tauri.conf.json productName (Atlas on this fork, Grok upstream).
+# RPM has shipped as both Product-ver-1.arch and Product_ver-1.arch.
 REQUIRED=(
-  "Grok_${VER}_aarch64.dmg"
-  "Grok_${VER}_x64.dmg"
-  "Grok_${VER}_x64-setup.exe"
-  "Grok_${VER}_x64-portable.zip"
-  "Grok_${VER}_amd64.AppImage"
-  "Grok_${VER}_amd64.deb"
-  "Grok-${VER}-1.x86_64.rpm|Grok-${VER}.x86_64.rpm|Grok_${VER}_x86_64.rpm|Grok_${VER}_amd64.rpm"
+  "${PRODUCT}_${VER}_aarch64.dmg"
+  "${PRODUCT}_${VER}_x64.dmg"
+  "${PRODUCT}_${VER}_x64-setup.exe"
+  "${PRODUCT}_${VER}_x64-portable.zip"
+  "${PRODUCT}_${VER}_amd64.AppImage"
+  "${PRODUCT}_${VER}_amd64.deb"
+  "${PRODUCT}-${VER}-1.x86_64.rpm|${PRODUCT}_${VER}-1.x86_64.rpm|${PRODUCT}-${VER}.x86_64.rpm|${PRODUCT}_${VER}_x86_64.rpm|${PRODUCT}_${VER}_amd64.rpm"
 )
 
 missing=()

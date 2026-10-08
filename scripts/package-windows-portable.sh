@@ -11,11 +11,18 @@ if [[ -z "$TAG" ]]; then
   TAG="v$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
 fi
 VER="${TAG#v}"
+PRODUCT="$(
+  python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json", encoding="utf-8"))["productName"])'
+)"
+if [[ -z "$PRODUCT" ]]; then
+  echo "error: productName missing in src-tauri/tauri.conf.json" >&2
+  exit 1
+fi
 
-# Tauri productName is "Grok" but Cargo package name may produce grok-app.exe.
+# productName is Atlas (or Grok upstream). Cargo package name may still be grok-app.exe.
 find_release_exe() {
   local name
-  for name in Grok.exe grok-app.exe; do
+  for name in "${PRODUCT}.exe" grok-app.exe Grok.exe; do
     # Prefer top-level release binary (not under bundle/)
     if [[ -f "src-tauri/target/release/${name}" ]]; then
       echo "src-tauri/target/release/${name}"
@@ -43,39 +50,39 @@ if [[ -z "${EXE:-}" || ! -f "$EXE" ]]; then
 fi
 echo "using EXE=$EXE"
 
-STAGE="dist-portable/Grok_${VER}_x64-portable"
+STAGE="dist-portable/${PRODUCT}_${VER}_x64-portable"
 rm -rf dist-portable
 mkdir -p "$STAGE"
-# Always ship as Grok.exe for end users (product name).
-cp "$EXE" "$STAGE/Grok.exe"
-python3 - "$VER" "$STAGE" <<'PY'
+# Ship under the product name (Atlas.exe on this fork).
+cp "$EXE" "$STAGE/${PRODUCT}.exe"
+python3 - "$VER" "$STAGE" "$PRODUCT" <<'PY'
 import sys
 from pathlib import Path
 
-ver, stage = sys.argv[1], Path(sys.argv[2])
+ver, stage, product = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
 (stage / "README-portable.txt").write_text(
-    f"""Grok App portable (绿色版) v{ver}
+    f"""{product} portable (绿色版) v{ver}
 ================================
 1. 解压本目录到任意位置（无需安装）。
-2. 双击 Grok.exe 运行。
+2. 双击 {product}.exe 运行。
 3. 需要系统已安装 Microsoft Edge WebView2 Runtime（Win10/11 通常已自带）。
-4. 真 Agent 能力仍需本机 Grok Build CLI（grok.exe）并完成登录。
+4. 真 Agent 能力仍需本机 {product} CLI，并完成登录。
 5. SmartScreen 可能提示未知发布者 → 更多信息 → 仍要运行。
 
-Extract anywhere and run Grok.exe. WebView2 required. Grok Build CLI still needed for agent sessions.
+Extract anywhere and run {product}.exe. WebView2 required. {product} CLI still needed for agent sessions.
 """,
     encoding="utf-8",
 )
 print("wrote", stage / "README-portable.txt")
 PY
 
-OUT="Grok_${VER}_x64-portable.zip"
+OUT="${PRODUCT}_${VER}_x64-portable.zip"
 # Prefer zip; on Windows Git Bash it is usually present. Fallback to PowerShell Compress-Archive.
 if command -v zip >/dev/null 2>&1; then
-  (cd dist-portable && zip -r "../${OUT}" "Grok_${VER}_x64-portable")
+  (cd dist-portable && zip -r "../${OUT}" "${PRODUCT}_${VER}_x64-portable")
 else
   powershell.exe -NoProfile -Command \
-    "Compress-Archive -Path 'dist-portable/Grok_${VER}_x64-portable' -DestinationPath '${OUT}' -Force"
+    "Compress-Archive -Path 'dist-portable/${PRODUCT}_${VER}_x64-portable' -DestinationPath '${OUT}' -Force"
 fi
 ls -lah "$OUT"
 if command -v gh >/dev/null 2>&1 && [[ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]]; then

@@ -5,8 +5,10 @@ The future official site must not host DMG/EXE (traffic cost). Buttons point at
 GitHub Releases. Versioned asset names include the semver, so this script also
 publishes unchanging aliases:
 
-  https://github.com/<repo>/releases/latest/download/Grok_mac_x64.dmg
-  https://github.com/<repo>/releases/latest/download/Grok_windows_x64-setup.exe
+  https://github.com/<repo>/releases/latest/download/<productName>_mac_x64.dmg
+  https://github.com/<repo>/releases/latest/download/<productName>_windows_x64-setup.exe
+
+The filename prefix is tauri.conf.json productName (Atlas on this fork).
 
 Usage (CI, after versioned assets are on the tag):
   python3 scripts/publish-website-downloads.py \\
@@ -27,7 +29,6 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
-PRODUCT = "Grok App"
 OFFICIAL_SITE = "https://grok-app.com"
 DOWNLOADS_JSON_NAME = "downloads.json"
 
@@ -42,77 +43,89 @@ REQUIRED_IDS = (
     "linux-x64-rpm",
 )
 
-# source_names: first existing file wins. `{ver}` is the tag without leading v.
-INSTALLER_SPEC: tuple[dict[str, Any], ...] = (
-    {
-        "id": "mac-aarch64",
-        "os": "macos",
-        "arch": "aarch64",
-        "kind": "dmg",
-        "label": "macOS Apple Silicon",
-        "stable": "Grok_mac_aarch64.dmg",
-        "sources": ("Grok_{ver}_aarch64.dmg",),
-    },
-    {
-        "id": "mac-x64",
-        "os": "macos",
-        "arch": "x64",
-        "kind": "dmg",
-        "label": "macOS Intel",
-        "stable": "Grok_mac_x64.dmg",
-        "sources": ("Grok_{ver}_x64.dmg",),
-    },
-    {
-        "id": "windows-x64",
-        "os": "windows",
-        "arch": "x64",
-        "kind": "nsis",
-        "label": "Windows x64",
-        "stable": "Grok_windows_x64-setup.exe",
-        "sources": ("Grok_{ver}_x64-setup.exe",),
-    },
-    {
-        "id": "windows-x64-portable",
-        "os": "windows",
-        "arch": "x64",
-        "kind": "portable-zip",
-        "label": "Windows x64 portable",
-        "stable": "Grok_windows_x64-portable.zip",
-        "sources": ("Grok_{ver}_x64-portable.zip",),
-    },
-    {
-        "id": "linux-x64-appimage",
-        "os": "linux",
-        "arch": "x64",
-        "kind": "appimage",
-        "label": "Linux x64 AppImage",
-        "stable": "Grok_linux_x64.AppImage",
-        "sources": ("Grok_{ver}_amd64.AppImage", "Grok_{ver}_x86_64.AppImage"),
-    },
-    {
-        "id": "linux-x64-deb",
-        "os": "linux",
-        "arch": "x64",
-        "kind": "deb",
-        "label": "Linux x64 .deb",
-        "stable": "Grok_linux_x64.deb",
-        "sources": ("Grok_{ver}_amd64.deb", "Grok_{ver}_x86_64.deb"),
-    },
-    {
-        "id": "linux-x64-rpm",
-        "os": "linux",
-        "arch": "x64",
-        "kind": "rpm",
-        "label": "Linux x64 .rpm",
-        "stable": "Grok_linux_x64.rpm",
-        "sources": (
-            "Grok-{ver}-1.x86_64.rpm",
-            "Grok-{ver}.x86_64.rpm",
-            "Grok_{ver}_x86_64.rpm",
-            "Grok_{ver}_amd64.rpm",
-        ),
-    },
-)
+def product_name() -> str:
+    """Tauri bundle prefix. This fork is Atlas; upstream Grok stays Grok."""
+    conf = Path(__file__).resolve().parents[1] / "src-tauri" / "tauri.conf.json"
+    name = json.loads(conf.read_text(encoding="utf-8")).get("productName")
+    if not isinstance(name, str) or not name.strip():
+        raise SystemExit(f"error: productName missing in {conf}")
+    return name.strip()
+
+
+def installer_spec(product: str) -> tuple[dict[str, Any], ...]:
+    """source_names: first existing file wins. `{ver}` is the tag without leading v."""
+    p = product
+    return (
+        {
+            "id": "mac-aarch64",
+            "os": "macos",
+            "arch": "aarch64",
+            "kind": "dmg",
+            "label": "macOS Apple Silicon",
+            "stable": f"{p}_mac_aarch64.dmg",
+            "sources": (f"{p}_{{ver}}_aarch64.dmg",),
+        },
+        {
+            "id": "mac-x64",
+            "os": "macos",
+            "arch": "x64",
+            "kind": "dmg",
+            "label": "macOS Intel",
+            "stable": f"{p}_mac_x64.dmg",
+            "sources": (f"{p}_{{ver}}_x64.dmg",),
+        },
+        {
+            "id": "windows-x64",
+            "os": "windows",
+            "arch": "x64",
+            "kind": "nsis",
+            "label": "Windows x64",
+            "stable": f"{p}_windows_x64-setup.exe",
+            "sources": (f"{p}_{{ver}}_x64-setup.exe",),
+        },
+        {
+            "id": "windows-x64-portable",
+            "os": "windows",
+            "arch": "x64",
+            "kind": "portable-zip",
+            "label": "Windows x64 portable",
+            "stable": f"{p}_windows_x64-portable.zip",
+            "sources": (f"{p}_{{ver}}_x64-portable.zip",),
+        },
+        {
+            "id": "linux-x64-appimage",
+            "os": "linux",
+            "arch": "x64",
+            "kind": "appimage",
+            "label": "Linux x64 AppImage",
+            "stable": f"{p}_linux_x64.AppImage",
+            "sources": (f"{p}_{{ver}}_amd64.AppImage", f"{p}_{{ver}}_x86_64.AppImage"),
+        },
+        {
+            "id": "linux-x64-deb",
+            "os": "linux",
+            "arch": "x64",
+            "kind": "deb",
+            "label": "Linux x64 .deb",
+            "stable": f"{p}_linux_x64.deb",
+            "sources": (f"{p}_{{ver}}_amd64.deb", f"{p}_{{ver}}_x86_64.deb"),
+        },
+        {
+            "id": "linux-x64-rpm",
+            "os": "linux",
+            "arch": "x64",
+            "kind": "rpm",
+            "label": "Linux x64 .rpm",
+            "stable": f"{p}_linux_x64.rpm",
+            "sources": (
+                f"{p}-{{ver}}-1.x86_64.rpm",
+                f"{p}_{{ver}}-1.x86_64.rpm",
+                f"{p}-{{ver}}.x86_64.rpm",
+                f"{p}_{{ver}}_x86_64.rpm",
+                f"{p}_{{ver}}_amd64.rpm",
+            ),
+        },
+    )
 
 
 def normalize_tag(raw: str) -> tuple[str, str]:
@@ -155,12 +168,14 @@ def build_manifest(
     tag: str,
     repo: str,
     write_aliases: bool,
+    product: str | None = None,
 ) -> dict[str, Any]:
     tag, ver = normalize_tag(tag)
+    product = product or product_name()
     installers: dict[str, Any] = {}
     upload_names: list[str] = [DOWNLOADS_JSON_NAME]
 
-    for spec in INSTALLER_SPEC:
+    for spec in installer_spec(product):
         source = find_source(directory, ver, spec["sources"])
         if source is None:
             continue
@@ -199,7 +214,7 @@ def build_manifest(
 
     manifest = {
         "schemaVersion": SCHEMA_VERSION,
-        "product": PRODUCT,
+        "product": product,
         "officialSite": OFFICIAL_SITE,
         "version": ver,
         "tag": tag,
@@ -285,17 +300,18 @@ class WebsiteDownloadsTests(unittest.TestCase):
         self.assertEqual(normalize_tag("0.2.20"), ("v0.2.20", "0.2.20"))
 
     def test_builds_stable_urls_and_aliases(self) -> None:
+        product = product_name()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             samples = {
-                "Grok_0.2.20_aarch64.dmg": b"arm-dmg",
-                "Grok_0.2.20_x64.dmg": b"intel-dmg",
-                "Grok_0.2.20_x64-setup.exe": b"win-setup",
-                "Grok_0.2.20_x64-portable.zip": b"win-zip",
-                "Grok_0.2.20_amd64.AppImage": b"appimage",
-                "Grok_0.2.20_amd64.deb": b"deb",
-                "Grok-0.2.20-1.x86_64.rpm": b"rpm",
-                "Grok_0.2.20_x64.dmg.sig": b"ignore-me",
+                f"{product}_0.2.20_aarch64.dmg": b"arm-dmg",
+                f"{product}_0.2.20_x64.dmg": b"intel-dmg",
+                f"{product}_0.2.20_x64-setup.exe": b"win-setup",
+                f"{product}_0.2.20_x64-portable.zip": b"win-zip",
+                f"{product}_0.2.20_amd64.AppImage": b"appimage",
+                f"{product}_0.2.20_amd64.deb": b"deb",
+                f"{product}_0.2.20-1.x86_64.rpm": b"rpm",
+                f"{product}_0.2.20_x64.dmg.sig": b"ignore-me",
             }
             for name, body in samples.items():
                 (root / name).write_bytes(body)
@@ -309,21 +325,25 @@ class WebsiteDownloadsTests(unittest.TestCase):
             installers = payload["manifest"]["installers"]
             self.assertEqual(
                 installers["mac-x64"]["url"],
-                "https://github.com/RongleCat/grok-app/releases/latest/download/Grok_mac_x64.dmg",
+                f"https://github.com/RongleCat/grok-app/releases/latest/download/{product}_mac_x64.dmg",
             )
             self.assertEqual(
                 installers["windows-x64"]["url"],
-                "https://github.com/RongleCat/grok-app/releases/latest/download/Grok_windows_x64-setup.exe",
+                f"https://github.com/RongleCat/grok-app/releases/latest/download/{product}_windows_x64-setup.exe",
             )
             self.assertEqual(
                 installers["mac-x64"]["versionedUrl"],
-                "https://github.com/RongleCat/grok-app/releases/download/v0.2.20/Grok_0.2.20_x64.dmg",
+                f"https://github.com/RongleCat/grok-app/releases/download/v0.2.20/{product}_0.2.20_x64.dmg",
             )
             self.assertEqual(installers["mac-x64"]["sha256"], hashlib.sha256(b"intel-dmg").hexdigest())
-            self.assertEqual((root / "Grok_mac_x64.dmg").read_bytes(), b"intel-dmg")
-            self.assertEqual((root / "Grok_windows_x64-setup.exe").read_bytes(), b"win-setup")
+            self.assertEqual((root / f"{product}_mac_x64.dmg").read_bytes(), b"intel-dmg")
+            self.assertEqual((root / f"{product}_windows_x64-setup.exe").read_bytes(), b"win-setup")
             self.assertIn("linux-x64-rpm", installers)
-            self.assertEqual(installers["linux-x64-rpm"]["versionedFilename"], "Grok-0.2.20-1.x86_64.rpm")
+            self.assertEqual(
+                installers["linux-x64-rpm"]["versionedFilename"],
+                f"{product}_0.2.20-1.x86_64.rpm",
+            )
+            self.assertEqual(payload["manifest"]["product"], product)
             self.assertNotIn("sig", json.dumps(installers))
             self.assertEqual(payload["manifest"]["officialSite"], OFFICIAL_SITE)
             self.assertEqual(payload["manifest"]["schemaVersion"], SCHEMA_VERSION)
@@ -332,16 +352,16 @@ class WebsiteDownloadsTests(unittest.TestCase):
             upload_list = root / ".website-upload.txt"
             write_outputs(root, payload, json_out=json_out, upload_list=upload_list)
             parsed = json.loads(json_out.read_text(encoding="utf-8"))
-            self.assertEqual(parsed["installers"]["mac-aarch64"]["filename"], "Grok_mac_aarch64.dmg")
+            self.assertEqual(parsed["installers"]["mac-aarch64"]["filename"], f"{product}_mac_aarch64.dmg")
             listed = upload_list.read_text(encoding="utf-8").splitlines()
             self.assertIn(DOWNLOADS_JSON_NAME, listed)
-            self.assertIn("Grok_mac_x64.dmg", listed)
-            self.assertIn("Grok_windows_x64-setup.exe", listed)
+            self.assertIn(f"{product}_mac_x64.dmg", listed)
+            self.assertIn(f"{product}_windows_x64-setup.exe", listed)
 
     def test_missing_required_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "Grok_0.2.20_aarch64.dmg").write_bytes(b"arm")
+            (root / f"{product_name()}_0.2.20_aarch64.dmg").write_bytes(b"arm")
             with self.assertRaises(SystemExit) as ctx:
                 build_manifest(
                     root,
