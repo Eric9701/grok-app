@@ -26,7 +26,7 @@ export function switcherDisplayName(a: {
   if (name) return name;
   const label = (a.label || "").replace(/\s*·\s*\d+(?:\.\d+)?%\s*.*$/, "").trim();
   if (label) return label;
-  return (a.email || "").trim() || "Grok";
+  return (a.email || "").trim() || "Atlas";
 }
 
 export function isSwitcherQuotaKnown(

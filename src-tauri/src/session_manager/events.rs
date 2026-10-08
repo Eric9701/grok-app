@@ -388,7 +388,7 @@ impl SessionManager {
                 if auto {
                     let acp = self.inner.lock().as_ref().and_then(|s| s.acp.clone());
                     if let Some(acp) = acp {
-                        // Grok Build CLI publishes hyphenated wire optionIds
+                        // Atlas CLI publishes hyphenated wire optionIds
                         // (`allow-once`, `always-allow`, …). Underscore fallbacks
                         // are rejected as "unknown permission option" (#523 / #542).
                         let option_id = coerce_wire_option_id_for_tool(

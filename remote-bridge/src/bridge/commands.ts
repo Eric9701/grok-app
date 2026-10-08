@@ -50,7 +50,7 @@ export function parseSlashCommand(text: string): BuiltinCommand | null {
 export function helpText(lang: "zh" | "en" = "zh"): string {
   if (lang === "en") {
     return [
-      "**Grok Remote Bridge** — local Grok Build via IM",
+      "**Atlas Remote Bridge** — local Atlas CLI via IM",
       "",
       "Commands:",
       "- `/help` — this message",
@@ -58,7 +58,7 @@ export function helpText(lang: "zh" | "en" = "zh"): string {
       "- `/p <name|n>` — bind project by name or number",
       "- `/r` · `/resume` — list / resume a prior session",
       "- `/r <n>` — resume by number",
-      "- `/new` — fresh Grok session (keep project)",
+      "- `/new` — fresh Atlas session (keep project)",
       "- `/whoami` — show your open_id (for allow_from)",
       "- `/status` — project + session snapshot",
       "- `/stop` — cancel in-flight turn",
@@ -69,7 +69,7 @@ export function helpText(lang: "zh" | "en" = "zh"): string {
     ].join("\n");
   }
   return [
-    "**Grok Remote Bridge** — 本地 Grok Build 远程 IM 桥",
+    "**Atlas Remote Bridge** — 本地 Atlas CLI 远程 IM 桥",
     "",
     "命令：",
     "- `/help` — 显示帮助",

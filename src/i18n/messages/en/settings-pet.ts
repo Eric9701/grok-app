@@ -3,20 +3,15 @@ export const enSettingsPet = {
   "settings.nav.pet": "Pet",
   "settings.tab.petLook": "Look",
   "settings.tab.petBubbles": "Bubbles",
-  "settings.pet.desc":
-    "A live desktop companion that shows the highest-priority session: needs you, error, ready, or working.",
+  "settings.pet.desc": "A live desktop companion that shows the highest-priority session: needs you, error, ready, or working.",
   "settings.pet.enabled": "Show desktop pet",
-  "settings.pet.enabledDesc":
-    "Float a living mark over other apps. Hide anytime from the pet menu or /pet.",
+  "settings.pet.enabledDesc": "Float a living mark over other apps. Hide anytime from the pet menu or /pet.",
   "settings.pet.bubbles": "Task bubbles",
-  "settings.pet.bubblesDesc":
-    "Show a chip above the pet when an agent posts a mid-turn reply. Concurrent chats stack instead of overwriting each other.",
+  "settings.pet.bubblesDesc": "Show a chip above the pet when an agent posts a mid-turn reply. Concurrent chats stack instead of overwriting each other.",
   "settings.pet.progressBar": "Bubble progress bar",
-  "settings.pet.progressBarDesc":
-    "Optional loading bar on each chip. Off by default — the spinner and check already show in progress vs done.",
+  "settings.pet.progressBarDesc": "Optional loading bar on each chip. Off by default — the spinner and check already show in progress vs done.",
   "settings.pet.bubbleDismiss": "Auto-hide bubbles after",
-  "settings.pet.bubbleDismissDesc":
-    "Seconds a chip stays after that chat goes quiet. Default 15.",
+  "settings.pet.bubbleDismissDesc": "Seconds a chip stays after that chat goes quiet. Default 15.",
   "settings.pet.bubbleDismiss.seconds": "{n}s",
   "settings.pet.bubbleLook": "Bubble look",
   "settings.pet.bubbleLookDesc": "Shape and background of the stacked chips.",
@@ -59,8 +54,7 @@ export const enSettingsPet = {
   "settings.pet.expression.somnolent": "Sleepy",
   "settings.pet.color": "Color",
   "settings.pet.eyeColor": "Eyes",
-  "settings.pet.eyeColorDesc":
-    "Auto keeps a readable contrast (white on a black body). Pick any color to override.",
+  "settings.pet.eyeColorDesc": "Auto keeps a readable contrast (white on a black body). Pick any color to override.",
   "settings.pet.eyeColor.auto": "Auto",
   "settings.pet.size": "Size",
   "settings.pet.sizeDesc": "On-screen size of the overlay.",

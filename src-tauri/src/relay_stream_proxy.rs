@@ -3,7 +3,7 @@
 //! Some gateways (OpenCode Zen Go, etc.) append proprietary trailers such as:
 //!   `{"choices":[],"x-opencode-type":"inference-cost",...}`  // missing `id`
 //!   `{"type":"ping","cost":"0"}`
-//! Grok Build CLI deserializes stream chunks strictly and **fatals** on these,
+//! Atlas CLI deserializes stream chunks strictly and **fatals** on these,
 //! which surfaces in the App as “Agent crashed / protocol interrupted”.
 //!
 //! Host rewrites affected providers’ `base_url` to

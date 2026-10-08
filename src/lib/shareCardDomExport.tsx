@@ -34,7 +34,7 @@ import { GROK_APP_SHARE_FOOTER } from "@/lib/sessionExportImage";
 
 function roleLabel(role: string): string {
   if (role === "user") return "You";
-  if (role === "assistant") return "Grok";
+  if (role === "assistant") return "Atlas";
   if (role === "tool") return "Tool";
   return role;
 }

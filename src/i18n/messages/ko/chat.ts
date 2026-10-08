@@ -6,7 +6,7 @@ export const koChat = {
   "message.nodes.prev": "이전 메시지",
   "message.nodes.next": "다음 메시지",
   "message.nodes.user": "나",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "사이드 패널",
   "main.leftPane": "사이드바",

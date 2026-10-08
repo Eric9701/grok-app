@@ -853,6 +853,7 @@ fn marketplace_cache_roots() -> Vec<std::path::PathBuf> {
     let settings = store::load_settings();
     let active = resolve_agent_grok_home(&settings.session_data_mode).join("marketplace-cache");
     roots.push(active);
+    roots.push(user_home().join(".atlas").join("marketplace-cache"));
     roots.push(user_home().join(".grok").join("marketplace-cache"));
     roots.push(agent_home_dir().join("marketplace-cache"));
     roots

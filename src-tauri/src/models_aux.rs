@@ -323,7 +323,7 @@ pub fn build_options(list: &crate::providers::ProvidersListResult) -> Vec<Models
         id: AUTO.into(),
         label: "Auto (CLI default)".into(),
         source: "auto".into(),
-        hint: "Use Grok Build built-in defaults for this task".into(),
+        hint: "Use Atlas CLI built-in defaults for this task".into(),
     }];
 
     opts.push(ModelsAuxOption {
@@ -894,7 +894,7 @@ pub fn run_aux_headless(
     let cli = probe
         .path
         .filter(|p| !p.trim().is_empty())
-        .ok_or_else(|| "grok CLI not found".to_string())?;
+        .ok_or_else(|| "Atlas CLI not found".to_string())?;
 
     let mut cmd = Command::new(&cli);
     cmd.arg("--no-auto-update")

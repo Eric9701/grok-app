@@ -964,6 +964,20 @@ html[data-theme="light"] .ui-check.is-mixed .ui-check__box {
   align-items: center;
 }
 
+.settings-acp-field--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.settings-acp-field--stack .settings-input {
+  flex: none;
+  width: 100%;
+}
+
+.settings-acp-field--stack .btn {
+  align-self: flex-start;
+}
+
 .settings-acp-field .settings-input {
   flex: 1;
   min-width: 0;

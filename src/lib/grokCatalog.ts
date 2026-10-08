@@ -1,6 +1,6 @@
 /**
  * Catalogs aligned with Grok Build CLI (`grok models`, reasoning effort, permission).
- * Live selectable models come from `models_list_available` (CLI cache + custom providers).
+ * Live selectable models come from `models_list_available` (CLI cache + Atlas `config.toml` `[model.*]`).
  * Update docs/llm-wiki/catalog.md when defaults change.
  */
 

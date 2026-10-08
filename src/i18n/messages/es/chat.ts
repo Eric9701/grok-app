@@ -6,7 +6,7 @@ export const esChat = {
   "message.nodes.prev": "Mensaje anterior",
   "message.nodes.next": "Mensaje siguiente",
   "message.nodes.user": "Tú",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Panel lateral",
   "main.leftPane": "Barra lateral",

@@ -194,7 +194,7 @@ fn apply_agent_env(cmd: &mut Command) {
     );
 }
 
-/// One-shot headless turn with JSON-line stream parse (compatible with Grok Build CLI).
+/// One-shot headless turn with JSON-line stream parse (compatible with Atlas CLI).
 pub async fn run_turn(
     work_dir: &Path,
     prompt: &str,

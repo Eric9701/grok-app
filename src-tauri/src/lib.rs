@@ -1,10 +1,12 @@
-//! Grok App Host — real ACP default (`grok agent stdio`).
+//! Atlas Host — real ACP default (`grok agent stdio`).
 
 mod account;
 
 mod account_profiles;
 
 mod acp_client;
+
+mod atlas_relay_agent;
 
 #[cfg(test)]
 mod acp_golden_test;
@@ -121,6 +123,8 @@ mod official_aux;
 mod path_scope;
 
 mod paths;
+
+mod remote_updates;
 
 mod plan_chrome;
 
@@ -317,6 +321,9 @@ pub fn run() {
     // (build.rs → cfg) and this is a non-debug binary. Crate is always linked for ACL.
 
     fn maybe_register_updater(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+        if !crate::remote_updates::REMOTE_UPDATES_ENABLED {
+            return builder;
+        }
         #[cfg(grok_updater_enabled)]
         {
             if !cfg!(debug_assertions) {
@@ -902,7 +909,7 @@ pub fn run() {
                 });
             }
 
-            // macOS: pin notification delivery to com.grokapp.desktop and request
+            // macOS: pin notification delivery to com.atlasapp.desktop and request
             // UNUserNotificationCenter auth so Grok appears in System Settings.
             desktop_notify::request_permission_on_startup();
 
@@ -970,6 +977,11 @@ pub fn run() {
                     tracing::info!("remote_im: deferred autostart begin");
                     remote_im::try_autostart(&rim).await;
                     tracing::info!("remote_im: deferred autostart finished");
+                });
+
+                tauri::async_runtime::spawn(async {
+                    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                    crate::atlas_relay_agent::autostart_from_settings().await;
                 });
 
                 // Crash / exit recovery while bridge stays enabled.
@@ -1047,7 +1059,7 @@ pub fn run() {
 
         .build(context)
 
-        .expect("error while building Grok App")
+        .expect("error while building Atlas")
 
         .run(|app, event| {
 

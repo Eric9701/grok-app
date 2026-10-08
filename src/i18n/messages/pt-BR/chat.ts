@@ -6,7 +6,7 @@ export const ptBRChat = {
   "message.nodes.prev": "Mensagem anterior",
   "message.nodes.next": "Próxima mensagem",
   "message.nodes.user": "Você",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Painel lateral",
   "main.leftPane": "Barra lateral",

@@ -6,7 +6,7 @@ export const ruChat = {
   "message.nodes.prev": "Предыдущее сообщение",
   "message.nodes.next": "Следующее сообщение",
   "message.nodes.user": "Вы",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Боковая панель",
   "main.leftPane": "Панель чатов",

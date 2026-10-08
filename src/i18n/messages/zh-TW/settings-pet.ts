@@ -3,20 +3,15 @@ export const zhTWSettingsPet = {
   "settings.nav.pet": "寵物",
   "settings.tab.petLook": "外觀設定",
   "settings.tab.petBubbles": "氣泡設定",
-  "settings.pet.desc":
-    "桌面活體夥伴：一眼看出最需要你的工作階段——等你、失敗、完成未讀，或正在進行。",
+  "settings.pet.desc": "桌面活體夥伴：一眼看出最需要你的工作階段——等你、失敗、完成未讀，或正在進行。",
   "settings.pet.enabled": "顯示桌面寵物",
-  "settings.pet.enabledDesc":
-    "讓活體標記浮在其他應用程式上方。可隨時從寵物選單或 /pet 收起。",
+  "settings.pet.enabledDesc": "讓活體標記浮在其他應用程式上方。可隨時從寵物選單或 /pet 收起。",
   "settings.pet.bubbles": "桌寵提示框",
-  "settings.pet.bubblesDesc":
-    "Agent 工作中寫出階段性回覆時才跳出氣泡。不同工作階段各自一塊、往上疊加，不會互相覆蓋。",
+  "settings.pet.bubblesDesc": "Agent 工作中寫出階段性回覆時才跳出氣泡。不同工作階段各自一塊、往上疊加，不會互相覆蓋。",
   "settings.pet.progressBar": "氣泡進度條",
-  "settings.pet.progressBarDesc":
-    "可選。預設關閉——左邊的旋轉與打勾已表示進行中 / 已完成。",
+  "settings.pet.progressBarDesc": "可選。預設關閉——左邊的旋轉與打勾已表示進行中 / 已完成。",
   "settings.pet.bubbleDismiss": "氣泡自動關閉",
-  "settings.pet.bubbleDismissDesc":
-    "該工作階段安靜後，氣泡再停留幾秒。預設 15 秒。",
+  "settings.pet.bubbleDismissDesc": "該工作階段安靜後，氣泡再停留幾秒。預設 15 秒。",
   "settings.pet.bubbleDismiss.seconds": "{n} 秒",
   "settings.pet.bubbleLook": "氣泡外觀",
   "settings.pet.bubbleLookDesc": "疊加氣泡的形狀與背景。",
@@ -59,8 +54,7 @@ export const zhTWSettingsPet = {
   "settings.pet.expression.somnolent": "困倦",
   "settings.pet.color": "顏色",
   "settings.pet.eyeColor": "眼睛",
-  "settings.pet.eyeColorDesc":
-    "自動會保證對比（黑色身體用淺色眼睛）。也可以指定任意顏色。",
+  "settings.pet.eyeColorDesc": "自動會保證對比（黑色身體用淺色眼睛）。也可以指定任意顏色。",
   "settings.pet.eyeColor.auto": "自動",
   "settings.pet.size": "尺寸",
   "settings.pet.sizeDesc": "浮層在螢幕上的大小。",

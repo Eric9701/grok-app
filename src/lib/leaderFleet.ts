@@ -479,7 +479,7 @@ export function deriveLeaderConnectStatus(
   // Capability gates first (honest unsupported / missing CLI).
   if (input.cliFound === false || state === "error" && !cliFound) {
     if (input.cliFound === false) {
-      const kind = classifyLeaderError(msg || "Grok Build CLI not found");
+      const kind = classifyLeaderError(msg || "Atlas CLI not found");
       return {
         ...base,
         phase: "cli_missing",

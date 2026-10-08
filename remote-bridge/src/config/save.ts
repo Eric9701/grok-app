@@ -153,7 +153,7 @@ export function serializeConfig(config: AppConfig): string {
     doc.runtime = { max_agent_processes: config.runtime.max_agent_processes ?? 8 };
   }
   doc.projects = config.projects.map((p) => projectToTomlObject(p));
-  const header = `# grok-remote-bridge config — managed by Grok App / CLI\n# Do not commit secrets.\n\n`;
+  const header = `# grok-remote-bridge config — managed by Atlas / CLI\n# Do not commit secrets.\n\n`;
   return header + stringifyToml(doc);
 }
 

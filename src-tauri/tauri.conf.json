@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Grok",
+  "productName": "Atlas",
   "version": "0.2.38",
-  "identifier": "com.grokapp.desktop",
+  "identifier": "com.atlasapp.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev:ui",
     "devUrl": "http://localhost:1421",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Grok",
+        "title": "Atlas",
         "visible": false,
         "create": false,
         "width": 1200,

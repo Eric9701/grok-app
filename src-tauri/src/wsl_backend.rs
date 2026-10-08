@@ -1,4 +1,4 @@
-//! Windows WSL backend for Grok Build CLI.
+//! Windows WSL backend for Atlas CLI.
 //!
 //! When `AppSettings.cli_backend == "wsl"`, the host spawns:
 //!   `wsl.exe [-d Distro] --cd <linux_cwd> -- env KEY=VAL… <linux_cli> <grok args…>`
@@ -76,7 +76,7 @@ pub fn resolve_wsl_launch(settings: &AppSettings) -> Option<WslLaunch> {
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .unwrap_or("grok")
+        .unwrap_or("atlas")
         .to_string();
     Some(WslLaunch { distro, linux_cli })
 }
@@ -227,7 +227,7 @@ pub fn probe_cli_for_settings(settings: &AppSettings, manual_path: Option<&str>)
     }
 }
 
-/// Probe Grok Build CLI **inside** WSL for settings / doctor.
+/// Probe Atlas CLI **inside** WSL for settings / doctor.
 pub fn probe_wsl_cli(settings: &AppSettings) -> CliProbeResult {
     let launch = match resolve_wsl_launch(settings) {
         Some(l) => l,
@@ -323,26 +323,29 @@ fn run_wsl_cli_probe(wsl: &Path, launch: &WslLaunch) -> (Option<String>, Option<
         }
     }
 
-    // Expand optional ~ and prefer explicit path; otherwise PATH + ~/.grok/bin.
+    // Expand optional ~ and prefer explicit path; otherwise PATH + ~/.atlas/bin.
     // Print: first line = resolved path, rest = --version banner.
     let script = r#"
 set -e
-export PATH="$HOME/.grok/bin:$HOME/.local/bin:$PATH"
+export PATH="$HOME/.atlas/bin:$HOME/.grok/bin:$HOME/.local/bin:$PATH"
 CLI_RAW="$1"
-if [ -n "$CLI_RAW" ] && [ "$CLI_RAW" != "grok" ]; then
+if [ -n "$CLI_RAW" ] && [ "$CLI_RAW" != "atlas" ] && [ "$CLI_RAW" != "grok" ]; then
   case "$CLI_RAW" in
     "~/"*) CLI="${HOME}/${CLI_RAW#~/}" ;;
     *) CLI="$CLI_RAW" ;;
   esac
 else
-  CLI="$(command -v grok 2>/dev/null || true)"
+  CLI="$(command -v atlas 2>/dev/null || command -v grok 2>/dev/null || true)"
+  if [ -z "$CLI" ] && [ -x "$HOME/.atlas/bin/atlas" ]; then
+    CLI="$HOME/.atlas/bin/atlas"
+  fi
   if [ -z "$CLI" ] && [ -x "$HOME/.grok/bin/grok" ]; then
     CLI="$HOME/.grok/bin/grok"
   fi
 fi
 if [ -z "$CLI" ]; then
   echo ""
-  echo "grok not found in WSL PATH or ~/.grok/bin" >&2
+  echo "atlas not found in WSL PATH or ~/.atlas/bin" >&2
   exit 127
 fi
 echo "$CLI"
@@ -374,7 +377,9 @@ echo "$CLI"
             let path = lines.next().map(|s| s.to_string());
             let version_line = lines
                 .find(|l| {
-                    l.to_ascii_lowercase().contains("grok") || extract_version_token(l).is_some()
+                    l.to_ascii_lowercase().contains("atlas")
+                || l.to_ascii_lowercase().contains("grok")
+                || extract_version_token(l).is_some()
                 })
                 .map(|s| s.to_string())
                 .or_else(|| {
@@ -386,6 +391,7 @@ echo "$CLI"
                 (Some(p), Some(v)) => (Some(p.clone()), Some(v.clone())),
                 (Some(p), None) => {
                     if extract_version_token(p).is_some()
+                        || p.to_ascii_lowercase().contains("atlas ")
                         || p.to_ascii_lowercase().contains("grok ")
                     {
                         (None, Some(p.clone()))
@@ -477,7 +483,9 @@ fn run_wsl_direct_probe(
         .map(str::trim)
         .find(|l| {
             !l.is_empty()
-                && (l.to_ascii_lowercase().contains("grok") || extract_version_token(l).is_some())
+                && (l.to_ascii_lowercase().contains("atlas")
+                || l.to_ascii_lowercase().contains("grok")
+                || extract_version_token(l).is_some())
         })
         .map(|s| s.to_string());
     let ok = success || version.is_some();
@@ -770,6 +778,8 @@ mod tests {
 
     #[test]
     fn safe_wsl_cli_path_rejects_injection() {
+        assert!(is_safe_wsl_cli_path("atlas"));
+        assert!(is_safe_wsl_cli_path("~/.atlas/bin/atlas"));
         assert!(is_safe_wsl_cli_path("grok"));
         assert!(is_safe_wsl_cli_path("~/.grok/bin/grok"));
         assert!(is_safe_wsl_cli_path("/usr/local/bin/grok"));

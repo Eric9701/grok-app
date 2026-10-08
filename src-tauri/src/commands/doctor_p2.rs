@@ -221,7 +221,7 @@ fn run_grok_inspect(project_path: Option<&str>) -> (Option<serde_json::Value>, O
     let settings = store::load_settings();
     let probe = cli_probe::probe_cli(settings.manual_cli_path.as_deref());
     let Some(cli_path) = probe.path.filter(|_| probe.found) else {
-        return (None, Some("Grok Build CLI not found".into()));
+        return (None, Some("Atlas CLI not found".into()));
     };
 
     let cwd = project_path

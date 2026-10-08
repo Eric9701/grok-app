@@ -214,7 +214,7 @@ pub fn build_managed_setup_status(
             Some("presence only — App does not re-verify cryptographic signatures".into())
         }
         (None, true, false) if !cli_found => {
-            Some("Grok Build CLI not found; local files only".into())
+            Some("Atlas CLI not found; local files only".into())
         }
         _ => reason,
     };
@@ -285,7 +285,7 @@ pub fn probe_managed_setup_status() -> ManagedSetupStatus {
             }
         }
     } else {
-        reason = Some("Grok Build CLI not found; local files only".into());
+        reason = Some("Atlas CLI not found; local files only".into());
     }
 
     build_managed_setup_status(

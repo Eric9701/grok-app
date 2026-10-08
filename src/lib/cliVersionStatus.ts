@@ -106,7 +106,7 @@ export function cliVersionStatusMessageParams(
 ): { version: string; recommended: string; min: string } {
   return {
     version: p?.version?.trim() || "—",
-    recommended: p?.recommendedVersion?.trim() || "1.0.0",
+    recommended: p?.recommendedVersion?.trim() || "0.2.134",
     min: p?.minVersion?.trim() || "0.2.112",
   };
 }

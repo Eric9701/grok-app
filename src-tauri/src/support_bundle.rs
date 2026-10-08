@@ -158,7 +158,7 @@ pub fn write_support_bundle(
     }
 
     // README for the recipient
-    let readme = "Grok App support bundle\n\
+    let readme = "Atlas support bundle\n\
 \n\
 Contents:\n\
 - doctor.json — health checks (paths only, no keys)\n\
@@ -379,7 +379,7 @@ pub fn write_session_bundle(
     }
 
     let readme = format!(
-        "Grok App session diagnostic bundle\n\
+        "Atlas session diagnostic bundle\n\
 \n\
 Session: {session_id}\n\
 Title: {}\n\
@@ -393,9 +393,9 @@ Contents:\n\
 - host/settings.json — app settings (secrets redacted)\n\
 - host/runtime.json — live/parked process snapshot (if attached)\n\
 - host/project.json — bound project (if any)\n\
-- host/cli_probe.json — Grok Build CLI discovery\n\
+- host/cli_probe.json — Atlas CLI discovery\n\
 - logs/ — recent App log files (if present)\n\
-- agent/ — Grok Build session trail (events, history, terminal logs)\n\
+- agent/ — Atlas CLI session trail (events, history, terminal logs)\n\
 \n\
 Never includes secrets.json, OS keychain material, or raw API keys.\n\
 Attach this zip when reporting bugs such as early end_turn / mid-task stop.\n\

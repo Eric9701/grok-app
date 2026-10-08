@@ -19,6 +19,7 @@ import {
   shouldInstallWhenReady,
 } from "@/lib/appUpdateHonesty";
 import { DEVELOPER_MODE_CHANGE_EVENT } from "@/lib/developerModePref";
+import { REMOTE_UPDATES_ENABLED } from "@/lib/remoteUpdates";
 import {
   UPDATE_SIM_CHANGE_EVENT,
   UPDATE_SIM_VERSION,
@@ -126,8 +127,14 @@ export type UpdaterChannelInfo = {
    * - `github_manual` — unsigned / local / plugin off
    * - `unsupported` — plugin on but package type cannot auto-update (e.g. Linux non-AppImage)
    * - `unknown` — not yet probed
+   * - `disabled` — Atlas white-label: remote updates off
    */
-  channel: "silent" | "github_manual" | "unsupported" | "unknown";
+  channel:
+    | "silent"
+    | "github_manual"
+    | "unsupported"
+    | "unknown"
+    | "disabled";
   pluginEnabled: boolean;
   platformSupported: boolean;
   endpoint: string;
@@ -373,6 +380,9 @@ export function useUpdater() {
 
   const runUpdateCheck = useCallback(
     async ({ background }: { background: boolean }) => {
+      if (!REMOTE_UPDATES_ENABLED) {
+        return;
+      }
       const simMode = readUpdateSimMode();
 
       // DEV simulation: skip host/plugin I/O entirely.
@@ -618,6 +628,15 @@ export function useUpdater() {
   }, [downloadUpdate, installAndRelaunch, runUpdateCheck]);
 
   const refreshChannelInfo = useCallback(async () => {
+    if (!REMOTE_UPDATES_ENABLED) {
+      setChannelInfo({
+        channel: "disabled",
+        pluginEnabled: false,
+        platformSupported: false,
+        endpoint: "",
+      });
+      return;
+    }
     const simMode = readUpdateSimMode();
     if (simMode !== "off") {
       setChannelInfo({
@@ -689,6 +708,14 @@ export function useUpdater() {
     installUpdateSimConsoleApi();
 
     void refreshChannelInfo();
+
+    if (!REMOTE_UPDATES_ENABLED) {
+      return () => {
+        aliveRef.current = false;
+        generationRef.current += 1;
+        void closeUpdate();
+      };
+    }
 
     // Startup + periodic discovery (download only; no silent install).
     void checkForUpdateInBackground();

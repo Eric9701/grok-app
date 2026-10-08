@@ -14,12 +14,17 @@ export interface AppSettings {
   sessionDataMode: string;
   manualCliPath: string | null;
   /**
+   * Enterprise Atlas CLI install/update base (`…/atlas/cli`).
+   * Empty = env `ATLAS_CLI_MIRROR` or the Host built-in default.
+   */
+  atlasCliMirror?: string | null;
+  /**
    * CLI launch backend: `native` (default) or `wsl` (Windows only — spawn via wsl.exe).
    */
   cliBackend?: string;
   /** Optional WSL distro when cliBackend is wsl. Empty = default distro. */
   wslDistro?: string | null;
-  /** Path to grok inside WSL (e.g. grok, ~/.grok/bin/grok). */
+  /** Path to atlas inside WSL (e.g. atlas, ~/.atlas/bin/atlas). */
   wslCliPath?: string | null;
   permissionPolicy: string;
   modelId: string | null;
@@ -37,6 +42,15 @@ export interface AppSettings {
   /** API mode: `host:port` of a remote ACP server. When set, sessions connect
    *  over TCP instead of spawning the local CLI. Empty/unset = local spawn. */
   acpServerAddr?: string | null;
+  /** Atlas Relay agent endpoint. With `atlasRelayAgentEnabled`, the app dials
+   *  this relay and bridges ACP to a local Atlas CLI. */
+  atlasRelayAgentUrl?: string | null;
+  /** `agent_id` query on the relay agent socket. */
+  atlasRelayAgentId?: string | null;
+  /** Keep the relay agent connected, including after the next launch. */
+  atlasRelayAgentEnabled?: boolean;
+  /** Seconds between WebSocket Pings to Atlas Relay. 0 uses the 15s default. */
+  atlasRelayAgentHealthSecs?: number;
   /** OpenSSH Host aliases with watch enabled. */
   sshWatchAliases?: string[] | null;
   /** Max warm/live agent processes (default 3). */

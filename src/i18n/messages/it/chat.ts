@@ -6,7 +6,7 @@ export const itChat = {
   "message.nodes.prev": "Messaggio precedente",
   "message.nodes.next": "Messaggio successivo",
   "message.nodes.user": "Tu",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Pannello laterale",
   "main.leftPane": "Barra laterale",

@@ -463,7 +463,7 @@ export function formatWindowsDayuseSummaryText(
   opts?: { title?: string; generatedAt?: string | null },
 ): string {
   const lines: string[] = [];
-  lines.push(opts?.title?.trim() || "Grok App — Windows day-use checklist");
+  lines.push(opts?.title?.trim() || "Atlas — Windows day-use checklist");
   lines.push(`Platform: ${checklist.platform}`);
   lines.push(
     `Target: ${checklist.isTargetPlatform ? "yes (Windows)" : "no (not the target of this list)"}`,

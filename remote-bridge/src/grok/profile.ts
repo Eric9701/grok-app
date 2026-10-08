@@ -22,7 +22,7 @@ const CHAT_RULES =
   "Prefer a direct answer over planning.";
 
 const CODE_RULES =
-  "You are Grok Build coding agent in Feishu. Be efficient: prefer fewer tool calls when a short answer is enough.";
+  "You are Atlas CLI coding agent in Feishu. Be efficient: prefer fewer tool calls when a short answer is enough.";
 
 /** Heuristic: short social / Q&A → chat; coding intent → code. Pure. */
 export function detectLightweightPrompt(prompt: string): boolean {

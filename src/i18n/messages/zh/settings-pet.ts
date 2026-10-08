@@ -3,20 +3,15 @@ export const zhSettingsPet = {
   "settings.nav.pet": "宠物",
   "settings.tab.petLook": "外观设置",
   "settings.tab.petBubbles": "气泡设置",
-  "settings.pet.desc":
-    "桌面活体伴侣：一眼看出最需要你的会话——等你、失败、完成未读，或正在干活。",
+  "settings.pet.desc": "桌面活体伴侣：一眼看出最需要你的会话——等你、失败、完成未读，或正在干活。",
   "settings.pet.enabled": "显示桌面宠物",
-  "settings.pet.enabledDesc":
-    "让活体标记浮在其他应用上方。可随时从宠物菜单或 /pet 收起。",
+  "settings.pet.enabledDesc": "让活体标记浮在其他应用上方。可随时从宠物菜单或 /pet 收起。",
   "settings.pet.bubbles": "桌宠提示框",
-  "settings.pet.bubblesDesc":
-    "Agent 工作中写出阶段性回复时才弹出气泡。不同会话各自一块，往上叠加，不会互相覆盖。",
+  "settings.pet.bubblesDesc": "Agent 工作中写出阶段性回复时才弹出气泡。不同会话各自一块，往上叠加，不会互相覆盖。",
   "settings.pet.progressBar": "气泡进度条",
-  "settings.pet.progressBarDesc":
-    "可选。默认关掉——左边的旋转和打钩已经表示进行中 / 已完成。",
+  "settings.pet.progressBarDesc": "可选。默认关掉——左边的旋转和打钩已经表示进行中 / 已完成。",
   "settings.pet.bubbleDismiss": "气泡自动关闭",
-  "settings.pet.bubbleDismissDesc":
-    "该会话安静后，气泡再停留多少秒。默认 15 秒。",
+  "settings.pet.bubbleDismissDesc": "该会话安静后，气泡再停留多少秒。默认 15 秒。",
   "settings.pet.bubbleDismiss.seconds": "{n} 秒",
   "settings.pet.bubbleLook": "气泡外观",
   "settings.pet.bubbleLookDesc": "叠加气泡的形状和背景。",
@@ -59,8 +54,7 @@ export const zhSettingsPet = {
   "settings.pet.expression.somnolent": "困倦",
   "settings.pet.color": "颜色",
   "settings.pet.eyeColor": "眼睛",
-  "settings.pet.eyeColorDesc":
-    "自动会保证对比（黑色身体用浅色眼睛）。也可以指定任意颜色。",
+  "settings.pet.eyeColorDesc": "自动会保证对比（黑色身体用浅色眼睛）。也可以指定任意颜色。",
   "settings.pet.eyeColor.auto": "自动",
   "settings.pet.size": "尺寸",
   "settings.pet.sizeDesc": "浮层在屏幕上的大小。",

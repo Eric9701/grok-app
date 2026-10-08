@@ -423,14 +423,14 @@ pub async fn pick_cli_binary() -> Result<Option<String>, String> {
         #[cfg(target_os = "windows")]
         {
             let dlg = rfd::FileDialog::new()
-                .set_title("Select Grok Build binary / 选择 Grok Build 可执行文件")
+                .set_title("Select Atlas CLI binary / 选择 Atlas CLI 可执行文件")
                 .add_filter("Executable", &["exe", "cmd", "bat"]);
             dlg.pick_file()
         }
         #[cfg(not(target_os = "windows"))]
         {
             rfd::FileDialog::new()
-                .set_title("Select Grok Build binary / 选择 Grok Build 可执行文件")
+                .set_title("Select Atlas CLI binary / 选择 Atlas CLI 可执行文件")
                 .pick_file()
         }
     })
@@ -664,7 +664,7 @@ pub async fn sessions_search(
     .map_err(|e| e.to_string())
 }
 
-/// List Grok Build CLI sessions under GROK_HOME (shared-mode discovery, E03).
+/// List Atlas CLI sessions under GROK_HOME (shared-mode discovery, E03).
 #[tauri::command]
 pub async fn cli_sessions_list() -> Result<Vec<crate::cli_sessions::CliSessionSummary>, String> {
     let mode = store::load_settings_async().await.session_data_mode;
@@ -836,7 +836,7 @@ pub fn open_session_window(
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .map(|t| format!("Grok · {t}"))
-        .unwrap_or_else(|| "Grok".to_string());
+        .unwrap_or_else(|| "Atlas".to_string());
 
     if let Some(w) = app.get_webview_window(&label) {
         let _ = w.set_title(&win_title);

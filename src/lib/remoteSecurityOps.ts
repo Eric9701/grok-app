@@ -590,7 +590,7 @@ export function formatRemoteSecuritySummaryText(
 ): string {
   const checklist = input.checklist ?? buildRemoteSecurityChecklist(input);
   const lines: string[] = [];
-  lines.push("Grok App — Remote security summary");
+  lines.push("Atlas — Remote security summary");
   lines.push(`Risk: ${checklist.risk}`);
   lines.push(`Allow-from: ${input.allowFromSummary}`);
   lines.push(

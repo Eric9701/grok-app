@@ -6,7 +6,7 @@ export const frChat = {
   "message.nodes.prev": "Message précédent",
   "message.nodes.next": "Message suivant",
   "message.nodes.user": "Vous",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Panneau latéral",
   "main.leftPane": "Barre latérale",

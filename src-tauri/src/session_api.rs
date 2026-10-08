@@ -1,7 +1,7 @@
 //! Local session API for external integrations (#626 first slice).
 //!
 //! Loopback HTTP (127.0.0.1, token file) + CLI that talks to the same Host
-//! helpers. Lists Grok App sessions and continues one by id + prompt.
+//! helpers. Lists Atlas sessions and continues one by id + prompt.
 //! Does not create a new chat. Does not interrupt a running turn.
 
 use std::fs;
@@ -368,7 +368,7 @@ pub struct SessionApiCliLink {
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
-const WIN_SHIM_MARKER: &str = "grok-app session-api shim (managed by Grok App)";
+const WIN_SHIM_MARKER: &str = "atlas session-api shim (managed by Atlas)";
 
 pub fn cli_link_name() -> &'static str {
     #[cfg(windows)]
@@ -786,7 +786,7 @@ pub fn classify_cli_transport_error(err: &str, session_id: &str) -> (TurnStatus,
             TurnStatus::AppNotRunning,
             2,
             format!(
-                "Grok App is not running ({err}). Start the app (or leave it in the tray), then retry."
+                "Atlas is not running ({err}). Start the app (or leave it in the tray), then retry."
             ),
         )
     } else {
@@ -1133,7 +1133,7 @@ pub fn session_api_status(app: AppHandle) -> SessionApiStatus {
 pub async fn session_api_reveal_token_file() -> Result<String, String> {
     let path = endpoint_path();
     if !path.is_file() {
-        return Err("session API is not listening — start Grok App first".into());
+        return Err("session API is not listening — start Atlas first".into());
     }
     let shown = path.display().to_string();
     let pb = path.clone();
@@ -1218,7 +1218,7 @@ pub fn run_cli() -> i32 {
                 let mut out = TurnResult::fail(
                     TurnStatus::AppNotRunning,
                     session_id,
-                    "Grok App is not running. Start the app (or leave it in the tray), then retry.",
+                    "Atlas is not running. Start the app (or leave it in the tray), then retry.",
                 );
                 out.idempotency_key = idempotency_key;
                 print_turn(&out);

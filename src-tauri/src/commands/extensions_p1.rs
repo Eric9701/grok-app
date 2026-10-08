@@ -714,7 +714,7 @@ pub async fn extensions_enable_all_skills(
     .map_err(|e| e.to_string())?
 }
 
-// ── Plugins via Grok Build CLI (`grok plugin …` + `inspect` + config.toml) ──
+// ── Plugins via Atlas CLI (`grok plugin …` + `inspect` + config.toml) ──
 //
 // Keep field semantics aligned with Grok Build:
 // - install inventory: `grok plugin list --json` (status/name/version/source/…)
@@ -770,7 +770,7 @@ fn run_grok_cli_args(args: &[&str], timeout_secs: u64) -> Result<(String, String
     let settings = store::load_settings();
     let probe = cli_probe::probe_cli(settings.manual_cli_path.as_deref());
     let Some(cli_path) = probe.path.filter(|_| probe.found) else {
-        return Err("Grok Build CLI not found".into());
+        return Err("Atlas CLI not found".into());
     };
 
     let args_owned: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();

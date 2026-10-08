@@ -374,8 +374,8 @@ export class BridgeEngine {
     if (!projects.length) {
       await send.reply(
         this.language === "en"
-          ? "No trusted projects. Trust a folder in Grok App first."
-          : "没有已信任项目。请先在 Grok App 侧栏信任一个文件夹。",
+          ? "No trusted projects. Trust a folder in Atlas first."
+          : "没有已信任项目。请先在 Atlas 侧栏信任一个文件夹。",
       );
       return;
     }

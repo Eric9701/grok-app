@@ -11,12 +11,28 @@ export const ABOUT_ENTRIES: readonly SettingsEntry[] = [
     keywords: ["about", "version", "update", "关于", "關於", "版本", "更新"],
   },
   {
+    id: "about.remoteUpdates",
+    section: "about",
+    anchorId: "settings-anchor-remoteUpdates",
+    labelKey: "settings.remoteUpdatesDisabled",
+    descKeys: ["settings.remoteUpdatesDisabledDesc"],
+    keywords: [
+      "update",
+      "remote update",
+      "auto update",
+      "github",
+      "atlas update",
+      "远程更新",
+    ],
+  },
+  {
     id: "about.cli",
     section: "about",
     anchorId: "settings-anchor-aboutCli",
     labelKey: "settings.cliUpdate",
     descKeys: [
       "settings.cliUpdateDesc",
+      "settings.remoteUpdatesDisabledDesc",
       "settings.cliChannel.switchHint",
       "settings.cliChannel.pinLabel",
     ],

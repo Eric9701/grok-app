@@ -6,7 +6,7 @@ export const filChat = {
   "message.nodes.prev": "Nakaraang mensahe",
   "message.nodes.next": "Susunod na mensahe",
   "message.nodes.user": "Ikaw",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Panel sa gilid",
   "main.leftPane": "Sidebar",

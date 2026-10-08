@@ -6,7 +6,7 @@ export const jaChat = {
   "message.nodes.prev": "前のメッセージ",
   "message.nodes.next": "次のメッセージ",
   "message.nodes.user": "あなた",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "サイドパネル",
   "main.leftPane": "サイドバー",

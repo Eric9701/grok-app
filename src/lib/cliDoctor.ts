@@ -471,7 +471,7 @@ export function parseCliDoctorEnvelope(input: unknown): CliDoctorView {
     return {
       available: false,
       reason: asString(input.reason),
-      error: error ?? "Grok Build CLI doctor unavailable",
+      error: error ?? "Atlas CLI doctor unavailable",
       schemaVersion: null,
       checks: [],
       facts: {},

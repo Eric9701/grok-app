@@ -38,6 +38,7 @@ import type { Attachment } from "@/lib/attachments";
 import type { SessionFileChange } from "@/lib/sessionChanges";
 import { type Project, type SessionRow } from "@/lib/app/sidebarModels";
 import type { ChatMessage, SessionSnapshot } from "@/lib/session";
+import type { WorkbenchHashPane } from "@/lib/workbenchHash";
 import { UiErrorBoundary } from "@/components/UiErrorBoundary";
 import { ConversationThreadLive } from "@/components/lobe-chat";
 import { GoalOrchSessionChip } from "@/components/GoalOrchSessionChip";
@@ -99,7 +100,7 @@ export type WorkbenchChatStageProps = {
   lastUserMessageId: string | null;
   liveMap: SessionLiveMap;
   locale: string;
-  mainPane: "chat" | "automations" | "kanban";
+  mainPane: WorkbenchHashPane;
   markSessionWorktree: (
     sessionId: string | null | undefined,
     path: string,

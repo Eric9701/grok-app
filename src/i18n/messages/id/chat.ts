@@ -6,7 +6,7 @@ export const idChat = {
   "message.nodes.prev": "Pesan sebelumnya",
   "message.nodes.next": "Pesan berikutnya",
   "message.nodes.user": "Anda",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Panel sisi",
   "main.leftPane": "Bilah sisi",

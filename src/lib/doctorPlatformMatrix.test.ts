@@ -41,6 +41,10 @@ describe("normalizeDoctorUpdateChannel", () => {
     expect(normalizeDoctorUpdateChannel("manual")).toBe("github_manual");
   });
 
+  it("maps disabled remote updates to unsupported", () => {
+    expect(normalizeDoctorUpdateChannel("disabled")).toBe("unsupported");
+  });
+
   it("does not invent from unknown strings", () => {
     expect(normalizeDoctorUpdateChannel(null)).toBe("unknown");
     expect(normalizeDoctorUpdateChannel("nightly")).toBe("unknown");

@@ -765,7 +765,7 @@ pub async fn plugin_validate(
                     "ok": false,
                     "messages": [
                         format!(
-                            "This Grok CLI does not support `plugin validate`; version {} or newer is required. Run `grok update`, then fully restart the app.",
+                            "This Atlas CLI does not support `plugin validate`; version {} or newer is required. Run `atlas update`, then fully restart the app.",
                             crate::cli_probe::min_cli_version_str()
                         )
                     ],

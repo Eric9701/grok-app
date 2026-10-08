@@ -10,7 +10,7 @@
 //!   hi
 //!   ```
 //!
-//! Grok.com cloud web history is not exposed by Grok Build CLI; file import is
+//! Grok.com cloud web history is not exposed by Atlas CLI; file import is
 //! the supported migration path.
 
 use chrono::Utc;

@@ -40,7 +40,7 @@ export function isSidebarBrandWordmark(brand: ProviderBrandId): boolean {
 export const SidebarBrand = memo(function SidebarBrand({
   replaceLogo = false,
   brandId = null,
-  label = "Grok",
+  label = "Atlas",
 }: SidebarBrandProps) {
   if (replaceLogo && brandId) {
     if (brandId === "deepseek") {
@@ -80,7 +80,7 @@ export const SidebarBrand = memo(function SidebarBrand({
   return (
     <>
       <GrokLogo size={16} />
-      <span className="sidebar-brand-row__label">Grok</span>
+      <span className="sidebar-brand-row__label">Atlas</span>
     </>
   );
 });

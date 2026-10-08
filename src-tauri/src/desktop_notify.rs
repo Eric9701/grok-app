@@ -23,9 +23,9 @@ use tauri_plugin_notification::NotificationExt;
 
 /// Packaged-macOS NS notification id. `tauri dev` is a bare binary and skips
 /// this path. Windows WinRT toasts use `app.config().identifier` so `pnpm dev`
-/// matches the overlay (`com.grokapp.desktop.dev`).
+/// matches the overlay (`com.atlasapp.desktop.dev`).
 #[cfg(target_os = "macos")]
-const APP_BUNDLE_ID: &str = "com.grokapp.desktop";
+const APP_BUNDLE_ID: &str = "com.atlasapp.desktop";
 
 /// Frontend listens for this after a native notification body click.
 pub const NOTIFY_CLICKED_EVENT: &str = "notify://clicked";
@@ -170,7 +170,7 @@ pub fn request_permission_on_startup() {
                 tracing::debug!(
                     target: "desktop_notify",
                     error = %e,
-                    "set_application(com.grokapp.desktop) failed"
+                    "set_application(com.atlasapp.desktop) failed"
                 );
             }
         } else {

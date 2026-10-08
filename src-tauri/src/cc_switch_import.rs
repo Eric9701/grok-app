@@ -49,7 +49,7 @@ pub struct CcSwitchProviderPreview {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<String>,
     pub is_current: bool,
-    /// Suggested Grok App provider id (slug).
+    /// Suggested Atlas provider id (slug).
     pub suggested_id: String,
     pub model: String,
     pub base_url: String,

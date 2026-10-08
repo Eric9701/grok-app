@@ -1,4 +1,4 @@
-//! Discover / import Grok Build CLI sessions from active GROK_HOME
+//! Discover / import Atlas CLI sessions from active GROK_HOME
 //! (shared `~/.grok` or independent agent-home).
 //!
 //! Layout: `{GROK_HOME}/sessions/{percent-encoded-cwd}/{agent_session_id}/`

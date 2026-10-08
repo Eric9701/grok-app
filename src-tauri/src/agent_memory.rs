@@ -100,7 +100,7 @@ pub fn clear_workspace_memory(
     let cli_path = probe
         .path
         .filter(|_| probe.found)
-        .ok_or_else(|| "Grok Build CLI not found".to_string())?;
+        .ok_or_else(|| "Atlas CLI not found".to_string())?;
 
     let args = memory_clear_cli_args(scope)?;
     let work_dir = resolve_memory_clear_cwd(cwd, scope)?;

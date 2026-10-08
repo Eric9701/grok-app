@@ -62,22 +62,22 @@ describe("classifyCliVersionStatus", () => {
     expect(cliVersionStatusHintClass("missing")).toBe("");
   });
 
-  it("fills message params with 1.0 recommend defaults", () => {
+  it("fills message params with Atlas recommend defaults", () => {
     expect(
       cliVersionStatusMessageParams({
         found: true,
-        version: "grok 1.0.0",
-        recommendedVersion: "1.0.0",
+        version: "atlas 0.2.134",
+        recommendedVersion: "0.2.134",
         minVersion: "0.2.112",
       }),
     ).toEqual({
-      version: "grok 1.0.0",
-      recommended: "1.0.0",
+      version: "atlas 0.2.134",
+      recommended: "0.2.134",
       min: "0.2.112",
     });
     expect(cliVersionStatusMessageParams({ found: false })).toEqual({
       version: "—",
-      recommended: "1.0.0",
+      recommended: "0.2.134",
       min: "0.2.112",
     });
   });

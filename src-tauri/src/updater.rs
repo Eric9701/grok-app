@@ -54,7 +54,9 @@ pub fn is_auto_update_supported() -> bool {
 /// (`GROK_UPDATER_*` at compile time) and is not a debug build.
 #[tauri::command]
 pub fn is_updater_plugin_enabled() -> bool {
-    cfg!(grok_updater_enabled) && !cfg!(debug_assertions)
+    crate::remote_updates::REMOTE_UPDATES_ENABLED
+        && cfg!(grok_updater_enabled)
+        && !cfg!(debug_assertions)
 }
 
 /// Snapshot for About / Doctor: which update path this binary can use.
@@ -77,7 +79,9 @@ pub struct UpdaterStatusDto {
 pub fn updater_status() -> UpdaterStatusDto {
     let platform_supported = is_auto_update_supported();
     let plugin_enabled = is_updater_plugin_enabled();
-    let channel = if plugin_enabled && platform_supported {
+    let channel = if !crate::remote_updates::REMOTE_UPDATES_ENABLED {
+        "disabled".to_string()
+    } else if plugin_enabled && platform_supported {
         "silent".to_string()
     } else if plugin_enabled && !platform_supported {
         // Signed binary but this install type cannot silent-update.
@@ -168,9 +172,15 @@ mod tests {
     fn updater_status_channel_matches_flags() {
         let s = updater_status();
         assert!(
-            s.channel == "silent" || s.channel == "github_manual" || s.channel == "unsupported"
+            s.channel == "silent"
+                || s.channel == "github_manual"
+                || s.channel == "unsupported"
+                || s.channel == "disabled"
         );
-        if s.plugin_enabled && s.platform_supported {
+        if !crate::remote_updates::REMOTE_UPDATES_ENABLED {
+            assert_eq!(s.channel, "disabled");
+            assert!(!s.plugin_enabled);
+        } else if s.plugin_enabled && s.platform_supported {
             assert_eq!(s.channel, "silent");
         } else if s.plugin_enabled && !s.platform_supported {
             assert_eq!(s.channel, "unsupported");

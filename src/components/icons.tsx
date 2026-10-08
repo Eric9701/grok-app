@@ -122,6 +122,7 @@ import {
   IconPhotoSearch as TbPhotoSearch,
   IconMovie as TbMovie,
   IconWand as TbWand,
+  IconCloud as TbCloud,
   IconWorld as TbWorld,
   IconX as TbX,
 } from "@tabler/icons-react";
@@ -188,7 +189,7 @@ function wrap(Tb: TbIcon, defaults?: { stroke?: number; className?: string }) {
  */
 export function IconGrokMark({
   size = 22,
-  title = "Grok",
+  title = "Atlas",
   className = "",
 }: IconProps) {
   const classes = ["g-icon", "g-icon--grok-mark", className]
@@ -507,6 +508,8 @@ export const IconCircle = wrap(TbCircle);
 export const IconBulb = wrap(TbBulb);
 /** Globe — Grok timeline "Browsed …" rows. */
 export const IconWorld = wrap(TbWorld);
+/** Cloud — Atlas Cloud nav. */
+export const IconCloud = wrap(TbCloud);
 /** 6-dot grid — Grok "Working for Ns" live indicator. */
 export const IconGridDots = wrap(TbGridDots);
 export const IconPlug = wrap(TbPlug);

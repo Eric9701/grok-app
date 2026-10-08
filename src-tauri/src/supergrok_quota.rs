@@ -139,7 +139,7 @@ pub async fn fetch_quota_snapshot(access_token: &str) -> Result<AccountQuotaSnap
     Ok(snap)
 }
 
-/// Fallback: JSON billing used by Grok Build CLI extension.
+/// Fallback: JSON billing used by Atlas CLI extension.
 pub async fn fetch_quota_via_cli_proxy(access_token: &str) -> Result<AccountQuotaSnapshot, String> {
     let client = crate::proxy::apply_to_reqwest(reqwest::Client::builder())
         .timeout(SUPERGROK_TIMEOUT)

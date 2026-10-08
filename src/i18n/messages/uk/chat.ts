@@ -6,7 +6,7 @@ export const ukChat = {
   "message.nodes.prev": "Попереднє повідомлення",
   "message.nodes.next": "Наступне повідомлення",
   "message.nodes.user": "Ви",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Бічна панель",
   "main.leftPane": "Бічна панель",

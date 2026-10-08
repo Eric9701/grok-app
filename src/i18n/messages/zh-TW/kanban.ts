@@ -2,8 +2,7 @@
 export const zhTWKanban = {
   "kanban.title": "智慧體",
   "kanban.open": "智慧體看板",
-  "kanban.hint":
-    "依執行狀態分欄：需要你、工作中、已完成。不是個人待辦。點擊卡片開啟該對話。",
+  "kanban.hint": "依執行狀態分欄：需要你、工作中、已完成。不是個人待辦。點擊卡片開啟該對話。",
   "kanban.total": "{n} 個",
   "kanban.view.dashboard": "儀表板",
   "kanban.view.map": "智慧體地圖",

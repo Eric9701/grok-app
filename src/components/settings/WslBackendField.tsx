@@ -1,8 +1,8 @@
 /**
- * Settings → Runtime → CLI: use Grok Build installed inside WSL (Windows only).
+ * Settings → Runtime → CLI: use Atlas CLI installed inside WSL (Windows only).
  *
  * Persists `cliBackend` / `wslDistro` / `wslCliPath` on AppSettings. When
- * backend is `wsl`, Host spawns via `wsl.exe` instead of a native grok.exe.
+ * backend is `wsl`, Host spawns via `wsl.exe` instead of a native atlas.exe.
  */
 import { useCallback, useEffect, useState } from "react";
 import * as api from "@/lib/api";

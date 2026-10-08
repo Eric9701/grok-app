@@ -14,6 +14,7 @@ import { useThemeShell } from "@/providers/ThemeShellContext";
 import { useSshWatch } from "@/providers/SshWatchProvider";
 import { usePetCompanion } from "@/hooks/usePetCompanion";
 import { useFloatingMenu } from "@/lib/floatingMenu";
+import type { WorkbenchHashPane } from "@/lib/workbenchHash";
 import { restoreSessionGate } from "@/lib/sessionGateRestore";
 import { DEFAULT_WALLPAPER_FOCUS } from "@/lib/themeSkin";
 import {
@@ -1270,9 +1271,7 @@ export function AppWorkbench() {
   const [phoneToolsOpen, setPhoneToolsOpen] = useState(false);
   const [phoneAccountOpen, setPhoneAccountOpen] = useState(false);
   /** Inside workbench: chat thread vs scheduled tasks vs agent kanban. */
-  const [mainPane, setMainPane] = useState<"chat" | "automations" | "kanban">(
-    "chat",
-  );
+  const [mainPane, setMainPane] = useState<WorkbenchHashPane>("chat");
   /** Prevent overlapping automation runs. */
   const automationRunLock = useRef(false);
   /** Conversation is guiding the user to create a scheduled task. */
@@ -11992,7 +11991,7 @@ export function AppWorkbench() {
               cliAuthPresent: false,
             }
           }
-          onAccountLoginOauth={() => runAccountLogin("oauth")}
+          onAccountLoginOauth={() => runAccountLogin("device")}
           onComplete={(cli) => {
             setCliInfo(mapProbeToCliInfo(cli));
             if (cli.path) setManualCliPath(cli.path);
@@ -12331,7 +12330,7 @@ export function AppWorkbench() {
           onSettings={() => navigateSettings()}
           onAccountSettings={() => navigateSettings("account")}
           onTutorial={() => setShowProductTutorial(true)}
-          onLogin={() => void runAccountLogin("oauth")}
+          onLogin={() => void runAccountLogin("device")}
           onLogout={() => void runAccountLogout()}
           savedAccounts={savedAccounts}
           activeAccountId={activeAccountId}
@@ -12521,7 +12520,7 @@ export function AppWorkbench() {
               }}
               onAiCreate={() => {
               void newChat(null, {
-              seedDraft: aiCreateSeedPrompt("Grok"),
+              seedDraft: aiCreateSeedPrompt("Atlas"),
               switchToChat: true,
               automationSetup: true,
               });

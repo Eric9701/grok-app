@@ -24,7 +24,7 @@ import { startDaemon } from "../runtime/daemon.js";
 import { serviceStatus } from "../service/manager.js";
 
 function printRootHelp(): void {
-  console.log(`${CLI_NAME} v${VERSION} — Grok App in-app Remote IM bridge (Feishu/Lark × Grok Build ACP)
+  console.log(`${CLI_NAME} v${VERSION} — Atlas in-app Remote IM bridge (Feishu/Lark × Atlas CLI ACP)
 
 Usage:
   ${CLI_NAME} <command> [options]
@@ -35,10 +35,10 @@ Commands:
   stop                Stop background / PID-tracked instance
   service             Install OS auto-start (launchd / systemd / WinSW)
   feishu              Feishu onboarding: setup | new | bind
-  doctor              Check config, grok binary, auth, hub
+  doctor              Check config, atlas binary, auth, hub
   status              Runtime + process + service status
   migrate             Migrate legacy config (from-lark-grok / from-agent-connect)
-  smoke-grok          One-shot local Grok headless prompt (no Feishu)
+  smoke-grok          One-shot local Atlas headless prompt (no Feishu)
   version             Print version
   help                Show this help
 
@@ -58,7 +58,7 @@ Examples:
   ${CLI_NAME} doctor
   ${CLI_NAME} status
 
-Note: Grok App Host spawns this bridge — do not install external agent-connect.
+Note: Atlas Host spawns this bridge — do not install external agent-connect.
 `);
 }
 
@@ -165,7 +165,7 @@ export function resolveProjectName(
   if (names.length === 0) {
     return {
       error:
-        `No projects in config. Bind Feishu in Grok App Settings → Remote IM, or: ${CLI_NAME} feishu setup --project default`,
+        `No projects in config. Bind Feishu in Atlas Settings → Remote IM, or: ${CLI_NAME} feishu setup --project default`,
     };
   }
   return {

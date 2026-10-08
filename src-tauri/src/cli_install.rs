@@ -1,19 +1,16 @@
-//! Install / update Grok Build CLI with multi-mirror download fallback.
+//! Install / update Atlas CLI from the enterprise `/atlas/cli` channel.
 //!
-//! Mirrors (preference order — GCS first: more reliable in CN / restricted networks):
-//! 1. Direct GCS `https://storage.googleapis.com/grok-build-public-artifacts/cli`
-//! 2. Cloudflare-fronted `https://x.ai/cli`
+//! Mirror resolution (first non-empty wins):
+//! 1. `ATLAS_CLI_MIRROR`
+//! 2. Settings `atlasCliMirror`
+//! 3. Built-in enterprise default
 //!
 //! Trust chain:
-//! - HTTPS only, URL must be under a known mirror base
+//! - URL must be under the resolved mirror base (`http` allowed for intranet)
 //! - Streaming SHA-256 of the downloaded bytes
 //! - Published checksum sidecar (`.sha256` / `SHA256SUMS` / `checksums.txt`);
-//!   **mismatch always aborts**. Official x.ai / GCS mirrors currently omit
-//!   sidecars (same as `install.sh` / `install.ps1`), so **missing sidecar
-//!   is allowed by default** and recorded as `checksum_verified: false`.
-//!   Strict fail-closed: `GROK_CLI_REQUIRE_CHECKSUM=1` (override with settings
-//!   allow-unverified or `GROK_CLI_ALLOW_UNVERIFIED=1`).
-//! - Architecture match via platform triple; size / `--version` gates after install
+//!   **mismatch always aborts**. Missing sidecar is allowed by default.
+//!   Strict fail-closed: `GROK_CLI_REQUIRE_CHECKSUM=1`.
 //!
 //! Each mirror is retried a few times before falling through. Progress is emitted
 //! on `setup://cli-install-progress` for the setup wizard UI.
@@ -30,14 +27,32 @@ use tauri::{AppHandle, Emitter};
 use tracing::{info, warn};
 
 use crate::cli_probe;
-use crate::process_util::{self, user_home};
+use crate::process_util;
 
-/// Official artifact bases (order = preference).
-/// GCS first: x.ai often fails or stalls in CN; fallback to Cloudflare-fronted x.ai.
-const MIRROR_BASES: &[&str] = &[
-    "https://storage.googleapis.com/grok-build-public-artifacts/cli",
-    "https://x.ai/cli",
-];
+/// Built-in enterprise Atlas CLI channel (overridable).
+const DEFAULT_ATLAS_CLI_MIRROR: &str = "http://10.218.220.237:22255/atlas/cli";
+
+/// Resolve the install/update base URL (no trailing slash).
+pub fn resolve_cli_mirror() -> String {
+    if let Ok(v) = std::env::var("ATLAS_CLI_MIRROR") {
+        let t = v.trim();
+        if !t.is_empty() {
+            return t.trim_end_matches('/').to_string();
+        }
+    }
+    let from_settings = crate::store::load_settings()
+        .atlas_cli_mirror
+        .unwrap_or_default();
+    let t = from_settings.trim();
+    if !t.is_empty() {
+        return t.trim_end_matches('/').to_string();
+    }
+    DEFAULT_ATLAS_CLI_MIRROR.trim_end_matches('/').to_string()
+}
+
+fn mirror_bases() -> Vec<String> {
+    vec![resolve_cli_mirror()]
+}
 
 const CHANNEL: &str = "stable";
 const MIRROR_ATTEMPTS: u32 = 2;
@@ -77,23 +92,23 @@ pub struct CliInstallResult {
     pub checksum_verified: Option<bool>,
 }
 
-/// True only for HTTPS URLs under a known official mirror base.
+/// True for URLs under a resolved Atlas CLI mirror base (`http` or `https`).
 pub fn is_allowed_download_url(url: &str) -> bool {
+    is_allowed_download_url_against(url, &mirror_bases())
+}
+
+/// Test helper: allowlist against an explicit base list (no settings/env).
+pub fn is_allowed_download_url_against(url: &str, bases: &[String]) -> bool {
     let url = url.trim();
-    if !url.starts_with("https://") {
+    if url.contains('@') || url.contains("..") {
         return false;
     }
-    // Reject credentials / userinfo and odd schemes already covered by https://.
-    if url.contains('@') {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
         return false;
     }
-    for base in MIRROR_BASES {
+    for base in bases {
         let base = base.trim_end_matches('/');
         if url == base || url.starts_with(&format!("{base}/")) {
-            // No path traversal via `..` segments.
-            if url.contains("..") {
-                return false;
-            }
             return true;
         }
     }
@@ -219,14 +234,14 @@ fn platform_triple() -> Result<(&'static str, &'static str), String> {
     } else if cfg!(target_os = "linux") {
         "linux"
     } else {
-        return Err("Unsupported OS for Grok Build auto-install".into());
+        return Err("Unsupported OS for Atlas CLI auto-install".into());
     };
     let arch = if cfg!(target_arch = "aarch64") {
         "aarch64"
     } else if cfg!(target_arch = "x86_64") {
         "x86_64"
     } else {
-        return Err("Unsupported CPU architecture for Grok Build auto-install".into());
+        return Err("Unsupported CPU architecture for Atlas CLI auto-install".into());
     };
     Ok((os, arch))
 }
@@ -235,7 +250,7 @@ fn http_client() -> Result<reqwest::Client, String> {
     crate::proxy::apply_to_reqwest(reqwest::Client::builder())
         .connect_timeout(CONNECT_TIMEOUT)
         .timeout(REQUEST_TIMEOUT)
-        .user_agent(format!("GrokApp/{}", env!("CARGO_PKG_VERSION")))
+        .user_agent(format!("AtlasApp/{}", env!("CARGO_PKG_VERSION")))
         .redirect(reqwest::redirect::Policy::limited(8))
         .build()
         .map_err(|e| e.to_string())
@@ -291,7 +306,7 @@ async fn resolve_version(
         app,
         progress(
             "resolving",
-            "Resolving latest Grok Build version…",
+            "Resolving latest Atlas CLI version…",
             Some(0.0),
             None,
             None,
@@ -299,7 +314,7 @@ async fn resolve_version(
     );
 
     let mut errors = Vec::new();
-    for base in MIRROR_BASES {
+    for base in mirror_bases() {
         for attempt in 1..=MIRROR_ATTEMPTS {
             emit(
                 app,
@@ -307,17 +322,17 @@ async fn resolve_version(
                     "resolving",
                     format!(
                         "Trying {} (attempt {attempt}/{MIRROR_ATTEMPTS})…",
-                        mirror_host(base)
+                        mirror_host(&base)
                     ),
                     Some(2.0),
-                    Some((*base).into()),
+                    Some(base.clone()),
                     None,
                 ),
             );
-            match fetch_version_text(client, base).await {
+            match fetch_version_text(client, &base).await {
                 Ok(v) => {
                     info!("cli_install: version {v} via {base}");
-                    return Ok((v, (*base).to_string()));
+                    return Ok((v, base));
                 }
                 Err(e) => {
                     warn!("cli_install version fail base={base} attempt={attempt}: {e}");
@@ -330,7 +345,7 @@ async fn resolve_version(
         }
     }
     Err(format!(
-        "Could not resolve Grok Build version from any mirror. {}",
+        "Could not resolve Atlas CLI version from any mirror. {}",
         errors.last().cloned().unwrap_or_default()
     ))
 }
@@ -498,9 +513,9 @@ fn verify_binary(path: &Path) -> Result<String, String> {
 }
 
 fn link_install(download_path: &Path, version: &str) -> Result<PathBuf, String> {
-    let home = user_home();
-    let download_dir = home.join(".grok").join("downloads");
-    let bin_dir = home.join(".grok").join("bin");
+    let home = crate::paths::shared_cli_home();
+    let download_dir = home.join("downloads");
+    let bin_dir = home.join("bin");
     fs::create_dir_all(&download_dir).map_err(|e| e.to_string())?;
     fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
 
@@ -523,7 +538,7 @@ fn link_install(download_path: &Path, version: &str) -> Result<PathBuf, String> 
 
     #[cfg(target_os = "windows")]
     {
-        let grok_exe = bin_dir.join("grok.exe");
+        let grok_exe = bin_dir.join("atlas.exe");
         let agent_exe = bin_dir.join("agent.exe");
         for target in [&grok_exe, &agent_exe] {
             let old = PathBuf::from(format!("{}.old", target.display()));
@@ -547,13 +562,13 @@ fn link_install(download_path: &Path, version: &str) -> Result<PathBuf, String> 
         } else {
             final_download.clone()
         };
-        let grok_link = bin_dir.join("grok");
+        let grok_link = bin_dir.join("atlas");
         let agent_link = bin_dir.join("agent");
         // Remove existing file/symlink then recreate
         let _ = fs::remove_file(&grok_link);
         let _ = fs::remove_file(&agent_link);
         std::os::unix::fs::symlink(&link_target, &grok_link)
-            .map_err(|e| format!("symlink grok: {e}"))?;
+            .map_err(|e| format!("symlink atlas: {e}"))?;
         std::os::unix::fs::symlink(&link_target, &agent_link)
             .map_err(|e| format!("symlink agent: {e}"))?;
         Ok(grok_link)
@@ -568,16 +583,16 @@ async fn try_download_all_mirrors(
 ) -> Result<(PathBuf, String), String> {
     let (os, arch) = platform_triple()?;
     let platform = format!("{os}-{arch}");
-    let mut bases: Vec<&str> = Vec::new();
+    let mut bases: Vec<String> = Vec::new();
     // Preferred first, then others
-    bases.push(preferred_mirror);
-    for b in MIRROR_BASES {
-        if *b != preferred_mirror {
-            bases.push(*b);
+    bases.push(preferred_mirror.to_string());
+    for b in mirror_bases() {
+        if b != preferred_mirror {
+            bases.push(b);
         }
     }
 
-    let tmp_dir = user_home().join(".grok").join("downloads");
+    let tmp_dir = crate::paths::shared_cli_home().join("downloads");
     fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
     // Windows: keep a trailing `.exe` so CreateProcess / probe can run the partial file
     // after a successful download (extension must not be bare `.part`).
@@ -626,15 +641,15 @@ async fn try_download_all_mirrors(
                         "downloading",
                         format!(
                             "Mirror {} · attempt {attempt}/{MIRROR_ATTEMPTS}",
-                            mirror_host(base)
+                            mirror_host(&base)
                         ),
                         Some(5.0),
-                        Some(base.into()),
+                        Some(base.clone()),
                         Some(version.into()),
                     ),
                 );
                 let _ = fs::remove_file(&tmp_path);
-                match download_to_file(app, client, url, &tmp_path, version, base).await {
+                match download_to_file(app, client, url, &tmp_path, version, &base).await {
                     Ok(()) => return Ok((tmp_path, base.to_string())),
                     Err(e) => {
                         warn!("cli_install download fail url={url}: {e}");
@@ -680,7 +695,7 @@ fn env_flag_truthy(name: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Download latest stable Grok Build and install into `~/.grok`.
+/// Download latest stable Atlas CLI and install into `~/.atlas`.
 ///
 /// `allow_unverified`: when true, continue if the mirror has no published
 /// checksum (still fail on mismatch). Default path should pass `false`.
@@ -695,7 +710,7 @@ pub async fn install_cli_latest(
         &app,
         progress(
             "downloading",
-            format!("Found Grok Build v{version}"),
+            format!("Found Atlas CLI v{version}"),
             Some(4.0),
             Some(preferred.clone()),
             Some(version.clone()),
@@ -801,7 +816,7 @@ pub async fn install_cli_latest(
         &app,
         CliInstallProgress {
             phase: "linking".into(),
-            message: "Installing to ~/.grok/bin…".into(),
+            message: "Installing to ~/.atlas/bin…".into(),
             percent: Some(96.0),
             bytes_downloaded: None,
             total_bytes: None,
@@ -840,7 +855,7 @@ pub async fn install_cli_latest(
         path,
         version: version_out,
         mirror_used: Some(mirror_used),
-        message: "Grok Build installed".into(),
+        message: "Atlas CLI installed".into(),
         sha256: Some(digest),
         checksum_verified: Some(checksum_verified),
     })
@@ -848,22 +863,23 @@ pub async fn install_cli_latest(
 
 /// Install command strings for copy-paste fallback (platform-specific).
 pub fn install_commands() -> serde_json::Value {
+    let base = resolve_cli_mirror();
     #[cfg(target_os = "windows")]
     {
         serde_json::json!({
-            "primary": "irm https://x.ai/cli/install.ps1 | iex",
+            "primary": format!("irm {base}/install.ps1 | iex"),
             "shell": "powershell",
-            "docsUrl": "https://docs.x.ai/build/overview",
-            "mirrors": MIRROR_BASES,
+            "docsUrl": base,
+            "mirrors": [base],
         })
     }
     #[cfg(not(target_os = "windows"))]
     {
         serde_json::json!({
-            "primary": "curl -fsSL https://x.ai/cli/install.sh | bash",
+            "primary": format!("curl -fsSL {base}/install.sh | bash"),
             "shell": "bash",
-            "docsUrl": "https://docs.x.ai/build/overview",
-            "mirrors": MIRROR_BASES,
+            "docsUrl": base,
+            "mirrors": [base],
         })
     }
 }
@@ -873,37 +889,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn allowlist_accepts_official_mirrors_only() {
-        assert!(is_allowed_download_url(
-            "https://storage.googleapis.com/grok-build-public-artifacts/cli/stable"
+    fn allowlist_accepts_configured_mirror() {
+        let bases = vec!["http://cli.example.test/atlas/cli".into()];
+        assert!(is_allowed_download_url_against(
+            "http://cli.example.test/atlas/cli/stable",
+            &bases
         ));
-        assert!(is_allowed_download_url(
-            "https://storage.googleapis.com/grok-build-public-artifacts/cli/grok-0.2.111-macos-aarch64"
+        assert!(is_allowed_download_url_against(
+            "http://cli.example.test/atlas/cli/grok-0.2.134-windows-x86_64.exe",
+            &bases
         ));
-        assert!(is_allowed_download_url(
-            "https://x.ai/cli/grok-0.2.111-macos-x86_64"
+        assert!(is_allowed_download_url_against(
+            "https://cli.example.test/atlas/cli/SHA256SUMS",
+            &["https://cli.example.test/atlas/cli".into()]
         ));
-        assert!(is_allowed_download_url("https://x.ai/cli/SHA256SUMS"));
     }
 
     #[test]
-    fn allowlist_rejects_http_and_foreign_hosts() {
-        assert!(!is_allowed_download_url(
-            "http://storage.googleapis.com/grok-build-public-artifacts/cli/stable"
+    fn allowlist_rejects_foreign_hosts() {
+        let bases = vec!["http://cli.example.test/atlas/cli".into()];
+        assert!(!is_allowed_download_url_against(
+            "https://evil.example/cli/grok-0.2.111-macos-aarch64",
+            &bases
         ));
-        assert!(!is_allowed_download_url(
-            "https://evil.example/cli/grok-0.2.111-macos-aarch64"
+        assert!(!is_allowed_download_url_against(
+            "http://cli.example.test/other/stable",
+            &bases
         ));
-        assert!(!is_allowed_download_url(
-            "https://storage.googleapis.com/other-bucket/cli/stable"
+        assert!(!is_allowed_download_url_against(
+            "http://user:pass@cli.example.test/atlas/cli/stable",
+            &bases
         ));
-        assert!(!is_allowed_download_url("https://x.ai/not-cli/payload"));
-        assert!(!is_allowed_download_url(
-            "https://user:pass@x.ai/cli/stable"
+        assert!(!is_allowed_download_url_against(
+            "http://cli.example.test/atlas/cli/../etc/passwd",
+            &bases
         ));
-        assert!(!is_allowed_download_url("https://x.ai/cli/../etc/passwd"));
-        assert!(!is_allowed_download_url(""));
-        assert!(!is_allowed_download_url("ftp://x.ai/cli/stable"));
+        assert!(!is_allowed_download_url_against("", &bases));
+        assert!(!is_allowed_download_url_against(
+            "ftp://cli.example.test/atlas/cli/stable",
+            &bases
+        ));
     }
 
     #[test]

@@ -234,7 +234,7 @@ pub fn run_official_headless(
     let cli = probe
         .path
         .filter(|p| !p.trim().is_empty())
-        .ok_or_else(|| "grok CLI not found".to_string())?;
+        .ok_or_else(|| "Atlas CLI not found".to_string())?;
 
     let mut cmd = Command::new(&cli);
     cmd.arg("--no-auto-update")
@@ -394,7 +394,7 @@ async fn run_official_acp_job_inner(
     let cli = probe
         .path
         .filter(|p| !p.trim().is_empty())
-        .ok_or_else(|| "grok CLI not found".to_string())?;
+        .ok_or_else(|| "Atlas CLI not found".to_string())?;
     let cli_path = PathBuf::from(cli);
 
     // Use official home as cwd so @image absolute paths still work; home is
@@ -1301,7 +1301,7 @@ pub fn native_media_block_hook_script_body_with(block_image_read: bool) -> Strin
     // Fail-open (exit 0, empty) if python missing or parse fails.
     format!(
         r#"#!/bin/sh
-# Managed by Grok App — do not edit; recreated on spawn when inject is on.
+# Managed by Atlas — do not edit; recreated on spawn when inject is on.
 # Denies: bare image_gen/image_edit/video tools; read_file of image extensions.
 f=$(mktemp 2>/dev/null) || exit 0
 cat >"$f" 2>/dev/null || {{ rm -f "$f"; exit 0; }}
@@ -1536,7 +1536,7 @@ pub fn inject_session_rules() -> Option<String> {
     Some(official_aux_session_rules_text().trim().to_string())
 }
 
-/// Narrow path-citation rules for Grok App UI (all routes).
+/// Narrow path-citation rules for Atlas UI (all routes).
 ///
 /// Soft guidance only — Host still normalizes shell escapes / rejects site-root
 /// paths. Prefer disambiguated project-relative code paths; absolute only for
@@ -1544,7 +1544,7 @@ pub fn inject_session_rules() -> Option<String> {
 pub fn path_citation_session_rules() -> &'static str {
     // Keep compact: injected on every session spawn. Inline backticks only —
     // fenced ``` blocks are NOT turned into FilePathCards in the chat UI.
-    r#"Path citations (Grok App UI — so path cards / previews work):
+    r#"Path citations (Atlas UI — so path cards / previews work):
 - Cite paths as **inline** backticks only: `path/to/file.ext`. One path per backtick span.
 - Do **not** put the only path citation inside a fenced code block (``` … ``` / ```text). Fenced blocks stay plain text and are not clickable path cards. Fences are for multi-line content previews, not for path handoff.
 - Do **not** write tool-journal forms in user-facing prose (`input:/abs/path`, `tool_step|…`, shell-only dumps). Cite the path for the human, not as a tool field.

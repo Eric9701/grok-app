@@ -21,6 +21,7 @@ import {
   stripAppBehindErrorPrefix,
 } from "@/lib/cliUpdateAppBehind";
 import { GlassModal } from "@/components/GlassModal";
+import { REMOTE_UPDATES_ENABLED } from "@/lib/remoteUpdates";
 
 type BusyKind =
   | "check"
@@ -76,6 +77,7 @@ export function CliUpdateRow({
   const channel = status?.channel ?? "unknown";
 
   const check = useCallback(async () => {
+    if (!REMOTE_UPDATES_ENABLED) return;
     if (!api.isTauri()) {
       setError("not in Tauri");
       return;
@@ -102,6 +104,7 @@ export function CliUpdateRow({
   }, [cliFound, t]);
 
   useEffect(() => {
+    if (!REMOTE_UPDATES_ENABLED) return;
     if (!autoCheck || compact) return;
     if (cliFound === false) return;
     void check();
@@ -242,6 +245,25 @@ export function CliUpdateRow({
         : confirm?.kind === "app-behind"
           ? t("settings.cliUpdate.appBehindTitle")
           : t("settings.cliUpdate");
+
+  if (!REMOTE_UPDATES_ENABLED) {
+    return (
+      <div
+        className={
+          compact
+            ? "settings-row settings-row--stack settings-cli-update--compact"
+            : "settings-row settings-row--stack"
+        }
+      >
+        <div className="settings-row__text">
+          <div className="settings-row__label">{t("settings.cliUpdate")}</div>
+          <div className="settings-row__desc">
+            {t("settings.remoteUpdatesDisabledDesc")}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const confirmBody =
     confirm?.kind === "switch"

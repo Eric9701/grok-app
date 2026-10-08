@@ -1,11 +1,14 @@
 /**
  * Center column chrome: drop overlay, toast, title row, top actions.
  * Chat / kanban / automations body stay with the host as children.
+ * Octo replaces that body with a fixed embedded page.
  */
 import type { Dispatch, MouseEvent, ReactNode, SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Tip } from "@/components/ui/tooltip";
 import { OpenLocationButton } from "@/components/OpenLocationButton";
+import { AtlasCloudPane } from "@/components/AtlasCloudPane";
+import { OctoPane } from "@/components/OctoPane";
 import { EnvInfoButton } from "@/components/side-workbench/EnvInfoButton";
 import { BottomTerminalToggle } from "@/components/bottom-terminal/BottomTerminalToggle";
 import { PaneToggleButton } from "@/components/PaneToggleButton";
@@ -15,8 +18,10 @@ import {
   IconList,
   IconMenu,
   IconMore,
+  IconCloud,
   IconScheduled,
   IconUser,
+  IconWorld,
 } from "@/components/icons";
 import { createT, type Locale, type MessageKey } from "@/i18n";
 import {
@@ -33,6 +38,11 @@ import { applySideContextOpen } from "@/lib/sideContextOpen";
 import { openSideTab, type SideWorkbenchState } from "@/lib/sideWorkbench";
 import type { SessionChangesSummary } from "@/lib/sessionChanges";
 import type { GitDirtySummary } from "@/lib/workspaceGit";
+import type { WorkbenchHashPane } from "@/lib/workbenchHash";
+import {
+  atlasCloudNavLabel,
+  useAtlasRelayStatus,
+} from "@/hooks/useAtlasRelayStatus";
 
 type TFn = ReturnType<typeof createT>;
 
@@ -62,7 +72,7 @@ export type WorkbenchMainProps = {
   toast: string | null;
   dragRegion: "false" | "deep";
   titlebarMax: TitlebarMax;
-  mainPane: "chat" | "automations" | "kanban";
+  mainPane: WorkbenchHashPane;
   sessions: SessionRow[];
   session: ChatTitleSession;
   activeProject: Project | null;
@@ -139,6 +149,7 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
     openAsidePane,
     showToast,
   } = props;
+  const relayStatus = useAtlasRelayStatus();
 
   const cur = sessions.find((s) => s.id === session.sessionId);
   const title =
@@ -228,7 +239,29 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
               }
             />
           ) : null}
-          {mainPane === "automations" ? (
+          {mainPane === "atlasCloud" ? (
+            <>
+              {!phoneLayout ? (
+                <span className="main__title-icon">
+                  <IconCloud size={16} />
+                </span>
+              ) : null}
+              <h1 className="main__title" data-tauri-drag-region={dragRegion}>
+                {atlasCloudNavLabel(tr, relayStatus?.phase)}
+              </h1>
+            </>
+          ) : mainPane === "octo" ? (
+            <>
+              {!phoneLayout ? (
+                <span className="main__title-icon">
+                  <IconWorld size={16} />
+                </span>
+              ) : null}
+              <h1 className="main__title" data-tauri-drag-region={dragRegion}>
+                {tr("sidebar.octo")}
+              </h1>
+            </>
+          ) : mainPane === "automations" ? (
             <>
               {!phoneLayout ? (
                 <span className="main__title-icon">
@@ -440,7 +473,13 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
           )}
         </div>
       </div>
-      {children}
+      {mainPane === "atlasCloud" ? (
+        <AtlasCloudPane locale={locale} tr={tr} status={relayStatus} />
+      ) : mainPane === "octo" ? (
+        <OctoPane locale={locale} title={tr("sidebar.octo")} />
+      ) : (
+        children
+      )}
       </main>
     </>
   );

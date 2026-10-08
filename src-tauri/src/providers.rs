@@ -807,7 +807,7 @@ fn assignment_key_exact(trimmed: &str) -> Option<&str> {
     crate::agent_home_config::assignment_key(trimmed)
 }
 
-fn get_models_default(text: &str) -> Option<String> {
+pub(crate) fn get_models_default(text: &str) -> Option<String> {
     let mut in_models = false;
     for line in text.lines() {
         let trimmed = line.trim();

@@ -59,7 +59,7 @@ export function tierLabel(
   if (billing.subscriptionTier?.trim()) {
     return billing.subscriptionTier.trim();
   }
-  if (channel === "official_oauth") return "Grok Build";
+  if (channel === "official_oauth") return "Atlas";
   if (channel === "official_key") return "API Key";
   if (channel === "relay") return "Relay";
   return "—";

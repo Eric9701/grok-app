@@ -132,6 +132,7 @@ export function normalizeDoctorUpdateChannel(
   }
   if (t === "unsupported") return "unsupported";
   if (t === "host_only" || t === "web") return "host_only";
+  if (t === "disabled") return "unsupported";
   if (t === "unknown") return "unknown";
   return "unknown";
 }

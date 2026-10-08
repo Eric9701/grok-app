@@ -137,7 +137,7 @@ fn parse_inspect_stdout(stdout: &str) -> (Option<serde_json::Value>, Option<Stri
     if status.eq_ignore_ascii_case("MISSING") {
         return (
             None,
-            Some("Grok Build CLI not found on the remote host".into()),
+            Some("Atlas CLI not found on the remote host".into()),
         );
     }
     let after = rest.get(status.len()..).unwrap_or("").trim_start();

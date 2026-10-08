@@ -268,7 +268,7 @@ fn headers_for_profile(profile: SafeHttpsRequestProfile) -> HeaderMap {
     headers.insert(
         USER_AGENT,
         HeaderValue::from_static(match profile {
-            SafeHttpsRequestProfile::Default => "Grok App",
+            SafeHttpsRequestProfile::Default => "Atlas",
             SafeHttpsRequestProfile::BrowserDocument => BROWSER_DOCUMENT_USER_AGENT,
         }),
     );

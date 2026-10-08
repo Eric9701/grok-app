@@ -556,9 +556,9 @@ fn wait_for_code(listener: TcpListener, expect_state: &str) -> Result<String, St
         }
     }
     let body = if code.is_some() {
-        "<html><body><h2>Authorization complete</h2><p>You can close this tab and return to Grok App.</p></body></html>"
+        "<html><body><h2>Authorization complete</h2><p>You can close this tab and return to Atlas.</p></body></html>"
     } else {
-        "<html><body><h2>Authorization failed</h2><p>Return to Grok App and retry.</p></body></html>"
+        "<html><body><h2>Authorization failed</h2><p>Return to Atlas and retry.</p></body></html>"
     };
     let resp = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
@@ -1062,7 +1062,7 @@ pub fn mcp_oauth_start(server_name: &str) -> Result<McpOauthStartResult, String>
     // Dynamic client registration when available
     let client = if let Some(reg_url) = as_meta.registration_endpoint.as_deref() {
         let body = json!({
-            "client_name": "Grok App",
+            "client_name": "Atlas",
             "redirect_uris": [&redirect_uri],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],

@@ -113,8 +113,8 @@ pub fn native_bot_commands() -> &'static [NativeBotCommand] {
         },
         NativeBotCommand {
             command: "switch",
-            description_en: "Switch Grok account by number",
-            description_zh: "按序号切换 Grok 账号",
+            description_en: "Switch Atlas account by number",
+            description_zh: "按序号切换 Atlas 账号",
         },
         NativeBotCommand {
             command: "quota",
@@ -176,7 +176,7 @@ pub fn parse_slash(text: &str) -> Option<BuiltinCommand> {
 pub fn help_text(lang: &str) -> String {
     if lang == "en" {
         [
-            "**Grok Remote IM** — local Grok Build via IM (Rust)",
+            "**Atlas Remote IM** — local Atlas CLI via IM (Rust)",
             "",
             "Commands (Telegram: type `/` for the native menu):",
             "- `/start` · `/help` — this message",
@@ -186,7 +186,7 @@ pub fn help_text(lang: &str) -> String {
             "- `/r <n>` — resume by number",
             "- `/new` — fresh session (keep project)",
             "- `/account` · `/quota` — list accounts & remaining SuperGrok quota",
-            "- `/account <n|label>` · `/switch <n>` — switch Grok account",
+            "- `/account <n|label>` · `/switch <n>` — switch Atlas account",
             "- `/whoami` — show your sender id",
             "- `/status` — snapshot",
             "- `/context` — current context usage (agent-reported or clearly marked estimate)",
@@ -197,7 +197,7 @@ pub fn help_text(lang: &str) -> String {
         .join("\n")
     } else {
         [
-            "**Grok Remote IM** — 本地 Grok Build 远程 IM 桥（Rust 内置）",
+            "**Atlas Remote IM** — 本地 Atlas CLI 远程 IM 桥（Rust 内置）",
             "",
             "命令（Telegram 输入 `/` 可唤起原生命令菜单）：",
             "- `/start` · `/help` — 显示帮助",
@@ -207,7 +207,7 @@ pub fn help_text(lang: &str) -> String {
             "- `/r <序号>` — 按序号恢复",
             "- `/new` — 保持项目，开启新会话",
             "- `/account` · `/quota` — 查看已保存账号与剩余额度",
-            "- `/account <序号|标签>` · `/switch <序号>` — 切换 Grok 账号",
+            "- `/account <序号|标签>` · `/switch <序号>` — 切换 Atlas 账号",
             "- `/whoami` — 查看发送者 id",
             "- `/status` — 状态快照",
             "- `/context` — 当前会话上下文用量（上报值或明确标注的估算值）",

@@ -6,7 +6,7 @@ export const enChat = {
   "message.nodes.prev": "Previous message",
   "message.nodes.next": "Next message",
   "message.nodes.user": "You",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Side panel",
   "main.leftPane": "Sidebar",

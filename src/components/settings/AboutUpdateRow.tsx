@@ -26,6 +26,7 @@ import {
   type AppUpdateStatusLike,
 } from "@/lib/appUpdateHonesty";
 import type { MessageKey } from "@/i18n";
+import { REMOTE_UPDATES_ENABLED } from "@/lib/remoteUpdates";
 
 export function AboutUpdateRow({
   t,
@@ -104,6 +105,24 @@ export function AboutUpdateRow({
   const assetNames = manualUrls?.assetNames;
   const toneClass = updateStatusToneClass(copy.severity);
 
+  if (!REMOTE_UPDATES_ENABLED) {
+    return (
+      <div
+        className="settings-row settings-row--stack"
+        id="settings-anchor-remoteUpdates"
+      >
+        <div className="settings-row__text">
+          <div className="settings-row__label">
+            {t("settings.remoteUpdatesDisabled")}
+          </div>
+          <div className="settings-row__desc">
+            {t("settings.remoteUpdatesDisabledDesc")}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const openErrorKind = openError ? classifyUpdateError(openError) : null;
   const openErrorHintKey =
     openErrorKind && openErrorKind !== "other"
@@ -111,7 +130,10 @@ export function AboutUpdateRow({
       : null;
 
   return (
-    <div className="settings-row settings-row--stack">
+    <div
+      className="settings-row settings-row--stack"
+      id="settings-anchor-remoteUpdates"
+    >
       <div className="settings-row__text">
         <div className="settings-row__label">{t("settings.checkUpdate")}</div>
         <div className="settings-row__desc">{t("settings.checkUpdateDesc")}</div>

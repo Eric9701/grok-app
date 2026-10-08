@@ -28,7 +28,9 @@ import {
   IconNewChat,
   IconScheduled,
   IconSearch,
+  IconCloud,
   IconSettings,
+  IconWorld,
 } from "@/components/icons";
 import { createT } from "@/i18n";
 import {
@@ -62,6 +64,11 @@ import {
 import { paneSplitSizeStyle } from "@/lib/paneSplitMotion";
 import type { Theme, ThemePreference } from "@/lib/theme";
 import { requestWhatsNewOpen } from "@/lib/whatsNew";
+import type { WorkbenchHashPane } from "@/lib/workbenchHash";
+import {
+  atlasCloudNavLabel,
+  useAtlasRelayStatus,
+} from "@/hooks/useAtlasRelayStatus";
 
 type TFn = ReturnType<typeof createT>;
 
@@ -110,7 +117,7 @@ export type WorkbenchSidebarProps = {
   replaceProviderBrandLogo: boolean;
   customRouteActive: boolean;
   activeCustomProvider: CustomProvider | null;
-  mainPane: "chat" | "automations" | "kanban";
+  mainPane: WorkbenchHashPane;
   onOpenSearch: () => void;
   onNewChat: () => void;
   onNavigateAutomations: () => void;
@@ -145,6 +152,7 @@ export type WorkbenchSidebarProps = {
 
 export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
   const [themeEditorOpen, setThemeEditorOpen] = useState(false);
+  const relayStatus = useAtlasRelayStatus();
   useEffect(() => {
     const onHash = () => {
       if ((window.location.hash || "").startsWith("#/settings")) {
@@ -364,7 +372,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
                   activeCustomProvider
                     ? activeCustomProvider.name.trim() ||
                       activeCustomProvider.id
-                    : "Grok"
+                    : "Atlas"
                 }
               />
             </span>
@@ -415,6 +423,37 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
               {tr("mirror.connect")}
             </button>
           ) : null}
+          <button
+            type="button"
+            className={
+              "nav-item" + (mainPane === "octo" ? " nav-item--active" : "")
+            }
+            onClick={() => {
+              setShowUserMenu(false);
+              window.location.hash = "#/octo";
+            }}
+          >
+            <span className="nav-item__icon">
+              <IconWorld size={16} />
+            </span>
+            {tr("sidebar.octo")}
+          </button>
+          <button
+            type="button"
+            className={
+              "nav-item" +
+              (mainPane === "atlasCloud" ? " nav-item--active" : "")
+            }
+            onClick={() => {
+              setShowUserMenu(false);
+              window.location.hash = "#/atlas-cloud";
+            }}
+          >
+            <span className="nav-item__icon">
+              <IconCloud size={16} />
+            </span>
+            {atlasCloudNavLabel(tr, relayStatus?.phase)}
+          </button>
         </div>
 
         {children}

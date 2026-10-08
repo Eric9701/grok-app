@@ -75,7 +75,7 @@ describe("shareCardToHtml", () => {
         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
     });
     const html = shareCardToHtml(model);
-    expect(html).toContain("Generated with Grok App");
+    expect(html).toContain("Generated with Atlas");
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>alert");
     expect(html).toContain('class="sc-logo"');

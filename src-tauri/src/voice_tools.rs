@@ -9,7 +9,7 @@ pub fn tool_definitions() -> Vec<Value> {
     vec![
         function_tool(
             "list_sessions",
-            "List recent Grok Build agent sessions for the current project (id, title, busy).",
+            "List recent Atlas CLI agent sessions for the current project (id, title, busy).",
             json!({
                 "type": "object",
                 "properties": {
@@ -19,7 +19,7 @@ pub fn tool_definitions() -> Vec<Value> {
         ),
         function_tool(
             "create_agent_session",
-            "Create a new Grok Build agent session in the active project to do coding work. Prefer this for multi-step implementation tasks.",
+            "Create a new Atlas CLI agent session in the active project to do coding work. Prefer this for multi-step implementation tasks.",
             json!({
                 "type": "object",
                 "properties": {
@@ -425,7 +425,7 @@ mod tests {
     fn classifies_cli_missing_as_soft() {
         assert_eq!(
             classify_tool_error(
-                "Grok Build CLI not found. Install Grok Build or set path in Settings."
+                "Atlas CLI not found. Install Atlas CLI or set path in Settings."
             ),
             "cli_missing"
         );

@@ -295,9 +295,9 @@ pub fn pick_session<'a>(
 pub fn format_project_menu(projects: &[TrustedProject], lang: &str) -> String {
     if projects.is_empty() {
         return if lang == "en" {
-            "No trusted projects. Trust a folder in Grok App first.".into()
+            "No trusted projects. Trust a folder in Atlas first.".into()
         } else {
-            "没有已信任项目。请先在 Grok App 中信任项目目录。".into()
+            "没有已信任项目。请先在 Atlas 中信任项目目录。".into()
         };
     }
     let mut lines = vec![if lang == "en" {
@@ -598,7 +598,7 @@ pub fn build_feishu_project_card(projects: &[TrustedProject], lang: &str) -> ser
     serde_json::json!({
         "config": { "wide_screen_mode": true },
         "header": {
-            "title": { "tag": "plain_text", "content": "Grok Remote IM · /p" }
+            "title": { "tag": "plain_text", "content": "Atlas Remote IM · /p" }
         },
         "elements": elements
     })
@@ -645,7 +645,7 @@ pub fn build_feishu_session_card(sessions: &[AppSessionEntry], lang: &str) -> se
     serde_json::json!({
         "config": { "wide_screen_mode": true },
         "header": {
-            "title": { "tag": "plain_text", "content": "Grok Remote IM · /r" }
+            "title": { "tag": "plain_text", "content": "Atlas Remote IM · /r" }
         },
         "elements": elements
     })
@@ -823,7 +823,7 @@ pub fn build_dingtalk_project_card(projects: &[TrustedProject], lang: &str) -> s
     }));
     serde_json::json!({
         "config": { "autoLayout": true },
-        "header": { "title": { "type": "text", "text": "Grok · /p" } },
+        "header": { "title": { "type": "text", "text": "Atlas · /p" } },
         "contents": [
             { "type": "markdown", "text": title },
             { "type": "action", "actions": btn }
@@ -854,7 +854,7 @@ pub fn build_dingtalk_session_card(sessions: &[AppSessionEntry], lang: &str) -> 
     }));
     serde_json::json!({
         "config": { "autoLayout": true },
-        "header": { "title": { "type": "text", "text": "Grok · /r" } },
+        "header": { "title": { "type": "text", "text": "Atlas · /r" } },
         "contents": [
             { "type": "markdown", "text": title },
             { "type": "action", "actions": btn }
@@ -924,7 +924,7 @@ pub fn grok_turn_cli_args_full(
     if always_approve {
         args.push("--always-approve".into());
     }
-    // Grok Build CLI: plain | json | streaming-json | streaming-messages-json.
+    // Atlas CLI: plain | json | streaming-json | streaming-messages-json.
     let fmt = output_format.trim();
     let fmt = if fmt.is_empty() {
         "streaming-json"

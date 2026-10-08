@@ -84,7 +84,7 @@ pub async fn open_theme_editor_window(app: AppHandle) -> Result<(), String> {
         THEME_EDITOR_WINDOW_LABEL,
         WebviewUrl::App("index.html#/theme-editor".into()),
     )
-    .title("Grok")
+    .title("Atlas")
     .inner_size(EDITOR_WIDTH, EDITOR_HEIGHT)
     .min_inner_size(EDITOR_MIN_WIDTH, EDITOR_MIN_HEIGHT)
     .resizable(true)

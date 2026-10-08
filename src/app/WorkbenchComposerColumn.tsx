@@ -34,6 +34,7 @@ import { useSendQueue } from "@/hooks/useSendQueue";
 import type { PromptHistoryEntry, PromptHistoryScope } from "@/lib/composerPromptHistory";
 import type { QueuedSend } from "@/lib/sendQueue";
 import type { Attachment } from "@/lib/attachments";
+import type { WorkbenchHashPane } from "@/lib/workbenchHash";
 import type { ComposerQuote } from "@/lib/composerQuotes";
 import * as api from "@/lib/api";
 import { ComposerProjectMenu } from "@/components/ComposerProjectMenu";
@@ -256,7 +257,7 @@ export type WorkbenchComposerColumnProps = {
   setWelcomeIntroActive: Dispatch<SetStateAction<boolean>>;
   dockSidebarOccupied: number;
   dragZone: "main" | "sidebar" | null;
-  mainPane: "chat" | "automations" | "kanban";
+  mainPane: WorkbenchHashPane;
   tr: TFn;
   slashFilterQuery: string;
   composerPlusStyle: CSSProperties | undefined;
@@ -407,7 +408,7 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
                     : "")
                 }
               >
-                <div className="composer-welcome-brand">
+                {/* <div className="composer-welcome-brand">
                   {welcomeProviderBrandNode ?? (
                     <SuperGrokMark
                       kind={welcomeBrandKind}
@@ -421,7 +422,7 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
                       }
                     />
                   )}
-                </div>
+                </div> */}
                 <div
                   className="composer-welcome-prompt"
                   style={

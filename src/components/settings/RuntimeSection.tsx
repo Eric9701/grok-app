@@ -33,8 +33,10 @@ import { SettingsTabStrip, UiCheck } from "./shared";
 import { IconArchive, IconDoctor } from "@/components/icons";
 import { NetworkProbeField } from "./NetworkProbeField";
 import { AcpServerField } from "./AcpServerField";
+import { AtlasRelayAgentField } from "./AtlasRelayAgentField";
 import { WslBackendField } from "./WslBackendField";
 import { SshHostsPanel } from "./SshHostsPanel";
+import { AtlasCliMirrorField } from "./AtlasCliMirrorField";
 import { detectAppPlatform } from "@/lib/appPlatform";
 import { resolveLocale, type MessageKey } from "@/i18n";
 import {
@@ -131,7 +133,7 @@ export function RuntimeSection() {
                   <input
                     className="settings-input"
                     value={manualCliPath}
-                    placeholder={cliInfo.path || "e.g. ~/.grok/bin/grok"}
+                    placeholder={cliInfo.path || t("settings.cliPathPlaceholder")}
                     onChange={(e) => onManualCliPath(e.target.value)}
                     onBlur={(e) => onCliBlur(e.target.value.trim())}
                   />
@@ -242,6 +244,7 @@ export function RuntimeSection() {
                     t={t}
                   />
                 ) : null}
+                <AtlasCliMirrorField t={t} rowHighlight={rowHighlight} />
                 {detectAppPlatform() === "win" ? (
                   <div
                     className={
@@ -325,6 +328,7 @@ export function RuntimeSection() {
             )}
             {activeTab === "connection" && (
               <>
+                <AtlasRelayAgentField t={t} rowHighlight={rowHighlight} />
                 <div
                   className={"settings-card" + rowHighlight("settings-anchor-acpServer")}
                   id="settings-anchor-acpServer"

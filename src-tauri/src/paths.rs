@@ -1,5 +1,5 @@
-//! App data roots: UI store under app data (`~/.grok-app` / Win: %APPDATA%/grok-app).
-//! Agent `GROK_HOME` defaults to shared CLI home (`~/.grok`); independent mode uses `agent-home`.
+//! App data roots: UI store under app data (`~/.atlas-app` / Win: %APPDATA%/atlas-app).
+//! Agent `GROK_HOME` defaults to shared CLI home (`~/.atlas`); independent mode uses `agent-home`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -13,7 +13,7 @@ pub fn app_data_root() -> PathBuf {
     if let Ok(custom) = std::env::var("GROK_APP_HOME") {
         return PathBuf::from(custom);
     }
-    if let Some(proj) = ProjectDirs::from("com", "grokapp", "grok-app") {
+    if let Some(proj) = ProjectDirs::from("com", "atlasapp", "atlas-app") {
         return proj.data_dir().to_path_buf();
     }
     // Fallback
@@ -24,10 +24,16 @@ fn dirs_fallback() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         if let Ok(appdata) = std::env::var("APPDATA") {
-            return PathBuf::from(appdata).join("grok-app");
+            return PathBuf::from(appdata).join("atlas-app");
         }
     }
-    crate::process_util::user_home().join(".grok-app")
+    crate::process_util::user_home().join(".atlas-app")
+}
+
+/// Shared terminal Atlas CLI home (`~/.atlas`). Spawned agents still see this
+/// path via the `GROK_HOME` env var (CLI name is unchanged).
+pub fn shared_cli_home() -> PathBuf {
+    crate::process_util::user_home().join(".atlas")
 }
 
 pub fn ensure_app_dirs() -> std::io::Result<PathBuf> {
@@ -128,14 +134,14 @@ pub fn agent_config_toml() -> PathBuf {
 /// Resolve GROK_HOME for a spawned agent process.
 pub fn resolve_agent_grok_home(session_data_mode: &str) -> PathBuf {
     if session_data_mode.trim().eq_ignore_ascii_case("shared") {
-        return crate::process_util::user_home().join(".grok");
+        return shared_cli_home();
     }
     let _ = ensure_app_dirs();
     agent_home_dir()
 }
 
 /// Custom providers always live in App `agent-home/config.toml` (never written
-/// into shared `~/.grok`). Spawn must point `GROK_HOME` there even when
+/// into shared `~/.atlas`). Spawn must point `GROK_HOME` there even when
 /// `session_data_mode=shared` so third-party keys work without official login (#557).
 pub fn resolve_inference_grok_home(session_data_mode: &str, custom_route: bool) -> PathBuf {
     if custom_route {
@@ -148,7 +154,7 @@ pub fn resolve_inference_grok_home(session_data_mode: &str, custom_route: bool) 
 /// Whether spawn prep must touch App agent-home (auth strip/sync, config heal).
 ///
 /// - Independent mode always uses agent-home.
-/// - Shared + official uses `~/.grok` and skips agent-home rewrites.
+/// - Shared + official uses `~/.atlas` and skips agent-home rewrites.
 /// - Shared + custom still uses agent-home (relay `config.toml` + api_key).
 pub fn needs_agent_home_spawn_prep(session_data_mode: &str, custom_route: bool) -> bool {
     custom_route || !session_data_mode.trim().eq_ignore_ascii_case("shared")
@@ -315,8 +321,8 @@ mod tests {
     fn inference_home_custom_route_uses_agent_home_even_when_shared() {
         let shared_official = resolve_inference_grok_home("shared", false);
         assert!(
-            shared_official.ends_with(".grok"),
-            "shared+official → ~/.grok, got {}",
+            shared_official.ends_with(".atlas"),
+            "shared+official → ~/.atlas, got {}",
             shared_official.display()
         );
 

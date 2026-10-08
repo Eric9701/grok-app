@@ -4,14 +4,17 @@
 
 ## 模型
 
-**UI 只展示官方真正可用的模型。服务商是后端渠道，只在设置 → 账户 → 自定义提供商切换。**
+**Composer 展示 Host `models_list_available` 的目录。App 设置里手写的自定义中转仍是渠道，只在设置 → 账户 → 自定义提供商切换。**
 
 | 来源 | 说明 |
 |------|------|
-| `models_cache.json` | CLI 官方目录 |
-| 静态兜底 | `grok-4.7`（默认）+ `grok-4.7-build-fast` + `grok-4.6` + `grok-4.5` |
+| `models_cache.json` | CLI 官方目录（live GROK_HOME → `~/.atlas` → `~/.grok`） |
+| `config.toml` `[model.*]` | **Atlas 企业目录**（`atlas models refresh` 同步的托管段）。只读 `id` / `name` / `context_window`，不把 `api_key` 或 ENC 路由名送进 UI |
+| 静态兜底 | `grok-4.7`（默认）+ `grok-4.7-build-fast` + `grok-4.6` + `grok-4.5`；cache + 企业目录皆空时才用 |
 
-探测：`scripts/probe-models.sh`。Host：`models_list_available`。
+默认模型：设置里已保存且仍在目录中的 id → CLI `[models].default` → `grok-4.6` / `grok-4.5`。
+
+探测：`scripts/probe-models.sh`。Host：`models_list_available`。本分支细节见 [atlas.md](./atlas.md)。
 
 Spawn 顺序（CLI 0.2.x）：
 

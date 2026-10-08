@@ -1,4 +1,4 @@
-//! Probe Grok Build CLI on PATH and common locations (B01–B03).
+//! Probe Atlas CLI on PATH and common locations (B01–B03).
 //!
 //! Cross-platform notes:
 //! - macOS/Windows GUI apps often inherit a sparse PATH (Dock / Explorer), so we
@@ -50,9 +50,9 @@ pub fn clear_last_acp_agent_version_for_test() {
 /// placement in `acp_client::spawn_with_home`.
 pub const MIN_CLI_VERSION: (u64, u64, u64) = (0, 2, 112);
 
-/// Product **recommended** CLI line (Grok Build 1.0). Below this still boots when
-/// ≥ [`MIN_CLI_VERSION`]; UI shows a soft upgrade chip, never a hard block.
-pub const RECOMMENDED_CLI_VERSION: (u64, u64, u64) = (1, 0, 0);
+/// Product **recommended** CLI line (Atlas enterprise channel). Below this still
+/// boots when ≥ [`MIN_CLI_VERSION`]; UI shows a soft upgrade chip, never a hard block.
+pub const RECOMMENDED_CLI_VERSION: (u64, u64, u64) = (0, 2, 134);
 
 /// Render [`MIN_CLI_VERSION`] as `x.y.z` for UI copy.
 pub fn min_cli_version_str() -> String {
@@ -89,9 +89,9 @@ pub fn version_tokens_skew(a: Option<&str>, b: Option<&str>) -> bool {
     }
 }
 
-/// Resolve the sibling `agent` launcher next to a `grok` path (or official
-/// `~/.grok/bin/agent`). Used for install skew detection only — App ACP always
-/// spawns `grok`, never this binary.
+/// Resolve the sibling `agent` launcher next to a probed CLI path (or official
+/// `~/.atlas/bin/agent`, then `~/.grok/bin/agent`). Used for install skew
+/// detection only — App ACP always spawns the probed CLI, never this binary.
 pub fn resolve_agent_sidecar_path(grok_path: Option<&str>) -> Option<PathBuf> {
     if let Some(g) = grok_path.map(str::trim).filter(|s| !s.is_empty()) {
         let p = PathBuf::from(g);
@@ -112,21 +112,33 @@ pub fn resolve_agent_sidecar_path(grok_path: Option<&str>) -> Option<PathBuf> {
             }
         }
     }
-    let home_agent = {
-        #[cfg(target_os = "windows")]
+    for home_agent in [
         {
-            user_home().join(r".grok\bin\agent.exe")
-        }
-        #[cfg(not(target_os = "windows"))]
+            #[cfg(target_os = "windows")]
+            {
+                user_home().join(r".atlas\bin\agent.exe")
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                user_home().join(".atlas/bin/agent")
+            }
+        },
         {
-            user_home().join(".grok/bin/agent")
+            #[cfg(target_os = "windows")]
+            {
+                user_home().join(r".grok\bin\agent.exe")
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                user_home().join(".grok/bin/agent")
+            }
+        },
+    ] {
+        if home_agent.exists() {
+            return Some(home_agent);
         }
-    };
-    if home_agent.exists() {
-        Some(home_agent)
-    } else {
-        None
     }
+    None
 }
 
 /// Probe version of the `agent` sidecar if present (best-effort, same timeout).
@@ -142,14 +154,21 @@ pub fn probe_agent_sidecar(grok_path: Option<&str>) -> (Option<String>, Option<S
     (Some(path_s), ver)
 }
 
-/// Relink/copy official `~/.grok/bin/agent` to match `~/.grok/bin/grok` (or the
-/// probed grok path when under `~/.grok/bin`). Soft-fail when paths missing.
+/// Relink/copy `agent` next to the probed CLI (`~/.atlas/bin` by default).
+/// Soft-fail when paths missing.
 pub fn repair_agent_sidecar_link(grok_path: Option<&str>) -> Result<String, String> {
-    let home_bin = user_home().join(".grok").join("bin");
+    let default_bin = crate::paths::shared_cli_home().join("bin");
+    let home_bin = grok_path
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .filter(|d| d.exists())
+        .unwrap_or(default_bin);
     #[cfg(target_os = "windows")]
-    let grok_bin = home_bin.join("grok.exe");
+    let grok_bin = home_bin.join("atlas.exe");
     #[cfg(not(target_os = "windows"))]
-    let grok_bin = home_bin.join("grok");
+    let grok_bin = home_bin.join("atlas");
 
     let grok = grok_path
         .map(str::trim)
@@ -159,7 +178,7 @@ pub fn repair_agent_sidecar_link(grok_path: Option<&str>) -> Result<String, Stri
         .unwrap_or(grok_bin);
 
     if !grok.exists() {
-        return Err("grok binary not found — install or locate CLI first".into());
+        return Err("Atlas CLI binary not found — install or locate CLI first".into());
     }
 
     #[cfg(target_os = "windows")]
@@ -237,14 +256,14 @@ pub struct CliProbeResult {
     pub version: Option<String>,
     pub source: String,
     pub candidates_tried: Vec<String>,
-    /// CLI auth material present at ~/.grok/auth.json (not App secrets).
+    /// CLI auth material present at ~/.atlas/auth.json (or ~/.grok/auth.json).
     pub cli_auth_present: bool,
     /// `Some(false)` when the CLI is older than [`MIN_CLI_VERSION`].
     /// `None` when the version could not be probed or parsed (NEW-03).
     pub version_supported: Option<bool>,
     /// Minimum version this app requires, so the UI need not hardcode it.
     pub min_version: String,
-    /// Product recommended CLI line (Grok Build 1.0+). Soft guidance only.
+    /// Product recommended CLI line (Atlas enterprise channel). Soft guidance only.
     #[serde(default)]
     pub recommended_version: String,
     /// `Some(true)` when version ≥ recommended; `Some(false)` when older;
@@ -270,7 +289,9 @@ pub struct CliProbeResult {
 }
 
 pub fn cli_auth_json_present() -> bool {
-    user_home().join(".grok").join("auth.json").is_file()
+    let home = user_home();
+    home.join(".atlas").join("auth.json").is_file()
+        || home.join(".grok").join("auth.json").is_file()
 }
 
 /// Expand `~` / `%USERPROFILE%` / `%HOME%` so manual paths work on both OSes.
@@ -322,11 +343,20 @@ pub fn expand_user_path(raw: &str) -> PathBuf {
 fn binary_names() -> &'static [&'static str] {
     #[cfg(target_os = "windows")]
     {
-        &["grok.exe", "grok.cmd", "grok.bat", "grok"]
+        &[
+            "atlas.exe",
+            "atlas.cmd",
+            "atlas.bat",
+            "atlas",
+            "grok.exe",
+            "grok.cmd",
+            "grok.bat",
+            "grok",
+        ]
     }
     #[cfg(not(target_os = "windows"))]
     {
-        &["grok"]
+        &["atlas", "grok"]
     }
 }
 
@@ -347,6 +377,33 @@ fn push_unique(out: &mut Vec<PathBuf>, seen: &mut std::collections::HashSet<Stri
     };
     if seen.insert(key) {
         out.push(p);
+    }
+}
+
+fn push_versioned_downloads(
+    out: &mut Vec<PathBuf>,
+    seen: &mut std::collections::HashSet<String>,
+    dir: &Path,
+) {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for ent in rd.flatten() {
+        let p = ent.path();
+        let name = p
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let prefix_ok = name.starts_with("atlas-") || name.starts_with("grok-");
+        if prefix_ok
+            && (name.ends_with(".exe") || !name.contains('.'))
+            && !name.ends_with(".part")
+            && !name.ends_with(".tmp")
+            && !name.ends_with(".old")
+        {
+            push_unique(out, seen, p);
+        }
     }
 }
 
@@ -417,31 +474,15 @@ fn candidate_paths(manual: Option<&str>) -> Vec<PathBuf> {
         }
     }
 
-    // 2) Official default install layout (xAI install.sh / install.ps1)
+    // 2) Official default install layout (Atlas then Grok).
     //    Prefer these over ambient PATH so GUI apps match CLI installs.
     let home = user_home();
     #[cfg(target_os = "windows")]
     {
+        push_bin_in_dir(&mut out, &mut seen, home.join(r".atlas\bin"));
+        push_versioned_downloads(&mut out, &mut seen, &home.join(r".atlas\downloads"));
         push_bin_in_dir(&mut out, &mut seen, home.join(r".grok\bin"));
-        // Versioned downloads left by installer (before link/copy)
-        if let Ok(rd) = std::fs::read_dir(home.join(r".grok\downloads")) {
-            for ent in rd.flatten() {
-                let p = ent.path();
-                let name = p
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_ascii_lowercase();
-                if name.starts_with("grok-")
-                    && (name.ends_with(".exe") || !name.contains('.'))
-                    && !name.ends_with(".part")
-                    && !name.ends_with(".tmp")
-                    && !name.ends_with(".old")
-                {
-                    push_unique(&mut out, &mut seen, p);
-                }
-            }
-        }
+        push_versioned_downloads(&mut out, &mut seen, &home.join(r".grok\downloads"));
         push_bin_in_dir(&mut out, &mut seen, home.join(r".local\bin"));
         // Scoop shims
         push_bin_in_dir(&mut out, &mut seen, home.join(r"scoop\shims"));
@@ -464,17 +505,10 @@ fn candidate_paths(manual: Option<&str>) -> Vec<PathBuf> {
     }
     #[cfg(not(target_os = "windows"))]
     {
+        push_bin_in_dir(&mut out, &mut seen, home.join(".atlas/bin"));
+        push_versioned_downloads(&mut out, &mut seen, &home.join(".atlas/downloads"));
         push_bin_in_dir(&mut out, &mut seen, home.join(".grok/bin"));
-        // Versioned downloads (symlink targets)
-        if let Ok(rd) = std::fs::read_dir(home.join(".grok/downloads")) {
-            for ent in rd.flatten() {
-                let p = ent.path();
-                let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if name.starts_with("grok-") && !name.ends_with(".part") && !name.contains(".tmp") {
-                    push_unique(&mut out, &mut seen, p);
-                }
-            }
-        }
+        push_versioned_downloads(&mut out, &mut seen, &home.join(".grok/downloads"));
         push_bin_in_dir(&mut out, &mut seen, home.join(".local/bin"));
         push_bin_in_dir(&mut out, &mut seen, home.join(".cargo/bin"));
         push_bin_in_dir(&mut out, &mut seen, home.join(".bun/bin"));
@@ -566,7 +600,8 @@ fn read_version(path: &Path) -> Option<String> {
                 }
                 // Some builds print version on stderr
                 let line = stderr.lines().next()?.trim().to_string();
-                if !line.is_empty() && line.to_ascii_lowercase().contains("grok") {
+                let lower = line.to_ascii_lowercase();
+                if !line.is_empty() && (lower.contains("atlas") || lower.contains("grok")) {
                     return Some(line);
                 }
                 return None;
@@ -595,7 +630,7 @@ fn classify_source(path: &Path, manual_first: bool) -> String {
     }
     let s = path.to_string_lossy();
     let lower = s.to_ascii_lowercase();
-    if lower.contains(".grok") {
+    if lower.contains(".atlas") || lower.contains(".grok") {
         "common_path".into()
     } else {
         "path".into()
@@ -715,6 +750,10 @@ mod tests {
             extract_version_token("grok 0.2.112 (a1b2c3d)").as_deref(),
             Some("0.2.112")
         );
+        assert_eq!(
+            extract_version_token("atlas 0.2.134 (0842713a11fe) [alpha]").as_deref(),
+            Some("0.2.134")
+        );
         assert_eq!(extract_version_token("0.2.101").as_deref(), Some("0.2.101"));
         assert_eq!(extract_version_token("1.0").as_deref(), Some("1.0"));
     }
@@ -804,7 +843,7 @@ mod tests {
             assert!(r
                 .version
                 .as_ref()
-                .map(|v| v.contains("grok") || !v.is_empty())
+                .map(|v| v.contains("atlas") || v.contains("grok") || !v.is_empty())
                 .unwrap_or(true));
         }
     }
@@ -814,7 +853,11 @@ mod tests {
         let r = probe_cli(None);
         // Soft if CI lacks grok.
         let home = user_home();
-        let likely_installed = which::which("grok").is_ok()
+        let likely_installed = which::which("atlas").is_ok()
+            || which::which("atlas.exe").is_ok()
+            || home.join(".atlas/bin/atlas").exists()
+            || home.join(r".atlas\bin\atlas.exe").exists()
+            || which::which("grok").is_ok()
             || home.join(".grok/bin/grok").exists()
             || home.join(r".grok\bin\grok").exists()
             || home.join(r".grok\bin\grok.exe").exists()
@@ -822,7 +865,7 @@ mod tests {
         if likely_installed {
             assert!(
                 r.found,
-                "expected local grok, tried {:?}",
+                "expected local atlas/grok, tried {:?}",
                 r.candidates_tried
             );
             assert!(r.path.is_some());
@@ -852,6 +895,17 @@ mod tests {
     }
 
     #[test]
+    fn binary_names_prefer_atlas() {
+        let names = binary_names();
+        let atlas = names.iter().position(|n| n.starts_with("atlas"));
+        let grok = names.iter().position(|n| n.starts_with("grok"));
+        assert!(atlas.is_some(), "atlas must be in binary_names: {names:?}");
+        if let (Some(a), Some(g)) = (atlas, grok) {
+            assert!(a < g, "atlas must sort before grok: {names:?}");
+        }
+    }
+
+    #[test]
     fn candidates_include_platform_defaults() {
         let c = candidate_paths(None);
         let joined = c
@@ -861,7 +915,10 @@ mod tests {
             .join("\n");
         // Both platforms should consider the official bin dir.
         assert!(
-            joined.contains(".grok") && (joined.contains("bin") || joined.contains("grok")),
+            (joined.contains(".atlas") || joined.contains(".grok"))
+                && (joined.contains("bin")
+                    || joined.contains("atlas")
+                    || joined.contains("grok")),
             "candidates missing official layout: {c:?}"
         );
     }

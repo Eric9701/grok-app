@@ -1,6 +1,6 @@
 /**
  * `pnpm dev` must merge tauri.dev.conf.json so debug does not steal the
- * installed Grok single-instance mutex / WebView2 user-data dir.
+ * installed Atlas single-instance mutex / WebView2 user-data dir.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -19,9 +19,9 @@ describe("tauri dev identifier overlay", () => {
       identifier: string;
       productName?: string;
     };
-    expect(base.identifier).toBe("com.grokapp.desktop");
-    expect(dev.identifier).toBe("com.grokapp.desktop.dev");
-    expect(dev.productName).toBe("Grok Dev");
+    expect(base.identifier).toBe("com.atlasapp.desktop");
+    expect(dev.identifier).toBe("com.atlasapp.desktop.dev");
+    expect(dev.productName).toBe("Atlas Dev");
   });
 
   it("wires pnpm dev to merge the overlay", () => {

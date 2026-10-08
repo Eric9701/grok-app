@@ -17,9 +17,9 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Grok</title>
+    <title>Atlas</title>
     <!--
-      Static boot shell mirrors App setup-gate (Grok logo + title).
+      Static boot shell mirrors App setup-gate (Atlas logo + title).
       Visible the moment the WebView paints — before the JS bundle arrives.
       React replaces #root on mount (same visual while appGate === "loading").
     -->
@@ -255,21 +255,21 @@
          * `setup.detecting`, so the two cannot drift apart.
          */
         var BOOT_COPY = {
-          "de": ["Willkommen bei Grok", "Grok Build wird geprüft…"],
-          "en": ["Welcome to Grok", "Checking Grok Build…"],
-          "es": ["Te damos la bienvenida a Grok", "Comprobando Grok Build…"],
-          "fil": ["Maligayang pagdating sa Grok", "Sini-check ang Grok Build…"],
-          "fr": ["Bienvenue dans Grok", "Vérification de Grok Build…"],
-          "id": ["Selamat datang di Grok", "Memeriksa Grok Build…"],
-          "it": ["Benvenuto in Grok", "Verifica di Grok Build…"],
-          "ja": ["Grok へようこそ", "Grok Build を確認中…"],
-          "ko": ["Grok에 오신 것을 환영합니다", "Grok Build 확인 중…"],
-          "pt-BR": ["Boas-vindas ao Grok", "Verificando o Grok Build…"],
-          "ru": ["Добро пожаловать в Grok", "Проверка Grok Build…"],
-          "ta": ["Grok க்கு வரவேற்கிறோம்", "Grok Build ஐச் சரிபார்க்கிறது…"],
-          "uk": ["Ласкаво просимо до Grok", "Перевірка Grok Build…"],
-          "zh": ["欢迎使用 Grok", "正在检测 Grok Build…"],
-          "zh-TW": ["歡迎使用 Grok", "正在偵測 Grok Build…"]
+          "de": ["Willkommen bei Atlas", "Atlas CLI wird geprüft…"],
+          "en": ["Welcome to Atlas", "Checking Atlas CLI…"],
+          "es": ["Te damos la bienvenida a Atlas", "Comprobando Atlas CLI…"],
+          "fil": ["Maligayang pagdating sa Atlas", "Sini-check ang Atlas CLI…"],
+          "fr": ["Bienvenue dans Atlas", "Vérification de Atlas CLI…"],
+          "id": ["Selamat datang di Atlas", "Memeriksa Atlas CLI…"],
+          "it": ["Benvenuto in Atlas", "Verifica di Atlas CLI…"],
+          "ja": ["Atlas へようこそ", "Atlas CLI を確認中…"],
+          "ko": ["Atlas에 오신 것을 환영합니다", "Atlas CLI 확인 중…"],
+          "pt-BR": ["Boas-vindas ao Atlas", "Verificando o Atlas CLI…"],
+          "ru": ["Добро пожаловать в Atlas", "Проверка Atlas CLI…"],
+          "ta": ["Atlas க்கு வரவேற்கிறோம்", "Atlas CLI ஐச் சரிபார்க்கிறது…"],
+          "uk": ["Ласкаво просимо до Atlas", "Перевірка Atlas CLI…"],
+          "zh": ["欢迎使用 Atlas", "正在检测 Atlas CLI…"],
+          "zh-TW": ["歡迎使用 Atlas", "正在偵測 Atlas CLI…"]
         };
         try {
           var loc = window.__GROK_BOOT_LOCALE__;
@@ -337,8 +337,8 @@
                 />
               </svg>
             </div>
-            <h1 class="boot-title">欢迎使用 Grok</h1>
-            <p class="boot-subtitle">正在检测 Grok Build…</p>
+            <h1 class="boot-title">欢迎使用 Atlas</h1>
+            <p class="boot-subtitle">正在检测 Atlas CLI…</p>
           </div>
         </div>
       </div>

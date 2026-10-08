@@ -245,7 +245,7 @@ fn home_env_present() -> bool {
 /// Ensure child sees `$HOME` when the parent GUI process does not.
 ///
 /// Windows apps launched from Start Menu / Explorer typically only have
-/// `USERPROFILE`, not `HOME`. Grok Build CLI hub resolves data under
+/// `USERPROFILE`, not `HOME`. Atlas CLI hub resolves data under
 /// `$GROK_HOME` **or** `$HOME/.grok` and errors with
 /// `neither $GROK_HOME nor $HOME is set` when both are missing
 /// (e.g. `grok worktree db path|stats|rebuild`).
@@ -644,6 +644,7 @@ pub fn enriched_path_env() -> Option<String> {
     let home_s = home.to_string_lossy();
     #[cfg(target_os = "windows")]
     {
+        push_path_part(&mut parts, &format!(r"{home_s}\.atlas\bin"));
         push_path_part(&mut parts, &format!(r"{home_s}\.grok\bin"));
         push_path_part(&mut parts, &format!(r"{home_s}\.local\bin"));
         push_path_part(&mut parts, &format!(r"{home_s}\.cargo\bin"));
@@ -659,6 +660,7 @@ pub fn enriched_path_env() -> Option<String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
+        push_path_part(&mut parts, &format!("{home_s}/.atlas/bin"));
         push_path_part(&mut parts, &format!("{home_s}/.grok/bin"));
         push_path_part(&mut parts, &format!("{home_s}/.local/bin"));
         push_path_part(&mut parts, &format!("{home_s}/.cargo/bin"));

@@ -749,17 +749,17 @@ export function AccountPanel({
                   type="button"
                   className="btn btn--solid btn--sm"
                   disabled={busy}
-                  onClick={onLoginOauth}
+                  onClick={onLoginDevice}
                 >
-                  {busy ? labels.loginBusy : labels.loginOauth}
+                  {busy ? labels.loginBusy : labels.loginDevice}
                 </button>
                 <button
                   type="button"
                   className="btn btn--ghost btn--sm"
                   disabled={busy}
-                  onClick={onLoginDevice}
+                  onClick={onLoginOauth}
                 >
-                  {labels.loginDevice}
+                  {labels.loginOauth}
                 </button>
                 {busy && onCancelLogin ? (
                   <button

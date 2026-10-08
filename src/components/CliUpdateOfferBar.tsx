@@ -17,6 +17,7 @@ import {
 } from "@/lib/cliUpdateAppBehind";
 import type { AppDialog } from "@/lib/app/appDialogTypes";
 import { isMirrorClient } from "@/lib/mirrorTransport";
+import { REMOTE_UPDATES_ENABLED } from "@/lib/remoteUpdates";
 
 type Offer = {
   current: string;
@@ -43,6 +44,7 @@ export function CliUpdateOfferBar({
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (!REMOTE_UPDATES_ENABLED) return;
     if (!active || !api.isTauri() || isMirrorClient()) return;
     let cancelled = false;
     const timer = window.setTimeout(() => {
@@ -76,7 +78,7 @@ export function CliUpdateOfferBar({
     };
   }, [active]);
 
-  if (!active || !offer) return null;
+  if (!REMOTE_UPDATES_ENABLED || !active || !offer) return null;
 
   const appBehindDialog = (onConfirm: () => void) => {
     setAppDialog({

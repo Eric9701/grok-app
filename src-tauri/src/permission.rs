@@ -14,7 +14,7 @@ pub enum PermissionPolicy {
     Ask,
     AllowOnce,
     AllowForSession,
-    /// Grok Build CLI `auto` — fewer prompts with safety checks (Host treats like Ask when prompted).
+    /// Atlas CLI `auto` — fewer prompts with safety checks (Host treats like Ask when prompted).
     Auto,
     /// Grok Build `dontAsk` — deny anything not pre-approved (no interactive prompt).
     DontAsk,
@@ -622,7 +622,7 @@ pub fn effective_permission_policy(
     }
 }
 
-/// Wire `optionId` values published by Grok Build CLI (`prompter.rs` / ACP).
+/// Wire `optionId` values published by Atlas CLI (`prompter.rs` / ACP).
 /// Host internal decision names stay snake_case (`allow_once`); only the
 /// JSON-RPC payload must use these hyphenated ids (#523).
 pub const FALLBACK_ALLOW_ONCE: &str = "allow-once";

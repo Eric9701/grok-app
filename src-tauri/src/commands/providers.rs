@@ -606,10 +606,10 @@ mod project_inspect_tests {
         let out = build_project_inspect_summary(
             None,
             Some("/tmp/p"),
-            Some("Grok Build CLI not found".into()),
+            Some("Atlas CLI not found".into()),
             vec![],
         );
         assert_eq!(out["skills"]["total"], 0);
-        assert_eq!(out["error"], "Grok Build CLI not found");
+        assert_eq!(out["error"], "Atlas CLI not found");
     }
 }

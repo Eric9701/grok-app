@@ -342,13 +342,16 @@ pub struct AppSettings {
     #[serde(default = "default_session_data_mode")]
     pub session_data_mode: String,
     pub manual_cli_path: Option<String>,
+    /// Enterprise Atlas CLI install/update base (`…/atlas/cli`). Empty = env `ATLAS_CLI_MIRROR` or built-in default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub atlas_cli_mirror: Option<String>,
     /// CLI launch backend: `native` (default) or `wsl` (Windows only — spawn via `wsl.exe`).
     #[serde(default = "default_cli_backend")]
     pub cli_backend: String,
     /// Optional WSL distro name when `cli_backend == "wsl"`. Empty = default distro.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wsl_distro: Option<String>,
-    /// Path to `grok` **inside** WSL (e.g. `grok`, `~/.grok/bin/grok`). Empty = `grok` on WSL PATH.
+    /// Path to `atlas` **inside** WSL (e.g. `atlas`, `~/.atlas/bin/atlas`). Empty = `atlas` on WSL PATH.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wsl_cli_path: Option<String>,
     pub permission_policy: String,
@@ -375,6 +378,20 @@ pub struct AppSettings {
     /// the normal local-CLI spawn path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acp_server_addr: Option<String>,
+    /// Atlas Relay agent URL. When enabled, this app dials the relay and
+    /// bridges ACP to a local `atlas agent stdio`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub atlas_relay_agent_url: Option<String>,
+    /// Agent identity sent as `agent_id` on the relay socket.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub atlas_relay_agent_id: Option<String>,
+    /// Reconnect, and connect again on the next launch.
+    #[serde(default)]
+    pub atlas_relay_agent_enabled: bool,
+    /// Seconds between WebSocket Pings to the relay. `0` means the 15s default.
+    /// Host clamps to 5–300.
+    #[serde(default = "default_atlas_relay_health_secs")]
+    pub atlas_relay_agent_health_secs: u32,
     /// Max warm/live agent processes (I02). Default 3.
     #[serde(default = "default_max_concurrent_agents")]
     pub max_concurrent_agents: u32,
@@ -578,7 +595,7 @@ pub struct AppSettings {
     #[serde(default)]
     pub auto_wake_enabled: bool,
     /// Enable Grok Build workflows (`workflows_enabled` in agent-home config.toml).
-    /// Default **true** (aligned with Grok Build CLI ≥0.2.111 / 1.0). Workflows are
+    /// Default **true** (aligned with Atlas CLI ≥0.2.111 / 1.0). Workflows are
     /// Rhai scripts under `~/.grok/workflows` / project `.grok/workflows` run by the
     /// CLI `workflow` tool. App lists names + headless smoke/run; no visual editor.
     /// Independent mode writes the top-level key; shared mode does not rewrite
@@ -709,6 +726,10 @@ fn default_max_concurrent_agents() -> u32 {
 
 fn default_agent_idle_minutes() -> u32 {
     crate::process_limits::DEFAULT_AGENT_IDLE_MINUTES
+}
+
+fn default_atlas_relay_health_secs() -> u32 {
+    15
 }
 
 fn default_stream_stall_seconds() -> u32 {
@@ -850,10 +871,11 @@ impl Default for AppSettings {
             // Follow OS language (zh / zh-TW / en). Users can lock a catalog in Settings.
             locale: default_locale(),
             locale_follow_system_migrated: true,
-            // Product default: share GROK_HOME (~/.grok) with terminal Grok Build CLI.
+            // Product default: share GROK_HOME (~/.grok) with terminal Atlas CLI.
             // Existing installs keep whatever is already persisted in settings.json.
             session_data_mode: "shared".into(),
             manual_cli_path: None,
+            atlas_cli_mirror: None,
             cli_backend: default_cli_backend(),
             wsl_distro: None,
             wsl_cli_path: None,
@@ -868,6 +890,10 @@ impl Default for AppSettings {
             default_open_target: default_open_target(),
             composer_prefs_scope: default_composer_prefs_scope(),
             acp_server_addr: None,
+            atlas_relay_agent_url: None,
+            atlas_relay_agent_id: None,
+            atlas_relay_agent_enabled: false,
+            atlas_relay_agent_health_secs: default_atlas_relay_health_secs(),
             max_concurrent_agents: default_max_concurrent_agents(),
             agent_idle_minutes: default_agent_idle_minutes(),
             // Fresh installs already start on the current default.

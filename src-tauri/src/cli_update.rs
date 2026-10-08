@@ -27,7 +27,7 @@ use crate::process_util;
 const CHECK_TIMEOUT: Duration = Duration::from_secs(45);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(600);
 
-/// Known Grok Build CLI release channels from `grok update --check --json`.
+/// Known Atlas CLI release channels from `grok update --check --json`.
 /// Do **not** invent extra channels — only map what the CLI documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CliReleaseChannel {
@@ -373,9 +373,32 @@ fn normalize_ver(s: &str) -> String {
 
 /// Resolve CLI binary and run `update --check --json`.
 pub fn check_cli_update(manual_path: Option<&str>) -> Result<CliUpdateCheck, String> {
+    if !crate::remote_updates::REMOTE_UPDATES_ENABLED {
+        let probe = cli_probe::probe_cli(manual_path);
+        let current = probe
+            .version
+            .as_deref()
+            .map(strip_grok_prefix)
+            .unwrap_or_default();
+        return Ok(CliUpdateCheck {
+            current_version: current.clone(),
+            latest_version: current,
+            update_available: false,
+            channel: None,
+            installer: None,
+            auto_update: Some(false),
+            error: Some(crate::remote_updates::disabled_message().into()),
+            cli_path: probe.path.filter(|_| probe.found),
+            app_version: None,
+            min_app_version: None,
+            latest_app_version: None,
+            app_update_available: None,
+            app_behind: None,
+        });
+    }
     let probe = cli_probe::probe_cli(manual_path);
     let path = probe.path.filter(|_| probe.found).ok_or_else(|| {
-        "Grok Build CLI not found — install or set the path under Runtime".to_string()
+        "Atlas CLI not found — install or set the path under Runtime".to_string()
     })?;
 
     let output = run_cli_with_timeout(
@@ -398,7 +421,7 @@ fn strip_grok_prefix(v: &str) -> String {
     let t = v.trim();
     // e.g. "grok 0.2.111" / "Grok Build 0.2.111"
     let lower = t.to_ascii_lowercase();
-    for prefix in ["grok build ", "grok "] {
+    for prefix in ["atlas build ", "atlas ", "grok build ", "grok "] {
         if lower.starts_with(prefix) {
             return t[prefix.len()..].trim().to_string();
         }
@@ -419,6 +442,17 @@ pub async fn install_cli_update(
     app: tauri::AppHandle,
     opts: CliUpdateInstallOpts,
 ) -> Result<CliInstallResult, String> {
+    if !crate::remote_updates::REMOTE_UPDATES_ENABLED {
+        return Ok(CliInstallResult {
+            ok: false,
+            path: None,
+            version: None,
+            mirror_used: None,
+            message: crate::remote_updates::disabled_message().into(),
+            sha256: None,
+            checksum_verified: None,
+        });
+    }
     let app_ver = env!("CARGO_PKG_VERSION");
     if !opts.acknowledge_app_behind {
         let mut behind = app_version_below_cli_upgrade_floor(app_ver);
@@ -438,6 +472,7 @@ pub async fn install_cli_update(
             return Err(app_behind_install_error(app_ver, latest_app.as_deref()));
         }
     }
+
 
     let settings = crate::store::load_settings();
     let manual = settings.manual_cli_path.clone();
@@ -504,7 +539,7 @@ pub async fn install_cli_update(
             }
         }
     } else if specialized {
-        return Err("Grok Build CLI not found — install or set the path under Runtime".into());
+        return Err("Atlas CLI not found — install or set the path under Runtime".into());
     }
 
     info!("cli_update_install: using cli_install trust-chain");

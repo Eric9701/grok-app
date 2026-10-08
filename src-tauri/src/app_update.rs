@@ -429,6 +429,21 @@ async fn fetch_via_html_redirect(
 
 /// Query GitHub for the latest release and compare to this build.
 pub async fn check_app_update() -> Result<AppUpdateCheck, String> {
+    if !crate::remote_updates::REMOTE_UPDATES_ENABLED {
+        let current = env!("CARGO_PKG_VERSION").to_string();
+        return Ok(AppUpdateCheck {
+            current_version: current.clone(),
+            latest_version: current,
+            update_available: false,
+            release_name: None,
+            html_url: String::new(),
+            published_at: None,
+            body: None,
+            asset_names: Vec::new(),
+            download_url: None,
+            download_name: None,
+        });
+    }
     let current = env!("CARGO_PKG_VERSION");
     let api_url =
         std::env::var("GROK_APP_RELEASES_URL").unwrap_or_else(|_| DEFAULT_RELEASES_API_URL.into());

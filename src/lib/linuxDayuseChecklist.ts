@@ -558,7 +558,7 @@ export function formatLinuxDayuseSummaryText(
   opts?: { title?: string; generatedAt?: string | null },
 ): string {
   const lines: string[] = [];
-  lines.push(opts?.title?.trim() || "Grok App — Linux day-use checklist");
+  lines.push(opts?.title?.trim() || "Atlas — Linux day-use checklist");
   lines.push(`Platform: ${checklist.platform}`);
   lines.push(
     `Target: ${checklist.isTargetPlatform ? "yes (Linux)" : "no (not the target of this list)"}`,

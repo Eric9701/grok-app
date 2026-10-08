@@ -2,8 +2,7 @@
 export const enKanban = {
   "kanban.title": "Agents",
   "kanban.open": "Agent Kanban",
-  "kanban.hint":
-    "Live agents by run state — Needs You, Working, Done. Not a personal to-do list. Click a card to open that chat.",
+  "kanban.hint": "Live agents by run state — Needs You, Working, Done. Not a personal to-do list. Click a card to open that chat.",
   "kanban.total": "{n} total",
   "kanban.view.dashboard": "Dashboard",
   "kanban.view.map": "Agent map",
@@ -18,8 +17,7 @@ export const enKanban = {
   "kanban.columnsLabel": "Agent run columns",
   "kanban.none": "None",
   "kanban.empty": "No agents to show",
-  "kanban.emptyHint":
-    "Start a chat or wait for an agent turn — live sessions appear here by run state.",
+  "kanban.emptyHint": "Start a chat or wait for an agent turn — live sessions appear here by run state.",
   "kanban.filterEmpty": "No agents match these filters",
   "kanban.filterEmptyHint": "Clear the search or show idle agents to see more.",
   "kanban.clearFilters": "Clear all filters",

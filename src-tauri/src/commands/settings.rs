@@ -48,6 +48,9 @@ pub async fn settings_set(
     // Keep Host routing, returned IPC settings, and persisted JSON on the same
     // canonical proxy mode. Legacy `use` needs proxyUrl context to migrate.
     store::normalize_proxy_settings(&mut settings);
+    settings.atlas_relay_agent_health_secs =
+        crate::atlas_relay_agent::health_interval_secs(settings.atlas_relay_agent_health_secs)
+            as u32;
     // Audit ledger retention presets: 7 / 30 / 90 / 0 (unlimited).
     settings.audit_ledger_retention_days =
         crate::audit_ledger::normalize_retention_days(settings.audit_ledger_retention_days);
@@ -133,6 +136,17 @@ pub async fn settings_set(
             .map(str::trim)
             .filter(|s| !s.is_empty());
         a != b
+    };
+    let relay_agent_flip = {
+        let norm = |s: &Option<String>| {
+            s.as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .map(str::to_string)
+        };
+        prev.atlas_relay_agent_enabled != settings.atlas_relay_agent_enabled
+            || norm(&prev.atlas_relay_agent_url) != norm(&settings.atlas_relay_agent_url)
+            || norm(&prev.atlas_relay_agent_id) != norm(&settings.atlas_relay_agent_id)
     };
     let launch_at_login_flip = prev.launch_at_login != settings.launch_at_login;
     let schedules_launch_agent_flip =
@@ -296,6 +310,14 @@ pub async fn settings_set(
     }
     if need_soft_respawn {
         mgr.soft_respawn_with_reason(&app, "settings_spawn").await;
+    }
+    if relay_agent_flip {
+        crate::atlas_relay_agent::apply_settings(&settings);
+    }
+    if crate::atlas_relay_agent::health_interval_secs(prev.atlas_relay_agent_health_secs) as u32
+        != settings.atlas_relay_agent_health_secs
+    {
+        crate::atlas_relay_agent::set_health_secs(settings.atlas_relay_agent_health_secs);
     }
 
     if let Err(e) = mgr
@@ -769,7 +791,13 @@ pub async fn provider_ping() -> Result<serde_json::Value, String> {
     }
 
     // CLI auth present?
-    let auth = crate::process_util::user_home().join(".grok").join("auth.json");
+    let home = crate::process_util::user_home();
+    let auth = crate::paths::shared_cli_home().join("auth.json");
+    let auth = if auth.is_file() {
+        auth
+    } else {
+        home.join(".grok").join("auth.json")
+    };
     if auth.is_file() {
         Ok(serde_json::json!({
             "ok": true,

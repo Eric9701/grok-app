@@ -285,6 +285,42 @@ export async function acpServerProbe(addr: string) {
   return invoke<AcpServerProbeResult>("acp_server_probe", { addr });
 }
 
+export interface AtlasRelayTask {
+  id: string;
+  sessionId: string;
+  text: string;
+  /** running | done | failed | cancelled */
+  status: string;
+  error?: string | null;
+  atMs: number;
+}
+
+export interface AtlasRelayAgentStatus {
+  /** stopped | connecting | online | reconnecting */
+  phase: string;
+  error?: string | null;
+  cliAlive: boolean;
+  agentId: string;
+  url: string;
+  /** Cloud session/prompt rows, newest first. */
+  tasks?: AtlasRelayTask[];
+}
+
+export async function atlasRelayAgentStatus() {
+  return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_status");
+}
+
+export async function atlasRelayAgentConnect(url: string, agentId: string) {
+  return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_connect", {
+    url,
+    agentId,
+  });
+}
+
+export async function atlasRelayAgentDisconnect() {
+  return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_disconnect");
+}
+
 /** WSL availability + distros + optional CLI probe (Settings → Runtime). */
 export interface WslStatus {
   available: boolean;

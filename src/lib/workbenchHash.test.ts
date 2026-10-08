@@ -23,6 +23,22 @@ describe("resolveWorkbenchHash", () => {
       kind: "pane",
       pane: "kanban",
     });
+    expect(resolveWorkbenchHash("#/octo")).toEqual({
+      kind: "pane",
+      pane: "octo",
+    });
+    expect(resolveWorkbenchHash("#/octo/inbox")).toEqual({
+      kind: "pane",
+      pane: "octo",
+    });
+    expect(resolveWorkbenchHash("#/atlas-cloud")).toEqual({
+      kind: "pane",
+      pane: "atlasCloud",
+    });
+    expect(resolveWorkbenchHash("#/atlas-cloud/tasks")).toEqual({
+      kind: "pane",
+      pane: "atlasCloud",
+    });
   });
 
   it("bare settings hash restores last route", () => {

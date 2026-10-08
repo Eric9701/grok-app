@@ -1,26 +1,30 @@
 # Custom providers & agent profile
 
-Product rules for **OpenAI-compatible relays** (CPA / sub2api / OneAPI / self-hosted) and how they reach Grok Build.
+Product rules for **OpenAI-compatible relays** (CPA / sub2api / OneAPI / self-hosted) and how they reach Atlas CLI.
 
-## Agent transport (shared with Grok Desktop)
+本分支（feat-atlas）shared 家目录是 `~/.atlas`。对照 [atlas.md](./atlas.md)。
 
-Both Grok App and community **Grok Desktop** drive intelligence the same way:
+## Agent transport
+
+Atlas 桌面壳与终端 Atlas CLI 走同一条 ACP 通道：
 
 | Layer | Implementation |
 |-------|----------------|
-| Runtime | **Grok Build CLI** binary (`grok`) |
-| Entry | `grok agent stdio` |
+| Runtime | **Atlas CLI** binary（优先 `atlas`，回退 `grok`） |
+| Entry | `atlas agent stdio`（或探测到的 `{cli} agent stdio`） |
 | Protocol | **ACP** (Agent Client Protocol) JSON-RPC over stdio |
 | Client | Desktop Host (`AcpClient`) — **not** a reimplemented agent brain |
 
 Desktop never reimplements tools/sampling. It is an ACP client + UI shell.
 
+环境变量名仍是 CLI 认识的 `GROK_HOME` / `GROK_CONFIG`。
+
 ## Agent profile (`GROK_HOME`)
 
 | Session data mode | `GROK_HOME` for spawned agent |
 |-------------------|-------------------------------|
-| `shared` (default) | `~/.grok` (same home as terminal Grok Build CLI) |
-| `independent` | `~/.grok-app/agent-home` (or `$GROK_APP_HOME/agent-home`) |
+| `shared` (default) | `~/.atlas`（与终端 `atlas` 同一套 config / 会话 / 插件） |
+| `independent` | App `agent-home`（`~/.atlas-app/agent-home` 或 `$GROK_APP_HOME/agent-home`）。**不改写** shared `~/.atlas`。 |
 
 Custom providers are written to **`$GROK_HOME/config.toml`** as `[model.<id>]` sections so the agent can use `base_url` + `api_key` without OAuth fallback.
 

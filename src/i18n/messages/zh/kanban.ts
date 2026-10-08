@@ -2,8 +2,7 @@
 export const zhKanban = {
   "kanban.title": "智能体",
   "kanban.open": "智能体看板",
-  "kanban.hint":
-    "按运行状态分列：需要你、工作中、已完成。不是个人待办。点击卡片打开该对话。",
+  "kanban.hint": "按运行状态分列：需要你、工作中、已完成。不是个人待办。点击卡片打开该对话。",
   "kanban.total": "{n} 个",
   "kanban.view.dashboard": "仪表盘",
   "kanban.view.map": "智能体地图",

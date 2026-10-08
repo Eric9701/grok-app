@@ -6,7 +6,7 @@ export const taChat = {
   "message.nodes.prev": "முந்தைய செய்தி",
   "message.nodes.next": "அடுத்த செய்தி",
   "message.nodes.user": "நீங்கள்",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "பக்க பலகை",
   "main.leftPane": "பக்கப்பட்டி",

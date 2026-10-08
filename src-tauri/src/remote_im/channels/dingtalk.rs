@@ -349,7 +349,7 @@ pub async fn send_card(
         .pointer("/header/title/text")
         .or_else(|| card.pointer("/header/title/content"))
         .and_then(|x| x.as_str())
-        .unwrap_or("Grok Remote IM");
+        .unwrap_or("Atlas Remote IM");
     let text = card
         .pointer("/contents/0/text")
         .and_then(|x| x.as_str())

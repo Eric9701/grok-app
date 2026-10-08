@@ -1,4 +1,4 @@
-//! List Grok Build CLI-tracked worktrees (`grok worktree list`).
+//! List Atlas CLI-tracked worktrees (`grok worktree list`).
 //!
 //! Prefers `grok worktree list --json`; falls back to careful text parsing when
 //! `--json` is rejected by older CLIs. Soft-fails when the CLI is missing.
@@ -834,7 +834,7 @@ fn run_grok_cli_args(args: &[&str], timeout_secs: u64) -> Result<(String, String
     let settings = store::load_settings();
     let probe = cli_probe::probe_cli(settings.manual_cli_path.as_deref());
     let Some(cli_path) = probe.path.filter(|_| probe.found) else {
-        return Err("Grok Build CLI not found".into());
+        return Err("Atlas CLI not found".into());
     };
 
     let args_owned: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
@@ -906,7 +906,7 @@ fn list_cli_worktrees_blocking(
         return CliWorktreesResult {
             available: false,
             worktrees: vec![],
-            reason: Some("Grok Build CLI not found".into()),
+            reason: Some("Atlas CLI not found".into()),
             cli_found: false,
             source: Some("none".into()),
         };
@@ -1101,7 +1101,7 @@ pub async fn cli_worktree_db_path() -> Result<CliWorktreeDbPathResult, String> {
 fn cli_worktree_db_path_blocking(home: PathBuf) -> CliWorktreeDbPathResult {
     let (cli_found, _) = db_cli_probe();
     if !cli_found {
-        return soft_db_path_err(false, false, "Grok Build CLI not found");
+        return soft_db_path_err(false, false, "Atlas CLI not found");
     }
     match run_grok_cli_args(&["worktree", "db", "path"], CLI_WORKTREE_DB_TIMEOUT_SECS) {
         Ok((stdout, stderr, ok)) => {
@@ -1109,7 +1109,7 @@ fn cli_worktree_db_path_blocking(home: PathBuf) -> CliWorktreeDbPathResult {
                 return soft_db_path_err(
                     true,
                     true,
-                    "CLI worktree DB requires Grok Build CLI 0.2.117+",
+                    "CLI worktree DB requires Atlas CLI 0.2.117+",
                 );
             }
             if let Some(path) = parse_cli_worktree_db_path_stdout(&stdout, &home) {
@@ -1159,7 +1159,7 @@ pub async fn cli_worktree_db_stats() -> Result<CliWorktreeDbStatsResult, String>
 fn cli_worktree_db_stats_blocking() -> CliWorktreeDbStatsResult {
     let (cli_found, _) = db_cli_probe();
     if !cli_found {
-        return soft_db_stats_err(false, false, "Grok Build CLI not found");
+        return soft_db_stats_err(false, false, "Atlas CLI not found");
     }
     match run_grok_cli_args(&["worktree", "db", "stats"], CLI_WORKTREE_DB_TIMEOUT_SECS) {
         Ok((stdout, stderr, ok)) => {
@@ -1167,7 +1167,7 @@ fn cli_worktree_db_stats_blocking() -> CliWorktreeDbStatsResult {
                 return soft_db_stats_err(
                     true,
                     true,
-                    "CLI worktree DB requires Grok Build CLI 0.2.117+",
+                    "CLI worktree DB requires Atlas CLI 0.2.117+",
                 );
             }
             let raw_trim = stdout.trim();
@@ -1255,7 +1255,7 @@ pub async fn cli_worktree_db_rebuild() -> Result<CliWorktreeDbRebuildResult, Str
 fn cli_worktree_db_rebuild_blocking() -> CliWorktreeDbRebuildResult {
     let (cli_found, _) = db_cli_probe();
     if !cli_found {
-        return soft_db_rebuild_err(false, false, "Grok Build CLI not found");
+        return soft_db_rebuild_err(false, false, "Atlas CLI not found");
     }
     match run_grok_cli_args(&["worktree", "db", "rebuild"], CLI_WORKTREE_DB_TIMEOUT_SECS) {
         Ok((stdout, stderr, ok)) => {
@@ -1263,7 +1263,7 @@ fn cli_worktree_db_rebuild_blocking() -> CliWorktreeDbRebuildResult {
                 return soft_db_rebuild_err(
                     true,
                     true,
-                    "CLI worktree DB requires Grok Build CLI 0.2.117+",
+                    "CLI worktree DB requires Atlas CLI 0.2.117+",
                 );
             }
             let (discovered, registered, already) = parse_cli_worktree_db_rebuild_text(&stdout);

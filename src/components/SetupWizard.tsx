@@ -1,5 +1,5 @@
 /**
- * Full-screen first-run gate: install Grok Build (required) → account (skippable) → enter home.
+ * Full-screen first-run gate: install Atlas CLI (required) → account (skippable) → enter home.
  * No page scrollbars; content is centered and compact.
  *
  * Honesty (SETUP-GATE-PRO): CLI is hard-required; account is soft/skippable.

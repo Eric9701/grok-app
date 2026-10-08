@@ -32,7 +32,7 @@ pub fn resolve_bearer_token() -> Result<String, String> {
     }
 
     Err(
-        "No xAI credentials found. Sign in with Grok CLI (`grok login`) or add an official API key in Settings."
+        "No xAI credentials found. Sign in with Atlas CLI (`atlas login`) or add an official API key in Settings."
             .into(),
     )
 }

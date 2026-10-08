@@ -300,9 +300,9 @@ pub fn agent_error_user_message(lang: &str, kind: RimErrorKind, raw: &str) -> St
         }
         RimErrorKind::Auth => {
             if lang == "en" {
-                "Authentication failed for Grok Build. Check login / API key in Settings → Account or Providers.".into()
+                "Authentication failed for Atlas CLI. Check login / API key in Settings → Account or Providers.".into()
             } else {
-                "Grok Build 鉴权失败。请在 设置 → 账号 或 中转 中检查登录 / API 密钥。".into()
+                "Atlas CLI 鉴权失败。请在 设置 → 账号 或 中转 中检查登录 / API 密钥。".into()
             }
         }
         _ => {

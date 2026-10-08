@@ -105,7 +105,7 @@ use crate::store;
 
 #[allow(dead_code)]
 const BILLING_CANDIDATES: &[&str] = &[
-    // Confirmed live endpoint used by Grok Build CLI billing extension.
+    // Confirmed live endpoint used by Atlas CLI billing extension.
     "https://cli-chat-proxy.grok.com/v1/billing?format=credits",
     "https://accounts.x.ai/billing?format=credits",
     "https://code.grok.com/billing?format=credits",
@@ -1644,7 +1644,7 @@ pub async fn account_status_opts(
             BillingSnapshot {
                 available: false,
                 source: "no_token".into(),
-                message: Some("Sign in with official Grok Build to load quota.".into()),
+                message: Some("Sign in with official Atlas CLI to load quota.".into()),
                 manage_url: USAGE_MANAGE_URL.into(),
                 subscribe_url: SUBSCRIBE_URL.into(),
                 products: vec![],
@@ -1714,7 +1714,7 @@ pub async fn account_login(method: &str, manual_cli: Option<&str>) -> LoginResul
             return LoginResult {
                 ok: false,
                 method: method.into(),
-                message: "Grok Build CLI not found. Install or set CLI path in Settings.".into(),
+                message: "Atlas CLI not found. Install or set CLI path in Settings.".into(),
                 device_url: None,
                 device_code: None,
                 profile: None,
@@ -1881,8 +1881,8 @@ pub async fn account_login(method: &str, manual_cli: Option<&str>) -> LoginResul
             ok: false,
             method: method.into(),
             message: format!(
-                "Sign-in timed out after {secs}s — the Grok auth endpoint could not be reached. \
-If the browser showed a code to paste into Grok Build, start sign-in again and paste it promptly \
+                "Sign-in timed out after {secs}s — the Atlas auth endpoint could not be reached. \
+If the browser showed a code to paste into Atlas, start sign-in again and paste it promptly \
 (or use Device code login)."
             ),
             device_url: None,

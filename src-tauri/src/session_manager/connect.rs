@@ -1209,7 +1209,7 @@ impl SessionManager {
                     if let Some(s) = guard.as_mut() {
                         let _ = s.fsm.connect_failed(AgentError::new(
                             AgentErrorCode::CliNotFound,
-                            "Grok Build CLI not found. Install Grok Build or set path in Settings.",
+                            "Atlas CLI not found. Install Atlas CLI or set path in Settings.",
                         ));
                     }
                 }

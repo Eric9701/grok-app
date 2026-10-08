@@ -5,5 +5,5 @@ import { IconGrokMark } from "@/components/icons";
  * Inherits text color from parent so dark/light themes invert automatically.
  */
 export function GrokLogo({ size = 22 }: { size?: number }) {
-  return <IconGrokMark size={size} className="grok-logo" title="Grok" />;
+  return <IconGrokMark size={size} className="grok-logo" title="Atlas" />;
 }

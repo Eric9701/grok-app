@@ -2,12 +2,14 @@
 
 Product rules for the **full-screen initialization wizard** before the workbench home.
 
+本分支（feat-atlas）探测 **Atlas CLI**，安装走企业 `atlas/cli` 基址。对照 [atlas.md](./atlas.md)。
+
 ## Goals
 
-1. **Hard gate:** Grok Build CLI must be found and runnable before entering home.
-2. **Soft gate:** Official login / API key / custom relay may be **skipped**.
+1. **Hard gate:** Atlas CLI must be found and runnable before entering home.
+2. **Soft gate:** Device-code login / API key / custom relay may be **skipped**.
 3. Match app chrome (tokens, logo, dark/light); **no scrollbars** on the gate page.
-4. Install uses **multi-mirror** download with retries (same bases as official `install.sh`).
+4. Install uses the **enterprise atlas/cli** base (`ATLAS_CLI_MIRROR` → settings `atlasCliMirror` → built-in default). Do **not** auto-install from x.ai / GCS on this branch.
 
 ## Flow
 
@@ -26,13 +28,16 @@ boot → probe CLI (≤3s per --version; Host spawn_blocking)
 | Detect | `probe_cli` — mac + Windows (see below) |
 | Auto install | `cli_install_latest` + event `setup://cli-install-progress` |
 | Manual path | `pick_cli_binary` → `manualCliPath` |
-| **WSL backend (Windows)** | Settings → Runtime → CLI → **Use WSL for Grok Build** (`cliBackend=wsl`). Spawns `wsl.exe [-d distro] --cd /mnt/… -- grok agent stdio` when the binary exists only inside WSL. Optional `wslDistro` / `wslCliPath`. **ACP server (API mode)** still wins when `acpServerAddr` is set. |
-| Fallback | Copy official install command / open docs |
+| **WSL backend (Windows)** | Settings → Runtime → CLI → **Use WSL for Atlas CLI** (`cliBackend=wsl`). Spawns `wsl.exe [-d distro] --cd /mnt/… -- atlas agent stdio` when the binary exists only inside WSL. Optional `wslDistro` / `wslCliPath`. **ACP server (API mode)** still wins when `acpServerAddr` is set. |
+| Fallback | Copy enterprise install command / open docs |
 
-Mirrors (order):
+Install base (order):
 
-1. `https://storage.googleapis.com/grok-build-public-artifacts/cli` (preferred — more reliable in CN)
-2. `https://x.ai/cli`
+1. Env `ATLAS_CLI_MIRROR`
+2. Settings `atlasCliMirror`（Runtime → CLI）
+3. Host built-in enterprise default（`…/atlas/cli`）
+
+Allowlist is **that base only** (intranet `http` allowed). Tests must use fixture hosts — never bake an internal IP into public test constants.
 
 Each mirror is tried multiple times before failing over.
 
@@ -42,7 +47,7 @@ Each mirror is tried multiple times before failing over.
 
 ### Step 2 — Account (skippable)
 
-OAuth, official key, relay, import CLI / grok-go. No `window.prompt`.
+**主路：** Atlas 设备码（`atlas login --device-auth`）、自定义中转。官方 grok.com OAuth / console.x.ai 降为设置里的高级项。仍可导入已有 CLI auth / grok-go。No `window.prompt`.
 
 ### Step 3 — Ready → Enter
 
@@ -82,9 +87,9 @@ Checksum: missing sidecar may offer **Install without checksum**; **mismatch nev
 
 | Source | macOS | Windows |
 |--------|-------|---------|
-| Official install | `~/.grok/bin/grok` (+ downloads) | `%USERPROFILE%\.grok\bin\grok.exe` (+ downloads) |
+| Official install | `~/.atlas/bin/atlas` (+ downloads；回退 `~/.grok`) | `%USERPROFILE%\.atlas\bin\atlas.exe` (+ downloads；回退 `~/.grok`) |
 | Package managers | Homebrew `/opt/homebrew`, `/usr/local` | WinGet Links, Scoop shims, Chocolatey |
-| PATH | process PATH + enriched PATH scan | same; names `grok.exe` / `.cmd` / `.bat` |
+| PATH | process PATH + enriched PATH scan | same; names `atlas.exe` / `grok.exe` / `.cmd` / `.bat`（**atlas 优先**） |
 | Manual | `~` expansion | `~` / `%USERPROFILE%` / auto-append `.exe` |
 | Home dir | `$HOME` | **`USERPROFILE` first** (not MSYS `$HOME`) |
 
@@ -95,7 +100,7 @@ Checksum: missing sidecar may offer **Install without checksum**; **mismatch nev
 | Command | Role |
 |---------|------|
 | `probe_cli` | Detect binary (cross-platform) |
-| `cli_install_latest` | Download + link into `~/.grok` |
+| `cli_install_latest` | Download + link into `~/.atlas` |
 | `cli_install_commands` | Platform shell command + docs URL |
 | `pick_cli_binary` | File picker |
 | `open_external_url` | Open install docs |

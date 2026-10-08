@@ -99,7 +99,7 @@ pub enum AcpEvent {
     /// Turn / context usage reported by the agent (when present).
     /// Prefer occupancy fields over UI char heuristics.
     ///
-    /// Grok Build CLI occupancy (same as `/session-info` / auto-compact):
+    /// Atlas CLI occupancy (same as `/session-info` / auto-compact):
     ///   tokens_used / context_window → percentage
     /// Streamed as `params._meta.totalTokens` or `auto_compact_started.tokens_used`.
     /// Do **not** treat `turn_completed.usage.totalTokens` as occupancy (billing sum).
@@ -1054,7 +1054,7 @@ impl AcpClient {
             } else {
                 AgentErrorCode::CliNotFound
             };
-            AgentError::new(code, format!("failed to spawn grok agent stdio: {e}"))
+            AgentError::new(code, format!("failed to spawn Atlas agent stdio: {e}"))
         })?;
 
         // Capture PID before pipes / reader tasks take ownership of the child.
@@ -1815,7 +1815,7 @@ pub fn parse_usage_update(kind: &str, update: &Value) -> Option<AcpEvent> {
             "output",
         ],
     );
-    // Grok Build CLI occupancy field is `tokens_used` (auto_compact_started,
+    // Atlas CLI occupancy field is `tokens_used` (auto_compact_started,
     // tokens_used updates). Prefer it over billing `totalTokens` when both exist
     // on the same object (should not happen on live wire).
     let occupancy = json_token_u64(

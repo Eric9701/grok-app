@@ -6,7 +6,7 @@ export const deChat = {
   "message.nodes.prev": "Vorherige Nachricht",
   "message.nodes.next": "Nächste Nachricht",
   "message.nodes.user": "Du",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "Seitenpanel",
   "main.leftPane": "Seitenleiste",

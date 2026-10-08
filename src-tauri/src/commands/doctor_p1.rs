@@ -8,16 +8,28 @@ fn apply_import_onboarding_done(settings: &mut AppSettings) {
 #[tauri::command]
 pub async fn import_grok_cli_config() -> Result<serde_json::Value, String> {
     let home = crate::process_util::user_home();
-    let auth = home.join(".grok").join("auth.json");
-    let config = home.join(".grok").join("config.toml");
+    let cli_home = crate::paths::shared_cli_home();
+    let auth = if cli_home.join("auth.json").is_file() {
+        cli_home.join("auth.json")
+    } else {
+        home.join(".grok").join("auth.json")
+    };
+    let config = if cli_home.join("config.toml").is_file() {
+        cli_home.join("config.toml")
+    } else {
+        home.join(".grok").join("config.toml")
+    };
     let mut msg = Vec::new();
     if auth.is_file() {
-        msg.push("Found ~/.grok/auth.json (CLI will use cached_token)".to_string());
+        msg.push(format!(
+            "Found {} (CLI will use cached_token)",
+            auth.display()
+        ));
     } else {
-        msg.push("No ~/.grok/auth.json".to_string());
+        msg.push("No ~/.atlas/auth.json".to_string());
     }
     if config.is_file() {
-        msg.push("Found ~/.grok/config.toml".to_string());
+        msg.push(format!("Found {}", config.display()));
     }
     let mut settings = store::load_settings_async().await;
     apply_import_onboarding_done(&mut settings);
@@ -231,7 +243,7 @@ pub async fn doctor_report() -> Result<serde_json::Value, String> {
         checks.push(doctor_check(
             "cli",
             level,
-            "Grok Build CLI",
+            "Atlas CLI",
             format!(
                 "Found {ver} ({}) at {path}{checksum_note}{rec_note}",
                 probe.source
@@ -252,8 +264,8 @@ pub async fn doctor_report() -> Result<serde_json::Value, String> {
         checks.push(doctor_check(
             "cli",
             "fail",
-            "Grok Build CLI",
-            "Grok Build CLI not found. Install from Settings → Runtime or the setup wizard."
+            "Atlas CLI",
+            "Atlas CLI not found. Install from Settings → Runtime or the setup wizard."
                 .into(),
             serde_json::json!({
                 "found": false,
@@ -296,7 +308,7 @@ pub async fn doctor_report() -> Result<serde_json::Value, String> {
             "CLI vs ACP agentVersion skew",
             format!(
                 "probed grok reports {:?} but last ACP initialize reported {:?}. \
-                 Restart sessions after CLI update, reinstall Grok Build CLI, or \
+                 Restart sessions after CLI update, reinstall Atlas CLI, or \
                  (API mode) confirm the remote agent binary matches Settings → Runtime.",
                 probe.version, probe.acp_agent_version
             ),
@@ -588,7 +600,7 @@ pub async fn doctor_report() -> Result<serde_json::Value, String> {
         }),
     ));
 
-    // Grok Build CLI `doctor --json` (terminal/clipboard/color findings).
+    // Atlas CLI `doctor --json` (terminal/clipboard/color findings).
     // Runs on a blocking pool so slow/hung CLI cannot stall the async runtime.
     let cli_doctor = tauri::async_runtime::spawn_blocking(run_cli_doctor_json)
         .await
@@ -868,7 +880,7 @@ pub async fn export_session_bundle(
     .await
 }
 
-/// Export the Grok Build CLI session trace (`grok trace <agent_id>`).
+/// Export the Atlas CLI session trace (`grok trace <agent_id>`).
 ///
 /// - `local_only` (default **true** for safety): when true, pass `--local` so the
 ///   CLI only writes a local archive. When false, omit `--local` so the CLI may
@@ -937,7 +949,7 @@ fn session_cli_export_blocking(
     let settings = store::load_settings();
     let probe = cli_probe::probe_cli(settings.manual_cli_path.as_deref());
     let Some(cli_path) = probe.path.filter(|_| probe.found) else {
-        return Err("Grok Build CLI not found".into());
+        return Err("Atlas CLI not found".into());
     };
     let grok_home = crate::paths::resolve_agent_grok_home(&settings.session_data_mode);
 
@@ -1046,7 +1058,7 @@ fn session_cli_export_blocking(
     }))
 }
 
-/// Export the Grok Build CLI session trace (`grok trace <agent_id> --local`).
+/// Export the Atlas CLI session trace (`grok trace <agent_id> --local`).
 /// Resolves `agent_session_id` from live/parked runtime or session meta.
 /// Opens a save dialog for the `.tar.gz` and reveals the file.
 #[tauri::command]
@@ -1144,7 +1156,7 @@ fn session_trace_export_blocking(
     let settings = store::load_settings();
     let probe = cli_probe::probe_cli(settings.manual_cli_path.as_deref());
     let Some(cli_path) = probe.path.filter(|_| probe.found) else {
-        return Err("Grok Build CLI not found".into());
+        return Err("Atlas CLI not found".into());
     };
     let grok_home = crate::paths::resolve_agent_grok_home(&settings.session_data_mode);
 

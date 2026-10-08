@@ -6,7 +6,7 @@ export const zhTWChat = {
   "message.nodes.prev": "上一則訊息",
   "message.nodes.next": "下一則訊息",
   "message.nodes.user": "你",
-  "message.nodes.assistant": "Grok",
+  "message.nodes.assistant": "Atlas",
   "message.nodes.count": "{current} / {total}",
   "main.rightPane": "側邊欄",
   "main.leftPane": "側邊欄",

@@ -338,7 +338,7 @@ pub(super) fn build_history_bootstrap(app_session_id: &str) -> Option<String> {
         &crate::session_attach::StoreAttachJournal,
     )?;
     let mut body = String::from(
-        "[Prior conversation context — this chat continues an existing Grok App session. \
+        "[Prior conversation context — this chat continues an existing Atlas session. \
 The agent process was restarted; use the following transcript for continuity ONLY. \
 Rules: do NOT re-greet; do NOT restate, quote, or re-answer prior assistant turns; \
 do NOT reprint the transcript in your reply; answer ONLY the new user message below.]\n\n",
@@ -1161,7 +1161,7 @@ fn push_output_chunk(out: &mut String, chunk: &str) {
     out.push_str(chunk);
 }
 
-/// When user asks to open a Grok App / foreign agent session by UUID, steer tools.
+/// When user asks to open a Atlas / foreign agent session by UUID, steer tools.
 pub(super) fn session_lookup_host_hint(user_text: &str) -> Option<String> {
     let t = user_text.trim();
     // UUID v4-ish
@@ -1182,10 +1182,10 @@ pub(super) fn session_lookup_host_hint(user_text: &str) -> Option<String> {
     }
     Some(
         "[Host hint — session lookup]\n\
-This looks like a request to read a **Grok App / agent session** by UUID.\n\
+This looks like a request to read a **Atlas / agent session** by UUID.\n\
 Do **not** scan the whole home directory or assume Claude/Codex/Cursor storage first.\n\
 Prefer, in order:\n\
-1. Grok App journal: `~/Library/Application Support/com.grokapp.grok-app/sessions/<id>/messages.json` \
+1. Atlas journal: `~/Library/Application Support/com.grokapp.grok-app/sessions/<id>/messages.json` \
 (and `sessions_index.json` for meta).\n\
 2. Grok agent-home: `…/com.grokapp.grok-app/agent-home/sessions/<encoded-cwd>/<agentSessionId>/` \
 (chat_history.jsonl, updates.jsonl) — map app session id via sessions_index.agentSessionId.\n\

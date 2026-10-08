@@ -1,7 +1,9 @@
-//! Live **model** catalog from Grok CLI cache only.
+//! Live **model** catalog for the composer.
 //!
-//! Providers / relays are **channels** managed on the Providers settings page —
-//! they must never appear as selectable model chips.
+//! Official xAI cache (`models_cache.json`) is one source. Atlas enterprise
+//! catalog lives in the live CLI home `config.toml` as `[model.*]` (often
+//! `managed = true`) and is what `atlas /model` shows — merge those ids here.
+//! App-written custom relays under Settings → Providers stay channels.
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -78,6 +80,16 @@ struct ParsedCacheModel {
 
 fn user_grok_home() -> PathBuf {
     crate::process_util::user_home().join(".grok")
+}
+
+fn shared_cli_home() -> PathBuf {
+    crate::paths::shared_cli_home()
+}
+
+/// True when `value` looks like At-Rest ENC (do not use as a display label).
+fn looks_like_at_rest_enc(value: &str) -> bool {
+    let t = value.trim();
+    t.starts_with("ENC(") && t.ends_with(')')
 }
 
 /// Newest official catalog id used as the empty-cache / preferred default.
@@ -241,9 +253,14 @@ fn normalize_effort_defaults(efforts: &mut [ReasoningEffort]) {
 fn preferred_official_model_id(
     by_id: &BTreeMap<String, AvailableModel>,
     settings_model: Option<&str>,
+    config_default: Option<&str>,
 ) -> String {
     if let Some(id) = settings_model.map(str::trim).filter(|s| !s.is_empty()) {
-        // Official cache never contains custom provider route ids.
+        if by_id.contains_key(id) {
+            return id.to_string();
+        }
+    }
+    if let Some(id) = config_default.map(str::trim).filter(|s| !s.is_empty()) {
         if by_id.contains_key(id) {
             return id.to_string();
         }
@@ -258,6 +275,64 @@ fn preferred_official_model_id(
         .next()
         .cloned()
         .unwrap_or_else(|| OFFICIAL_FALLBACK_MODEL_ID.into())
+}
+
+/// Atlas / Grok Build catalog ids from `config.toml` `[model.*]`.
+///
+/// Catalog **id** is the table name. Display uses plaintext `name` (never ENC).
+/// Does not copy `api_key` / routing `model` onto the UI struct.
+fn parse_config_catalog_models(text: &str) -> BTreeMap<String, ParsedCacheModel> {
+    let mut map = BTreeMap::new();
+    for section in crate::providers::parse_model_sections_for_proxy(text) {
+        let id = section.id.trim();
+        if id.is_empty() {
+            continue;
+        }
+        let hidden = section
+            .fields
+            .get("hidden")
+            .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+            .unwrap_or(false);
+        if hidden {
+            continue;
+        }
+        let label = section
+            .fields
+            .get("name")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty() && !looks_like_at_rest_enc(s))
+            .unwrap_or(id)
+            .to_string();
+        let context_window = section
+            .fields
+            .get("context_window")
+            .and_then(|s| s.trim().parse::<u64>().ok());
+        map.insert(
+            id.to_string(),
+            ParsedCacheModel {
+                label,
+                reasoning_efforts: Vec::new(),
+                context_window,
+            },
+        );
+    }
+    map
+}
+
+fn insert_parsed_models(
+    by_id: &mut BTreeMap<String, AvailableModel>,
+    map: BTreeMap<String, ParsedCacheModel>,
+) {
+    for (id, parsed) in map {
+        by_id.entry(id.clone()).or_insert(AvailableModel {
+            id,
+            label: parsed.label,
+            source: "official".into(),
+            is_default: false,
+            reasoning_efforts: parsed.reasoning_efforts,
+            context_window: parsed.context_window,
+        });
+    }
 }
 
 /// Parse `/info/reasoning_efforts` from a models_cache entry body.
@@ -374,23 +449,35 @@ fn read_models_cache(
 
 /// Models the user can select in the composer.
 ///
-/// **Only** official Grok Build catalog IDs from `models_cache.json`.
-/// Custom providers (`[model.*]` in config.toml) are channels — switch them under
-/// Settings → Account → Providers, not here.
+/// Sources (first id wins, later files only fill gaps):
+/// 1. `models_cache.json` under live GROK_HOME, then `~/.atlas`, then `~/.grok`
+/// 2. Atlas / Grok Build `[model.*]` in the same homes' `config.toml`
+///    (enterprise managed catalog — this is what `atlas /model` lists)
+/// 3. Hard fallback `grok-4.6` when both are empty
+///
+/// App Settings → Providers relays are still channels; they are written only
+/// to App `agent-home` and are not the Atlas enterprise list.
 pub fn list_available_models() -> AvailableModelsResult {
     let settings = store::load_settings();
     let agent_home = resolve_agent_grok_home(&settings.session_data_mode);
+    let atlas_home = shared_cli_home();
+    let legacy_home = user_grok_home();
 
     let mut by_id: BTreeMap<String, AvailableModel> = BTreeMap::new();
     let mut origin = None;
     let mut fetched_at = None;
+    let mut config_default = None;
 
-    // Prefer agent-home cache (GROK_HOME for independent mode), then ~/.grok.
-    // Do NOT merge agent config.toml [model.*] provider routes into this list.
-    for cache in [
-        agent_home.join("models_cache.json"),
-        user_grok_home().join("models_cache.json"),
-    ] {
+    let mut cache_homes: Vec<PathBuf> = vec![agent_home.clone()];
+    if atlas_home != agent_home {
+        cache_homes.push(atlas_home.clone());
+    }
+    if legacy_home != agent_home && legacy_home != atlas_home {
+        cache_homes.push(legacy_home.clone());
+    }
+
+    for home in &cache_homes {
+        let cache = home.join("models_cache.json");
         if let Some((map, o, f)) = read_models_cache(&cache) {
             if origin.is_none() {
                 origin = o;
@@ -398,23 +485,25 @@ pub fn list_available_models() -> AvailableModelsResult {
             if fetched_at.is_none() {
                 fetched_at = f;
             }
-            for (id, parsed) in map {
-                by_id.entry(id.clone()).or_insert(AvailableModel {
-                    id,
-                    label: parsed.label,
-                    source: "official".into(),
-                    is_default: false,
-                    reasoning_efforts: parsed.reasoning_efforts,
-                    context_window: parsed.context_window,
-                });
-            }
-            if !by_id.is_empty() {
-                break;
-            }
+            insert_parsed_models(&mut by_id, map);
         }
     }
 
-    // Hard fallback — known official ids when cache is empty / offline.
+    for home in &cache_homes {
+        let cfg_path = home.join("config.toml");
+        let Ok(text) = fs::read_to_string(&cfg_path) else {
+            continue;
+        };
+        if text.trim().is_empty() {
+            continue;
+        }
+        if config_default.is_none() {
+            config_default = crate::providers::get_models_default(&text);
+        }
+        insert_parsed_models(&mut by_id, parse_config_catalog_models(&text));
+    }
+
+    // Hard fallback — known official ids when cache + Atlas catalog empty.
     // Live CLI cache replaces this list, including Fast when the CLI ships it.
     if by_id.is_empty() {
         insert_static_fallback(&mut by_id);
@@ -433,9 +522,12 @@ pub fn list_available_models() -> AvailableModelsResult {
         }
     }
 
-    // Prefer a saved official catalog id; ignore stale provider route ids
-    // (e.g. "yunyi"). Otherwise newest official present (4.6 > 4.5).
-    let preferred = preferred_official_model_id(&by_id, settings.model_id.as_deref());
+    // Settings model id, then CLI `[models].default`, then newest official (4.6 > 4.5).
+    let preferred = preferred_official_model_id(
+        &by_id,
+        settings.model_id.as_deref(),
+        config_default.as_deref(),
+    );
 
     let mut models: Vec<AvailableModel> = by_id.into_values().collect();
     models.sort_by(|a, b| a.id.cmp(&b.id));
@@ -670,6 +762,75 @@ mod tests {
     }
 
     #[test]
+    fn parse_config_catalog_uses_table_id_and_plaintext_name() {
+        let text = r#"
+[models]
+default = "arch-kimi-for-coding"
+
+[model.arch-kimi-for-coding]
+name = "架构组kimi coding"
+context_window = 200000
+managed = true
+
+[model."arch-glm-5.2"]
+name = "arch-glm-5.2"
+context_window = 200000
+managed = true
+
+[model.hidden-one]
+name = "nope"
+hidden = true
+
+[model.enc-name]
+name = "ENC(not-a-label)"
+"#;
+        let map = parse_config_catalog_models(text);
+        assert_eq!(
+            map.get("arch-kimi-for-coding").map(|m| m.label.as_str()),
+            Some("架构组kimi coding")
+        );
+        assert_eq!(
+            map.get("arch-kimi-for-coding").and_then(|m| m.context_window),
+            Some(200000)
+        );
+        assert_eq!(
+            map.get("arch-glm-5.2").map(|m| m.label.as_str()),
+            Some("arch-glm-5.2")
+        );
+        assert!(!map.contains_key("hidden-one"));
+        assert_eq!(
+            map.get("enc-name").map(|m| m.label.as_str()),
+            Some("enc-name")
+        );
+        assert_eq!(
+            crate::providers::get_models_default(text).as_deref(),
+            Some("arch-kimi-for-coding")
+        );
+    }
+
+    #[test]
+    fn preferred_id_uses_config_default_when_settings_unknown() {
+        let mut by_id = BTreeMap::new();
+        by_id.insert(
+            "arch-kimi-for-coding".into(),
+            AvailableModel {
+                id: "arch-kimi-for-coding".into(),
+                label: "kimi".into(),
+                source: "official".into(),
+                is_default: false,
+                reasoning_efforts: vec![],
+                context_window: None,
+            },
+        );
+        let pick = preferred_official_model_id(
+            &by_id,
+            Some("grok-4.6"),
+            Some("arch-kimi-for-coding"),
+        );
+        assert_eq!(pick, "arch-kimi-for-coding");
+    }
+
+    #[test]
     fn merge_live_context_windows_inserts_without_panic() {
         // Use a unique id to avoid interfering with other tests / list_available_models.
         let unique = format!(
@@ -705,17 +866,17 @@ mod tests {
         for id in ["grok-4.5", "grok-4.6", "grok-4.7", "grok-4.7-build-fast"] {
             by_id.insert(id.to_string(), stub_model(id));
         }
-        assert_eq!(preferred_official_model_id(&by_id, None), "grok-4.7");
+        assert_eq!(preferred_official_model_id(&by_id, None, None), "grok-4.7");
         assert_eq!(
-            preferred_official_model_id(&by_id, Some("grok-4.7-build-fast")),
+            preferred_official_model_id(&by_id, Some("grok-4.7-build-fast"), None),
             "grok-4.7-build-fast"
         );
         assert_eq!(
-            preferred_official_model_id(&by_id, Some("grok-4.6")),
+            preferred_official_model_id(&by_id, Some("grok-4.6"), None),
             "grok-4.6"
         );
         assert_eq!(
-            preferred_official_model_id(&by_id, Some("not-in-cache")),
+            preferred_official_model_id(&by_id, Some("not-in-cache"), None),
             "grok-4.7"
         );
     }
