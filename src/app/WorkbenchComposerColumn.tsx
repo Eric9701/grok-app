@@ -42,7 +42,6 @@ import { ComposerRemoteMenu } from "@/components/ComposerRemoteMenu";
 import { ComposerWorktreeMenu } from "@/components/ComposerWorktreeMenu";
 import { AskUserBar } from "@/components/AskUserBar";
 import { PermissionCountdown } from "@/components/PermissionCountdown";
-import { SuperGrokMark } from "@/components/SuperGrokMark";
 import { IconFileDiff, IconGitBranch } from "@/components/icons";
 import { Tip } from "@/components/ui/tooltip";
 import { mapProjectsList, projectDisplayName } from "@/lib/app/sidebarModels";
@@ -289,7 +288,6 @@ type ComposerAttachLabels = {
 
 export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
   const {
-    account,
     activeProject,
     addProjectFromPicker,
     bindSessionProject,
@@ -339,7 +337,6 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
     switchToWorktree,
     switchToBranch,
     welcomeBrandKind,
-    welcomeProviderBrandNode,
     welcomeSession,
     welcomeMotionEnabled,
     welcomeIntroActive,
