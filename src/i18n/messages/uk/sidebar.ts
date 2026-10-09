@@ -79,6 +79,8 @@ export const ukSidebar = {
   "atlasCloud.done": "Готово",
   "atlasCloud.failed": "Помилка",
   "atlasCloud.cancelled": "Скасовано",
+  "atlasCloud.siteEmpty": "Сайт Atlas Cloud ще не задано. Додайте адресу в Налаштування → Atlas.",
+  "atlasCloud.openSettings": "Відкрити налаштування",
   "sidebar.newSession": "Нова сесія",
   "sidebar.update.available": "Доступне оновлення{version}",
   "sidebar.update.downloading": "Завантаження оновлення{version}…",

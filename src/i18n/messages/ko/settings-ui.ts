@@ -54,6 +54,7 @@ export const koSettingsUi = {
   "settings.nav.archived": "보관된 대화",
   "settings.nav.extensions": "확장",
   "settings.nav.runtime": "CLI / 런타임",
+  "settings.nav.atlas": "Atlas",
   "settings.nav.shortcuts": "키보드",
   "settings.nav.about": "정보",
   "settings.tab.composer": "작성기",

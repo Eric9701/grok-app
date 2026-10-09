@@ -2,7 +2,10 @@
 export const ukKanban = {
   "kanban.title": "Агенти",
   "kanban.open": "Канбан агентів",
-  "kanban.hint": "Активні агенти за станом виконання — Потрібна дія, Працює, Готово. Це не особистий список справ. Натисніть картку, щоб відкрити відповідний чат.",
+  "kanban.hint": "Активні агенти за станом виконання — Потрібна дія, Працює, Готово. Це не особистий список справ. Картка чату відкриває цей чат. Картка Atlas Cloud відкриває це завдання.",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Відкрити Atlas Cloud",
+  "kanban.relayUntitled": "Хмарне завдання",
   "kanban.total": "Усього: {n}",
   "kanban.view.dashboard": "Панель",
   "kanban.view.map": "Карта агентів",

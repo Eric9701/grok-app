@@ -79,6 +79,8 @@ export const esSidebar = {
   "atlasCloud.done": "Hecho",
   "atlasCloud.failed": "Error",
   "atlasCloud.cancelled": "Cancelado",
+  "atlasCloud.siteEmpty": "Aún no hay un sitio de Atlas Cloud. Añade la dirección en Ajustes → Atlas.",
+  "atlasCloud.openSettings": "Abrir ajustes",
   "sidebar.newSession": "Nueva sesión",
   "sidebar.update.available": "Actualización disponible{version}",
   "sidebar.update.downloading": "Descargando actualización{version}…",

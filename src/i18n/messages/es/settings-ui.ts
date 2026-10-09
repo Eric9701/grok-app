@@ -54,6 +54,7 @@ export const esSettingsUi = {
   "settings.nav.archived": "Chats archivados",
   "settings.nav.extensions": "Extensiones",
   "settings.nav.runtime": "CLI / Ejecución",
+  "settings.nav.atlas": "Atlas",
   "settings.nav.shortcuts": "Teclado",
   "settings.nav.about": "Acerca de",
   "settings.tab.composer": "Cuadro de mensaje",

@@ -58,3 +58,19 @@ export function resolveWorkbenchHash(
   }
   return { kind: "pane", pane: "chat" };
 }
+
+/** `#/atlas-cloud/task/<id>` still parses a prompt id. The cloud pane is a site webview and does not highlight that row. */
+export function atlasCloudTaskIdFromHash(
+  fullHash: string | null | undefined,
+): string | null {
+  const raw = (fullHash || "").replace(/^#\/?/, "").split("?")[0];
+  const parts = raw.split("/").filter(Boolean);
+  if (parts[0] !== "atlas-cloud" || parts[1] !== "task") return null;
+  const id = parts[2]?.trim() ?? "";
+  if (!id) return null;
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    return id;
+  }
+}

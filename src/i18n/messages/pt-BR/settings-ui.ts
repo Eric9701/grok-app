@@ -54,6 +54,7 @@ export const ptBRSettingsUi = {
   "settings.nav.archived": "Chats arquivados",
   "settings.nav.extensions": "Extensões",
   "settings.nav.runtime": "CLI / Runtime",
+  "settings.nav.atlas": "Atlas",
   "settings.nav.shortcuts": "Teclado",
   "settings.nav.about": "Sobre",
   "settings.tab.composer": "Compositor",

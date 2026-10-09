@@ -54,6 +54,7 @@ export const itSettingsUi = {
   "settings.nav.archived": "Chat archiviate",
   "settings.nav.extensions": "Estensioni",
   "settings.nav.runtime": "CLI / Runtime",
+  "settings.nav.atlas": "Atlas",
   "settings.nav.shortcuts": "Tastiera",
   "settings.nav.about": "Informazioni",
   "settings.tab.composer": "Composer",

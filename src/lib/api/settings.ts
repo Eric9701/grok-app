@@ -47,10 +47,14 @@ export interface AppSettings {
   atlasRelayAgentUrl?: string | null;
   /** `agent_id` query on the relay agent socket. */
   atlasRelayAgentId?: string | null;
+  /** `token` query on the relay agent socket. Empty omits it. */
+  atlasRelayAgentToken?: string | null;
   /** Keep the relay agent connected, including after the next launch. */
   atlasRelayAgentEnabled?: boolean;
   /** Seconds between WebSocket Pings to Atlas Relay. 0 uses the 15s default. */
   atlasRelayAgentHealthSecs?: number;
+  /** Sidebar Atlas Cloud webview. Empty until set in Settings → Atlas. */
+  atlasCloudSiteUrl?: string | null;
   /** OpenSSH Host aliases with watch enabled. */
   sshWatchAliases?: string[] | null;
   /** Max warm/live agent processes (default 3). */

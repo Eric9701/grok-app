@@ -54,6 +54,7 @@ export const ruSettingsUi = {
   "settings.nav.archived": "Архивные чаты",
   "settings.nav.extensions": "Расширения",
   "settings.nav.runtime": "CLI / Среда выполнения",
+  "settings.nav.atlas": "Atlas",
   "settings.nav.shortcuts": "Клавиатура",
   "settings.nav.about": "О приложении",
   "settings.tab.composer": "Ввод",

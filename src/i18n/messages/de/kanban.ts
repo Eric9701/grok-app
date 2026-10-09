@@ -2,7 +2,10 @@
 export const deKanban = {
   "kanban.title": "Agenten",
   "kanban.open": "Agenten-Kanban",
-  "kanban.hint": "Aktive Agenten nach Laufstatus — Aktion nötig, Arbeitet, Fertig. Keine persönliche To-do-Liste. Klicke eine Karte, um den Chat zu öffnen.",
+  "kanban.hint": "Aktive Agenten nach Laufstatus — Aktion nötig, Arbeitet, Fertig. Keine persönliche To-do-Liste. Eine Chat-Karte öffnet den Chat. Eine Atlas-Cloud-Karte öffnet diese Aufgabe.",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Atlas Cloud öffnen",
+  "kanban.relayUntitled": "Cloud-Aufgabe",
   "kanban.total": "{n} gesamt",
   "kanban.view.dashboard": "Dashboard",
   "kanban.view.map": "Agentenkarte",

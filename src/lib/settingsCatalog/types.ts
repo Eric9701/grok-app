@@ -14,6 +14,7 @@ export type SettingsSectionId =
   | "extensions"
   | "remote_im"
   | "runtime"
+  | "atlas"
   | "shortcuts"
   | "about";
 
@@ -25,6 +26,7 @@ export const SETTINGS_SECTION_IDS: readonly SettingsSectionId[] = [
   "pet",
   "extensions",
   "runtime",
+  "atlas",
   "remote_im",
   "shortcuts",
   "about",
@@ -83,6 +85,7 @@ export type SettingsNavIcon =
   | "extensions"
   | "remote_im"
   | "doctor"
+  | "cloud"
   | "keyboard"
   | "info";
 

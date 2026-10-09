@@ -79,6 +79,8 @@ export const taSidebar = {
   "atlasCloud.done": "முடிந்தது",
   "atlasCloud.failed": "தோல்வி",
   "atlasCloud.cancelled": "ரத்து செய்யப்பட்டது",
+  "atlasCloud.siteEmpty": "Atlas Cloud தளம் இன்னும் இல்லை. அமைப்புகள் → Atlas இல் முகவரியைச் சேர்க்கவும்.",
+  "atlasCloud.openSettings": "அமைப்புகளைத் திற",
   "sidebar.newSession": "புதிய அமர்வு",
   "sidebar.update.available": "புதுப்பிப்பு கிடைக்கிறது{version}",
   "sidebar.update.downloading": "புதுப்பிப்பு பதிவிறக்கப்படுகிறது{version}…",

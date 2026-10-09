@@ -54,6 +54,7 @@ export const idSettingsUi = {
   "settings.nav.archived": "Obrolan yang diarsipkan",
   "settings.nav.extensions": "Ekstensi",
   "settings.nav.runtime": "CLI / Runtime",
+  "settings.nav.atlas": "Atlas",
   "settings.nav.shortcuts": "Papan ketik",
   "settings.nav.about": "Tentang",
   "settings.tab.composer": "Composer",

@@ -79,6 +79,8 @@ export const zhTWSidebar = {
   "atlasCloud.done": "已完成",
   "atlasCloud.failed": "失敗",
   "atlasCloud.cancelled": "已取消",
+  "atlasCloud.siteEmpty": "還沒有填寫 Atlas 雲端站點。請到設定 → Atlas 填寫地址。",
+  "atlasCloud.openSettings": "開啟設定",
   "sidebar.newSession": "新增對話",
   "sidebar.update.available": "有可用更新{version}",
   "sidebar.update.downloading": "正在下載更新{version}…",

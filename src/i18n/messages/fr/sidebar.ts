@@ -79,6 +79,8 @@ export const frSidebar = {
   "atlasCloud.done": "Terminé",
   "atlasCloud.failed": "Échec",
   "atlasCloud.cancelled": "Annulé",
+  "atlasCloud.siteEmpty": "Aucun site Atlas Cloud pour l’instant. Ajoutez l’adresse dans Réglages → Atlas.",
+  "atlasCloud.openSettings": "Ouvrir les réglages",
   "sidebar.newSession": "Nouvelle session",
   "sidebar.update.available": "Mise à jour disponible{version}",
   "sidebar.update.downloading": "Téléchargement de la mise à jour{version}…",

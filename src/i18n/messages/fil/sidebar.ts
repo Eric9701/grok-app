@@ -79,6 +79,8 @@ export const filSidebar = {
   "atlasCloud.done": "Tapos na",
   "atlasCloud.failed": "Nabigo",
   "atlasCloud.cancelled": "Kinansela",
+  "atlasCloud.siteEmpty": "Wala pang site ng Atlas Cloud. Ilagay ang address sa Mga Setting → Atlas.",
+  "atlasCloud.openSettings": "Buksan ang mga setting",
   "sidebar.newSession": "Bagong session",
   "sidebar.update.available": "May update{version}",
   "sidebar.update.downloading": "Dina-download ang update{version}…",

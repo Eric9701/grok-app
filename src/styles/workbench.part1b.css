@@ -507,7 +507,8 @@
   white-space: nowrap;
 }
 
-.agent-kanban__card-current {
+.agent-kanban__card-current,
+.agent-kanban__card-source {
   font-size: 10.5px;
   color: var(--accent, #5b8def);
   font-weight: 560;

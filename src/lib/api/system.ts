@@ -310,10 +310,15 @@ export async function atlasRelayAgentStatus() {
   return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_status");
 }
 
-export async function atlasRelayAgentConnect(url: string, agentId: string) {
+export async function atlasRelayAgentConnect(
+  url: string,
+  agentId: string,
+  token?: string,
+) {
   return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_connect", {
     url,
     agentId,
+    token: token?.trim() || "",
   });
 }
 

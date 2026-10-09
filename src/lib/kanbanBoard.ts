@@ -43,8 +43,14 @@ export const AGENT_KANBAN_DEFAULT_COLUMNS: readonly AgentKanbanColumnId[] = [
 
 export const AGENT_KANBAN_PREFS_KEY = "grok-app.agentKanbanPrefs";
 
+export type AgentKanbanCardSource = "session" | "relay";
+
 export type AgentKanbanCard = TaskBoardCard & {
   kanbanColumn: AgentKanbanColumnId;
+  /** Desktop chat, or one Atlas Relay `session/prompt`. */
+  source: AgentKanbanCardSource;
+  /** JSON-RPC id when `source` is `relay`. */
+  relayTaskId?: string;
 };
 
 export type AgentKanbanBoard = Record<AgentKanbanColumnId, AgentKanbanCard[]>;
@@ -158,7 +164,7 @@ function projectTaskBoard(
       const dest = mapTaskColumnToAgentKanban(card.column, {
         finishedTurn,
       });
-      out[dest].push({ ...card, kanbanColumn: dest });
+      out[dest].push({ ...card, kanbanColumn: dest, source: "session" });
     }
   }
   return out;
@@ -198,6 +204,85 @@ export function buildAgentKanban(opts: BuildAgentKanbanOpts): AgentKanbanBoard {
   return projectTaskBoard(taskBoard, opts.liveMap, recentDoneAt);
 }
 
+/** One cloud `session/prompt`. Not a desktop session. */
+export type RelayKanbanTask = {
+  id: string;
+  text: string;
+  status: string;
+  error?: string | null;
+  atMs: number;
+};
+
+/**
+ * Relay status → kanban column.
+ * Cancelled and unknown statuses stay off the board.
+ * `--always-approve` means a task never waits on permission.
+ */
+export function relayTaskKanbanColumn(status: string): AgentKanbanColumnId | null {
+  if (status === "running") return "working";
+  if (status === "done") return "done";
+  if (status === "failed") return "needs_you";
+  return null;
+}
+
+export function relayTaskToKanbanCard(
+  task: RelayKanbanTask,
+  labels: { projectName: string; untitled: string },
+): AgentKanbanCard | null {
+  const kanbanColumn = relayTaskKanbanColumn(task.status);
+  const id = task.id.trim();
+  if (!kanbanColumn || !id) return null;
+  const title = task.text.trim() || labels.untitled;
+  const error = task.error?.trim() || "";
+  const column: TaskBoardColumn =
+    kanbanColumn === "working"
+      ? "running"
+      : kanbanColumn === "needs_you"
+        ? "error"
+        : "done";
+  return {
+    sessionId: `relay:${id}`,
+    title,
+    projectName: labels.projectName,
+    projectPath: null,
+    status: kanbanColumn === "working" ? "busy" : kanbanColumn === "needs_you" ? "error" : "idle",
+    column,
+    liveToolTitle: error || null,
+    isCurrent: false,
+    lastActivityAt: Number.isFinite(task.atMs) ? task.atMs : 0,
+    archived: false,
+    kanbanColumn,
+    source: "relay",
+    relayTaskId: id,
+  };
+}
+
+/** Append cloud prompts beside session cards. Does not write sessions. */
+export function mergeRelayTasksIntoKanban(
+  board: AgentKanbanBoard,
+  tasks: readonly RelayKanbanTask[],
+  labels: { projectName: string; untitled: string },
+): AgentKanbanBoard {
+  const out = createEmptyAgentKanbanBoard();
+  for (const col of AGENT_KANBAN_COLUMN_IDS) {
+    out[col] = board[col].slice();
+  }
+  const touched = new Set<AgentKanbanColumnId>();
+  for (const task of tasks) {
+    const card = relayTaskToKanbanCard(task, labels);
+    if (!card) continue;
+    out[card.kanbanColumn].push(card);
+    touched.add(card.kanbanColumn);
+  }
+  for (const col of touched) {
+    out[col].sort((a, b) => {
+      if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
+      return b.lastActivityAt - a.lastActivityAt;
+    });
+  }
+  return out;
+}
+
 export function filterAgentKanban(
   board: AgentKanbanBoard,
   filter: { query?: string; projectQuery?: string } = {},
@@ -210,17 +295,19 @@ export function filterAgentKanban(
     error: [],
   };
   const filtered = filterTaskBoard(asTask, filter);
+  const keep = (c: TaskBoardCard, column: AgentKanbanColumnId): AgentKanbanCard => {
+    const extra = c as AgentKanbanCard;
+    return {
+      ...extra,
+      kanbanColumn: column,
+      source: extra.source === "relay" ? "relay" : "session",
+    };
+  };
   return {
-    needs_you: filtered.needs_you.map((c) => ({
-      ...c,
-      kanbanColumn: "needs_you" as const,
-    })),
-    working: filtered.running.map((c) => ({
-      ...c,
-      kanbanColumn: "working" as const,
-    })),
-    done: filtered.done.map((c) => ({ ...c, kanbanColumn: "done" as const })),
-    idle: filtered.idle.map((c) => ({ ...c, kanbanColumn: "idle" as const })),
+    needs_you: filtered.needs_you.map((c) => keep(c, "needs_you")),
+    working: filtered.running.map((c) => keep(c, "working")),
+    done: filtered.done.map((c) => keep(c, "done")),
+    idle: filtered.idle.map((c) => keep(c, "idle")),
   };
 }
 

@@ -79,6 +79,8 @@ export const koSidebar = {
   "atlasCloud.done": "완료",
   "atlasCloud.failed": "실패",
   "atlasCloud.cancelled": "취소됨",
+  "atlasCloud.siteEmpty": "Atlas 클라우드 사이트가 아직 없습니다. 설정 → Atlas에서 주소를 입력하세요.",
+  "atlasCloud.openSettings": "설정 열기",
   "sidebar.newSession": "새 세션",
   "sidebar.update.available": "업데이트 있음{version}",
   "sidebar.update.downloading": "업데이트 다운로드 중{version}…",

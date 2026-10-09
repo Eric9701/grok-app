@@ -2,7 +2,10 @@
 export const ptBRKanban = {
   "kanban.title": "Agentes",
   "kanban.open": "Kanban de agentes",
-  "kanban.hint": "Agentes ativos por estado de execução — Precisa de você, Trabalhando, Concluído. Não é uma lista de tarefas pessoal. Clique num cartão para abrir aquela conversa.",
+  "kanban.hint": "Agentes ativos por estado de execução — Precisa de você, Trabalhando, Concluído. Não é uma lista de tarefas pessoal. Um cartão de conversa abre aquele chat. Um cartão Atlas Cloud abre essa tarefa.",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Abrir Atlas Cloud",
+  "kanban.relayUntitled": "Tarefa na nuvem",
   "kanban.total": "{n} no total",
   "kanban.view.dashboard": "Painel",
   "kanban.view.map": "Mapa de agentes",

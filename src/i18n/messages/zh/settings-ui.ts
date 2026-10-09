@@ -54,6 +54,7 @@ export const zhSettingsUi = {
   "settings.nav.archived": "已归档会话",
   "settings.nav.extensions": "扩展",
   "settings.nav.runtime": "CLI / 运行时",
+  "settings.nav.atlas": "Atlas",
   "settings.nav.shortcuts": "键盘",
   "settings.nav.about": "关于",
   "settings.tab.composer": "对话偏好",

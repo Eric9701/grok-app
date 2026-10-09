@@ -22,6 +22,9 @@ import {
   mapTaskColumnToAgentKanban,
   markAgentKanbanSeen,
   mergeKanbanLiveMaps,
+  mergeRelayTasksIntoKanban,
+  relayTaskKanbanColumn,
+  relayTaskToKanbanCard,
   saveAgentKanbanPrefs,
   visibleAgentKanbanColumns,
   type AgentKanbanStorage,
@@ -319,6 +322,65 @@ describe("buildAgentKanban (shipped buildTaskBoard path)", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0]!.name).toBe("grok-app");
     expect(groups[0]!.cards.map((c) => c.sessionId).sort()).toEqual(["a", "b"]);
+  });
+});
+
+describe("relay tasks on the agent kanban", () => {
+  const labels = { projectName: "Atlas Cloud", untitled: "Cloud task" };
+
+  it("maps running, done, and failed, and drops cancelled", () => {
+    expect(relayTaskKanbanColumn("running")).toBe("working");
+    expect(relayTaskKanbanColumn("done")).toBe("done");
+    expect(relayTaskKanbanColumn("failed")).toBe("needs_you");
+    expect(relayTaskKanbanColumn("cancelled")).toBeNull();
+    expect(
+      relayTaskToKanbanCard(
+        { id: "  ", text: "x", status: "running", atMs: 1 },
+        labels,
+      ),
+    ).toBeNull();
+  });
+
+  it("keeps session cards and does not use the desktop session id", () => {
+    const board = createEmptyAgentKanbanBoard();
+    board.working.push({
+      sessionId: "chat-1",
+      title: "local",
+      projectName: "app",
+      projectPath: "/app",
+      status: "busy",
+      column: "running",
+      liveToolTitle: null,
+      isCurrent: false,
+      lastActivityAt: 50,
+      archived: false,
+      kanbanColumn: "working",
+      source: "session",
+    });
+    const merged = mergeRelayTasksIntoKanban(
+      board,
+      [
+        { id: "9", text: "  ", status: "running", atMs: 80 },
+        { id: "3", text: "look", status: "done", atMs: 10 },
+        { id: "4", text: "nope", status: "failed", error: "boom", atMs: 20 },
+        { id: "5", text: "stop", status: "cancelled", atMs: 30 },
+      ],
+      labels,
+    );
+    expect(merged.working.map((c) => c.sessionId)).toEqual(["relay:9", "chat-1"]);
+    expect(merged.working[0]).toMatchObject({
+      source: "relay",
+      relayTaskId: "9",
+      title: "Cloud task",
+      projectName: "Atlas Cloud",
+    });
+    expect(merged.done.map((c) => c.relayTaskId)).toEqual(["3"]);
+    expect(merged.needs_you[0]).toMatchObject({
+      relayTaskId: "4",
+      liveToolTitle: "boom",
+    });
+    expect(countAgentKanbanCards(merged)).toBe(4);
+    expect(board.working).toHaveLength(1);
   });
 });
 

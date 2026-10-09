@@ -216,6 +216,7 @@ import { ArchivedSection } from "@/components/settings/ArchivedSection";
 import { ExtensionsSection } from "@/components/settings/ExtensionsSection";
 import { RemoteImSection } from "@/components/settings/RemoteImSection";
 import { RuntimeSection } from "@/components/settings/RuntimeSection";
+import { AtlasSection } from "@/components/settings/AtlasSection";
 import { ShortcutsSection } from "@/components/settings/ShortcutsSection";
 import { AboutSection } from "@/components/settings/AboutSection";
 import { PetSection } from "@/components/settings/PetSection";
@@ -1970,6 +1971,7 @@ export function SettingsPage({
         {section === "extensions" && <ExtensionsSection />}
         {section === "remote_im" && <RemoteImSection />}
         {section === "runtime" && <RuntimeSection />}
+        {section === "atlas" && <AtlasSection />}
         {section === "shortcuts" && <ShortcutsSection />}
         {section === "about" && <AboutSection />}
       </main>

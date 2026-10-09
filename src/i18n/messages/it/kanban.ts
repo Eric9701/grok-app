@@ -2,7 +2,10 @@
 export const itKanban = {
   "kanban.title": "Agenti",
   "kanban.open": "Kanban degli agenti",
-  "kanban.hint": "Agenti attivi per stato di esecuzione — Richiede attenzione, In lavorazione, Completato. Non è un elenco di attività personali. Clicca una scheda per aprire quella chat.",
+  "kanban.hint": "Agenti attivi per stato di esecuzione — Richiede attenzione, In lavorazione, Completato. Non è un elenco di attività personali. Una scheda chat apre quella conversazione. Una scheda Atlas Cloud apre quel compito.",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Apri Atlas Cloud",
+  "kanban.relayUntitled": "Attività cloud",
   "kanban.total": "{n} in totale",
   "kanban.view.dashboard": "Dashboard",
   "kanban.view.map": "Mappa degli agenti",

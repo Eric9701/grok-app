@@ -1,6 +1,6 @@
 //! Atlas Relay **Agent** bridge.
 //!
-//! Outbound WebSocket to `atlas-relay-demo` `/ws?agent_id=`. Each ACP JSON
+//! Outbound WebSocket to `atlas-relay-demo` `/ws?agent_id=&token=`. Each ACP JSON
 //! frame is written as one line to a local `atlas agent --always-approve stdio`
 //! process, and each stdout line is sent back as one WebSocket text frame.
 //! The desktop session client is not involved.
@@ -96,7 +96,7 @@ fn snapshot() -> AtlasRelayAgentStatus {
         error: s.error.clone(),
         cli_alive: s.cli_alive,
         agent_id: s.agent_id.clone(),
-        url: s.url.clone(),
+        url: redact_relay_url(&s.url),
         tasks: s.tasks.clone(),
     })
 }
@@ -237,13 +237,22 @@ pub fn sanitize_agent_id(raw: &str) -> String {
     flat.trim().chars().take(128).collect()
 }
 
+/// Drop whitespace and control characters. Empty means “no token”.
+pub fn sanitize_token(raw: &str) -> String {
+    raw.chars()
+        .filter(|c| !c.is_control() && !c.is_whitespace())
+        .take(512)
+        .collect()
+}
+
 /// Normalize a pasted relay address into the Agent socket
-/// `ws(s)://host[:port]/ws?agent_id=...`.
+/// `ws(s)://host[:port]/ws?agent_id=...&token=...`.
 ///
 /// Page URLs (`/build`, `/m`) and a bare `host:port` become `/ws`.
-/// An address that is already `/ws` or `/ws/agent` keeps that path and only
-/// receives `agent_id`.
-pub fn relay_agent_ws_url(raw: &str, agent_id: &str) -> Result<String, String> {
+/// An address that is already `/ws` or `/ws/agent` keeps that path.
+/// `token` is optional. A token typed in settings wins over `token` pasted
+/// on the address.
+pub fn relay_agent_ws_url(raw: &str, agent_id: &str, token: &str) -> Result<String, String> {
     let id = sanitize_agent_id(agent_id);
     if id.is_empty() {
         return Err("empty agent id".into());
@@ -277,6 +286,13 @@ pub fn relay_agent_ws_url(raw: &str, agent_id: &str) -> Result<String, String> {
         || path == "/ws/agent"
         || path.ends_with("/ws")
         || path.ends_with("/ws/agent");
+    let pasted = u
+        .query_pairs()
+        .find(|(k, _)| k == "token")
+        .map(|(_, v)| sanitize_token(&v))
+        .unwrap_or_default();
+    let explicit = sanitize_token(token);
+    let token = if explicit.is_empty() { pasted } else { explicit };
     if !keep_agent_path {
         u.set_path("/ws");
     }
@@ -284,9 +300,53 @@ pub fn relay_agent_ws_url(raw: &str, agent_id: &str) -> Result<String, String> {
         let mut pairs = u.query_pairs_mut();
         pairs.clear();
         pairs.append_pair("agent_id", &id);
+        if !token.is_empty() {
+            pairs.append_pair("token", &token);
+        }
     }
     u.set_fragment(None);
     Ok(u.to_string())
+}
+
+/// Status and logs keep the socket address, with the token value replaced.
+pub fn redact_relay_url(url: &str) -> String {
+    let Ok(mut u) = Url::parse(url) else {
+        return url.to_string();
+    };
+    let pairs: Vec<(String, String)> = u
+        .query_pairs()
+        .map(|(k, v)| {
+            let key = k.into_owned();
+            let val = if key == "token" && !v.is_empty() {
+                "redacted".to_string()
+            } else {
+                v.into_owned()
+            };
+            (key, val)
+        })
+        .collect();
+    if pairs.is_empty() {
+        return u.to_string();
+    }
+    {
+        let mut q = u.query_pairs_mut();
+        q.clear();
+        for (k, v) in &pairs {
+            q.append_pair(k, v);
+        }
+    }
+    u.to_string()
+}
+
+fn token_from_ws_url(url: &str) -> String {
+    Url::parse(url)
+        .ok()
+        .and_then(|u| {
+            u.query_pairs()
+                .find(|(k, _)| k == "token")
+                .map(|(_, v)| v.into_owned())
+        })
+        .unwrap_or_default()
 }
 
 /// One inbound WebSocket body → one stdin line, or drop (`ping` / blank).
@@ -337,10 +397,10 @@ fn current_health_secs() -> u64 {
 }
 
 /// Start or replace the bridge. Reconnects until [`stop`] or a newer start.
-pub fn start(raw_url: &str, agent_id: &str) -> Result<(), String> {
+pub fn start(raw_url: &str, agent_id: &str, token: &str) -> Result<(), String> {
     let saved = crate::store::load_settings();
     set_health_secs(saved.atlas_relay_agent_health_secs);
-    let ws_url = relay_agent_ws_url(raw_url, agent_id)?;
+    let ws_url = relay_agent_ws_url(raw_url, agent_id, token)?;
     let id = sanitize_agent_id(agent_id);
     let gen = GEN.fetch_add(1, Ordering::SeqCst) + 1;
     CANCEL.notify_waiters();
@@ -384,17 +444,21 @@ pub fn apply_settings(settings: &crate::store::AppSettings) {
         .atlas_relay_agent_id
         .as_deref()
         .unwrap_or("");
+    let token = settings
+        .atlas_relay_agent_token
+        .as_deref()
+        .unwrap_or("");
     if url.is_empty() || sanitize_agent_id(id).is_empty() {
         stop();
         return;
     }
-    if let Ok(ws) = relay_agent_ws_url(url, id) {
+    if let Ok(ws) = relay_agent_ws_url(url, id, token) {
         let same = with_state(|s| s.phase != "stopped" && s.url == ws);
         if same {
             return;
         }
     }
-    if let Err(e) = start(url, id) {
+    if let Err(e) = start(url, id, token) {
         with_state(|s| {
             s.phase = "stopped".into();
             s.error = Some(e);
@@ -538,7 +602,8 @@ async fn run_once(gen: u64, ws_url: &str) -> RunEnd {
             s.cli_alive = true;
         }
     });
-    tracing::info!(url = ws_url, pid, "atlas relay agent online");
+    let safe_url = redact_relay_url(ws_url);
+    tracing::info!(url = %safe_url, pid, "atlas relay agent online");
 
     let stdin = child.stdin.take();
     let stdout = child.stdout.take();
@@ -744,15 +809,23 @@ pub fn atlas_relay_agent_status() -> AtlasRelayAgentStatus {
 pub async fn atlas_relay_agent_connect(
     url: String,
     agent_id: String,
+    token: String,
 ) -> Result<AtlasRelayAgentStatus, String> {
     let id = sanitize_agent_id(&agent_id);
-    relay_agent_ws_url(url.trim(), &id)?;
+    let given = token;
+    let ws = relay_agent_ws_url(url.trim(), &id, &given)?;
+    let stored = token_from_ws_url(&ws);
     let mut settings = crate::store::load_settings();
     settings.atlas_relay_agent_url = Some(url.trim().to_string());
     settings.atlas_relay_agent_id = Some(id.clone());
+    settings.atlas_relay_agent_token = if stored.is_empty() {
+        None
+    } else {
+        Some(stored.clone())
+    };
     settings.atlas_relay_agent_enabled = true;
     crate::store::save_settings_async(&settings).await?;
-    start(url.trim(), &id)?;
+    start(url.trim(), &id, &stored)?;
     Ok(status())
 }
 
@@ -773,24 +846,57 @@ mod tests {
     #[test]
     fn agent_url_from_page_host_and_existing_socket() {
         assert_eq!(
-            relay_agent_ws_url("http://10.1.2.3:2420/build?agent=laptop-a", "laptop-a").unwrap(),
+            relay_agent_ws_url("http://10.1.2.3:2420/build?agent=laptop-a", "laptop-a", "").unwrap(),
             "ws://10.1.2.3:2420/ws?agent_id=laptop-a"
         );
         assert_eq!(
-            relay_agent_ws_url("10.1.2.3:2420", "laptop-a").unwrap(),
+            relay_agent_ws_url("10.1.2.3:2420", "laptop-a", "").unwrap(),
             "ws://10.1.2.3:2420/ws?agent_id=laptop-a"
         );
         assert_eq!(
-            relay_agent_ws_url("wss://relay.example:2420/ws/agent", "laptop-b").unwrap(),
+            relay_agent_ws_url("wss://relay.example:2420/ws/agent", "laptop-b", "").unwrap(),
             "wss://relay.example:2420/ws/agent?agent_id=laptop-b"
         );
         assert_eq!(
-            relay_agent_ws_url("https://relay.example/m", "laptop-a").unwrap(),
+            relay_agent_ws_url("https://relay.example/m", "laptop-a", "").unwrap(),
             "wss://relay.example/ws?agent_id=laptop-a"
         );
-        assert!(relay_agent_ws_url("ws://10.1.2.3:2420/ws", "").is_err());
-        assert!(relay_agent_ws_url("", "laptop-a").is_err());
-        assert!(relay_agent_ws_url("ftp://relay.example/ws", "laptop-a").is_err());
+        assert!(relay_agent_ws_url("ws://10.1.2.3:2420/ws", "", "").is_err());
+        assert!(relay_agent_ws_url("", "laptop-a", "").is_err());
+        assert!(relay_agent_ws_url("ftp://relay.example/ws", "laptop-a", "").is_err());
+    }
+
+    #[test]
+    fn agent_url_appends_token_and_keeps_it_out_of_status() {
+        let secret = "OGAhRfcbqFwB_4j63SpU3AadbeGakHflr5Q1MobZNVQ";
+        let id = "9c7fc43585b0422e9cbfe93407f9b150-1";
+        let expected = format!("ws://10.218.221.203:2420/ws?agent_id={id}&token={secret}");
+        assert_eq!(
+            relay_agent_ws_url("ws://10.218.221.203:2420/ws", id, secret).unwrap(),
+            expected
+        );
+        assert_eq!(
+            relay_agent_ws_url(
+                &format!("ws://10.218.221.203:2420/ws?agent_id=other&token={secret}"),
+                id,
+                ""
+            )
+            .unwrap(),
+            expected
+        );
+        assert_eq!(
+            relay_agent_ws_url(
+                "ws://10.218.221.203:2420/ws?token=from-url",
+                id,
+                "from-field"
+            )
+            .unwrap(),
+            format!("ws://10.218.221.203:2420/ws?agent_id={id}&token=from-field")
+        );
+        let redacted = redact_relay_url(&expected);
+        assert!(!redacted.contains(secret));
+        assert!(redacted.contains("token=redacted"));
+        assert!(redacted.contains(id));
     }
 
     #[test]

@@ -79,6 +79,8 @@ export const jaSidebar = {
   "atlasCloud.done": "完了",
   "atlasCloud.failed": "失敗",
   "atlasCloud.cancelled": "キャンセル",
+  "atlasCloud.siteEmpty": "Atlasクラウドサイトが未設定です。設定 → Atlas でアドレスを入力してください。",
+  "atlasCloud.openSettings": "設定を開く",
   "sidebar.newSession": "新しいセッション",
   "sidebar.update.available": "アップデートがあります{version}",
   "sidebar.update.downloading": "アップデートをダウンロード中{version}…",

@@ -2,7 +2,10 @@
 export const koKanban = {
   "kanban.title": "에이전트",
   "kanban.open": "에이전트 칸반",
-  "kanban.hint": "실행 상태별 에이전트 — 확인 필요 / 작업 중 / 완료. 개인 할 일 목록이 아닙니다. 카드를 클릭하면 해당 대화가 열립니다.",
+  "kanban.hint": "실행 상태별 에이전트 — 확인 필요 / 작업 중 / 완료. 개인 할 일 목록이 아닙니다. 채팅 카드는 해당 대화를 열고, Atlas Cloud 카드는 그 작업을 엽니다.",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Atlas 클라우드 열기",
+  "kanban.relayUntitled": "클라우드 작업",
   "kanban.total": "총 {n}개",
   "kanban.view.dashboard": "대시보드",
   "kanban.view.map": "에이전트 맵",

@@ -2,7 +2,10 @@
 export const idKanban = {
   "kanban.title": "Agen",
   "kanban.open": "Kanban agen",
-  "kanban.hint": "Agen aktif menurut status jalan — Perlu Anda, Bekerja, Selesai. Ini bukan daftar tugas pribadi. Klik kartu untuk membuka obrolan itu.",
+  "kanban.hint": "Agen aktif menurut status jalan — Perlu Anda, Bekerja, Selesai. Ini bukan daftar tugas pribadi. Kartu obrolan membuka obrolan itu. Kartu Atlas Cloud membuka tugas itu.",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Buka Atlas Cloud",
+  "kanban.relayUntitled": "Tugas cloud",
   "kanban.total": "Total {n}",
   "kanban.view.dashboard": "Dasbor",
   "kanban.view.map": "Peta agen",

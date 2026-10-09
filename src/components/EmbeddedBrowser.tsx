@@ -203,6 +203,11 @@ export interface EmbeddedBrowserProps {
    */
   instanceId?: string;
   /**
+   * When false, the chrome bar omits the address. Refresh and
+   * open-externally stay. Default true (resource browser).
+   */
+  showAddress?: boolean;
+  /**
    * Bump to force a full document reload without changing `url`
    * (address-bar Enter on same URL / explicit refresh).
    */
@@ -241,6 +246,7 @@ export function EmbeddedBrowser({
   active = true,
   className = "",
   instanceId,
+  showAddress = true,
   reloadKey = 0,
   onLoadingChange,
 }: EmbeddedBrowserProps) {
@@ -260,6 +266,8 @@ export function EmbeddedBrowser({
   const [pageLoading, setPageLoading] = useState(true);
   /** Short status for download save result (host event). */
   const [downloadStatus, setDownloadStatus] = useState<string | null>(null);
+  /** Iframe preview has no host reload; bumping this remounts the frame. */
+  const [previewReload, setPreviewReload] = useState(0);
   /** DOM overlays (floating menus) that must paint above native Webviews. */
   const [covered, setCovered] = useState(() => isNativeWebviewCovered());
   const tr = createT(locale);
@@ -918,7 +926,12 @@ export function EmbeddedBrowser({
   };
 
   const reload = () => {
-    if (!isTauri()) return;
+    if (!isTauri()) {
+      setError(null);
+      markPageLoading(true);
+      setPreviewReload((n) => n + 1);
+      return;
+    }
     if (!webviewRef.current) return;
     void (async () => {
       try {
@@ -937,6 +950,13 @@ export function EmbeddedBrowser({
   // In-navigation feedback is chrome progress only (native surface stays up).
   const showBootLoading = !ready && !error;
   const displayUrl = url.trim();
+  const addressNode = showAddress ? (
+    <span className="embedded-browser__url" title={url}>
+      {url}
+    </span>
+  ) : (
+    <span className="embedded-browser__bar-fill" aria-hidden="true" />
+  );
 
   // Dev / browser preview: iframe has no host page-load events.
   useEffect(() => {
@@ -949,9 +969,7 @@ export function EmbeddedBrowser({
     return (
       <div className={"embedded-browser " + className}>
         <div className="embedded-browser__bar">
-          <span className="embedded-browser__url" title={url}>
-            {url}
-          </span>
+          {addressNode}
           {pageLoading ? (
             <span
               className="embedded-browser__load-status"
@@ -962,6 +980,19 @@ export function EmbeddedBrowser({
               {tr("resources.browserLoading")}
             </span>
           ) : null}
+          <button
+            type="button"
+            className="chrome-btn"
+            onClick={reload}
+            title={tr("resources.browserReload")}
+            aria-busy={pageLoading}
+          >
+            <span
+              className={pageLoading ? "embedded-browser__reload-spin" : undefined}
+            >
+              <IconRefresh size={14} />
+            </span>
+          </button>
           <button
             type="button"
             className="chrome-btn"
@@ -983,7 +1014,7 @@ export function EmbeddedBrowser({
           ) : null}
         </div>
         <iframe
-          key={`${url}::${reloadKey}`}
+          key={`${url}::${reloadKey}::${previewReload}`}
           className="rp-preview__frame rp-preview__frame--browser"
           title={title || url}
           src={url}
@@ -1005,9 +1036,7 @@ export function EmbeddedBrowser({
       data-page-loading={pageLoading ? "1" : "0"}
     >
       <div className="embedded-browser__bar">
-        <span className="embedded-browser__url" title={url}>
-          {url}
-        </span>
+        {addressNode}
         {downloadStatus ? (
           <span
             className="embedded-browser__download-status"
@@ -1090,7 +1119,7 @@ export function EmbeddedBrowser({
             <div className="embedded-browser__loading-text">
               {tr("resources.loading")}
             </div>
-            {displayUrl ? (
+            {showAddress && displayUrl ? (
               <div className="embedded-browser__loading-url" title={displayUrl}>
                 {displayUrl}
               </div>

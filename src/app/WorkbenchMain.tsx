@@ -7,8 +7,8 @@ import type { Dispatch, MouseEvent, ReactNode, SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Tip } from "@/components/ui/tooltip";
 import { OpenLocationButton } from "@/components/OpenLocationButton";
-import { AtlasCloudPane } from "@/components/AtlasCloudPane";
-import { OctoPane } from "@/components/OctoPane";
+import { AtlasCloudSlot } from "@/components/AtlasCloudPane";
+import { OctoSlot } from "@/components/OctoPane";
 import { EnvInfoButton } from "@/components/side-workbench/EnvInfoButton";
 import { BottomTerminalToggle } from "@/components/bottom-terminal/BottomTerminalToggle";
 import { PaneToggleButton } from "@/components/PaneToggleButton";
@@ -473,13 +473,18 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
           )}
         </div>
       </div>
-      {mainPane === "atlasCloud" ? (
-        <AtlasCloudPane locale={locale} tr={tr} status={relayStatus} />
-      ) : mainPane === "octo" ? (
-        <OctoPane locale={locale} title={tr("sidebar.octo")} />
-      ) : (
-        children
-      )}
+      <OctoSlot
+        open={mainPane === "octo"}
+        locale={locale}
+        title={tr("sidebar.octo")}
+      />
+      <AtlasCloudSlot
+        open={mainPane === "atlasCloud"}
+        locale={locale}
+        title={atlasCloudNavLabel(tr, relayStatus?.phase)}
+        tr={tr}
+      />
+      {mainPane === "atlasCloud" || mainPane === "octo" ? null : children}
       </main>
     </>
   );

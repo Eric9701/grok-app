@@ -79,6 +79,8 @@ export const ptBRSidebar = {
   "atlasCloud.done": "Concluído",
   "atlasCloud.failed": "Falhou",
   "atlasCloud.cancelled": "Cancelado",
+  "atlasCloud.siteEmpty": "Ainda não há um site Atlas Cloud. Adicione o endereço em Configurações → Atlas.",
+  "atlasCloud.openSettings": "Abrir configurações",
   "sidebar.newSession": "Nova sessão",
   "sidebar.update.available": "Atualização disponível{version}",
   "sidebar.update.downloading": "Baixando atualização{version}…",

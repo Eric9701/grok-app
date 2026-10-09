@@ -30,9 +30,36 @@ function phaseLabel(
   }
 }
 
+/** Pull `token` / `agent_id` out of a pasted relay address. */
+function splitRelayPaste(raw: string): {
+  url: string;
+  token?: string;
+  agentId?: string;
+} | null {
+  if (!raw.includes("token=") && !raw.includes("agent_id=")) return null;
+  try {
+    const trimmed = raw.trim();
+    const withScheme = trimmed.includes("://") ? trimmed : `ws://${trimmed}`;
+    const parsed = new URL(withScheme);
+    const token = parsed.searchParams.get("token")?.trim() || "";
+    const agentId = parsed.searchParams.get("agent_id")?.trim() || "";
+    if (!token && !agentId) return null;
+    parsed.searchParams.delete("token");
+    parsed.searchParams.delete("agent_id");
+    return {
+      url: parsed.toString(),
+      token: token || undefined,
+      agentId: agentId || undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
   const [url, setUrl] = useState("");
   const [agentId, setAgentId] = useState("");
+  const [token, setToken] = useState("");
   const [healthSecs, setHealthSecs] = useState("15");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<AtlasRelayAgentStatus | null>(null);
@@ -43,6 +70,7 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
       const s = await api.settingsGet();
       setUrl(s.atlasRelayAgentUrl?.trim() || "");
       setAgentId(s.atlasRelayAgentId?.trim() || "");
+      setToken(s.atlasRelayAgentToken?.trim() || "");
       const secs = s.atlasRelayAgentHealthSecs;
       setHealthSecs(String(secs && secs > 0 ? secs : 15));
     } catch {
@@ -75,7 +103,9 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
     if (!api.isTauri() || busy) return;
     setBusy(true);
     try {
-      setStatus(await api.atlasRelayAgentConnect(url.trim(), agentId.trim()));
+      setStatus(
+        await api.atlasRelayAgentConnect(url.trim(), agentId.trim(), token.trim()),
+      );
     } catch (e) {
       setStatus({
         phase: "stopped",
@@ -143,7 +173,17 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
             value={url}
             placeholder={t("settings.atlasRelayAgentUrlPh")}
             disabled={busy || live}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              const split = splitRelayPaste(next);
+              if (!split) {
+                setUrl(next);
+                return;
+              }
+              setUrl(split.url);
+              if (split.token) setToken(split.token);
+              if (split.agentId && !agentId.trim()) setAgentId(split.agentId);
+            }}
             aria-label={t("settings.atlasRelayAgent")}
           />
           <input
@@ -153,6 +193,17 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
             disabled={busy || live}
             onChange={(e) => setAgentId(e.target.value)}
             aria-label={t("settings.atlasRelayAgentIdPh")}
+          />
+          <input
+            className="settings-input"
+            type="password"
+            value={token}
+            placeholder={t("settings.atlasRelayAgentTokenPh")}
+            disabled={busy || live}
+            onChange={(e) => setToken(e.target.value)}
+            aria-label={t("settings.atlasRelayAgentTokenPh")}
+            spellCheck={false}
+            autoComplete="off"
           />
           {live ? (
             <button

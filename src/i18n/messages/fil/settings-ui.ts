@@ -54,6 +54,7 @@ export const filSettingsUi = {
   "settings.nav.archived": "Mga naka-archive na chat",
   "settings.nav.extensions": "Mga extension",
   "settings.nav.runtime": "CLI / Runtime",
+  "settings.nav.atlas": "Atlas",
   "settings.nav.shortcuts": "Keyboard",
   "settings.nav.about": "Tungkol",
   "settings.tab.composer": "Composer",

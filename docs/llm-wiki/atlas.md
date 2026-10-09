@@ -46,11 +46,13 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 ## Relay Agent
 
-设置 → 运行时 → 连接 里的 **Atlas Relay** 让本应用作为执行端出站连 `atlas-relay-demo` 的 `/ws?agent_id=`。中继把 ACP 帧转进来，Host 原样写给本机 `atlas agent --always-approve stdio`，再把 stdout 的一行回成一条 WebSocket 文本帧。工具在这台机器上执行。桌面会话仍走原来的本地 CLI / ACP 服务器 / SSH，不进这条桥。
+设置 → Atlas 里的 **Atlas Relay** 让本应用作为执行端出站连 `atlas-relay-demo` 的 `/ws?agent_id=`。填了 Token 时再带 `&token=`。中继把 ACP 帧转进来，Host 原样写给本机 `atlas agent --always-approve stdio`，再把 stdout 的一行回成一条 WebSocket 文本帧。工具在这台机器上执行。桌面会话仍走原来的本地 CLI / ACP 服务器 / SSH，不进这条桥。
 
-登记：`settingsCatalog` 的 `runtime.atlasRelayAgent`。字段：`atlasRelayAgentUrl`、`atlasRelayAgentId`、`atlasRelayAgentEnabled`。健康检查间隔是 `atlasRelayAgentHealthSecs`（`runtime.atlasRelayAgentHealth`）：在线后按该秒数发 WebSocket Ping，下一次到期前没有 Pong 就断开并重连。默认 15 秒，范围 5–300。改间隔不重启桥。
+登记：`settingsCatalog` 的 `atlas.relayAgent`。字段：`atlasRelayAgentUrl`、`atlasRelayAgentId`、`atlasRelayAgentToken`、`atlasRelayAgentEnabled`。Token 可空；空则不带该参数。地址栏里粘贴的 `token` 会拆进这个字段，设置里手填的优先。状态和日志只保留打码后的地址。健康检查间隔是 `atlasRelayAgentHealthSecs`（`atlas.relayAgentHealth`）：在线后按该秒数发 WebSocket Ping，下一次到期前没有 Pong 就断开并重连。默认 15 秒，范围 5–300。改间隔不重启桥。改 Token 会按新地址重连。
 
-侧栏「Atlas云端」只读展示这条桥上的 `session/prompt` 及完成、失败、取消状态。只有 `online` 显示已连接。桌面聊天不受影响。
+同页的 **Atlas云端站点**（`atlasCloudSiteUrl`，`atlas.cloudSite`）是侧栏「Atlas云端」打开的网页。只接受 http 或 https；留空则显示去设置的入口，不挂空白网页。切换菜单时页面保持，地址栏不显示，刷新和用系统应用打开仍在。只有 Relay `online` 时侧栏标题显示已连接。
+
+智能体看板把这条桥上的 `session/prompt` 当作带来源标记的卡片放进现有列：进行中、已完成、失败（需要你）。取消的不进看板。点卡片打开 `#/atlas-cloud`（上面的站点），不打开桌面会话，也不写入会话列表。
 
 ## 安装包文件名
 

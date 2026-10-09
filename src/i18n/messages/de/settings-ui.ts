@@ -55,6 +55,7 @@ export const deSettingsUi = {
   "settings.nav.archived": "Archivierte Chats",
   "settings.nav.extensions": "Erweiterungen",
   "settings.nav.runtime": "CLI / Laufzeit",
+  "settings.nav.atlas": "Atlas",
   "settings.nav.shortcuts": "Tastatur",
   "settings.nav.about": "Info",
   "settings.tab.composer": "Composer",

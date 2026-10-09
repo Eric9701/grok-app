@@ -79,6 +79,8 @@ export const enSidebar = {
   "atlasCloud.done": "Done",
   "atlasCloud.failed": "Failed",
   "atlasCloud.cancelled": "Cancelled",
+  "atlasCloud.siteEmpty": "No Atlas Cloud site yet. Add the address in Settings → Atlas.",
+  "atlasCloud.openSettings": "Open settings",
   "sidebar.newSession": "New session",
   "sidebar.update.available": "Update available{version}",
   "sidebar.update.downloading": "Downloading update{version}…",

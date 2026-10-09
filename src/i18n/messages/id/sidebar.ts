@@ -79,6 +79,8 @@ export const idSidebar = {
   "atlasCloud.done": "Selesai",
   "atlasCloud.failed": "Gagal",
   "atlasCloud.cancelled": "Dibatalkan",
+  "atlasCloud.siteEmpty": "Belum ada situs Atlas Cloud. Tambahkan alamat di Pengaturan → Atlas.",
+  "atlasCloud.openSettings": "Buka pengaturan",
   "sidebar.newSession": "Sesi baru",
   "sidebar.update.available": "Pembaruan tersedia{version}",
   "sidebar.update.downloading": "Mengunduh pembaruan{version}…",

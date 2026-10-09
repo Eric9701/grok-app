@@ -1,80 +1,105 @@
 /**
- * Read-only list of cloud session/prompt tasks on the Atlas Relay bridge.
- * Desktop chat stays on the local session path.
+ * Sidebar Atlas Cloud: embedded page from Settings → Atlas.
+ * Stays mounted after the first open so switching menus does not reload it.
+ * The address stays off the chrome, same as Octo.
  */
-import { intlLocale, type createT } from "@/i18n";
-import type { AtlasRelayAgentStatus } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { EmbeddedBrowser } from "@/components/EmbeddedBrowser";
+import { ATLAS_CLOUD_SITE_EVENT } from "@/components/settings/AtlasSection";
+import type { Locale, createT } from "@/i18n";
+import * as api from "@/lib/api";
 
 type TFn = ReturnType<typeof createT>;
 
-function taskTone(status: string): string {
-  if (status === "done") return "ok";
-  if (status === "failed") return "err";
-  if (status === "running") return "warn";
-  return "muted";
-}
-
-function taskLabel(tr: TFn, status: string): string {
-  if (status === "running") return tr("atlasCloud.running");
-  if (status === "done") return tr("atlasCloud.done");
-  if (status === "failed") return tr("atlasCloud.failed");
-  return tr("atlasCloud.cancelled");
-}
-
-function formatTaskTime(locale: string, atMs: number): string {
-  if (!atMs) return "";
-  return new Intl.DateTimeFormat(intlLocale(locale), {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(atMs));
+function readSiteDetail(event: Event): string {
+  const detail = (event as CustomEvent<string>).detail;
+  return typeof detail === "string" ? detail.trim() : "";
 }
 
 export function AtlasCloudPane({
   locale,
+  title,
   tr,
-  status,
+  active,
+  siteUrl,
 }: {
-  locale: string;
+  locale: Locale;
+  title: string;
   tr: TFn;
-  status: AtlasRelayAgentStatus | null;
+  active: boolean;
+  /** Test override. Undefined loads the saved setting. */
+  siteUrl?: string;
 }) {
-  const tasks = status?.tasks ?? [];
-  const error = status?.error?.trim() || "";
+  const [url, setUrl] = useState(siteUrl?.trim() ?? "");
+
+  useEffect(() => {
+    if (siteUrl != null) {
+      setUrl(siteUrl.trim());
+      return;
+    }
+    let stop = false;
+    const load = () => {
+      if (!api.isTauri()) return;
+      void api.settingsGet().then((settings) => {
+        if (!stop) setUrl(settings.atlasCloudSiteUrl?.trim() || "");
+      }).catch(() => undefined);
+    };
+    const onSite = (event: Event) => {
+      if (!stop) setUrl(readSiteDetail(event));
+    };
+    load();
+    window.addEventListener(ATLAS_CLOUD_SITE_EVENT, onSite);
+    return () => {
+      stop = true;
+      window.removeEventListener(ATLAS_CLOUD_SITE_EVENT, onSite);
+    };
+  }, [siteUrl]);
+
   return (
-    <div className="atlas-cloud-page">
-      {error ? (
-        <p className="atlas-cloud-page__error" role="status">
-          {error}
-        </p>
-      ) : null}
-      {tasks.length === 0 ? (
-        <p className="atlas-cloud-page__empty">{tr("atlasCloud.empty")}</p>
+    <div className="atlas-cloud-pane" hidden={!active}>
+      {url ? (
+        <EmbeddedBrowser
+          url={url}
+          title={title}
+          locale={locale}
+          instanceId="atlas-cloud"
+          active={active}
+          showAddress={false}
+        />
       ) : (
-        <ul className="atlas-cloud-page__list">
-          {tasks.map((task) => (
-            <li key={`${task.id}-${task.atMs}`} className="atlas-cloud-page__row">
-              <span className="atlas-cloud-page__time">
-                {formatTaskTime(locale, task.atMs)}
-              </span>
-              <span className="atlas-cloud-page__text">
-                {task.text}
-                {task.error ? (
-                  <span className="atlas-cloud-page__task-error">{task.error}</span>
-                ) : null}
-              </span>
-              <span
-                className={"status-pill status-pill--" + taskTone(task.status)}
-                role="status"
-              >
-                <span className="status-pill__dot" aria-hidden />
-                {taskLabel(tr, task.status)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="atlas-cloud-page">
+          <p className="atlas-cloud-page__empty">{tr("atlasCloud.siteEmpty")}</p>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => {
+              window.location.hash = "#/settings/atlas";
+            }}
+          >
+            {tr("atlasCloud.openSettings")}
+          </button>
+        </div>
       )}
     </div>
+  );
+}
+
+/** Mount on first open and keep the webview alive across pane switches. */
+export function AtlasCloudSlot({
+  open,
+  locale,
+  title,
+  tr,
+}: {
+  open: boolean;
+  locale: Locale;
+  title: string;
+  tr: TFn;
+}) {
+  const keptRef = useRef(open);
+  if (open) keptRef.current = true;
+  if (!keptRef.current) return null;
+  return (
+    <AtlasCloudPane locale={locale} title={title} tr={tr} active={open} />
   );
 }

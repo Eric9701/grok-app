@@ -79,6 +79,8 @@ export const ruSidebar = {
   "atlasCloud.done": "Готово",
   "atlasCloud.failed": "Ошибка",
   "atlasCloud.cancelled": "Отменено",
+  "atlasCloud.siteEmpty": "Сайт Atlas Cloud ещё не задан. Укажите адрес в Настройки → Atlas.",
+  "atlasCloud.openSettings": "Открыть настройки",
   "sidebar.newSession": "Новая сессия",
   "sidebar.update.available": "Доступно обновление{version}",
   "sidebar.update.downloading": "Загрузка обновления{version}…",

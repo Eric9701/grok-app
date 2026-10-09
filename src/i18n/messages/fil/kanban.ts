@@ -2,7 +2,10 @@
 export const filKanban = {
   "kanban.title": "Mga agent",
   "kanban.open": "Kanban ng agent",
-  "kanban.hint": "Mga buhay na agent ayon sa run state — Kailangan Ka, Gumagawa, Tapos. Hindi ito personal na to-do list. I-click ang card para buksan ang chat na iyon.",
+  "kanban.hint": "Mga buhay na agent ayon sa run state — Kailangan Ka, Gumagawa, Tapos. Hindi ito personal na to-do list. Ang chat card ay nagbubukas ng chat. Ang Atlas Cloud card ay nagbubukas ng task na iyon.",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Buksan ang Atlas Cloud",
+  "kanban.relayUntitled": "Cloud task",
   "kanban.total": "{n} sa kabuuan",
   "kanban.view.dashboard": "Dashboard",
   "kanban.view.map": "Mapa ng agent",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveWorkbenchHash } from "./workbenchHash";
+import { atlasCloudTaskIdFromHash, resolveWorkbenchHash } from "./workbenchHash";
 
 describe("resolveWorkbenchHash", () => {
   it("treats empty / workbench / home as the chat pane", () => {
@@ -39,6 +39,15 @@ describe("resolveWorkbenchHash", () => {
       kind: "pane",
       pane: "atlasCloud",
     });
+    expect(resolveWorkbenchHash("#/atlas-cloud/task/prompt%201")).toEqual({
+      kind: "pane",
+      pane: "atlasCloud",
+    });
+    expect(atlasCloudTaskIdFromHash("#/atlas-cloud/task/prompt%201")).toBe(
+      "prompt 1",
+    );
+    expect(atlasCloudTaskIdFromHash("#/atlas-cloud")).toBeNull();
+    expect(atlasCloudTaskIdFromHash("#/atlas-cloud/tasks")).toBeNull();
   });
 
   it("bare settings hash restores last route", () => {

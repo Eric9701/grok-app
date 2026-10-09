@@ -17,6 +17,7 @@ import {
   getFinishedTurns,
   subscribeFinishedTurns,
 } from "@/lib/sessionFinishedTurns";
+import { useAtlasRelayStatus } from "@/hooks/useAtlasRelayStatus";
 import {
   buildAgentKanban,
   countAgentKanbanCards,
@@ -24,6 +25,7 @@ import {
   groupAgentKanbanByProject,
   loadAgentKanbanPrefs,
   mergeKanbanLiveMaps,
+  mergeRelayTasksIntoKanban,
   saveAgentKanbanPrefs,
   visibleAgentKanbanColumns,
   type AgentKanbanCard,
@@ -63,8 +65,9 @@ function AgentKanbanCardView({
   card: AgentKanbanCard;
   t: TFn;
   locale: Locale;
-  onSelect?: (sessionId: string) => void;
+  onSelect?: (card: AgentKanbanCard) => void;
 }) {
+  const isRelay = card.source === "relay";
   const metaParts: string[] = [];
   if (card.projectName) metaParts.push(card.projectName);
   else if (card.projectPath) metaParts.push(card.projectPath);
@@ -86,12 +89,15 @@ function AgentKanbanCardView({
       <button
         type="button"
         className="agent-kanban__card-btn"
-        onClick={() => onSelect?.(card.sessionId)}
-        title={t("dashboard.openSession")}
+        onClick={() => onSelect?.(card)}
+        title={isRelay ? t("kanban.openRelay") : t("dashboard.openSession")}
       >
         <span className="agent-kanban__card-title" title={card.title}>
           {card.title}
         </span>
+        {isRelay ? (
+          <span className="agent-kanban__card-source">{t("kanban.relayBadge")}</span>
+        ) : null}
         {card.isCurrent ? (
           <span className="agent-kanban__card-current">
             {t("dashboard.current")}
@@ -170,18 +176,27 @@ export function KanbanBoardPage({
     setPrefs(next);
   };
 
+  const relayStatus = useAtlasRelayStatus();
+  const relayTasks = relayStatus?.tasks ?? [];
   const board = useMemo(
     () =>
-      buildAgentKanban({
-        sessions,
-        projects,
-        liveMap,
-        currentSessionId,
-        untitledLabel,
-        generalWorkspacePath,
-        unboundProjectLabel,
-        recentDoneAt,
-      }),
+      mergeRelayTasksIntoKanban(
+        buildAgentKanban({
+          sessions,
+          projects,
+          liveMap,
+          currentSessionId,
+          untitledLabel,
+          generalWorkspacePath,
+          unboundProjectLabel,
+          recentDoneAt,
+        }),
+        relayTasks,
+        {
+          projectName: tr("kanban.relayBadge"),
+          untitled: tr("kanban.relayUntitled"),
+        },
+      ),
     [
       sessions,
       projects,
@@ -191,6 +206,8 @@ export function KanbanBoardPage({
       generalWorkspacePath,
       unboundProjectLabel,
       recentDoneAt,
+      relayTasks,
+      tr,
     ],
   );
 
@@ -210,8 +227,12 @@ export function KanbanBoardPage({
     [filtered, columns],
   );
 
-  const onOpenCard = (sessionId: string) => {
-    onSelectSession?.(sessionId);
+  const onOpenCard = (card: AgentKanbanCard) => {
+    if (card.source === "relay" && card.relayTaskId) {
+      window.location.hash = "#/atlas-cloud";
+      return;
+    }
+    onSelectSession?.(card.sessionId);
   };
 
   return (
@@ -348,7 +369,11 @@ export function KanbanBoardPage({
                   <ul className="agent-kanban__cards" role="list">
                     {group.cards.map((card) => (
                       <AgentKanbanCardView
-                        key={card.sessionId}
+                        key={
+                          card.source === "relay"
+                            ? `${card.sessionId}:${card.lastActivityAt}`
+                            : card.sessionId
+                        }
                         card={card}
                         t={tFn}
                         locale={locale}
@@ -388,7 +413,11 @@ export function KanbanBoardPage({
                     <ul className="agent-kanban__cards" role="list">
                       {cards.map((card) => (
                         <AgentKanbanCardView
-                          key={card.sessionId}
+                          key={
+                          card.source === "relay"
+                            ? `${card.sessionId}:${card.lastActivityAt}`
+                            : card.sessionId
+                        }
                           card={card}
                           t={tFn}
                           locale={locale}

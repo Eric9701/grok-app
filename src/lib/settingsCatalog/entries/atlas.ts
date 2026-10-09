@@ -1,0 +1,73 @@
+import type { SettingsEntry } from "../types";
+
+/** Settings → Atlas (system group). Relay agent + cloud site page. */
+export const ATLAS_ENTRIES: readonly SettingsEntry[] = [
+  {
+    id: "atlas.relayAgent",
+    section: "atlas",
+    anchorId: "settings-anchor-atlasRelayAgent",
+    labelKey: "settings.atlasRelayAgent",
+    descKeys: [
+      "settings.atlasRelayAgentDesc",
+      "settings.atlasRelayAgentUrlPh",
+      "settings.atlasRelayAgentIdPh",
+      "settings.atlasRelayAgentTokenPh",
+      "settings.atlasRelayAgentConnect",
+      "settings.atlasRelayAgentDisconnect",
+    ],
+    keywords: [
+      "atlas relay",
+      "relay agent",
+      "websocket",
+      "acp",
+      "headless",
+      "agent id",
+      "token",
+      "dispatch",
+      "中继",
+      "中繼",
+      "令牌",
+      "權杖",
+      "下发",
+      "派工",
+    ],
+  },
+  {
+    id: "atlas.relayAgentHealth",
+    section: "atlas",
+    anchorId: "settings-anchor-atlasRelayAgentHealth",
+    labelKey: "settings.atlasRelayAgentHealth",
+    descKeys: ["settings.atlasRelayAgentHealthDesc"],
+    keywords: [
+      "health",
+      "ping",
+      "pong",
+      "interval",
+      "reconnect",
+      "健康检查",
+      "健康檢查",
+      "间隔",
+      "間隔",
+    ],
+  },
+  {
+    id: "atlas.cloudSite",
+    section: "atlas",
+    anchorId: "settings-anchor-atlasCloudSite",
+    labelKey: "settings.atlasCloudSite",
+    descKeys: [
+      "settings.atlasCloudSiteDesc",
+      "settings.atlasCloudSitePh",
+    ],
+    keywords: [
+      "atlas cloud",
+      "site",
+      "webview",
+      "url",
+      "云端",
+      "雲端",
+      "站点",
+      "站點",
+    ],
+  },
+];

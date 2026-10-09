@@ -2,7 +2,10 @@
 export const esKanban = {
   "kanban.title": "Agentes",
   "kanban.open": "Kanban de agentes",
-  "kanban.hint": "Agentes activos por estado de ejecución — Requiere atención, Trabajando, Hecho. No es una lista personal de tareas. Pulsa una tarjeta para abrir ese chat.",
+  "kanban.hint": "Agentes activos por estado de ejecución — Requiere atención, Trabajando, Hecho. No es una lista personal de tareas. Una tarjeta de chat abre esa conversación. Una tarjeta de Atlas Cloud abre esa tarea.",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Abrir Atlas Cloud",
+  "kanban.relayUntitled": "Tarea en la nube",
   "kanban.total": "{n} en total",
   "kanban.view.dashboard": "Panel",
   "kanban.view.map": "Mapa de agentes",

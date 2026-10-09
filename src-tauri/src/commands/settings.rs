@@ -147,6 +147,7 @@ pub async fn settings_set(
         prev.atlas_relay_agent_enabled != settings.atlas_relay_agent_enabled
             || norm(&prev.atlas_relay_agent_url) != norm(&settings.atlas_relay_agent_url)
             || norm(&prev.atlas_relay_agent_id) != norm(&settings.atlas_relay_agent_id)
+            || norm(&prev.atlas_relay_agent_token) != norm(&settings.atlas_relay_agent_token)
     };
     let launch_at_login_flip = prev.launch_at_login != settings.launch_at_login;
     let schedules_launch_agent_flip =

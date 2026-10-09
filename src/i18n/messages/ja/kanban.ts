@@ -2,7 +2,10 @@
 export const jaKanban = {
   "kanban.title": "エージェント",
   "kanban.open": "エージェントかんばん",
-  "kanban.hint": "実行状態ごとのエージェント一覧 — 要対応 / 実行中 / 完了。個人の ToDo リストではありません。カードをクリックするとそのチャットが開きます。",
+  "kanban.hint": "実行状態ごとのエージェント一覧 — 要対応 / 実行中 / 完了。個人の ToDo リストではありません。チャットのカードでそのチャットを開き、Atlas Cloud のカードでそのタスクを開きます。",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Atlasクラウドを開く",
+  "kanban.relayUntitled": "クラウドタスク",
   "kanban.total": "全 {n} 件",
   "kanban.view.dashboard": "ダッシュボード",
   "kanban.view.map": "エージェントマップ",

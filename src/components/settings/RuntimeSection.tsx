@@ -33,7 +33,6 @@ import { SettingsTabStrip, UiCheck } from "./shared";
 import { IconArchive, IconDoctor } from "@/components/icons";
 import { NetworkProbeField } from "./NetworkProbeField";
 import { AcpServerField } from "./AcpServerField";
-import { AtlasRelayAgentField } from "./AtlasRelayAgentField";
 import { WslBackendField } from "./WslBackendField";
 import { SshHostsPanel } from "./SshHostsPanel";
 import { AtlasCliMirrorField } from "./AtlasCliMirrorField";
@@ -328,7 +327,6 @@ export function RuntimeSection() {
             )}
             {activeTab === "connection" && (
               <>
-                <AtlasRelayAgentField t={t} rowHighlight={rowHighlight} />
                 <div
                   className={"settings-card" + rowHighlight("settings-anchor-acpServer")}
                   id="settings-anchor-acpServer"

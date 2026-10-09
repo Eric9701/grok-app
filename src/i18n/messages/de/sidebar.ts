@@ -79,6 +79,8 @@ export const deSidebar = {
   "atlasCloud.done": "Fertig",
   "atlasCloud.failed": "Fehlgeschlagen",
   "atlasCloud.cancelled": "Abgebrochen",
+  "atlasCloud.siteEmpty": "Noch keine Atlas-Cloud-Seite. Adresse unter Einstellungen → Atlas eintragen.",
+  "atlasCloud.openSettings": "Einstellungen öffnen",
   "sidebar.newSession": "Neue Sitzung",
   "sidebar.update.available": "Update verfügbar{version}",
   "sidebar.update.downloading": "Update wird geladen{version}…",

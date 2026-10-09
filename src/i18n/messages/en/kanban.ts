@@ -2,7 +2,10 @@
 export const enKanban = {
   "kanban.title": "Agents",
   "kanban.open": "Agent Kanban",
-  "kanban.hint": "Live agents by run state — Needs You, Working, Done. Not a personal to-do list. Click a card to open that chat.",
+  "kanban.hint": "Live agents by run state — Needs You, Working, Done. Not a personal to-do list. Click a chat card to open that chat. An Atlas Cloud card opens that task.",
+  "kanban.relayBadge": "Atlas Cloud",
+  "kanban.openRelay": "Open Atlas Cloud",
+  "kanban.relayUntitled": "Cloud task",
   "kanban.total": "{n} total",
   "kanban.view.dashboard": "Dashboard",
   "kanban.view.map": "Agent map",

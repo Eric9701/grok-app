@@ -92,6 +92,13 @@ export const SETTINGS_NAV: readonly SettingsNavDef[] = [
     ],
   },
   {
+    id: "atlas",
+    icon: "cloud",
+    labelKey: "settings.nav.atlas",
+    group: "system",
+    tabs: [],
+  },
+  {
     id: "remote_im",
     icon: "remote_im",
     labelKey: "settings.nav.remoteIm",

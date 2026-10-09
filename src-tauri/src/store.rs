@@ -385,6 +385,9 @@ pub struct AppSettings {
     /// Agent identity sent as `agent_id` on the relay socket.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atlas_relay_agent_id: Option<String>,
+    /// Shared secret sent as `token` on the relay socket. Empty omits it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub atlas_relay_agent_token: Option<String>,
     /// Reconnect, and connect again on the next launch.
     #[serde(default)]
     pub atlas_relay_agent_enabled: bool,
@@ -392,6 +395,9 @@ pub struct AppSettings {
     /// Host clamps to 5–300.
     #[serde(default = "default_atlas_relay_health_secs")]
     pub atlas_relay_agent_health_secs: u32,
+    /// Page opened by the sidebar Atlas Cloud item. Empty hides the webview.
+    #[serde(default)]
+    pub atlas_cloud_site_url: String,
     /// Max warm/live agent processes (I02). Default 3.
     #[serde(default = "default_max_concurrent_agents")]
     pub max_concurrent_agents: u32,
@@ -892,8 +898,10 @@ impl Default for AppSettings {
             acp_server_addr: None,
             atlas_relay_agent_url: None,
             atlas_relay_agent_id: None,
+            atlas_relay_agent_token: None,
             atlas_relay_agent_enabled: false,
             atlas_relay_agent_health_secs: default_atlas_relay_health_secs(),
+            atlas_cloud_site_url: String::new(),
             max_concurrent_agents: default_max_concurrent_agents(),
             agent_idle_minutes: default_agent_idle_minutes(),
             // Fresh installs already start on the current default.
