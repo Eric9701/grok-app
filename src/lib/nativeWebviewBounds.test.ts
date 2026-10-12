@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   boundsNearlyEqual,
   clipHostRectAgainstLeftResizers,
+  clipHostRectBelowTop,
   clipHostRectToAncestor,
   createTrailingSingleFlight,
   isAsideWebviewSuppressed,
@@ -73,6 +74,43 @@ describe("isAsideWebviewSuppressed", () => {
         getAttribute: () => null,
       }),
     ).toBe(false);
+  });
+});
+
+describe("clipHostRectBelowTop", () => {
+  const host = {
+    left: 200,
+    top: 0,
+    right: 1200,
+    bottom: 800,
+    width: 1000,
+    height: 800,
+  };
+
+  it("leaves a host that already clears the caption", () => {
+    const below = { ...host, top: 40, height: 760, bottom: 800 };
+    expect(clipHostRectBelowTop(below, 40)).toEqual(below);
+  });
+
+  it("pushes a full-window host below the caption buttons", () => {
+    expect(clipHostRectBelowTop(host, 40)).toEqual({
+      left: 200,
+      top: 40,
+      right: 1200,
+      bottom: 800,
+      width: 1000,
+      height: 760,
+    });
+  });
+
+  it("drops a host that would have no area under the caption", () => {
+    expect(
+      clipHostRectBelowTop({ ...host, top: 0, bottom: 20, height: 20 }, 40),
+    ).toBeNull();
+  });
+
+  it("does nothing when there is no caption band", () => {
+    expect(clipHostRectBelowTop(host, 0)).toEqual(host);
   });
 });
 

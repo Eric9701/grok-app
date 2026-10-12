@@ -329,6 +329,20 @@ pub struct SessionMeta {
     pub provider_id: Option<String>,
 }
 
+/// One Atlas Relay agent. Address and token are not shared with the others.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AtlasRelayAgentRecord {
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub token: String,
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub enabled: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -378,19 +392,21 @@ pub struct AppSettings {
     /// the normal local-CLI spawn path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acp_server_addr: Option<String>,
-    /// Atlas Relay agent URL. When enabled, this app dials the relay and
-    /// bridges ACP to a local `atlas agent stdio`.
+    /// Legacy single relay URL. Read once into `atlas_relay_agents`, then cleared.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atlas_relay_agent_url: Option<String>,
-    /// Agent identity sent as `agent_id` on the relay socket.
+    /// Legacy single `agent_id`. Read once into `atlas_relay_agents`, then cleared.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atlas_relay_agent_id: Option<String>,
-    /// Shared secret sent as `token` on the relay socket. Empty omits it.
+    /// Legacy single relay token. Read once into `atlas_relay_agents`, then cleared.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atlas_relay_agent_token: Option<String>,
-    /// Reconnect, and connect again on the next launch.
+    /// Legacy single auto-connect flag. Read once into `atlas_relay_agents`.
     #[serde(default)]
     pub atlas_relay_agent_enabled: bool,
+    /// Up to 4 relay agents. Each has its own URL, token, and agent id.
+    #[serde(default)]
+    pub atlas_relay_agents: Vec<AtlasRelayAgentRecord>,
     /// Seconds between WebSocket Pings to the relay. `0` means the 15s default.
     /// Host clamps to 5–300.
     #[serde(default = "default_atlas_relay_health_secs")]
@@ -900,6 +916,7 @@ impl Default for AppSettings {
             atlas_relay_agent_id: None,
             atlas_relay_agent_token: None,
             atlas_relay_agent_enabled: false,
+            atlas_relay_agents: Vec::new(),
             atlas_relay_agent_health_secs: default_atlas_relay_health_secs(),
             atlas_cloud_site_url: String::new(),
             max_concurrent_agents: default_max_concurrent_agents(),
@@ -1114,6 +1131,10 @@ pub fn load_settings() -> AppSettings {
             "settings migration: normalized proxyMode to {}",
             s.proxy_mode
         );
+        let _ = write_json(&settings_file(), &s);
+    }
+    if crate::atlas_relay_agent::migrate_relay_agent_settings(&mut s) {
+        tracing::info!("settings migration: atlas relay agents list");
         let _ = write_json(&settings_file(), &s);
     }
     // One-time: installs that already stored keys in keychain before the opt-in

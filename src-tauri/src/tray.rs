@@ -244,7 +244,9 @@ fn hide_to_tray_inner(app: &AppHandle, hide_dock: bool) {
             tracing::debug!(error = %e, "window-state save on hide-to-tray failed");
         }
     }
-    if let Some(w) = app.get_webview_window("main") {
+    // Not get_webview_window: that returns None after a child webview
+    // (Octo / Atlas Cloud) is attached to main.
+    if let Some(w) = app.get_window("main") {
         let _ = w.hide();
         // Windows: TOOLWINDOW + DeleteTab (see win_shell) so reopen can fully
         // restore Show Desktop significance. Linux: Tauri skip_taskbar only.
@@ -273,13 +275,15 @@ fn hide_to_tray_inner(app: &AppHandle, hide_dock: bool) {
 
 /// Show and focus the main workbench window (tray Open / dock reopen / after hide-to-tray).
 pub fn show_main_window(app: &AppHandle) {
+    #[cfg(windows)]
+    crate::win_shell::set_suppress_child_focus(false);
     // Restore Dock / taskbar presence before showing.
     #[cfg(target_os = "macos")]
     {
         let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
         let _ = app.set_dock_visibility(true);
     }
-    if let Some(w) = app.get_webview_window("main") {
+    if let Some(w) = app.get_window("main") {
         #[cfg(windows)]
         {
             // Restore APPWINDOW / clear TOOLWINDOW / re-AddTab before show so
@@ -308,6 +312,8 @@ pub fn show_main_window(app: &AppHandle) {
             // DeleteTab/AddTab drops ITaskbarList3 overlay; put the last overlay count back.
             reapply_windows_overlay(app);
         }
+        // Side browsers were concealed for the hide. Let the active one show.
+        let _ = app.emit("app://main-shown", ());
     }
 }
 

@@ -269,6 +269,8 @@ mod skin_video_bake;
 #[cfg(target_os = "macos")]
 mod mac_ime_fn_bridge;
 #[cfg(windows)]
+mod win_caption_pass;
+#[cfg(windows)]
 mod win_file_drop;
 #[cfg(windows)]
 mod win_shell;
@@ -477,7 +479,7 @@ pub fn run() {
             app_menu::handle_menu_event(app, event);
         })
         .on_window_event(|window, event| {
-            use tauri::{Emitter, Manager, WindowEvent};
+            use tauri::{Manager, WindowEvent};
 
             match event {
                 WindowEvent::CloseRequested { api, .. } => {
@@ -494,30 +496,8 @@ pub fn run() {
                         return;
                     }
 
-                    let settings = store::load_settings();
-                    let any_enabled = store::load_automations().iter().any(|a| a.enabled);
-                    let hide = automation_runner::should_hide_to_tray_on_close(
-                        settings.close_to_tray,
-                        settings.keep_tray_for_schedules,
-                        any_enabled,
-                    );
-
-                    if hide {
-                        api.prevent_close();
-                        // hide_to_tray persists geometry before hide (plugin only
-                        // flushes on Exit by default).
-                        tray::hide_to_tray(window.app_handle());
-                    } else {
-                        // Always prevent_close so FE can confirm when busy — but arm a
-                        // host failsafe so a wedged WebView cannot trap the process.
-                        api.prevent_close();
-                        // Flush latest size before quit-confirm so a kill during the
-                        // dialog still restores the resized frame next launch.
-                        persist_main_window_state(window.app_handle());
-                        let app = window.app_handle().clone();
-                        let _ = window.emit("app://close-requested", ());
-                        crate::pending_quit::schedule_pending_quit(&app);
-                    }
+                    api.prevent_close();
+                    handle_main_window_close(window.app_handle());
                 }
                 // Plugin keeps in-memory state on Resized/Moved but only writes disk
                 // on process Exit. Debounce-persist so force-quit / crash / tauri-dev
@@ -1156,9 +1136,35 @@ pub(crate) fn force_ns_app_activate() {}
 /// every keystroke dies in the responder chain until one click focuses the
 /// web view. Idempotent; logs when it had to re-point.
 #[cfg(target_os = "macos")]
-pub(crate) fn point_keys_at_webview(win: &tauri::WebviewWindow) {
+pub(crate) trait MacKeyWindow {
+    fn key_ns_window(&self) -> tauri::Result<*mut std::ffi::c_void>;
+    fn key_ns_view(&self) -> tauri::Result<*mut std::ffi::c_void>;
+}
+
+#[cfg(target_os = "macos")]
+impl MacKeyWindow for tauri::Window {
+    fn key_ns_window(&self) -> tauri::Result<*mut std::ffi::c_void> {
+        self.ns_window()
+    }
+    fn key_ns_view(&self) -> tauri::Result<*mut std::ffi::c_void> {
+        self.ns_view()
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl MacKeyWindow for tauri::WebviewWindow {
+    fn key_ns_window(&self) -> tauri::Result<*mut std::ffi::c_void> {
+        self.ns_window()
+    }
+    fn key_ns_view(&self) -> tauri::Result<*mut std::ffi::c_void> {
+        self.ns_view()
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn point_keys_at_webview(win: &impl MacKeyWindow) {
     use objc2::{class, msg_send, runtime::AnyObject};
-    let (Ok(ns_win), Ok(ns_view)) = (win.ns_window(), win.ns_view()) else {
+    let (Ok(ns_win), Ok(ns_view)) = (win.key_ns_window(), win.key_ns_view()) else {
         return;
     };
     unsafe {
@@ -1174,7 +1180,7 @@ pub(crate) fn point_keys_at_webview(win: &tauri::WebviewWindow) {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn point_keys_at_webview(_win: &tauri::WebviewWindow) {}
+pub(crate) fn point_keys_at_webview<W>(_win: &W) {}
 
 /// Resolve AppSettings.theme (`system` | `light` | `dark`) to a concrete
 /// boot theme for the static shell and native chrome before React loads.
@@ -1197,6 +1203,70 @@ fn resolve_boot_theme(pref: &str) -> &'static str {
 fn main_window_state_flags() -> tauri_plugin_window_state::StateFlags {
     use tauri_plugin_window_state::StateFlags;
     StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED | StateFlags::FULLSCREEN
+}
+
+/// Close button / Alt+F4 on the main window.
+///
+/// Default policy hides the top-level window to the tray. The embedded
+/// Octo / Atlas Cloud webview stays mounted; hiding that child is what
+/// blanked the page while the window itself remained.
+pub(crate) fn handle_main_window_close(app: &tauri::AppHandle) {
+    use tauri::{Emitter, Manager};
+
+    let settings = store::load_settings();
+    let any_enabled = store::load_automations().iter().any(|a| a.enabled);
+    let hide = automation_runner::should_hide_to_tray_on_close(
+        settings.close_to_tray,
+        settings.keep_tray_for_schedules,
+        any_enabled,
+    );
+    if hide {
+        #[cfg(windows)]
+        win_shell::set_suppress_child_focus(true);
+        tray::hide_to_tray(app);
+        #[cfg(windows)]
+        schedule_keep_main_hidden(app);
+        return;
+    }
+    // Flush latest size before quit-confirm so a kill during the dialog
+    // still restores the resized frame next launch.
+    persist_main_window_state(app);
+    // `get_webview_window("main")` is None once a child webview exists:
+    // Tauri only treats a window as a webview-window when every webview
+    // shares the window label. Octo / Atlas Cloud break that.
+    if let Some(window) = app.get_window("main") {
+        let _ = window.emit("app://close-requested", ());
+    }
+    crate::pending_quit::schedule_pending_quit(app);
+}
+
+/// If a child WebView2 activates the parent right after tray-hide, hide
+/// the top-level window again. Do not touch the child webview.
+#[cfg(windows)]
+fn schedule_keep_main_hidden(app: &tauri::AppHandle) {
+    use tauri::Manager;
+
+    let app = app.clone();
+    std::thread::Builder::new()
+        .name("keep-main-hidden".into())
+        .spawn(move || {
+            for ms in [80_u64, 250, 600] {
+                std::thread::sleep(std::time::Duration::from_millis(ms));
+                let app2 = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    if !win_shell::child_focus_suppressed() {
+                        return;
+                    }
+                    let Some(window) = app2.get_window("main") else {
+                        return;
+                    };
+                    if window.is_visible().unwrap_or(false) {
+                        let _ = window.hide();
+                    }
+                });
+            }
+        })
+        .ok();
 }
 
 /// Immediately write main-window geometry to `.window-state.json`.

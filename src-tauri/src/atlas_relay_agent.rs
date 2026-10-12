@@ -5,9 +5,10 @@
 //! process, and each stdout line is sent back as one WebSocket text frame.
 //! The desktop session client is not involved.
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
@@ -25,10 +26,8 @@ const MAX_TASK_TEXT: usize = 240;
 const DEFAULT_HEALTH_SECS: u64 = 15;
 const MIN_HEALTH_SECS: u64 = 5;
 const MAX_HEALTH_SECS: u64 = 300;
+pub const MAX_RELAY_AGENTS: usize = 4;
 
-static GEN: AtomicU64 = AtomicU64::new(0);
-static PID: AtomicU32 = AtomicU32::new(0);
-static CANCEL: Notify = Notify::const_new();
 static HEALTH_SECS: AtomicU64 = AtomicU64::new(DEFAULT_HEALTH_SECS);
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -41,63 +40,103 @@ pub struct AtlasRelayTask {
     pub status: String,
     pub error: Option<String>,
     pub at_ms: u64,
+    /// Which relay agent recorded this prompt.
+    #[serde(default)]
+    pub agent_id: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AtlasRelayAgentStatus {
+pub struct AtlasRelayAgentLive {
     /// `stopped` | `connecting` | `online` | `reconnecting`
     pub phase: String,
     pub error: Option<String>,
     pub cli_alive: bool,
     pub agent_id: String,
+    /// Redacted socket address.
     pub url: String,
-    /// Cloud `session/prompt` rows, newest first. Kept after disconnect.
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AtlasRelayFleetStatus {
+    /// `online` when any agent is online. Otherwise the busiest other phase.
+    pub phase: String,
+    pub agents: Vec<AtlasRelayAgentLive>,
+    /// Cloud prompts from every agent, newest first.
     pub tasks: Vec<AtlasRelayTask>,
 }
 
-struct State {
+struct Slot {
+    gen: u64,
+    pid: u32,
     phase: String,
     error: Option<String>,
     cli_alive: bool,
     agent_id: String,
+    /// Real socket URL, including the token. Status redacts it.
     url: String,
-    gen: u64,
     tasks: Vec<AtlasRelayTask>,
+    cancel: Arc<Notify>,
 }
 
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            phase: "stopped".into(),
-            error: None,
-            cli_alive: false,
-            agent_id: String::new(),
-            url: String::new(),
-            gen: 0,
-            tasks: Vec::new(),
-        }
-    }
+struct Hub {
+    next_gen: u64,
+    slots: HashMap<String, Slot>,
 }
 
-fn state() -> &'static Mutex<State> {
-    static S: OnceLock<Mutex<State>> = OnceLock::new();
-    S.get_or_init(|| Mutex::new(State::default()))
+fn hub() -> &'static Mutex<Hub> {
+    static H: OnceLock<Mutex<Hub>> = OnceLock::new();
+    H.get_or_init(|| {
+        Mutex::new(Hub {
+            next_gen: 1,
+            slots: HashMap::new(),
+        })
+    })
 }
 
-fn with_state<T>(f: impl FnOnce(&mut State) -> T) -> T {
-    let mut guard = state().lock().unwrap_or_else(|e| e.into_inner());
+fn with_hub<T>(f: impl FnOnce(&mut Hub) -> T) -> T {
+    let mut guard = hub().lock().unwrap_or_else(|e| e.into_inner());
     f(&mut guard)
 }
 
-fn snapshot() -> AtlasRelayAgentStatus {
-    with_state(|s| AtlasRelayAgentStatus {
-        phase: s.phase.clone(),
-        error: s.error.clone(),
-        cli_alive: s.cli_alive,
-        agent_id: s.agent_id.clone(),
-        url: redact_relay_url(&s.url),
-        tasks: s.tasks.clone(),
+fn fleet_phase(agents: &[AtlasRelayAgentLive]) -> String {
+    if agents.iter().any(|a| a.phase == "online") {
+        "online".into()
+    } else if agents.iter().any(|a| a.phase == "connecting") {
+        "connecting".into()
+    } else if agents.iter().any(|a| a.phase == "reconnecting") {
+        "reconnecting".into()
+    } else {
+        "stopped".into()
+    }
+}
+
+fn snapshot() -> AtlasRelayFleetStatus {
+    with_hub(|h| {
+        let mut agents: Vec<AtlasRelayAgentLive> = h
+            .slots
+            .values()
+            .map(|s| AtlasRelayAgentLive {
+                phase: s.phase.clone(),
+                error: s.error.clone(),
+                cli_alive: s.cli_alive,
+                agent_id: s.agent_id.clone(),
+                url: redact_relay_url(&s.url),
+            })
+            .collect();
+        agents.sort_by(|a, b| a.agent_id.cmp(&b.agent_id));
+        let mut tasks = Vec::new();
+        for slot in h.slots.values() {
+            tasks.extend(slot.tasks.iter().cloned());
+        }
+        tasks.sort_by(|a, b| b.at_ms.cmp(&a.at_ms));
+        let phase = fleet_phase(&agents);
+        AtlasRelayFleetStatus {
+            phase,
+            agents,
+            tasks,
+        }
     })
 }
 
@@ -189,6 +228,7 @@ pub fn note_relay_frame(tasks: &mut Vec<AtlasRelayTask>, frame: &str, inbound: b
                     status: "running".into(),
                     error: None,
                     at_ms,
+                    agent_id: String::new(),
                 },
             );
             return;
@@ -226,9 +266,20 @@ pub fn note_relay_frame(tasks: &mut Vec<AtlasRelayTask>, frame: &str, inbound: b
     }
 }
 
-fn observe_frame(frame: &str, inbound: bool) {
+fn observe_frame(agent_id: &str, frame: &str, inbound: bool) {
     let at = unix_ms();
-    with_state(|s| note_relay_frame(&mut s.tasks, frame, inbound, at));
+    with_hub(|h| {
+        let Some(slot) = h.slots.get_mut(agent_id) else {
+            return;
+        };
+        let before = slot.tasks.len();
+        note_relay_frame(&mut slot.tasks, frame, inbound, at);
+        if slot.tasks.len() > before {
+            if let Some(task) = slot.tasks.first_mut() {
+                task.agent_id = agent_id.to_string();
+            }
+        }
+    });
 }
 
 /// Trim, drop CR/LF, cap at 128 characters.
@@ -369,7 +420,7 @@ pub fn stdout_line_to_frame(line: &str) -> Option<String> {
     }
 }
 
-pub fn status() -> AtlasRelayAgentStatus {
+pub fn status() -> AtlasRelayFleetStatus {
     snapshot()
 }
 
@@ -396,86 +447,216 @@ fn current_health_secs() -> u64 {
     }
 }
 
-/// Start or replace the bridge. Reconnects until [`stop`] or a newer start.
-pub fn start(raw_url: &str, agent_id: &str, token: &str) -> Result<(), String> {
-    let saved = crate::store::load_settings();
-    set_health_secs(saved.atlas_relay_agent_health_secs);
-    let ws_url = relay_agent_ws_url(raw_url, agent_id, token)?;
-    let id = sanitize_agent_id(agent_id);
-    let gen = GEN.fetch_add(1, Ordering::SeqCst) + 1;
-    CANCEL.notify_waiters();
-    kill_recorded_child();
-    with_state(|s| {
-        s.phase = "connecting".into();
-        s.error = None;
-        s.cli_alive = false;
-        s.agent_id = id.clone();
-        s.url = ws_url.clone();
-        s.gen = gen;
-    });
-    tauri::async_runtime::spawn(run_forever(gen, ws_url));
+/// Fold a legacy single relay target into the agent list, then drop empty
+/// and duplicate ids. Returns true when the settings object changed.
+pub fn migrate_relay_agent_settings(settings: &mut crate::store::AppSettings) -> bool {
+    let mut changed = false;
+    if settings.atlas_relay_agents.is_empty() {
+        let id = sanitize_agent_id(settings.atlas_relay_agent_id.as_deref().unwrap_or(""));
+        if !id.is_empty() {
+            settings
+                .atlas_relay_agents
+                .push(crate::store::AtlasRelayAgentRecord {
+                    url: settings
+                        .atlas_relay_agent_url
+                        .clone()
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string(),
+                    token: sanitize_token(
+                        settings.atlas_relay_agent_token.as_deref().unwrap_or(""),
+                    ),
+                    id,
+                    enabled: settings.atlas_relay_agent_enabled,
+                });
+            changed = true;
+        }
+    }
+    let mut kept = Vec::new();
+    let mut seen = HashSet::new();
+    for slot in settings.atlas_relay_agents.drain(..) {
+        if kept.len() >= MAX_RELAY_AGENTS {
+            changed = true;
+            continue;
+        }
+        let id = sanitize_agent_id(&slot.id);
+        let url = slot.url.trim().to_string();
+        let token = sanitize_token(&slot.token);
+        if id.is_empty() || !seen.insert(id.clone()) {
+            changed = true;
+            continue;
+        }
+        if id != slot.id || url != slot.url || token != slot.token {
+            changed = true;
+        }
+        kept.push(crate::store::AtlasRelayAgentRecord {
+            url,
+            token,
+            id,
+            enabled: slot.enabled,
+        });
+    }
+    settings.atlas_relay_agents = kept;
+    if settings.atlas_relay_agent_url.is_some()
+        || settings.atlas_relay_agent_id.is_some()
+        || settings.atlas_relay_agent_token.is_some()
+        || settings.atlas_relay_agent_enabled
+    {
+        settings.atlas_relay_agent_url = None;
+        settings.atlas_relay_agent_id = None;
+        settings.atlas_relay_agent_token = None;
+        settings.atlas_relay_agent_enabled = false;
+        changed = true;
+    }
+    changed
+}
+
+/// Reject a fifth agent and any repeated id. Empty ids are rejected too.
+pub fn validate_relay_agents(agents: &[crate::store::AtlasRelayAgentRecord]) -> Result<(), String> {
+    if agents.len() > MAX_RELAY_AGENTS {
+        return Err("at most 4 relay agents".into());
+    }
+    let mut seen = HashSet::new();
+    for slot in agents {
+        let id = sanitize_agent_id(&slot.id);
+        if id.is_empty() {
+            return Err("empty agent id".into());
+        }
+        if !seen.insert(id) {
+            return Err("duplicate agent id".into());
+        }
+    }
     Ok(())
 }
 
-pub fn stop() {
-    let gen = GEN.fetch_add(1, Ordering::SeqCst) + 1;
-    CANCEL.notify_waiters();
-    kill_recorded_child();
-    with_state(|s| {
-        s.phase = "stopped".into();
-        s.error = None;
-        s.cli_alive = false;
-        s.gen = gen;
+/// Start or replace one agent. Other agents keep running.
+pub fn start(raw_url: &str, agent_id: &str, token: &str) -> Result<(), String> {
+    let saved = crate::store::load_settings();
+    set_health_secs(saved.atlas_relay_agent_health_secs);
+    let id = sanitize_agent_id(agent_id);
+    if id.is_empty() {
+        return Err("empty agent id".into());
+    }
+    let ws_url = relay_agent_ws_url(raw_url, &id, token)?;
+    let (gen, old_pid, cancel) = with_hub(|h| {
+        if !h.slots.contains_key(&id) && h.slots.len() >= MAX_RELAY_AGENTS {
+            return Err("at most 4 relay agents".to_string());
+        }
+        let gen = h.next_gen;
+        h.next_gen = h.next_gen.saturating_add(1);
+        let slot = h.slots.entry(id.clone()).or_insert_with(|| Slot {
+            gen: 0,
+            pid: 0,
+            phase: "stopped".into(),
+            error: None,
+            cli_alive: false,
+            agent_id: id.clone(),
+            url: String::new(),
+            tasks: Vec::new(),
+            cancel: Arc::new(Notify::new()),
+        });
+        let old_pid = std::mem::take(&mut slot.pid);
+        slot.gen = gen;
+        slot.phase = "connecting".into();
+        slot.error = None;
+        slot.cli_alive = false;
+        slot.agent_id = id.clone();
+        slot.url = ws_url.clone();
+        slot.cancel.notify_waiters();
+        Ok((gen, old_pid, slot.cancel.clone()))
+    })?;
+    kill_pid(old_pid);
+    tauri::async_runtime::spawn(run_forever(id, gen, ws_url, cancel));
+    Ok(())
+}
+
+/// Stop one agent and keep its task log. Other agents keep running.
+pub fn stop_agent(agent_id: &str) {
+    let id = sanitize_agent_id(agent_id);
+    if id.is_empty() {
+        return;
+    }
+    let pid = with_hub(|h| {
+        let Some(slot) = h.slots.get_mut(&id) else {
+            return 0;
+        };
+        slot.gen = h.next_gen;
+        h.next_gen = h.next_gen.saturating_add(1);
+        slot.phase = "stopped".into();
+        slot.error = None;
+        slot.cli_alive = false;
+        slot.cancel.notify_waiters();
+        std::mem::take(&mut slot.pid)
+    });
+    kill_pid(pid);
+}
+
+fn drop_agent(agent_id: &str) {
+    stop_agent(agent_id);
+    let id = sanitize_agent_id(agent_id);
+    with_hub(|h| {
+        h.slots.remove(&id);
     });
 }
 
-/// Apply persisted settings. No-op when the same target is already running.
+/// Reconcile running bridges with the saved list. One row's address change
+/// restarts only that row.
 pub fn apply_settings(settings: &crate::store::AppSettings) {
-    if !settings.atlas_relay_agent_enabled {
-        stop();
-        return;
-    }
-    let url = settings
-        .atlas_relay_agent_url
-        .as_deref()
-        .unwrap_or("")
-        .trim();
-    let id = settings
-        .atlas_relay_agent_id
-        .as_deref()
-        .unwrap_or("");
-    let token = settings
-        .atlas_relay_agent_token
-        .as_deref()
-        .unwrap_or("");
-    if url.is_empty() || sanitize_agent_id(id).is_empty() {
-        stop();
-        return;
-    }
-    if let Ok(ws) = relay_agent_ws_url(url, id, token) {
-        let same = with_state(|s| s.phase != "stopped" && s.url == ws);
-        if same {
-            return;
+    set_health_secs(settings.atlas_relay_agent_health_secs);
+    let saved_ids: HashSet<String> = settings
+        .atlas_relay_agents
+        .iter()
+        .map(|s| sanitize_agent_id(&s.id))
+        .filter(|id| !id.is_empty())
+        .collect();
+    let running: Vec<String> = with_hub(|h| h.slots.keys().cloned().collect());
+    for id in running {
+        if !saved_ids.contains(&id) {
+            drop_agent(&id);
         }
     }
-    if let Err(e) = start(url, id, token) {
-        with_state(|s| {
-            s.phase = "stopped".into();
-            s.error = Some(e);
-            s.cli_alive = false;
+    for slot in &settings.atlas_relay_agents {
+        let id = sanitize_agent_id(&slot.id);
+        if id.is_empty() {
+            continue;
+        }
+        if !slot.enabled || slot.url.trim().is_empty() {
+            stop_agent(&id);
+            continue;
+        }
+        let Ok(ws) = relay_agent_ws_url(slot.url.trim(), &id, &slot.token) else {
+            stop_agent(&id);
+            continue;
+        };
+        let same = with_hub(|h| {
+            h.slots
+                .get(&id)
+                .map(|s| s.phase != "stopped" && s.url == ws)
+                .unwrap_or(false)
         });
+        if same {
+            continue;
+        }
+        if let Err(e) = start(slot.url.trim(), &id, &slot.token) {
+            with_hub(|h| {
+                if let Some(s) = h.slots.get_mut(&id) {
+                    s.phase = "stopped".into();
+                    s.error = Some(e);
+                    s.cli_alive = false;
+                }
+            });
+        }
     }
 }
 
 pub async fn autostart_from_settings() {
     let settings = crate::store::load_settings();
-    if settings.atlas_relay_agent_enabled {
+    if settings.atlas_relay_agents.iter().any(|s| s.enabled) {
         apply_settings(&settings);
     }
 }
 
-fn kill_recorded_child() {
-    let pid = PID.swap(0, Ordering::SeqCst);
+fn kill_pid(pid: u32) {
     if pid != 0 {
         tauri::async_runtime::spawn(async move {
             crate::process_util::kill_process_tree_async(pid).await;
@@ -483,14 +664,14 @@ fn kill_recorded_child() {
     }
 }
 
-fn current(gen: u64) -> bool {
-    GEN.load(Ordering::SeqCst) == gen
+fn slot_is_current(agent_id: &str, gen: u64) -> bool {
+    with_hub(|h| h.slots.get(agent_id).map(|s| s.gen == gen).unwrap_or(false))
 }
 
-async fn cancelled(gen: u64) {
+async fn cancelled(agent_id: &str, gen: u64, notify: &Notify) {
     loop {
-        CANCEL.notified().await;
-        if !current(gen) {
+        notify.notified().await;
+        if !slot_is_current(agent_id, gen) {
             return;
         }
     }
@@ -501,45 +682,49 @@ enum RunEnd {
     Disconnected(Option<String>),
 }
 
-async fn run_forever(gen: u64, ws_url: String) {
-    if !current(gen) {
+async fn run_forever(agent_id: String, gen: u64, ws_url: String, cancel: Arc<Notify>) {
+    if !slot_is_current(&agent_id, gen) {
         return;
     }
     let mut delay_secs = 1u64;
     let mut first = true;
     loop {
-        if !current(gen) {
+        if !slot_is_current(&agent_id, gen) {
             return;
         }
-        with_state(|s| {
-            if s.gen == gen {
-                s.phase = if first {
-                    "connecting".into()
-                } else {
-                    "reconnecting".into()
-                };
-                s.cli_alive = false;
+        with_hub(|h| {
+            if let Some(slot) = h.slots.get_mut(&agent_id) {
+                if slot.gen == gen {
+                    slot.phase = if first {
+                        "connecting".into()
+                    } else {
+                        "reconnecting".into()
+                    };
+                    slot.cli_alive = false;
+                }
             }
         });
         first = false;
-        match run_once(gen, &ws_url).await {
+        match run_once(&agent_id, gen, &ws_url, cancel.as_ref()).await {
             RunEnd::Stopped => return,
             RunEnd::Disconnected(err) => {
-                if !current(gen) {
+                if !slot_is_current(&agent_id, gen) {
                     return;
                 }
-                with_state(|s| {
-                    if s.gen == gen {
-                        s.phase = "reconnecting".into();
-                        s.cli_alive = false;
-                        s.error = err;
+                with_hub(|h| {
+                    if let Some(slot) = h.slots.get_mut(&agent_id) {
+                        if slot.gen == gen {
+                            slot.phase = "reconnecting".into();
+                            slot.cli_alive = false;
+                            slot.error = err;
+                        }
                     }
                 });
                 let sleep = tokio::time::sleep(Duration::from_secs(delay_secs));
                 tokio::pin!(sleep);
                 tokio::select! {
                     _ = &mut sleep => {}
-                    _ = cancelled(gen) => return,
+                    _ = cancelled(&agent_id, gen, cancel.as_ref()) => return,
                 }
                 delay_secs = delay_secs.saturating_mul(2).min(MAX_BACKOFF_SECS);
             }
@@ -547,8 +732,8 @@ async fn run_forever(gen: u64, ws_url: String) {
     }
 }
 
-async fn run_once(gen: u64, ws_url: &str) -> RunEnd {
-    if !current(gen) {
+async fn run_once(agent_id: &str, gen: u64, ws_url: &str, cancel: &Notify) -> RunEnd {
+    if !slot_is_current(agent_id, gen) {
         return RunEnd::Stopped;
     }
     let mut child = match spawn_stdio_agent().await {
@@ -556,26 +741,26 @@ async fn run_once(gen: u64, ws_url: &str) -> RunEnd {
         Err(e) => return RunEnd::Disconnected(Some(e)),
     };
     let pid = child.id().unwrap_or(0);
-    if pid != 0 {
-        PID.store(pid, Ordering::SeqCst);
-    }
-    with_state(|s| {
-        if s.gen == gen {
-            s.cli_alive = true;
+    with_hub(|h| {
+        if let Some(slot) = h.slots.get_mut(agent_id) {
+            if slot.gen == gen {
+                slot.pid = pid;
+                slot.cli_alive = true;
+            }
         }
     });
-    if !current(gen) {
-        finish_child(&mut child, pid).await;
+    if !slot_is_current(agent_id, gen) {
+        finish_child(agent_id, &mut child, pid).await;
         return RunEnd::Stopped;
     }
 
     let ws = tokio::select! {
-        _ = cancelled(gen) => {
-            finish_child(&mut child, pid).await;
+        _ = cancelled(agent_id, gen, cancel) => {
+            finish_child(agent_id, &mut child, pid).await;
             return RunEnd::Stopped;
         }
         _ = tokio::time::sleep(CONNECT_TIMEOUT) => {
-            finish_child(&mut child, pid).await;
+            finish_child(agent_id, &mut child, pid).await;
             return RunEnd::Disconnected(Some(format!(
                 "connect timed out ({}s)",
                 CONNECT_TIMEOUT.as_secs()
@@ -585,48 +770,50 @@ async fn run_once(gen: u64, ws_url: &str) -> RunEnd {
             match result {
                 Ok((ws, _)) => ws,
                 Err(e) => {
-                    finish_child(&mut child, pid).await;
+                    finish_child(agent_id, &mut child, pid).await;
                     return RunEnd::Disconnected(Some(format!("connect failed: {e}")));
                 }
             }
         }
     };
-    if !current(gen) {
-        finish_child(&mut child, pid).await;
+    if !slot_is_current(agent_id, gen) {
+        finish_child(agent_id, &mut child, pid).await;
         return RunEnd::Stopped;
     }
-    with_state(|s| {
-        if s.gen == gen {
-            s.phase = "online".into();
-            s.error = None;
-            s.cli_alive = true;
+    with_hub(|h| {
+        if let Some(slot) = h.slots.get_mut(agent_id) {
+            if slot.gen == gen {
+                slot.phase = "online".into();
+                slot.error = None;
+                slot.cli_alive = true;
+            }
         }
     });
     let safe_url = redact_relay_url(ws_url);
-    tracing::info!(url = %safe_url, pid, "atlas relay agent online");
+    tracing::info!(url = %safe_url, pid, agent_id, "atlas relay agent online");
 
     let stdin = child.stdin.take();
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
-    let end = bridge(gen, ws, stdin, stdout, stderr, &mut child).await;
-    finish_child(&mut child, pid).await;
+    let end = bridge(agent_id, gen, cancel, ws, stdin, stdout, stderr, &mut child).await;
+    finish_child(agent_id, &mut child, pid).await;
     end
 }
 
-async fn finish_child(child: &mut Child, pid: u32) {
-    if pid != 0 && PID.load(Ordering::SeqCst) == pid {
-        PID.store(0, Ordering::SeqCst);
-    }
+async fn finish_child(agent_id: &str, child: &mut Child, pid: u32) {
+    with_hub(|h| {
+        if let Some(slot) = h.slots.get_mut(agent_id) {
+            if pid != 0 && slot.pid == pid {
+                slot.pid = 0;
+                slot.cli_alive = false;
+            }
+        }
+    });
     if pid != 0 {
         crate::process_util::kill_process_tree_async(pid).await;
     }
     let _ = child.start_kill();
     let _ = child.wait().await;
-    with_state(|s| {
-        if s.cli_alive && PID.load(Ordering::SeqCst) == 0 {
-            s.cli_alive = false;
-        }
-    });
 }
 
 async fn spawn_stdio_agent() -> Result<Child, String> {
@@ -657,7 +844,9 @@ async fn spawn_stdio_agent() -> Result<Child, String> {
 }
 
 async fn bridge(
+    agent_id: &str,
     gen: u64,
+    cancel: &Notify,
     ws: tokio_tungstenite::WebSocketStream<
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
     >,
@@ -716,7 +905,7 @@ async fn bridge(
 
     let end = loop {
         tokio::select! {
-            _ = cancelled(gen) => break RunEnd::Stopped,
+            _ = cancelled(agent_id, gen, cancel) => break RunEnd::Stopped,
             _ = health_sleep.as_mut() => {
                 if awaiting_pong {
                     break RunEnd::Disconnected(Some("health check timed out".into()));
@@ -738,7 +927,7 @@ async fn bridge(
                 match incoming {
                     Some(Ok(Message::Text(t))) => {
                         if let Some(body) = inbound_frame_to_line(&t) {
-                            observe_frame(&body, true);
+                            observe_frame(agent_id, &body, true);
                             if write_line(&mut stdin, &body).await.is_err() {
                                 break RunEnd::Disconnected(Some("CLI stdin closed".into()));
                             }
@@ -747,7 +936,7 @@ async fn bridge(
                     Some(Ok(Message::Binary(b))) => {
                         if let Ok(text) = std::str::from_utf8(&b) {
                             if let Some(body) = inbound_frame_to_line(text) {
-                                observe_frame(&body, true);
+                                observe_frame(agent_id, &body, true);
                                 if write_line(&mut stdin, &body).await.is_err() {
                                     break RunEnd::Disconnected(Some("CLI stdin closed".into()));
                                 }
@@ -771,7 +960,7 @@ async fn bridge(
             outgoing = line_rx.recv() => {
                 match outgoing {
                     Some(frame) => {
-                        observe_frame(&frame, false);
+                        observe_frame(agent_id, &frame, false);
                         if sink.send(Message::Text(frame.into())).await.is_err() {
                             break RunEnd::Disconnected(Some("relay closed".into()));
                         }
@@ -800,42 +989,72 @@ async fn write_line(stdin: &mut tokio::process::ChildStdin, body: &str) -> std::
 }
 
 #[tauri::command]
-pub fn atlas_relay_agent_status() -> AtlasRelayAgentStatus {
+pub fn atlas_relay_agent_status() -> AtlasRelayFleetStatus {
     status()
 }
 
-/// Persist the relay target, mark auto-connect, and open the bridge.
+/// Persist this agent, mark it auto-connect, and open only its bridge.
 #[tauri::command]
 pub async fn atlas_relay_agent_connect(
     url: String,
     agent_id: String,
     token: String,
-) -> Result<AtlasRelayAgentStatus, String> {
+) -> Result<AtlasRelayFleetStatus, String> {
     let id = sanitize_agent_id(&agent_id);
+    if id.is_empty() {
+        return Err("empty agent id".into());
+    }
     let given = token;
     let ws = relay_agent_ws_url(url.trim(), &id, &given)?;
     let stored = token_from_ws_url(&ws);
     let mut settings = crate::store::load_settings();
-    settings.atlas_relay_agent_url = Some(url.trim().to_string());
-    settings.atlas_relay_agent_id = Some(id.clone());
-    settings.atlas_relay_agent_token = if stored.is_empty() {
-        None
+    if let Some(slot) = settings
+        .atlas_relay_agents
+        .iter_mut()
+        .find(|s| sanitize_agent_id(&s.id) == id)
+    {
+        slot.url = url.trim().to_string();
+        slot.token = stored.clone();
+        slot.id = id.clone();
+        slot.enabled = true;
     } else {
-        Some(stored.clone())
-    };
-    settings.atlas_relay_agent_enabled = true;
+        if settings.atlas_relay_agents.len() >= MAX_RELAY_AGENTS {
+            return Err("at most 4 relay agents".into());
+        }
+        settings
+            .atlas_relay_agents
+            .push(crate::store::AtlasRelayAgentRecord {
+                url: url.trim().to_string(),
+                token: stored.clone(),
+                id: id.clone(),
+                enabled: true,
+            });
+    }
+    validate_relay_agents(&settings.atlas_relay_agents)?;
     crate::store::save_settings_async(&settings).await?;
     start(url.trim(), &id, &stored)?;
     Ok(status())
 }
 
-/// Stop the bridge and turn off auto-connect.
+/// Stop one agent and turn off its auto-connect. The row stays in the list.
 #[tauri::command]
-pub async fn atlas_relay_agent_disconnect() -> Result<AtlasRelayAgentStatus, String> {
+pub async fn atlas_relay_agent_disconnect(
+    agent_id: String,
+) -> Result<AtlasRelayFleetStatus, String> {
+    let id = sanitize_agent_id(&agent_id);
+    if id.is_empty() {
+        return Err("empty agent id".into());
+    }
     let mut settings = crate::store::load_settings();
-    settings.atlas_relay_agent_enabled = false;
+    if let Some(slot) = settings
+        .atlas_relay_agents
+        .iter_mut()
+        .find(|s| sanitize_agent_id(&s.id) == id)
+    {
+        slot.enabled = false;
+    }
     crate::store::save_settings_async(&settings).await?;
-    stop();
+    stop_agent(&id);
     Ok(status())
 }
 
@@ -1004,5 +1223,56 @@ mod tests {
         assert_eq!(tasks[0].text.chars().count(), MAX_TASK_TEXT);
         note_relay_frame(&mut tasks, "{not-json", true, 17);
         assert_eq!(tasks[0].id, "8");
+    }
+
+    #[test]
+    fn legacy_relay_target_becomes_the_first_agent() {
+        let mut settings = crate::store::AppSettings::default();
+        settings.atlas_relay_agent_url = Some("ws://10.218.221.203:2420".into());
+        settings.atlas_relay_agent_id = Some("9c7fc43585b0422e9cbfe93407f9b150-1".into());
+        settings.atlas_relay_agent_token = Some("tok".into());
+        settings.atlas_relay_agent_enabled = true;
+        assert!(migrate_relay_agent_settings(&mut settings));
+        assert_eq!(settings.atlas_relay_agents.len(), 1);
+        assert_eq!(
+            settings.atlas_relay_agents[0].id,
+            "9c7fc43585b0422e9cbfe93407f9b150-1"
+        );
+        assert_eq!(
+            settings.atlas_relay_agents[0].url,
+            "ws://10.218.221.203:2420"
+        );
+        assert_eq!(settings.atlas_relay_agents[0].token, "tok");
+        assert!(settings.atlas_relay_agents[0].enabled);
+        assert!(settings.atlas_relay_agent_id.is_none());
+        assert!(!settings.atlas_relay_agent_enabled);
+        assert!(!migrate_relay_agent_settings(&mut settings));
+    }
+
+    #[test]
+    fn relay_agents_reject_a_fifth_and_a_duplicate_id() {
+        let mut agents = Vec::new();
+        for i in 0..4 {
+            agents.push(crate::store::AtlasRelayAgentRecord {
+                url: format!("ws://10.0.0.{i}:2420"),
+                token: String::new(),
+                id: format!("a{i}"),
+                enabled: false,
+            });
+        }
+        assert!(validate_relay_agents(&agents).is_ok());
+        agents.push(crate::store::AtlasRelayAgentRecord {
+            url: "ws://10.9.9.9:2420".into(),
+            token: String::new(),
+            id: "a9".into(),
+            enabled: false,
+        });
+        assert!(validate_relay_agents(&agents).unwrap_err().contains("4"));
+        agents.pop();
+        agents[3].id = "a0".into();
+        agents[3].url = "ws://other.example:2420".into();
+        assert!(validate_relay_agents(&agents)
+            .unwrap_err()
+            .contains("duplicate"));
     }
 }

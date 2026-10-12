@@ -1,12 +1,12 @@
 /**
- * Settings → Runtime → Connection: this app as an Atlas Relay agent.
+ * Settings → Atlas: up to four Relay agents, each with its own address.
  *
  * Dials the relay and bridges ACP to a local Atlas CLI. Does not open a
  * workbench transcript.
  */
 import { useCallback, useEffect, useState } from "react";
 import * as api from "@/lib/api";
-import type { AtlasRelayAgentStatus } from "@/lib/api";
+import type { AtlasRelayAgentLive, AtlasRelayAgentRecord, AtlasRelayAgentStatus } from "@/lib/api";
 import type { Vars } from "@/i18n";
 
 type Props = {
@@ -14,11 +14,21 @@ type Props = {
   rowHighlight: (anchorId: string) => string;
 };
 
-function phaseLabel(
-  t: Props["t"],
-  status: AtlasRelayAgentStatus | null,
-): string {
-  switch (status?.phase) {
+type Row = {
+  key: string;
+  url: string;
+  agentId: string;
+  token: string;
+  /** Id last saved. Empty until this row is stored. */
+  savedId: string;
+  /** `duplicate` or a host error string. */
+  rowError: string;
+};
+
+const MAX_AGENTS = 4;
+
+function phaseLabel(t: Props["t"], phase: string | undefined): string {
+  switch (phase) {
     case "connecting":
       return t("settings.atlasRelayAgentConnecting");
     case "online":
@@ -28,6 +38,14 @@ function phaseLabel(
     default:
       return t("settings.atlasRelayAgentStopped");
   }
+}
+
+function agentKey(id: string): string {
+  return id.replace(/[\r\n]/g, "").trim().slice(0, 128);
+}
+
+function isLive(phase: string | undefined): boolean {
+  return phase === "connecting" || phase === "online" || phase === "reconnecting";
 }
 
 /** Pull `token` / `agent_id` out of a pasted relay address. */
@@ -56,32 +74,66 @@ function splitRelayPaste(raw: string): {
   }
 }
 
+function rowFromSaved(slot: AtlasRelayAgentRecord): Row {
+  const id = slot.id?.trim() || "";
+  return {
+    key: id || `saved-${Math.random().toString(36).slice(2)}`,
+    url: slot.url?.trim() || "",
+    agentId: id,
+    token: slot.token?.trim() || "",
+    savedId: id,
+    rowError: "",
+  };
+}
+
+let draftSeq = 0;
+
+function blankRow(): Row {
+  draftSeq += 1;
+  return {
+    key: `draft-${draftSeq}`,
+    url: "",
+    agentId: "",
+    token: "",
+    savedId: "",
+    rowError: "",
+  };
+}
+
 export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
-  const [url, setUrl] = useState("");
-  const [agentId, setAgentId] = useState("");
-  const [token, setToken] = useState("");
+  const [rows, setRows] = useState<Row[]>([]);
   const [healthSecs, setHealthSecs] = useState("15");
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<AtlasRelayAgentStatus | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [fleet, setFleet] = useState<AtlasRelayAgentStatus | null>(null);
+
+  const applySaved = useCallback((agents: AtlasRelayAgentRecord[] | undefined) => {
+    const saved = (agents ?? []).map(rowFromSaved).filter((r) => r.savedId);
+    setRows((prev) => {
+      const savedIds = new Set(saved.map((r) => agentKey(r.savedId)));
+      const pending = prev.filter((r) => {
+        if (r.savedId && savedIds.has(agentKey(r.savedId))) return false;
+        return !savedIds.has(agentKey(r.agentId));
+      });
+      return [...saved, ...pending].slice(0, MAX_AGENTS);
+    });
+  }, []);
 
   const refreshSettings = useCallback(async () => {
     if (!api.isTauri()) return;
     try {
       const s = await api.settingsGet();
-      setUrl(s.atlasRelayAgentUrl?.trim() || "");
-      setAgentId(s.atlasRelayAgentId?.trim() || "");
-      setToken(s.atlasRelayAgentToken?.trim() || "");
+      applySaved(s.atlasRelayAgents);
       const secs = s.atlasRelayAgentHealthSecs;
       setHealthSecs(String(secs && secs > 0 ? secs : 15));
     } catch {
       /* keep the draft */
     }
-  }, []);
+  }, [applySaved]);
 
   const refreshStatus = useCallback(async () => {
     if (!api.isTauri()) return;
     try {
-      setStatus(await api.atlasRelayAgentStatus());
+      setFleet(await api.atlasRelayAgentStatus());
     } catch {
       /* status is best-effort */
     }
@@ -94,46 +146,85 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
     return () => window.clearInterval(id);
   }, [refreshSettings, refreshStatus]);
 
-  const live =
-    status?.phase === "connecting" ||
-    status?.phase === "online" ||
-    status?.phase === "reconnecting";
+  const liveOf = (agentId: string): AtlasRelayAgentLive | undefined =>
+    fleet?.agents?.find((a) => a.agentId === agentKey(agentId));
 
-  const connect = async () => {
-    if (!api.isTauri() || busy) return;
-    setBusy(true);
+  const patch = (key: string, next: Partial<Row>) => {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...next } : r)));
+  };
+
+  const duplicateOf = (row: Row, agentId = row.agentId) => {
+    const id = agentKey(agentId);
+    if (!id) return false;
+    return rows.some((other) => other.key !== row.key && agentKey(other.agentId) === id);
+  };
+
+  const connect = async (row: Row) => {
+    if (!api.isTauri() || busyKey) return;
+    const id = agentKey(row.agentId);
+    if (!row.url.trim() || !id) return;
+    if (duplicateOf(row)) {
+      patch(row.key, { rowError: "duplicate" });
+      return;
+    }
+    setBusyKey(row.key);
     try {
-      setStatus(
-        await api.atlasRelayAgentConnect(url.trim(), agentId.trim(), token.trim()),
+      if (row.savedId && agentKey(row.savedId) !== id) {
+        const current = await api.settingsGet();
+        await api.settingsSet({
+          ...current,
+          atlasRelayAgents: (current.atlasRelayAgents ?? []).filter(
+            (slot) => agentKey(slot.id ?? "") !== agentKey(row.savedId),
+          ),
+        });
+      }
+      setFleet(
+        await api.atlasRelayAgentConnect(row.url.trim(), id, row.token.trim()),
       );
+      patch(row.key, { rowError: "", savedId: id, agentId: id });
+      await refreshSettings();
     } catch (e) {
-      setStatus({
-        phase: "stopped",
-        error: String(e),
-        cliAlive: false,
-        agentId: agentId.trim(),
-        url: url.trim(),
-      });
+      patch(row.key, { rowError: String(e) });
     } finally {
-      setBusy(false);
+      setBusyKey(null);
     }
   };
 
-  const disconnect = async () => {
-    if (!api.isTauri() || busy) return;
-    setBusy(true);
+  const disconnect = async (row: Row) => {
+    if (!api.isTauri() || busyKey) return;
+    const id = agentKey(row.savedId || row.agentId);
+    if (!id) return;
+    setBusyKey(row.key);
     try {
-      setStatus(await api.atlasRelayAgentDisconnect());
+      setFleet(await api.atlasRelayAgentDisconnect(id));
+      patch(row.key, { rowError: "" });
     } catch (e) {
-      setStatus((prev) => ({
-        phase: "stopped",
-        error: String(e),
-        cliAlive: false,
-        agentId: prev?.agentId || agentId.trim(),
-        url: prev?.url || url.trim(),
-      }));
+      patch(row.key, { rowError: String(e) });
     } finally {
-      setBusy(false);
+      setBusyKey(null);
+    }
+  };
+
+  const remove = async (row: Row) => {
+    if (busyKey) return;
+    const live = isLive(liveOf(row.agentId)?.phase);
+    if (live) return;
+    setBusyKey(row.key);
+    try {
+      if (row.savedId && api.isTauri()) {
+        const current = await api.settingsGet();
+        await api.settingsSet({
+          ...current,
+          atlasRelayAgents: (current.atlasRelayAgents ?? []).filter(
+            (slot) => agentKey(slot.id ?? "") !== agentKey(row.savedId),
+          ),
+        });
+      }
+      setRows((prev) => prev.filter((r) => r.key !== row.key));
+    } catch (e) {
+      patch(row.key, { rowError: String(e) });
+    } finally {
+      setBusyKey(null);
     }
   };
 
@@ -154,8 +245,7 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
     }
   };
 
-  const ok = status?.phase === "online";
-  const failed = !!status?.error && status.phase !== "online";
+  const atCap = rows.length >= MAX_AGENTS;
 
   return (
     <div
@@ -167,105 +257,158 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
           <div className="settings-row__label">{t("settings.atlasRelayAgent")}</div>
           <div className="settings-row__desc">{t("settings.atlasRelayAgentDesc")}</div>
         </div>
-        <div className="settings-acp-field settings-acp-field--stack">
-          <input
-            className="settings-input"
-            value={url}
-            placeholder={t("settings.atlasRelayAgentUrlPh")}
-            disabled={busy || live}
-            onChange={(e) => {
-              const next = e.target.value;
-              const split = splitRelayPaste(next);
-              if (!split) {
-                setUrl(next);
-                return;
-              }
-              setUrl(split.url);
-              if (split.token) setToken(split.token);
-              if (split.agentId && !agentId.trim()) setAgentId(split.agentId);
-            }}
-            aria-label={t("settings.atlasRelayAgent")}
-          />
-          <input
-            className="settings-input"
-            value={agentId}
-            placeholder={t("settings.atlasRelayAgentIdPh")}
-            disabled={busy || live}
-            onChange={(e) => setAgentId(e.target.value)}
-            aria-label={t("settings.atlasRelayAgentIdPh")}
-          />
-          <input
-            className="settings-input"
-            type="password"
-            value={token}
-            placeholder={t("settings.atlasRelayAgentTokenPh")}
-            disabled={busy || live}
-            onChange={(e) => setToken(e.target.value)}
-            aria-label={t("settings.atlasRelayAgentTokenPh")}
-            spellCheck={false}
-            autoComplete="off"
-          />
-          {live ? (
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={busy}
-              onClick={() => void disconnect()}
-            >
-              {t("settings.atlasRelayAgentDisconnect")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn btn--ghost"
-              disabled={busy || !url.trim() || !agentId.trim()}
-              onClick={() => void connect()}
-            >
-              {t("settings.atlasRelayAgentConnect")}
-            </button>
-          )}
-          <label
-            className="settings-row__text"
-            id="settings-anchor-atlasRelayAgentHealth"
-            htmlFor="atlas-relay-health-secs"
-          >
-            <span className="settings-row__label">
-              {t("settings.atlasRelayAgentHealth")}
-            </span>
-            <span className="settings-row__desc">
-              {t("settings.atlasRelayAgentHealthDesc")}
-            </span>
-          </label>
-          <input
-            id="atlas-relay-health-secs"
-            className="settings-input"
-            type="number"
-            min={5}
-            max={300}
-            inputMode="numeric"
-            value={healthSecs}
-            aria-label={t("settings.atlasRelayAgentHealth")}
-            onChange={(e) => setHealthSecs(e.target.value)}
-            onBlur={() => void commitHealth()}
-          />
-        </div>
-        {status ? (
-          <div
-            className={
-              "settings-acp-chip" + (ok ? " is-ok" : failed ? " is-fail" : "")
-            }
-            role="status"
-          >
-            <span className="settings-acp-chip__dot" aria-hidden />
-            <span className="settings-acp-chip__label">{phaseLabel(t, status)}</span>
-            <span className="settings-acp-chip__meta">
-              {status.cliAlive
-                ? t("settings.atlasRelayAgentCli")
-                : t("settings.atlasRelayAgentCliDown")}
-              {status.error ? ` · ${status.error}` : ""}
-            </span>
-          </div>
+        {rows.map((row) => {
+          const live = liveOf(row.agentId);
+          const locked = !!busyKey || isLive(live?.phase);
+          const duplicate = row.rowError === "duplicate" || duplicateOf(row);
+          const hostError =
+            row.rowError && row.rowError !== "duplicate" ? row.rowError : live?.error || "";
+          const ok = live?.phase === "online";
+          const failed = !!hostError && live?.phase !== "online";
+          return (
+            <div key={row.key} className="settings-acp-field settings-acp-field--stack">
+              <input
+                className="settings-input"
+                value={row.url}
+                placeholder={t("settings.atlasRelayAgentUrlPh")}
+                disabled={locked}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  const split = splitRelayPaste(next);
+                  if (!split) {
+                    patch(row.key, { url: next, rowError: "" });
+                    return;
+                  }
+                  const nextId = split.agentId ?? row.agentId;
+                  const dup = !!split.agentId && duplicateOf(row, nextId);
+                  patch(row.key, {
+                    url: split.url,
+                    token: split.token ?? row.token,
+                    agentId: nextId,
+                    rowError: dup ? "duplicate" : "",
+                  });
+                }}
+                aria-label={t("settings.atlasRelayAgent")}
+              />
+              <input
+                className="settings-input"
+                value={row.agentId}
+                placeholder={t("settings.atlasRelayAgentIdPh")}
+                disabled={locked}
+                onChange={(e) => {
+                  const agentId = e.target.value;
+                  patch(row.key, {
+                    agentId,
+                    rowError: duplicateOf(row, agentId) ? "duplicate" : "",
+                  });
+                }}
+                aria-label={t("settings.atlasRelayAgentIdPh")}
+              />
+              <input
+                className="settings-input"
+                type="password"
+                value={row.token}
+                placeholder={t("settings.atlasRelayAgentTokenPh")}
+                disabled={locked}
+                onChange={(e) => patch(row.key, { token: e.target.value })}
+                aria-label={t("settings.atlasRelayAgentTokenPh")}
+                spellCheck={false}
+                autoComplete="off"
+              />
+              {duplicate ? (
+                <div className="settings-row__desc" role="status">
+                  {t("settings.atlasRelayAgentDuplicate")}
+                </div>
+              ) : null}
+              <div className="settings-acp-field">
+                {isLive(live?.phase) ? (
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    disabled={!!busyKey}
+                    onClick={() => void disconnect(row)}
+                  >
+                    {t("settings.atlasRelayAgentDisconnect")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    disabled={
+                      !!busyKey || !row.url.trim() || !agentKey(row.agentId) || duplicate
+                    }
+                    onClick={() => void connect(row)}
+                  >
+                    {t("settings.atlasRelayAgentConnect")}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  disabled={!!busyKey || isLive(live?.phase)}
+                  onClick={() => void remove(row)}
+                >
+                  {t("settings.atlasRelayAgentRemove")}
+                </button>
+              </div>
+              <div
+                className={
+                  "settings-acp-chip" + (ok ? " is-ok" : failed ? " is-fail" : "")
+                }
+                role="status"
+              >
+                <span className="settings-acp-chip__dot" aria-hidden />
+                <span className="settings-acp-chip__label">
+                  {phaseLabel(t, live?.phase)}
+                </span>
+                <span className="settings-acp-chip__meta">
+                  {live?.cliAlive
+                    ? t("settings.atlasRelayAgentCli")
+                    : t("settings.atlasRelayAgentCliDown")}
+                  {hostError ? ` · ${hostError}` : ""}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+        <button
+          type="button"
+          className="btn btn--ghost"
+          disabled={atCap || !!busyKey}
+          onClick={() => {
+            if (atCap) return;
+            setRows((prev) => [...prev, blankRow()].slice(0, MAX_AGENTS));
+          }}
+        >
+          {t("settings.atlasRelayAgentAdd")}
+        </button>
+        {atCap ? (
+          <div className="settings-row__desc">{t("settings.atlasRelayAgentMax")}</div>
         ) : null}
+        <label
+          className="settings-row__text"
+          id="settings-anchor-atlasRelayAgentHealth"
+          htmlFor="atlas-relay-health-secs"
+        >
+          <span className="settings-row__label">
+            {t("settings.atlasRelayAgentHealth")}
+          </span>
+          <span className="settings-row__desc">
+            {t("settings.atlasRelayAgentHealthDesc")}
+          </span>
+        </label>
+        <input
+          id="atlas-relay-health-secs"
+          className="settings-input"
+          type="number"
+          min={5}
+          max={300}
+          inputMode="numeric"
+          value={healthSecs}
+          aria-label={t("settings.atlasRelayAgentHealth")}
+          onChange={(e) => setHealthSecs(e.target.value)}
+          onBlur={() => void commitHealth()}
+        />
       </div>
     </div>
   );

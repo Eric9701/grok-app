@@ -211,6 +211,7 @@ export type RelayKanbanTask = {
   status: string;
   error?: string | null;
   atMs: number;
+  agentId?: string;
 };
 
 /**
@@ -234,6 +235,7 @@ export function relayTaskToKanbanCard(
   if (!kanbanColumn || !id) return null;
   const title = task.text.trim() || labels.untitled;
   const error = task.error?.trim() || "";
+  const agentId = task.agentId?.trim() || "";
   const column: TaskBoardColumn =
     kanbanColumn === "working"
       ? "running"
@@ -241,9 +243,9 @@ export function relayTaskToKanbanCard(
         ? "error"
         : "done";
   return {
-    sessionId: `relay:${id}`,
+    sessionId: agentId ? `relay:${agentId}:${id}` : `relay:${id}`,
     title,
-    projectName: labels.projectName,
+    projectName: agentId ? `${labels.projectName} · ${agentId}` : labels.projectName,
     projectPath: null,
     status: kanbanColumn === "working" ? "busy" : kanbanColumn === "needs_you" ? "error" : "idle",
     column,

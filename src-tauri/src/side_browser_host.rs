@@ -156,6 +156,50 @@ pub(crate) fn get_side_webview<R: tauri::Runtime>(
         .ok_or_else(|| format!("side browser webview not found: {label}"))
 }
 
+/// Move and resize together.
+///
+/// `set_size` then `set_position` is two IPC calls. On Windows the size call
+/// re-reads the origin, and that read can still be `(0, 0)` while the move is
+/// in flight. A large size at the origin covers the caption buttons.
+///
+/// After the move, Windows also punches the caption button band out of the
+/// child HWND. A child WebView2 paints above HTML, so minimize / maximize /
+/// close never see the click while that band is covered.
+pub fn set_bounds(
+    app: &AppHandle,
+    label: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let wv = get_side_webview(app, &label)?;
+    let width = width.max(1.0);
+    let height = height.max(1.0);
+    wv.set_bounds(tauri::Rect {
+        position: tauri::Position::Logical(LogicalPosition::new(x, y)),
+        size: tauri::Size::Logical(LogicalSize::new(width, height)),
+    })
+    .map_err(|e| format!("side browser bounds: {e}"))?;
+    pass_caption_through(&wv, x, y, width, height);
+    Ok(())
+}
+
+fn pass_caption_through(wv: &tauri::Webview, x: f64, y: f64, width: f64, height: f64) {
+    #[cfg(windows)]
+    {
+        if let Err(e) = wv.with_webview(move |platform| {
+            crate::win_caption_pass::apply(platform.controller(), x, y, width, height);
+        }) {
+            tracing::debug!(target: "side_browser", "caption pass-through skipped: {e}");
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (wv, x, y, width, height);
+    }
+}
+
 /// Sanitize a suggested download file name for the save dialog.
 fn sanitize_file_name(raw: &str) -> String {
     let trimmed = raw.trim();
@@ -328,12 +372,8 @@ pub fn create(
             url = %url,
             "reusing existing side browser webview"
         );
-        existing
-            .set_position(LogicalPosition::new(x, y))
-            .map_err(|e| format!("reuse side browser position: {e}"))?;
-        existing
-            .set_size(LogicalSize::new(width, height))
-            .map_err(|e| format!("reuse side browser size: {e}"))?;
+        set_bounds(app, label.clone(), x, y, width, height)
+            .map_err(|e| format!("reuse side browser bounds: {e}"))?;
         let should_navigate = existing
             .url()
             .map(|current| current != parsed)
@@ -647,13 +687,14 @@ pub fn create(
         "creating side browser child webview"
     );
 
-    window
+    let created = window
         .add_child(
             builder,
             LogicalPosition::new(x, y),
             LogicalSize::new(width, height),
         )
         .map_err(|e| format!("side browser create: {e}"))?;
+    pass_caption_through(&created, x, y, width, height);
 
     tracing::info!(
         target: "side_browser",

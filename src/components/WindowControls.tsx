@@ -86,6 +86,7 @@ export function WindowControls({ visible, labels }: Props) {
     try {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const w = getCurrentWindow();
+      console.log("winChrome:", action, w);
       if (action === "minimize") await w.minimize();
       if (action === "toggleMaximize") {
         setMaximized(await toggleMaximizeReliable());

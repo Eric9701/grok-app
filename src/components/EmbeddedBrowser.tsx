@@ -14,8 +14,11 @@
  * Lifecycle (perf):
  * - Create once per label; URL changes use `side_browser_navigate` (not recreate).
  * - Reload uses `side_browser_reload` (full document refresh without tear-down).
- * - Pane hide/show only toggles visibility; bounds re-apply only when the host
- *   rect actually moves (avoids open/close blocking on setPosition/setSize).
+ * - Pane hide parks the child outside the window, then hides it. On Windows a
+ *   hidden WebView2 keeps hit-testing its last rect, which covers the caption
+ *   buttons (z-index cannot win). Show places it again in one setBounds.
+ *   The host also returns HTTRANSPARENT for the caption button band, so
+ *   minimize / maximize / close still reach this page while the child is up.
  *
  * Bounds: host ResizeObserver + ancestor observers + window resize, coalesced
  * through a trailing single-flight so setPosition/setSize never interleave
@@ -30,6 +33,7 @@ import {
   sideBrowserClose,
   sideBrowserCreate,
   sideBrowserEval,
+  sideBrowserSetBounds,
   sideBrowserInstallDownloadHook,
   sideBrowserNavigate,
   sideBrowserReload,
@@ -52,9 +56,11 @@ import {
 import {
   boundsNearlyEqual,
   clipHostRectAgainstLeftResizers,
+  clipHostRectBelowTop,
   clipHostRectToAncestor,
   createTrailingSingleFlight,
   isAsideWebviewSuppressed,
+  PARKED_CHILD_WEBVIEW_BOUNDS,
   snapBounds,
   type BoundsPx,
   type HostRectPx,
@@ -188,6 +194,34 @@ function loadDpi(): Promise<DpiMod> {
     dpiModPromise = import("@tauri-apps/api/dpi");
   }
   return dpiModPromise;
+}
+
+/** Bottom of the self-drawn caption buttons, or 0 when that chrome is absent. */
+function captionBottomLimit(): number {
+  if (typeof document === "undefined") return 0;
+  const el = document.querySelector(".window-controls");
+  if (!(el instanceof HTMLElement)) return 0;
+  const style = window.getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden") return 0;
+  const rect = el.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) return 0;
+  return rect.bottom;
+}
+
+/**
+ * Move a child webview in one host call.
+ * The JS API only has setSize and setPosition. setSize re-reads the origin,
+ * and on Windows that read can still be (0, 0), so a large size covers the
+ * caption buttons and the later move never wins.
+ */
+async function moveChildWebview(label: string, next: BoundsPx): Promise<void> {
+  await sideBrowserSetBounds({
+    label,
+    x: next.x,
+    y: next.y,
+    width: Math.max(next.width, 1),
+    height: Math.max(next.height, 1),
+  });
 }
 
 export interface EmbeddedBrowserProps {
@@ -393,6 +427,30 @@ export function EmbeddedBrowser({
     }
   };
 
+  // Park outside the parent, then hide. hide() alone leaves the last rect
+  // hit-testable on Windows, which is how Octo / Atlas Cloud kill the caption
+  // buttons after the pane stays mounted.
+  const concealWebview = async (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    wv: any,
+  ) => {
+    try {
+      if (
+        !boundsNearlyEqual(
+          lastBoundsRef.current,
+          PARKED_CHILD_WEBVIEW_BOUNDS,
+          0.5,
+        )
+      ) {
+        await moveChildWebview(webviewLabel, PARKED_CHILD_WEBVIEW_BOUNDS);
+        lastBoundsRef.current = PARKED_CHILD_WEBVIEW_BOUNDS;
+      }
+      await setWebviewVisible(wv, false);
+    } catch {
+      /* next apply retries */
+    }
+  };
+
   /**
    * Apply host rect → native webview. Always re-reads DOM at start so trailing
    * coalesced runs pick up the latest sidebar/window size.
@@ -408,16 +466,17 @@ export function EmbeddedBrowser({
       coveredRef.current ||
       isAsideWebviewSuppressed(aside);
     if (mustHide) {
-      lastBoundsRef.current = null;
-      await setWebviewVisible(wv, false);
+      await concealWebview(wv);
       return;
     }
 
     // Clip past left-edge pane resizers first (native webviews paint above DOM).
-    const rect = hostRectForWebview(el);
+    const measured = hostRectForWebview(el);
+    const rect = measured
+      ? clipHostRectBelowTop(measured, captionBottomLimit())
+      : null;
     if (!rect || rect.width < 2 || rect.height < 2) {
-      lastBoundsRef.current = null;
-      await setWebviewVisible(wv, false);
+      await concealWebview(wv);
       return;
     }
 
@@ -442,8 +501,7 @@ export function EmbeddedBrowser({
     );
 
     if (clipped.width < 2 || clipped.height < 2) {
-      lastBoundsRef.current = null;
-      await setWebviewVisible(wv, false);
+      await concealWebview(wv);
       return;
     }
 
@@ -466,12 +524,9 @@ export function EmbeddedBrowser({
     }
 
     try {
-      const { LogicalPosition, LogicalSize } = await loadDpi();
-      // Position then size — one pair per apply; single-flight prevents interleave.
-      // When hidden (pane closed), still update bounds so the next show is correct
-      // without a second full apply — but skip show/hide thrash via lastVisibleRef.
-      await wv.setPosition(new LogicalPosition(next.x, next.y));
-      await wv.setSize(new LogicalSize(next.width, next.height));
+      // One bounds update. A later setSize would re-read the origin, and on
+      // Windows that read can still be (0, 0) and cover the caption buttons.
+      await moveChildWebview(webviewLabel, next);
       lastBoundsRef.current = next;
       await setWebviewVisible(wv, wantShow);
     } catch (e) {
@@ -503,7 +558,7 @@ export function EmbeddedBrowser({
       setCovered(next);
       if (next) {
         const wv = webviewRef.current;
-        if (wv) void setWebviewVisible(wv, false);
+        if (wv) void concealWebview(wv);
       }
     });
   }, []);
@@ -657,7 +712,6 @@ export function EmbeddedBrowser({
         void loadDpi();
         const { Webview } = await import("@tauri-apps/api/webview");
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const { LogicalPosition, LogicalSize } = await loadDpi();
         const win = getCurrentWindow();
 
         // Do not close before create. The host reuses a live label, which avoids
@@ -668,11 +722,20 @@ export function EmbeddedBrowser({
         if (cancelled) return;
 
         const el = hostRef.current;
-        const rect = el ? hostRectForWebview(el) : null;
-        const x = Math.round(rect?.left ?? 0);
-        const y = Math.round(rect?.top ?? 0);
-        const w = Math.max(Math.round(rect?.width ?? 320), 40);
-        const h = Math.max(Math.round(rect?.height ?? 240), 40);
+        const measured = el ? hostRectForWebview(el) : null;
+        const fitted = measured
+          ? clipHostRectBelowTop(measured, captionBottomLimit())
+          : null;
+        // No layout yet: do not spawn a child at (0, 0). That rect grows over
+        // the caption buttons before the first real sync.
+        const x = fitted ? Math.round(fitted.left) : PARKED_CHILD_WEBVIEW_BOUNDS.x;
+        const y = fitted ? Math.round(fitted.top) : PARKED_CHILD_WEBVIEW_BOUNDS.y;
+        const w = fitted
+          ? Math.max(Math.round(fitted.width), 1)
+          : PARKED_CHILD_WEBVIEW_BOUNDS.width;
+        const h = fitted
+          ? Math.max(Math.round(fitted.height), 1)
+          : PARKED_CHILD_WEBVIEW_BOUNDS.height;
 
         // Use latest desired URL in case props changed while we awaited imports.
         const target = bootUrlRef.current || initialUrl;
@@ -707,9 +770,9 @@ export function EmbeddedBrowser({
 
         webviewRef.current = webview;
         currentUrlRef.current = target;
-        lastBoundsRef.current = { x, y, width: w, height: h };
-        await webview.setPosition(new LogicalPosition(x, y));
-        await webview.setSize(new LogicalSize(w, h));
+        const placed = { x, y, width: w, height: h };
+        lastBoundsRef.current = placed;
+        await moveChildWebview(webviewLabel, placed);
         // Show as soon as the child exists — do not wait on pageLoading
         // (that path caused navigate-time hide/show flicker).
         const wantShow = activeRef.current && !coveredRef.current;
@@ -787,10 +850,7 @@ export function EmbeddedBrowser({
               const wv = webviewRef.current;
               if (!wv) return;
               if (!vis || !activeRef.current) {
-                if (lastVisibleRef.current !== false) {
-                  lastVisibleRef.current = false;
-                  void wv.hide().catch(() => undefined);
-                }
+                void concealWebview(wv);
               } else {
                 scheduleSyncRaf();
               }
@@ -898,12 +958,33 @@ export function EmbeddedBrowser({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey, ready, webviewLabel]);
 
-  // Visibility only — do NOT null bounds (avoids open/close setPosition thrash).
+  // Tray restore conceals every side browser. Show again if this one is active.
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void import("@tauri-apps/api/event").then(async ({ listen }) => {
+      const stop = await listen("app://main-shown", () => {
+        const wv = webviewRef.current;
+        if (!wv || !activeRef.current || coveredRef.current) return;
+        void wv.show();
+      });
+      if (cancelled) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [webviewLabel]);
+
+  // Hide parks the child. Leaving the last rect in place keeps it under
+  // the caption buttons on Windows even after hide().
   useEffect(() => {
     const wv = webviewRef.current;
     if (!wv || !isTauri()) return;
     if (!active || covered) {
-      void setWebviewVisible(wv, false);
+      void concealWebview(wv);
       return;
     }
     scheduleSync();

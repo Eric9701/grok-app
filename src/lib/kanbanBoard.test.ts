@@ -382,6 +382,19 @@ describe("relay tasks on the agent kanban", () => {
     expect(countAgentKanbanCards(merged)).toBe(4);
     expect(board.working).toHaveLength(1);
   });
+
+  it("puts the agent id on the card so two relays do not share a session id", () => {
+    const card = relayTaskToKanbanCard(
+      { id: "9", text: "look", status: "running", atMs: 1, agentId: "box-a" },
+      labels,
+    );
+    expect(card).toMatchObject({
+      sessionId: "relay:box-a:9",
+      projectName: "Atlas Cloud · box-a",
+      relayTaskId: "9",
+      source: "relay",
+    });
+  });
 });
 
 describe("agent kanban surface is not a todo list", () => {

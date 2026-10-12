@@ -132,6 +132,23 @@ export async function sideBrowserClose(label: string) {
   return invoke<void>("side_browser_close", { label });
 }
 
+/** Move and resize a child webview together. Split calls cover the caption on Windows. */
+export async function sideBrowserSetBounds(opts: {
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}) {
+  return invoke<void>("side_browser_set_bounds", {
+    label: opts.label,
+    x: opts.x,
+    y: opts.y,
+    width: opts.width,
+    height: opts.height,
+  });
+}
+
 export async function sideBrowserList() {
   return invoke<SideBrowserInfo[]>("side_browser_list");
 }
@@ -293,16 +310,27 @@ export interface AtlasRelayTask {
   status: string;
   error?: string | null;
   atMs: number;
+  /** Relay agent that received this prompt. */
+  agentId?: string;
 }
 
-export interface AtlasRelayAgentStatus {
+/** One running relay bridge. */
+export interface AtlasRelayAgentLive {
   /** stopped | connecting | online | reconnecting */
   phase: string;
   error?: string | null;
   cliAlive: boolean;
   agentId: string;
+  /** Redacted socket address. */
   url: string;
-  /** Cloud session/prompt rows, newest first. */
+}
+
+/** Every relay bridge. `phase` is online when any agent is online. */
+export interface AtlasRelayAgentStatus {
+  /** stopped | connecting | online | reconnecting */
+  phase: string;
+  agents?: AtlasRelayAgentLive[];
+  /** Cloud session/prompt rows from every agent, newest first. */
   tasks?: AtlasRelayTask[];
 }
 
@@ -322,8 +350,10 @@ export async function atlasRelayAgentConnect(
   });
 }
 
-export async function atlasRelayAgentDisconnect() {
-  return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_disconnect");
+export async function atlasRelayAgentDisconnect(agentId: string) {
+  return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_disconnect", {
+    agentId,
+  });
 }
 
 /** WSL availability + distros + optional CLI probe (Settings → Runtime). */

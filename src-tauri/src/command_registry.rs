@@ -494,6 +494,7 @@ pub fn app_invoke_handler(
         commands::terminal_pty_kill,
         // ── Side browser ──
         commands::side_browser_create,
+        commands::side_browser_set_bounds,
         commands::side_browser_close,
         commands::side_browser_list,
         commands::side_browser_navigate,

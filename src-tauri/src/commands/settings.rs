@@ -51,6 +51,8 @@ pub async fn settings_set(
     settings.atlas_relay_agent_health_secs =
         crate::atlas_relay_agent::health_interval_secs(settings.atlas_relay_agent_health_secs)
             as u32;
+    crate::atlas_relay_agent::validate_relay_agents(&settings.atlas_relay_agents)?;
+    crate::atlas_relay_agent::migrate_relay_agent_settings(&mut settings);
     // Audit ledger retention presets: 7 / 30 / 90 / 0 (unlimited).
     settings.audit_ledger_retention_days =
         crate::audit_ledger::normalize_retention_days(settings.audit_ledger_retention_days);
@@ -137,18 +139,7 @@ pub async fn settings_set(
             .filter(|s| !s.is_empty());
         a != b
     };
-    let relay_agent_flip = {
-        let norm = |s: &Option<String>| {
-            s.as_deref()
-                .map(str::trim)
-                .filter(|v| !v.is_empty())
-                .map(str::to_string)
-        };
-        prev.atlas_relay_agent_enabled != settings.atlas_relay_agent_enabled
-            || norm(&prev.atlas_relay_agent_url) != norm(&settings.atlas_relay_agent_url)
-            || norm(&prev.atlas_relay_agent_id) != norm(&settings.atlas_relay_agent_id)
-            || norm(&prev.atlas_relay_agent_token) != norm(&settings.atlas_relay_agent_token)
-    };
+    let relay_agent_flip = prev.atlas_relay_agents != settings.atlas_relay_agents;
     let launch_at_login_flip = prev.launch_at_login != settings.launch_at_login;
     let schedules_launch_agent_flip =
         prev.schedules_launch_agent != settings.schedules_launch_agent;

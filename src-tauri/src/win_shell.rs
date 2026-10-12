@@ -19,7 +19,7 @@
 use std::os::windows::ffi::OsStrExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use tauri::{Manager, WebviewWindow};
+use tauri::{Manager, WebviewWindow, Window};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HANDLE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::Com::{
@@ -36,7 +36,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowLongW, IsChild, IsWindowVisible, RemovePropW, SendMessageW, SetClassLongPtrW, SetMenu,
     SetPropW, SetWindowLongPtrW, SetWindowLongW, SetWindowPos, GCLP_HICON, GCLP_HICONSM,
     GWLP_HWNDPARENT, GWLP_WNDPROC, GWL_EXSTYLE, GWL_STYLE, GW_CHILD, GW_HWNDNEXT, GW_OWNER, HICON,
-    HWND_NOTOPMOST, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+    HWND_NOTOPMOST, SWP_FRAMECHANGED, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER,
     WA_ACTIVE, WA_CLICKACTIVE, WM_ACTIVATE, WM_NCDESTROY, WM_SETFOCUS, WM_SETICON, WNDPROC,
     WS_EX_APPWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_MAXIMIZEBOX, WS_MINIMIZEBOX,
 };
@@ -87,16 +88,52 @@ pub fn strip_overlay_native_menu(window: &WebviewWindow) {
     }
 }
 
-/// Ensure the main window is a normal taskbar / Alt-Tab / Show-Desktop participant.
+/// HWND + default-icon surface shared by `Window` and `WebviewWindow`.
 ///
-/// Safe to call repeatedly (setup, show-from-tray, after skip_taskbar restore).
-pub fn ensure_main_window_shell_integration(window: &WebviewWindow) {
-    if let Some(icon) = window.app_handle().default_window_icon() {
-        if let Err(e) = window.set_icon(icon.clone()) {
+/// After Octo / Atlas Cloud attach a child webview, `get_webview_window("main")`
+/// is `None`, so tray hide/show must go through `Window`.
+pub(crate) trait ShellTarget {
+    fn shell_hwnd(&self) -> tauri::Result<HWND>;
+    fn shell_apply_default_icon(&self);
+}
+
+impl ShellTarget for Window {
+    fn shell_hwnd(&self) -> tauri::Result<HWND> {
+        self.hwnd()
+    }
+
+    fn shell_apply_default_icon(&self) {
+        apply_default_window_icon(self.app_handle(), |icon| self.set_icon(icon));
+    }
+}
+
+impl ShellTarget for WebviewWindow {
+    fn shell_hwnd(&self) -> tauri::Result<HWND> {
+        self.hwnd()
+    }
+
+    fn shell_apply_default_icon(&self) {
+        apply_default_window_icon(self.app_handle(), |icon| self.set_icon(icon));
+    }
+}
+
+fn apply_default_window_icon(
+    app: &tauri::AppHandle,
+    set_icon: impl FnOnce(tauri::image::Image<'_>) -> tauri::Result<()>,
+) {
+    if let Some(icon) = app.default_window_icon() {
+        if let Err(e) = set_icon(icon.clone()) {
             tracing::warn!("win_shell: default_window_icon: {e}");
         }
     }
-    let Ok(hwnd) = window.hwnd() else {
+}
+
+/// Ensure the main window is a normal taskbar / Alt-Tab / Show-Desktop participant.
+///
+/// Safe to call repeatedly (setup, show-from-tray, after skip_taskbar restore).
+pub fn ensure_main_window_shell_integration(window: &impl ShellTarget) {
+    window.shell_apply_default_icon();
+    let Ok(hwnd) = window.shell_hwnd() else {
         tracing::warn!("win_shell: no hwnd for main window");
         return;
     };
@@ -194,8 +231,8 @@ pub fn set_overlay_skip_taskbar(window: &WebviewWindow) {
 
 /// Apply or clear "live in tray only" extended styles + taskbar tab.
 /// Prefer this over bare `set_skip_taskbar` so TOOLWINDOW/APPWINDOW stay consistent.
-pub fn set_main_window_skip_taskbar(window: &WebviewWindow, skip: bool) {
-    let Ok(hwnd) = window.hwnd() else {
+pub fn set_main_window_skip_taskbar(window: &impl ShellTarget, skip: bool) {
+    let Ok(hwnd) = window.shell_hwnd() else {
         return;
     };
     unsafe {
@@ -208,15 +245,14 @@ pub fn set_main_window_skip_taskbar(window: &WebviewWindow, skip: bool) {
             ex |= WS_EX_APPWINDOW.0;
         }
         SetWindowLongW(hwnd, GWL_EXSTYLE, ex as i32);
-        let _ = SetWindowPos(
-            hwnd,
-            None,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED,
-        );
+        let mut flags =
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED;
+        // Style changes after SW_HIDE otherwise show the window again once a
+        // child WebView2 exists.
+        if skip {
+            flags |= SWP_HIDEWINDOW;
+        }
+        let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, flags);
         taskbar_set_tab(hwnd, !skip);
     }
     if !skip {
@@ -329,6 +365,17 @@ const WRY_WEBVIEW_CLASS: &str = "WRY_WEBVIEW";
 /// Stored original WndProc pointer (`SetWindowLongPtr` subclass).
 const ORIG_PROC_PROP: PCWSTR = windows::core::w!("GrokWvKbdFocusOrig");
 static FORWARDING_KEYBOARD_FOCUS: AtomicBool = AtomicBool::new(false);
+/// Close hides to tray. A side-browser WebView2 that then takes focus
+/// activates the parent and the window pops straight back.
+static SUPPRESS_CHILD_FOCUS: AtomicBool = AtomicBool::new(false);
+
+pub fn set_suppress_child_focus(suppress: bool) {
+    SUPPRESS_CHILD_FOCUS.store(suppress, Ordering::SeqCst);
+}
+
+pub fn child_focus_suppressed() -> bool {
+    SUPPRESS_CHILD_FOCUS.load(Ordering::SeqCst)
+}
 
 /// Forward Alt-Tab / taskbar activation into the child WebView2 HWND.
 ///
@@ -390,11 +437,17 @@ unsafe extern "system" fn keyboard_focus_wndproc(
 }
 
 fn forward_keyboard_focus_to_webview(hwnd: HWND) {
+    if SUPPRESS_CHILD_FOCUS.load(Ordering::SeqCst) {
+        return;
+    }
     if FORWARDING_KEYBOARD_FOCUS.swap(true, Ordering::SeqCst) {
         return;
     }
     let _guard = ForwardingGuard;
     unsafe {
+        if !IsWindowVisible(hwnd).as_bool() {
+            return;
+        }
         let focus = GetFocus();
         if !focus.0.is_null() && IsChild(hwnd, focus).as_bool() {
             return;

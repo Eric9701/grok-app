@@ -14,6 +14,10 @@ export const ATLAS_ENTRIES: readonly SettingsEntry[] = [
       "settings.atlasRelayAgentTokenPh",
       "settings.atlasRelayAgentConnect",
       "settings.atlasRelayAgentDisconnect",
+      "settings.atlasRelayAgentAdd",
+      "settings.atlasRelayAgentRemove",
+      "settings.atlasRelayAgentMax",
+      "settings.atlasRelayAgentDuplicate",
     ],
     keywords: [
       "atlas relay",

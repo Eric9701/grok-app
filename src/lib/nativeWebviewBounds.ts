@@ -101,6 +101,42 @@ export function isAsideWebviewSuppressed(
  * getBoundingClientRect can stay at the old 400px (min-content overflow).
  * Painting the native webview at that stale rect covers chat / chrome.
  */
+/**
+ * Child webviews paint above HTML, so a hidden one kept at its last rect
+ * still receives clicks on Windows. Park it outside the parent window.
+ */
+export const PARKED_CHILD_WEBVIEW_BOUNDS: BoundsPx = {
+  x: -32000,
+  y: -32000,
+  width: 1,
+  height: 1,
+};
+
+/**
+ * Keep a child webview below the caption band.
+ * A rect that starts under the close/minimize buttons steals their clicks;
+ * z-index cannot put those HTML buttons back on top.
+ */
+export function clipHostRectBelowTop(
+  host: HostRectPx,
+  topLimit: number,
+): HostRectPx | null {
+  if (!Number.isFinite(topLimit) || topLimit <= 0) return host;
+  if (host.top >= topLimit - 0.5) return host;
+  const top = topLimit;
+  const height = host.bottom - top;
+  const width = host.width;
+  if (width < 2 || height < 2) return null;
+  return {
+    left: host.left,
+    top,
+    right: host.right,
+    bottom: host.bottom,
+    width,
+    height,
+  };
+}
+
 export function clipHostRectToAncestor(
   host: HostRectPx,
   ancestor: Pick<HostRectPx, "left" | "top" | "right" | "bottom" | "width" | "height"> | null,

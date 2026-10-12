@@ -7,6 +7,14 @@ import {
 
 export type ComposerPrefsScope = "global" | "project" | "session";
 
+/** One Atlas Relay agent. Address and token belong to this row only. */
+export interface AtlasRelayAgentRecord {
+  url?: string | null;
+  token?: string | null;
+  id?: string | null;
+  enabled?: boolean;
+}
+
 export interface AppSettings {
   wallpaperXSearchMode?: string;
   theme: string;
@@ -49,6 +57,8 @@ export interface AppSettings {
   atlasRelayAgentId?: string | null;
   /** `token` query on the relay agent socket. Empty omits it. */
   atlasRelayAgentToken?: string | null;
+  /** Up to 4 relay agents. Each has its own URL, token, and agent id. */
+  atlasRelayAgents?: AtlasRelayAgentRecord[];
   /** Keep the relay agent connected, including after the next launch. */
   atlasRelayAgentEnabled?: boolean;
   /** Seconds between WebSocket Pings to Atlas Relay. 0 uses the 15s default. */
