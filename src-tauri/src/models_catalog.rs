@@ -790,7 +790,8 @@ name = "ENC(not-a-label)"
             Some("架构组kimi coding")
         );
         assert_eq!(
-            map.get("arch-kimi-for-coding").and_then(|m| m.context_window),
+            map.get("arch-kimi-for-coding")
+                .and_then(|m| m.context_window),
             Some(200000)
         );
         assert_eq!(
@@ -822,11 +823,8 @@ name = "ENC(not-a-label)"
                 context_window: None,
             },
         );
-        let pick = preferred_official_model_id(
-            &by_id,
-            Some("grok-4.6"),
-            Some("arch-kimi-for-coding"),
-        );
+        let pick =
+            preferred_official_model_id(&by_id, Some("grok-4.6"), Some("arch-kimi-for-coding"));
         assert_eq!(pick, "arch-kimi-for-coding");
     }
 

@@ -164,6 +164,8 @@ export const taSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 அல்லது http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "முகவர் அடையாளம், எ.கா. laptop-a",
   "settings.atlasRelayAgentTokenPh": "டோக்கன் (விருப்பம்)",
+  "settings.atlasRelayAgentModel": "மாதிரி",
+  "settings.atlasRelayAgentModelDefault": "இயல்பைப் பின்பற்று",
   "settings.atlasRelayAgentConnect": "இணை",
   "settings.atlasRelayAgentDisconnect": "துண்டி",
   "settings.atlasRelayAgentConnecting": "இணைக்கிறது…",

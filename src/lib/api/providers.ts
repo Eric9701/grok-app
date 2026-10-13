@@ -131,7 +131,7 @@ export async function providersCcSwitchScan() {
   return invoke<CcSwitchScanResult>("providers_cc_switch_scan");
 }
 
-/** Import selected CC Switch providers into agent-home config.toml. */
+/** Import selected CC Switch providers into `~/.atlas/config.toml`. */
 export async function providersCcSwitchImport(body: {
   sourceIds: string[];
   /** Default overwrite — same id updates key/base_url. */

@@ -339,6 +339,9 @@ pub struct AtlasRelayAgentRecord {
     pub token: String,
     #[serde(default)]
     pub id: String,
+    /// Catalog id for this connection (`[model.<id>]`). Empty leaves the cloud frame and CLI default alone.
+    #[serde(default)]
+    pub model_id: String,
     #[serde(default)]
     pub enabled: bool,
 }

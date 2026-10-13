@@ -2266,44 +2266,6 @@ pub async fn list_remote_models(
     parse_remote_models_response(endpoint, &text)
 }
 
-/// Blocking model-catalog probe for import paths that already run on a
-/// dedicated blocking worker. The key is request-only and must never be logged.
-pub fn list_remote_models_blocking(
-    base_url: &str,
-    api_key: &str,
-) -> Result<RemoteModelsResult, String> {
-    let base = base_url.trim();
-    if !(base.starts_with("http://") || base.starts_with("https://")) {
-        return Err("base_url must start with http:// or https://".into());
-    }
-    let key = api_key.trim();
-    if key.is_empty() {
-        return Err("api_key is required to list models".into());
-    }
-    let endpoint = models_list_endpoint(base)?;
-    let client = crate::proxy::apply_to_reqwest_blocking(
-        reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(20)),
-    )
-    .build()
-    .map_err(|e| e.to_string())?;
-    let res = client
-        .get(&endpoint)
-        .header("Authorization", format!("Bearer {key}"))
-        .header("Accept", "application/json")
-        .send()
-        .map_err(|e| format!("request failed: {e}"))?;
-    let status = res.status();
-    let text = res.text().map_err(|e| e.to_string())?;
-    if !status.is_success() {
-        return Err(format!(
-            "models HTTP {}: {}",
-            status.as_u16(),
-            text.chars().take(240).collect::<String>()
-        ));
-    }
-    parse_remote_models_response(endpoint, &text)
-}
-
 fn parse_remote_models_response(
     endpoint: String,
     text: &str,

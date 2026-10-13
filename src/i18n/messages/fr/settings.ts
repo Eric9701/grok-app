@@ -160,6 +160,8 @@ export const frSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 ou http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Identité de l’agent, p. ex. laptop-a",
   "settings.atlasRelayAgentTokenPh": "Jeton (facultatif)",
+  "settings.atlasRelayAgentModel": "Modèle",
+  "settings.atlasRelayAgentModelDefault": "Suivre le modèle par défaut",
   "settings.atlasRelayAgentConnect": "Connecter",
   "settings.atlasRelayAgentDisconnect": "Déconnecter",
   "settings.atlasRelayAgentConnecting": "Connexion…",

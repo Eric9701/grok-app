@@ -424,9 +424,7 @@ mod tests {
     #[test]
     fn classifies_cli_missing_as_soft() {
         assert_eq!(
-            classify_tool_error(
-                "Atlas CLI not found. Install Atlas CLI or set path in Settings."
-            ),
+            classify_tool_error("Atlas CLI not found. Install Atlas CLI or set path in Settings."),
             "cli_missing"
         );
         assert!(is_soft_tool_error("cli_missing"));

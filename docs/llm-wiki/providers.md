@@ -232,9 +232,10 @@ Settings → Account → Custom providers → **Import from CC Switch**.
 | Detect | Resolve `cc-switch.db` (see paths below); open SQLite **read-only** |
 | Scope | `providers` where `app_type = 'grokbuild'` |
 | Preview | Multi-select list (no full API keys; status badges) |
-| Import | Map TOML → current agent-home `config.toml`; **same id overwrites** (no UI toggle); does not auto-activate route |
-| Native capability | An explicit `app_provider_mode` is honored. Otherwise a Responses provider is promoted to `grok_build_proxy` only when its selected real model advertises `supports_backend_search = true` in the live `/models` response |
-| Apply | Any successful import recycles warm ACP children so the next send cannot reuse stale provider semantics |
+| Import | Merge the selected `[model.<id>]` into shared `~/.atlas/config.toml` with the real upstream `base_url`. **Same id overwrites** a non-enterprise section. Does **not** change `[models].default` and does **not** write App agent-home |
+| Official | `category = official` (Grok Official) is omitted from the scan list and rejected if its id is submitted |
+| Enterprise | Sections whose `api_key` is `ENC(...)` or `hidden = true` are not overwritten |
+| Apply | Any successful import recycles warm ACP children so the next send cannot reuse stale `~/.atlas` config |
 
 ### CC Switch data paths (cross-platform)
 
@@ -253,10 +254,9 @@ Store file locations:
 | Windows | `%APPDATA%\com.ccswitch.desktop\app_paths.json` |
 | Linux | `${XDG_DATA_HOME:-~/.local/share}/com.ccswitch.desktop/app_paths.json` |
 
-Official CC Switch rows are not imported as custom relays. Proxy-takeover placeholders (`PROXY_MANAGED`, `127.0.0.1:…`) are rejected.
-Capability detection never matches provider names or hosts. Explicit native mode
-fails closed when the live catalog cannot validate it; implicit probe failures
-preserve the previous generic import behavior.
+Official CC Switch rows (Grok Official) are not listed and are not written. Proxy-takeover placeholders (`PROXY_MANAGED`, `127.0.0.1:…`) are rejected. The written `base_url` stays the upstream URL from CC Switch; this path does not rewrite it to the App loopback sanitizer.
+
+This import is the only Host path allowed to merge custom `[model.*]` tables into shared `~/.atlas/config.toml`. It does not change `[models].default` and does not overwrite enterprise `ENC(...)` or `hidden` sections. Other shared-home writes stay refused.
 
 ## Security
 

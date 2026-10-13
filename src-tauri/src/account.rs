@@ -15,6 +15,7 @@ use std::time::Duration;
 use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tauri::{AppHandle, Emitter};
 use tokio::io::AsyncBufReadExt;
 use tracing::{info, warn};
 
@@ -39,6 +40,8 @@ pub struct LoginProcState {
     busy: tokio::sync::Mutex<bool>,
     /// Live child stdin while `account_login` is in flight (for paste-back codes).
     stdin: tokio::sync::Mutex<Option<tokio::process::ChildStdin>>,
+    /// CLI `user_code` captured while a private device login is still polling.
+    user_code: tokio::sync::Mutex<Option<String>>,
 }
 
 impl Default for LoginProcState {
@@ -47,6 +50,7 @@ impl Default for LoginProcState {
             cancel: tokio::sync::Notify::new(),
             busy: tokio::sync::Mutex::new(false),
             stdin: tokio::sync::Mutex::new(None),
+            user_code: tokio::sync::Mutex::new(None),
         }
     }
 }
@@ -252,12 +256,67 @@ fn auth_json_path() -> PathBuf {
     cli_default_auth_json_path()
 }
 
-/// Canonical CLI auth path (`~/.grok/auth.json`), ignoring process `GROK_HOME`.
+/// CLI home Atlas actually writes: `~/.atlas` when that directory exists,
+/// otherwise legacy `~/.grok`, otherwise `~/.atlas`.
+fn cli_auth_home() -> PathBuf {
+    let atlas = crate::paths::shared_cli_home();
+    if atlas.is_dir() {
+        return atlas;
+    }
+    let legacy = crate::process_util::user_home().join(".grok");
+    if legacy.is_dir() {
+        return legacy;
+    }
+    atlas
+}
+
+/// Canonical CLI auth path, ignoring process `GROK_HOME`.
 /// Login writes here; independent-mode agents use a different GROK_HOME and need a copy.
 fn cli_default_auth_json_path() -> PathBuf {
+    cli_auth_home().join("auth.json")
+}
+
+fn legacy_grok_auth_json_path() -> PathBuf {
     crate::process_util::user_home()
         .join(".grok")
         .join("auth.json")
+}
+
+fn auth_file_mtime(path: &Path) -> Option<std::time::SystemTime> {
+    path.metadata().and_then(|m| m.modified()).ok()
+}
+
+/// Files a `atlas login` child may update. The child is started with
+/// `GROK_HOME` set to [`cli_auth_home`]; both homes are watched so a write
+/// that landed in the other directory is still seen.
+fn login_auth_watch_paths() -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let push = |v: &mut Vec<PathBuf>, p: PathBuf| {
+        if !v.iter().any(|x| x == &p) {
+            v.push(p);
+        }
+    };
+    push(&mut out, cli_auth_home().join("auth.json"));
+    push(&mut out, crate::paths::shared_cli_home().join("auth.json"));
+    push(&mut out, legacy_grok_auth_json_path());
+    push(&mut out, auth_json_path());
+    out
+}
+
+async fn capture_device_user_code(app: Option<&AppHandle>, line: &str) {
+    let Some(code) = crate::account_private::user_code_from_login_line(line) else {
+        return;
+    };
+    *login_proc().user_code.lock().await = Some(code.clone());
+    if let Some(app) = app {
+        let _ = app.emit(
+            crate::account_private::device_event_name(),
+            crate::account_private::DeviceCodeEvent {
+                user_code: code,
+                verification_uri: crate::account_private::verification_uri_from_line(line),
+            },
+        );
+    }
 }
 
 fn agent_home_auth_json_path() -> PathBuf {
@@ -347,6 +406,8 @@ fn logout_auth_paths() -> Vec<PathBuf> {
     let mut out = vec![
         auth_json_path(),
         cli_default_auth_json_path(),
+        crate::paths::shared_cli_home().join("auth.json"),
+        legacy_grok_auth_json_path(),
         agent_home_auth_json_path(),
         official_aux_auth_json_path(),
     ];
@@ -416,6 +477,11 @@ fn auth_json_candidate_paths() -> Vec<PathBuf> {
     };
     push(&mut out, auth_json_path());
     push(&mut out, cli_default_auth_json_path());
+    push(
+        &mut out,
+        crate::paths::shared_cli_home().join("auth.json"),
+    );
+    push(&mut out, legacy_grok_auth_json_path());
     push(&mut out, agent_home_auth_json_path());
     out
 }
@@ -1706,8 +1772,38 @@ fn login_timeout_secs() -> u64 {
         .unwrap_or(LOGIN_TOTAL_TIMEOUT_SECS)
 }
 
+/// Device login waits for the private machine-code form. The atlas-server
+/// device code itself lives for 15 minutes.
+fn login_wait_secs(method: &str) -> u64 {
+    if method == "device" && std::env::var("GROK_APP_LOGIN_TIMEOUT_SECS").is_err() {
+        15 * 60
+    } else {
+        login_timeout_secs()
+    }
+}
+
+/// Approve the running private device login with the account machine code.
+pub async fn account_login_approve_machine(
+    email: &str,
+    password: &str,
+    machine_code: &str,
+) -> Result<(), String> {
+    let user_code = login_proc()
+        .user_code
+        .lock()
+        .await
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| "CLI user code is not ready yet".to_string())?;
+    crate::account_private::approve_machine_login(&user_code, email, password, machine_code).await
+}
+
 /// Run `grok login --oauth` or `--device-auth`. OAuth opens the system browser via CLI.
-pub async fn account_login(method: &str, manual_cli: Option<&str>) -> LoginResult {
+pub async fn account_login(
+    app: Option<&AppHandle>,
+    method: &str,
+    manual_cli: Option<&str>,
+) -> LoginResult {
     let cli = match resolve_cli_path(manual_cli) {
         Some(p) => p,
         None => {
@@ -1729,7 +1825,13 @@ pub async fn account_login(method: &str, manual_cli: Option<&str>) -> LoginResul
         "oauth"
     };
 
-    let before_mtime = auth_json_path().metadata().and_then(|m| m.modified()).ok();
+    {
+        let mut slot = login_proc().user_code.lock().await;
+        *slot = None;
+    }
+    let auth_watch = login_auth_watch_paths();
+    let before_auth: Vec<Option<std::time::SystemTime>> =
+        auth_watch.iter().map(|p| auth_file_mtime(p)).collect();
 
     info!("account: starting login method={method} cli={cli}");
 
@@ -1751,12 +1853,15 @@ pub async fn account_login(method: &str, manual_cli: Option<&str>) -> LoginResul
     // “copy code into Grok Build” pages can be completed without restarting
     // login. Leaving stdin open without writing does not replace the auto path.
     // tokio::process lets us race this against the Cancel notifier.
+    let login_home = cli_auth_home();
+    let _ = std::fs::create_dir_all(&login_home);
     let mut cmd = tokio::process::Command::new(&cli);
     cmd.arg("login")
         .arg(arg)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        .env("GROK_HOME", &login_home);
     // Login may open a browser; still hide the console flash on Windows.
     crate::process_util::apply_no_window_tokio(&mut cmd);
     // The OpenID config fetch inside `grok login` needs the proxy too (NEW-02).
@@ -1789,15 +1894,23 @@ pub async fn account_login(method: &str, manual_cli: Option<&str>) -> LoginResul
 
     // Drain stdout: open the browser on the first URL we see, and collect
     // everything for later message/diagnostics parsing.
-    let stdout_collect = async {
+    let app_for_stdout = app.cloned();
+    let app_for_stderr = app.cloned();
+    let private_device = method == "device";
+    let stdout_collect = async move {
         let mut buf = String::new();
         let mut url_opened = false;
         if let Some(h) = stdout_handle {
             let mut reader = tokio::io::BufReader::new(h).lines();
             while let Ok(Some(line)) = reader.next_line().await {
                 let t = line.trim();
-                // First URL => open the browser immediately (OAuth + device).
-                if !url_opened && (t.starts_with("http://") || t.starts_with("https://")) {
+                if private_device {
+                    capture_device_user_code(app_for_stdout.as_ref(), t).await;
+                } else if !url_opened
+                    && (t.starts_with("http://") || t.starts_with("https://"))
+                {
+                    // Browser OAuth still opens the URL. Private device login
+                    // stays in the account form (email + machine code).
                     url_opened = true;
                     if let Err(e) = open_url(t) {
                         warn!("account: open login URL failed: {e}");
@@ -1809,11 +1922,14 @@ pub async fn account_login(method: &str, manual_cli: Option<&str>) -> LoginResul
         }
         buf
     };
-    let stderr_collect = async {
+    let stderr_collect = async move {
         let mut buf = String::new();
         if let Some(h) = stderr_handle {
             let mut reader = tokio::io::BufReader::new(h).lines();
             while let Ok(Some(line)) = reader.next_line().await {
+                if private_device {
+                    capture_device_user_code(app_for_stderr.as_ref(), line.trim()).await;
+                }
                 buf.push_str(&line);
                 buf.push('\n');
             }
@@ -1838,7 +1954,7 @@ pub async fn account_login(method: &str, manual_cli: Option<&str>) -> LoginResul
             timed_out = false;
             (String::new(), String::new(), None)
         }
-        _ = tokio::time::sleep(Duration::from_secs(login_timeout_secs())) => {
+        _ = tokio::time::sleep(Duration::from_secs(login_wait_secs(method))) => {
             let _ = child.kill().await;
             cancelled = false;
             timed_out = true;
@@ -1875,7 +1991,7 @@ pub async fn account_login(method: &str, manual_cli: Option<&str>) -> LoginResul
     }
 
     if timed_out {
-        let secs = login_timeout_secs();
+        let secs = login_wait_secs(method);
         warn!("account: login timed out after {secs}s (auth endpoint unreachable?)");
         return LoginResult {
             ok: false,
@@ -1899,7 +2015,10 @@ If the browser showed a code to paste into Atlas, start sign-in again and paste 
     let mut device_code = None;
     for line in combined.lines() {
         let t = line.trim();
-        if (t.starts_with("http://") || t.starts_with("https://")) && device_url.is_none() {
+        if method != "device"
+            && (t.starts_with("http://") || t.starts_with("https://"))
+            && device_url.is_none()
+        {
             device_url = Some(t.to_string());
         }
         // Common patterns: "code: ABCD-EFGH" / "enter code ABCD"
@@ -1917,15 +2036,13 @@ If the browser showed a code to paste into Atlas, start sign-in again and paste 
 
     // Wait briefly for auth.json to update if process returned quickly after browser flow.
     // OAuth/device can take longer; poll up to ~30s for credentials.
-    if exit_success || before_mtime.is_some() || device_url.is_some() {
+    if exit_success || before_auth.iter().any(|m| m.is_some()) || device_url.is_some() {
         for _ in 0..60 {
             tokio::time::sleep(Duration::from_millis(500)).await;
-            let after = auth_json_path().metadata().and_then(|m| m.modified()).ok();
-            if after != before_mtime {
-                break;
-            }
-            let p = read_auth_profile();
-            if p.signed_in {
+            let changed = auth_watch.iter().enumerate().any(|(i, path)| {
+                auth_file_mtime(path) != before_auth.get(i).copied().flatten()
+            });
+            if changed || read_auth_profile().signed_in {
                 break;
             }
         }
@@ -1976,6 +2093,23 @@ Try another network/VPN, use device-code login, or configure a custom provider i
                 .into()
         } else {
             format!("Login did not complete: {detail}")
+        }
+    } else if method == "device" {
+        let detail = combined
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("")
+            .trim();
+        let detail = if detail.len() > 240 {
+            format!("{}…", &detail[..240])
+        } else {
+            detail.to_string()
+        };
+        if detail.is_empty() {
+            "Machine-code sign-in ended, but no credentials were written.".into()
+        } else {
+            format!("Machine-code sign-in ended without credentials: {detail}")
         }
     } else {
         "Login process finished but no credentials found. Try device-code login, switch network, or use a custom provider in Settings.".into()
@@ -2358,7 +2492,7 @@ mod tests {
         std::fs::set_permissions(&fake, perm).unwrap();
 
         std::env::set_var("GROK_APP_LOGIN_TIMEOUT_SECS", "2");
-        let res = account_login("oauth", Some(fake.to_str().unwrap())).await;
+        let res = account_login(None, "oauth", Some(fake.to_str().unwrap())).await;
         std::env::remove_var("GROK_APP_LOGIN_TIMEOUT_SECS");
         let _ = std::fs::remove_dir_all(&dir);
 

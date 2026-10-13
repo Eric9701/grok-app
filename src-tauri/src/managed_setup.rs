@@ -213,9 +213,7 @@ pub fn build_managed_setup_status(
         (None, true, true) => {
             Some("presence only — App does not re-verify cryptographic signatures".into())
         }
-        (None, true, false) if !cli_found => {
-            Some("Atlas CLI not found; local files only".into())
-        }
+        (None, true, false) if !cli_found => Some("Atlas CLI not found; local files only".into()),
         _ => reason,
     };
     ManagedSetupStatus {

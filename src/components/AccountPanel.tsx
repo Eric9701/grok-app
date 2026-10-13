@@ -44,6 +44,7 @@ import {
   summarizeHeatmapStats,
 } from "@/lib/heatmapStats";
 import { GlassModal } from "@/components/GlassModal";
+import { MachineCodeLoginForm } from "@/components/MachineCodeLoginForm";
 import { Tip } from "@/components/ui/tooltip";
 import { IconHelp, IconPlus, IconTrash, IconUser } from "@/components/icons";
 import * as api from "@/lib/api";
@@ -226,9 +227,7 @@ export function AccountPanel({
   probeError = null,
   savedAccounts = [],
   activeAccountId = null,
-  onLoginOauth,
   onLoginDevice,
-  onSubmitLoginCode,
   onCancelLogin,
   onLogout,
   onRefresh,
@@ -244,13 +243,6 @@ export function AccountPanel({
   onOpenSession,
 }: AccountPanelProps) {
   const [accountsOpen, setAccountsOpen] = useState(false);
-  /**
-   * Optional paste-back from auth.x.ai “copy into Grok Build” page.
-   * Collapsed by default — normal OAuth still auto-completes in the browser.
-   */
-  const [loginPasteOpen, setLoginPasteOpen] = useState(false);
-  const [loginPasteCode, setLoginPasteCode] = useState("");
-  const [loginPasteBusy, setLoginPasteBusy] = useState(false);
   const [importBusy, setImportBusy] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -260,21 +252,12 @@ export function AccountPanel({
   const [linkedAppByAgent, setLinkedAppByAgent] = useState<
     Record<string, string>
   >({});
-  // Collapse paste UI when login ends so next sign-in starts clean.
-  useEffect(() => {
-    if (!busy) {
-      setLoginPasteOpen(false);
-      setLoginPasteCode("");
-      setLoginPasteBusy(false);
-    }
-  }, [busy]);
-  /** Day or week range → filter recent call logs. */
+  const logsSectionRef = useRef<HTMLElement | null>(null);
   const [heatGranularity, setHeatGranularity] =
     useState<HeatGranularity>("day");
   const [selectedHeatRange, setSelectedHeatRange] = useState<HeatRange | null>(
     null,
   );
-  const logsSectionRef = useRef<HTMLElement | null>(null);
 
   const profile = status?.profile;
   const signedIn = !!profile?.signedIn;
@@ -753,14 +736,6 @@ export function AccountPanel({
                 >
                   {busy ? labels.loginBusy : labels.loginDevice}
                 </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  disabled={busy}
-                  onClick={onLoginOauth}
-                >
-                  {labels.loginOauth}
-                </button>
                 {busy && onCancelLogin ? (
                   <button
                     type="button"
@@ -782,81 +757,7 @@ export function AccountPanel({
             {loginHint ? (
               <p className="account-login-help__err">{loginHint}</p>
             ) : null}
-            {/*
-              Optional fallback only. Default OAuth still finishes in the
-              browser with no paste. Show while login is in flight so users who
-              hit the reverse pairing page can expand and paste.
-            */}
-            {busy && onSubmitLoginCode ? (
-              <div className="account-login-paste">
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm account-login-paste__toggle"
-                  aria-expanded={loginPasteOpen}
-                  onClick={() => setLoginPasteOpen((v) => !v)}
-                >
-                  {labels.loginPasteToggle}
-                </button>
-                {loginPasteOpen ? (
-                  <>
-                    <strong>{labels.loginPasteTitle}</strong>
-                    <p>{labels.loginPasteBody}</p>
-                    <div className="account-login-paste__row">
-                      <input
-                        type="text"
-                        className="input account-login-paste__input"
-                        value={loginPasteCode}
-                        placeholder={labels.loginPastePlaceholder}
-                        autoComplete="off"
-                        spellCheck={false}
-                        disabled={loginPasteBusy}
-                        onChange={(e) => setLoginPasteCode(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && loginPasteCode.trim()) {
-                            e.preventDefault();
-                            void (async () => {
-                              setLoginPasteBusy(true);
-                              try {
-                                await onSubmitLoginCode(loginPasteCode.trim());
-                                setLoginPasteCode("");
-                              } finally {
-                                setLoginPasteBusy(false);
-                              }
-                            })();
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn--solid btn--sm"
-                        disabled={loginPasteBusy || !loginPasteCode.trim()}
-                        onClick={() => {
-                          void (async () => {
-                            setLoginPasteBusy(true);
-                            try {
-                              await onSubmitLoginCode(loginPasteCode.trim());
-                              setLoginPasteCode("");
-                            } finally {
-                              setLoginPasteBusy(false);
-                            }
-                          })();
-                        }}
-                      >
-                        {labels.loginPasteSubmit}
-                      </button>
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              disabled={busy}
-              onClick={onLoginDevice}
-            >
-              {labels.loginTryDevice}
-            </button>
+            <MachineCodeLoginForm t={t} active={busy && !signedIn} />
           </div>
         ) : null}
 

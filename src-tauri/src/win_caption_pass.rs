@@ -329,15 +329,7 @@ pub fn apply(controller: ICoreWebView2Controller, x: f64, y: f64, width: f64, he
     let pw = (width * scale).round().max(1.0) as i32;
     let ph = (height * scale).round().max(1.0) as i32;
     unsafe {
-        let _ = SetWindowPos(
-            hwnd,
-            None,
-            px,
-            py,
-            pw,
-            ph,
-            SWP_NOZORDER | SWP_NOACTIVATE,
-        );
+        let _ = SetWindowPos(hwnd, None, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE);
         let _ = controller.SetBounds(RECT {
             left: 0,
             top: 0,

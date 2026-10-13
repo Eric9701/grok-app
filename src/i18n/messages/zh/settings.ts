@@ -183,6 +183,8 @@ export const zhSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 或 http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Agent 身份，例如 laptop-a",
   "settings.atlasRelayAgentTokenPh": "Token（可选）",
+  "settings.atlasRelayAgentModel": "模型",
+  "settings.atlasRelayAgentModelDefault": "跟随默认",
   "settings.atlasRelayAgentConnect": "连接",
   "settings.atlasRelayAgentDisconnect": "断开",
   "settings.atlasRelayAgentConnecting": "正在连接…",

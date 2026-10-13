@@ -2,6 +2,8 @@
 
 mod account;
 
+mod account_private;
+
 mod account_profiles;
 
 mod acp_client;

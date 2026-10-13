@@ -160,6 +160,8 @@ export const filSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 o http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Identity ng agent, hal. laptop-a",
   "settings.atlasRelayAgentTokenPh": "Token (opsyonal)",
+  "settings.atlasRelayAgentModel": "Modelo",
+  "settings.atlasRelayAgentModelDefault": "Sundin ang default",
   "settings.atlasRelayAgentConnect": "Kumonekta",
   "settings.atlasRelayAgentDisconnect": "Idiskonekta",
   "settings.atlasRelayAgentConnecting": "Kumokonekta…",

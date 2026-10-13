@@ -6,7 +6,8 @@
 use crate::{
     atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub, leader, mirror,
     os_theme, pet_window, remote_im, serve, session_api, ssh_remote, system_fonts,
-    theme_editor_window, tray, updater, voice_host, wallpaper_grok_album, wallpaper_remote_commands,
+    theme_editor_window, tray, updater, voice_host, wallpaper_grok_album,
+    wallpaper_remote_commands,
 };
 
 /// Single invoke handler consumed by `Builder::invoke_handler` in `run()`.
@@ -60,6 +61,7 @@ pub fn app_invoke_handler(
         atlas_relay_agent::atlas_relay_agent_status,
         atlas_relay_agent::atlas_relay_agent_connect,
         atlas_relay_agent::atlas_relay_agent_disconnect,
+        atlas_relay_agent::atlas_relay_agent_set_model,
         commands::cli_install_latest,
         commands::cli_install_commands,
         commands::cli_update_check,
@@ -345,6 +347,7 @@ pub fn app_invoke_handler(
         commands::account_login,
         commands::account_login_cancel,
         commands::account_login_submit_code,
+        commands::account_login_approve_machine,
         commands::account_logout,
         commands::account_open_usage,
         commands::account_open_subscribe,

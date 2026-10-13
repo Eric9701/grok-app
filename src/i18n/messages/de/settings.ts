@@ -160,6 +160,8 @@ export const deSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 oder http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Agent-Identität, z. B. laptop-a",
   "settings.atlasRelayAgentTokenPh": "Token (optional)",
+  "settings.atlasRelayAgentModel": "Modell",
+  "settings.atlasRelayAgentModelDefault": "Standard folgen",
   "settings.atlasRelayAgentConnect": "Verbinden",
   "settings.atlasRelayAgentDisconnect": "Trennen",
   "settings.atlasRelayAgentConnecting": "Verbinden…",

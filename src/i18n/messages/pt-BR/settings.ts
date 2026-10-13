@@ -160,6 +160,8 @@ export const ptBRSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 ou http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Identidade do agente, ex. laptop-a",
   "settings.atlasRelayAgentTokenPh": "Token (opcional)",
+  "settings.atlasRelayAgentModel": "Modelo",
+  "settings.atlasRelayAgentModelDefault": "Seguir o padrão",
   "settings.atlasRelayAgentConnect": "Conectar",
   "settings.atlasRelayAgentDisconnect": "Desconectar",
   "settings.atlasRelayAgentConnecting": "Conectando…",

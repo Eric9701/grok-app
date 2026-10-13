@@ -181,6 +181,19 @@ export async function accountLoginSubmitCode(code: string) {
   return invoke<void>("account_login_submit_code", { code });
 }
 
+/** Approve the running private device login with email, password, and machine code. */
+export async function accountLoginApproveMachine(body: {
+  email: string;
+  password: string;
+  machineCode: string;
+}) {
+  return invoke<void>("account_login_approve_machine", {
+    email: body.email,
+    password: body.password,
+    machineCode: body.machineCode,
+  });
+}
+
 /** Abort a running `grok login` (OAuth / device-code). No-op if none is running. */
 export async function accountLoginCancel() {
   return invoke<void>("account_login_cancel");

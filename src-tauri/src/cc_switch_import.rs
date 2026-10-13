@@ -5,9 +5,13 @@
 //! Store `app_paths.json` (`com.ccswitch.desktop`). Windows also has a legacy
 //! `HOME/.cc-switch` fallback when Profile `.cc-switch` has no db.
 //!
-//! We only **read** the database; writes go through [`crate::providers`].
+//! We only **read** the database. Selected custom rows are merged into the
+//! shared Atlas CLI home `~/.atlas/config.toml` as `[model.<id>]` sections.
+//! That merge does not change `[models].default`, does not overwrite
+//! enterprise `ENC(...)` / `hidden` sections, and does not write App
+//! `agent-home`. Grok Official (`category = official`) is omitted.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -15,7 +19,11 @@ use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 
 use crate::process_util;
-use crate::providers::{self, UpsertProviderInput};
+use crate::providers;
+
+/// Test hook: when set, import/scan use `{dir}/config.toml` instead of `~/.atlas`.
+const ATLAS_HOME_ENV: &str = "GROK_APP_ATLAS_HOME";
+const CC_SOURCE_KEY: &str = "app_cc_switch_source";
 
 const DB_NAME: &str = "cc-switch.db";
 const STORE_APP_ID: &str = "com.ccswitch.desktop";
@@ -284,10 +292,10 @@ pub fn scan_cc_switch_providers() -> CcSwitchScanResult {
 
     match read_grokbuild_rows(&db_path) {
         Ok(rows) => {
-            let existing = existing_provider_ids();
-            let items: Vec<_> = rows
+            let atlas = load_atlas_index();
+            let items: Vec<_> = rows_for_preview(rows)
                 .into_iter()
-                .map(|r| row_to_preview(r, &existing))
+                .map(|r| row_to_preview(r, &atlas))
                 .collect();
             CcSwitchScanResult {
                 status: "ok".into(),
@@ -310,16 +318,12 @@ pub fn scan_cc_switch_providers() -> CcSwitchScanResult {
 pub fn import_cc_switch_providers(
     req: CcSwitchImportRequest,
 ) -> Result<CcSwitchImportResult, String> {
-    import_cc_switch_providers_with(req, resolve_import_provider_mode)
+    import_cc_switch_providers_with(req)
 }
 
-fn import_cc_switch_providers_with<F>(
+fn import_cc_switch_providers_with(
     req: CcSwitchImportRequest,
-    mut resolve_mode: F,
-) -> Result<CcSwitchImportResult, String>
-where
-    F: FnMut(&ParsedModel) -> Result<String, String>,
-{
+) -> Result<CcSwitchImportResult, String> {
     // Default overwrite: re-importing the same slug updates key/base_url in place.
     let on_conflict = req
         .on_conflict
@@ -339,8 +343,7 @@ where
     let mut imported = 0u32;
     let mut skipped = 0u32;
     let mut failed = Vec::new();
-    let mut last_list = None;
-    let mut existing = existing_provider_ids();
+    let mut atlas = load_atlas_index();
 
     for sid in &req.source_ids {
         let Some(row) = by_id.get(sid) else {
@@ -350,6 +353,14 @@ where
             });
             continue;
         };
+
+        if is_official_category(row.category.as_deref()) {
+            failed.push(CcSwitchImportFailure {
+                source_id: sid.clone(),
+                reason: "official Grok login cannot be imported".into(),
+            });
+            continue;
+        }
 
         let parsed = match parse_settings_config(&row.settings_config, &row.name) {
             Ok(p) => p,
@@ -362,10 +373,10 @@ where
             }
         };
 
-        if row.category.as_deref() == Some("official") || parsed.base_url.trim().is_empty() {
+        if parsed.base_url.trim().is_empty() {
             failed.push(CcSwitchImportFailure {
                 source_id: sid.clone(),
-                reason: "official or empty base_url cannot be imported as custom".into(),
+                reason: "empty base_url cannot be imported as custom".into(),
             });
             continue;
         }
@@ -386,23 +397,21 @@ where
             continue;
         }
 
-        let provider_mode = match resolve_mode(&parsed) {
-            Ok(mode) => mode,
-            Err(e) => {
-                failed.push(CcSwitchImportFailure {
-                    source_id: sid.clone(),
-                    reason: e,
-                });
-                continue;
-            }
-        };
-
         let mut id = slugify_id(&row.name, &parsed.profile);
-        if existing.contains(&id) {
+        if atlas.enterprise.contains(&id) {
+            failed.push(CcSwitchImportFailure {
+                source_id: sid.clone(),
+                reason: format!(
+                    "id `{id}` is an enterprise-managed Atlas model and will not be overwritten"
+                ),
+            });
+            continue;
+        }
+        if atlas.overwrite.contains(&id) {
             match on_conflict.as_str() {
                 "overwrite" => {}
                 "rename" => {
-                    id = unique_id(&id, &existing);
+                    id = unique_id(&id, &atlas.taken());
                 }
                 _ => {
                     skipped += 1;
@@ -411,37 +420,10 @@ where
             }
         }
 
-        match providers::upsert_custom_provider(UpsertProviderInput {
-            id: id.clone(),
-            model: parsed.model.clone(),
-            base_url: parsed.base_url.clone(),
-            name: Some(parsed.name.clone()),
-            api_key: Some(parsed.api_key.clone()),
-            api_backend: Some(parsed.api_backend.clone()),
-            provider_mode: Some(provider_mode),
-            set_as_default: Some(false),
-            create_only: Some(false),
-            models: Some(vec![providers::ProviderModelEntry::named(
-                parsed.model.clone(),
-                if parsed.model.trim().is_empty() {
-                    parsed.name.clone()
-                } else {
-                    parsed.model.clone()
-                },
-            )]),
-            efforts: None,
-            context_window: None,
-            // Imports carry no channel rules; the user can add them per provider.
-            append_prompt: None,
-            // Import URLs as typed; existing /v1 suffix preserved by normalizer.
-            base_url_full_path: None,
-            supports_vision: None,
-            extra_headers: None,
-        }) {
-            Ok(list) => {
-                existing.insert(id);
+        match merge_model_into_atlas(&id, sid, &parsed) {
+            Ok(()) => {
+                atlas.overwrite.insert(id);
                 imported += 1;
-                last_list = Some(list);
             }
             Err(e) => {
                 failed.push(CcSwitchImportFailure {
@@ -452,33 +434,25 @@ where
         }
     }
 
-    // Optional activate after import
-    if let Some(act) = req
+    // activate_id used to switch the App route. This import only merges model
+    // tables into ~/.atlas and must not change [models].default.
+    if req
         .activate_id
         .as_deref()
         .map(str::trim)
-        .filter(|s| !s.is_empty())
+        .is_some_and(|s| !s.is_empty())
     {
-        match providers::activate_provider("custom", Some(act)) {
-            Ok(list) => last_list = Some(list),
-            Err(e) => {
-                failed.push(CcSwitchImportFailure {
-                    source_id: act.to_string(),
-                    reason: format!("imported but activate failed: {e}"),
-                });
-            }
-        }
-    }
-
-    if last_list.is_none() {
-        last_list = providers::list_custom_providers().ok();
+        failed.push(CcSwitchImportFailure {
+            source_id: req.activate_id.unwrap_or_default(),
+            reason: "import does not activate a route or change [models].default".into(),
+        });
     }
 
     Ok(CcSwitchImportResult {
         imported,
         skipped,
         failed,
-        providers: last_list,
+        providers: None,
     })
 }
 
@@ -500,7 +474,37 @@ struct ParsedModel {
     name: String,
     api_key: String,
     api_backend: String,
-    provider_mode: Option<String>,
+    /// Other CLI keys from the selected table, in source order.
+    /// `app_*` and `env_key` are omitted.
+    extra: Vec<(String, String)>,
+}
+
+struct AtlasIndex {
+    overwrite: HashSet<String>,
+    enterprise: HashSet<String>,
+}
+
+impl AtlasIndex {
+    fn taken(&self) -> HashSet<String> {
+        self.overwrite.union(&self.enterprise).cloned().collect()
+    }
+
+    fn empty() -> Self {
+        Self {
+            overwrite: HashSet::new(),
+            enterprise: HashSet::new(),
+        }
+    }
+}
+
+fn is_official_category(category: Option<&str>) -> bool {
+    category == Some("official")
+}
+
+fn rows_for_preview(rows: Vec<DbRow>) -> Vec<DbRow> {
+    rows.into_iter()
+        .filter(|r| !is_official_category(r.category.as_deref()))
+        .collect()
 }
 
 fn read_grokbuild_rows(db_path: &Path) -> Result<Vec<DbRow>, String> {
@@ -543,10 +547,7 @@ fn read_grokbuild_rows(db_path: &Path) -> Result<Vec<DbRow>, String> {
     Ok(out)
 }
 
-fn row_to_preview(
-    row: DbRow,
-    existing: &std::collections::HashSet<String>,
-) -> CcSwitchProviderPreview {
+fn row_to_preview(row: DbRow, atlas: &AtlasIndex) -> CcSwitchProviderPreview {
     let suggested = slugify_id(&row.name, "");
     let mut preview = CcSwitchProviderPreview {
         source_id: row.id.clone(),
@@ -586,10 +587,13 @@ fn row_to_preview(
             } else if is_proxy_managed(&p) {
                 preview.status = "proxy_managed".into();
                 preview.status_detail = Some("local proxy takeover — import may not work".into());
-            } else if existing.contains(&suggested) {
+            } else if atlas.enterprise.contains(&suggested) {
+                preview.status = "invalid".into();
+                preview.status_detail = Some(format!(
+                    "id `{suggested}` is an enterprise-managed Atlas model and will not be overwritten"
+                ));
+            } else if atlas.overwrite.contains(&suggested) {
                 preview.status = "exists".into();
-                preview.status_detail =
-                    Some(format!("id `{suggested}` already present — will overwrite"));
             } else {
                 preview.status = "importable".into();
             }
@@ -620,8 +624,8 @@ fn parse_grok_toml(config: &str, fallback_name: &str) -> Result<ParsedModel, Str
 
     let mut default_profile: Option<String> = None;
     let mut in_models = false;
-    // profile id → fields
-    let mut tables: HashMap<String, HashMap<String, String>> = HashMap::new();
+    let mut tables: HashMap<String, TableFields> = HashMap::new();
+    let mut table_order: Vec<String> = Vec::new();
     let mut current_profile: Option<String> = None;
 
     for raw in config.lines() {
@@ -643,6 +647,9 @@ fn parse_grok_toml(config: &str, fallback_name: &str) -> Result<ParsedModel, Str
             {
                 let id = unquote_toml_key(rest);
                 if !id.is_empty() {
+                    if !tables.contains_key(&id) {
+                        table_order.push(id.clone());
+                    }
                     current_profile = Some(id);
                 }
             }
@@ -658,16 +665,13 @@ fn parse_grok_toml(config: &str, fallback_name: &str) -> Result<ParsedModel, Str
             continue;
         }
         if let Some(ref pid) = current_profile {
-            tables
-                .entry(pid.clone())
-                .or_default()
-                .insert(key.to_string(), val);
+            tables.entry(pid.clone()).or_default().insert(key, val);
         }
     }
 
     let profile = default_profile
         .filter(|p| tables.contains_key(p))
-        .or_else(|| tables.keys().next().cloned())
+        .or_else(|| table_order.into_iter().find(|id| tables.contains_key(id)))
         .ok_or_else(|| "no [model.<id>] table found".to_string())?;
 
     let fields = tables
@@ -702,10 +706,7 @@ fn parse_grok_toml(config: &str, fallback_name: &str) -> Result<ParsedModel, Str
         .cloned()
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "responses".into());
-    let provider_mode = fields
-        .get("app_provider_mode")
-        .cloned()
-        .filter(|s| !s.trim().is_empty());
+    let extra = fields.extra_pairs();
 
     Ok(ParsedModel {
         profile,
@@ -714,64 +715,202 @@ fn parse_grok_toml(config: &str, fallback_name: &str) -> Result<ParsedModel, Str
         name,
         api_key,
         api_backend,
-        provider_mode,
+        extra,
     })
 }
 
-fn resolve_import_provider_mode(parsed: &ParsedModel) -> Result<String, String> {
-    resolve_import_provider_mode_with(parsed, |base_url, api_key| {
-        providers::list_remote_models_blocking(base_url, api_key)
-    })
+struct TableFields {
+    order: Vec<String>,
+    values: HashMap<String, String>,
 }
 
-fn resolve_import_provider_mode_with<F>(parsed: &ParsedModel, probe: F) -> Result<String, String>
-where
-    F: FnOnce(&str, &str) -> Result<providers::RemoteModelsResult, String>,
-{
-    let explicit = parsed
-        .provider_mode
-        .as_deref()
-        .map(|raw| providers::normalize_provider_mode(Some(raw)));
-    if explicit.as_deref() == Some(providers::PROVIDER_MODE_GENERIC) {
-        return Ok(providers::PROVIDER_MODE_GENERIC.into());
-    }
-    if providers::normalize_backend(Some(&parsed.api_backend)) != "responses" {
-        if explicit.as_deref() == Some(providers::PROVIDER_MODE_GROK_BUILD_PROXY) {
-            return Err("grok_build_proxy requires api_backend=responses".into());
+impl TableFields {
+    fn insert(&mut self, key: &str, value: String) {
+        if !self.values.contains_key(key) {
+            self.order.push(key.to_string());
         }
-        return Ok(providers::PROVIDER_MODE_GENERIC.into());
+        self.values.insert(key.to_string(), value);
     }
 
-    let normalized_base =
-        providers::normalize_openai_base_url(&parsed.base_url, "responses", false);
-    let remote = match probe(&normalized_base, &parsed.api_key) {
-        Ok(remote) => remote,
-        Err(error) => {
-            if explicit.as_deref() == Some(providers::PROVIDER_MODE_GROK_BUILD_PROXY) {
-                return Err(format!(
-                    "explicit grok_build_proxy capability check failed: {error}"
-                ));
-            }
-            tracing::warn!(
-                target: "cc_switch_import",
-                "model capability probe failed; preserving generic provider semantics: {error}"
-            );
-            return Ok(providers::PROVIDER_MODE_GENERIC.into());
+    fn get(&self, key: &str) -> Option<&String> {
+        self.values.get(key)
+    }
+
+    fn extra_pairs(&self) -> Vec<(String, String)> {
+        const SKIP: &[&str] = &[
+            "model",
+            "base_url",
+            "name",
+            "api_key",
+            "api_backend",
+            "env_key",
+        ];
+        self.order
+            .iter()
+            .filter(|k| !k.starts_with("app_") && !SKIP.contains(&k.as_str()))
+            .filter_map(|k| {
+                let v = self.values.get(k)?.trim();
+                if v.is_empty() {
+                    None
+                } else {
+                    Some((k.clone(), v.to_string()))
+                }
+            })
+            .collect()
+    }
+}
+
+impl Default for TableFields {
+    fn default() -> Self {
+        Self {
+            order: Vec::new(),
+            values: HashMap::new(),
         }
+    }
+}
+
+fn atlas_config_path() -> PathBuf {
+    if let Ok(raw) = std::env::var(ATLAS_HOME_ENV) {
+        let trimmed = raw.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed).join("config.toml");
+        }
+    }
+    crate::paths::shared_cli_home().join("config.toml")
+}
+
+fn load_atlas_index() -> AtlasIndex {
+    let text = fs::read_to_string(atlas_config_path()).unwrap_or_default();
+    atlas_index_from(&text)
+}
+
+fn atlas_index_from(text: &str) -> AtlasIndex {
+    let mut overwrite = HashSet::new();
+    let mut enterprise = HashSet::new();
+    for section in providers::parse_model_sections_for_proxy(text) {
+        if is_enterprise_managed(&section.fields) {
+            enterprise.insert(section.id);
+        } else {
+            overwrite.insert(section.id);
+        }
+    }
+    AtlasIndex {
+        overwrite,
+        enterprise,
+    }
+}
+
+fn is_enterprise_managed(fields: &HashMap<String, String>) -> bool {
+    if let Some(key) = fields.get("api_key") {
+        let trimmed = key.trim();
+        if trimmed.starts_with("ENC(") && trimmed.ends_with(')') {
+            return true;
+        }
+    }
+    if let Some(hidden) = fields.get("hidden") {
+        let hidden = hidden.trim();
+        if hidden.eq_ignore_ascii_case("true") || hidden == "1" {
+            return true;
+        }
+    }
+    false
+}
+
+fn merge_model_into_atlas(id: &str, source_id: &str, parsed: &ParsedModel) -> Result<(), String> {
+    let path = atlas_config_path();
+    let original = fs::read_to_string(&path).unwrap_or_default();
+    let before_default = providers::get_models_default(&original);
+    if providers::parse_model_sections_for_proxy(&original)
+        .into_iter()
+        .find(|section| section.id == id)
+        .is_some_and(|section| is_enterprise_managed(&section.fields))
+    {
+        return Err(format!(
+            "id `{id}` is an enterprise-managed Atlas model and will not be overwritten"
+        ));
+    }
+    let stripped = remove_model_section(&original, id);
+    let next = append_model_section(&stripped, id, &cli_fields(parsed, source_id));
+    let after_default = providers::get_models_default(&next);
+    if before_default != after_default {
+        return Err("refusing to change [models].default".into());
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(&path, &next).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn cli_fields(parsed: &ParsedModel, source_id: &str) -> Vec<(String, String)> {
+    let mut out = vec![
+        ("model".to_string(), parsed.model.clone()),
+        ("base_url".to_string(), parsed.base_url.clone()),
+        ("name".to_string(), parsed.name.clone()),
+        ("api_key".to_string(), parsed.api_key.clone()),
+        ("api_backend".to_string(), parsed.api_backend.clone()),
+    ];
+    for (key, value) in &parsed.extra {
+        if out.iter().any(|(existing, _)| existing == key) {
+            continue;
+        }
+        out.push((key.clone(), value.clone()));
+    }
+    out.push((CC_SOURCE_KEY.to_string(), source_id.to_string()));
+    out
+}
+
+fn remove_model_section(text: &str, id: &str) -> String {
+    let sections = providers::parse_model_sections_for_proxy(text);
+    let Some(hit) = sections.iter().find(|s| s.id == id) else {
+        return text.to_string();
     };
-    let selected = [providers::ProviderModelEntry::named(
-        parsed.model.clone(),
-        parsed.model.clone(),
-    )];
-    match providers::validate_grok_build_proxy_models(&remote.models, &selected) {
-        Ok(()) => Ok(providers::PROVIDER_MODE_GROK_BUILD_PROXY.into()),
-        Err(error) if explicit.as_deref() == Some(providers::PROVIDER_MODE_GROK_BUILD_PROXY) => {
-            Err(format!(
-                "explicit grok_build_proxy capability check failed: {error}"
-            ))
-        }
-        Err(_) => Ok(providers::PROVIDER_MODE_GENERIC.into()),
+    let mut lines: Vec<&str> = text.lines().collect();
+    let start = hit.start.min(lines.len());
+    let end = hit.end.min(lines.len()).max(start);
+    if start < end {
+        lines.drain(start..end);
     }
+    let mut out = lines.join("\n");
+    if text.ends_with('\n') && !out.ends_with('\n') {
+        out.push('\n');
+    }
+    out
+}
+
+fn append_model_section(text: &str, id: &str, fields: &[(String, String)]) -> String {
+    let body = fields
+        .iter()
+        .filter(|(_, value)| !value.trim().is_empty())
+        .map(|(key, value)| format!("{key} = {}", format_atlas_value(key, value)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let header = format!(
+        "[model.{}]",
+        serde_json::to_string(id).unwrap_or_else(|_| format!("\"{id}\""))
+    );
+    let block = format!("{header}\n{body}\n");
+    let base = text.trim_end();
+    if base.is_empty() {
+        block
+    } else {
+        format!("{base}\n\n{block}")
+    }
+}
+
+fn format_atlas_value(key: &str, value: &str) -> String {
+    if key == "context_window" {
+        if let Ok(n) = value.trim().parse::<u64>() {
+            return n.to_string();
+        }
+    }
+    if key == "extra_headers" {
+        let raw = value.trim();
+        if raw.starts_with('{') {
+            return raw.to_string();
+        }
+    }
+    serde_json::to_string(value).unwrap_or_else(|_| format!("\"{value}\""))
 }
 
 fn unquote_toml_key(raw: &str) -> String {
@@ -867,12 +1006,6 @@ fn unique_id(base: &str, existing: &std::collections::HashSet<String>) -> String
     format!("{base}-x")
 }
 
-fn existing_provider_ids() -> std::collections::HashSet<String> {
-    providers::list_custom_providers()
-        .map(|l| l.providers.into_iter().map(|p| p.id).collect())
-        .unwrap_or_default()
-}
-
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -900,11 +1033,14 @@ api_key = "sk-testkey1234"
         assert_eq!(p.api_backend, "responses");
         assert_eq!(p.api_key, "sk-testkey1234");
         assert_eq!(p.model, "grok-4.5");
-        assert_eq!(p.provider_mode, None);
+        assert_eq!(
+            p.extra,
+            vec![("context_window".to_string(), "500000".to_string())]
+        );
     }
 
     #[test]
-    fn parses_explicit_native_provider_mode() {
+    fn drops_app_provider_mode_from_cli_fields() {
         let toml = r#"[models]
 default = "grok-4.6"
 
@@ -916,64 +1052,12 @@ api_backend = "responses"
 app_provider_mode = "grok_build_proxy"
 "#;
         let parsed = parse_grok_toml(toml, "Relay").expect("parse");
-        assert_eq!(
-            parsed.provider_mode.as_deref(),
-            Some(providers::PROVIDER_MODE_GROK_BUILD_PROXY)
-        );
-    }
-
-    #[test]
-    fn cc_switch_import_auto_promotes_live_backend_search_capability() {
-        let parsed = test_parsed_model(None);
-        let mode = resolve_import_provider_mode_with(&parsed, |base, key| {
-            assert_eq!(base, "https://relay.example/v1");
-            assert_eq!(key, "runtime-key");
-            Ok(providers::RemoteModelsResult {
-                endpoint: "https://relay.example/v1/models".into(),
-                models: vec![providers::RemoteModel {
-                    id: "grok-4.6".into(),
-                    owned_by: Some("grok_build".into()),
-                    supports_backend_search: Some(true),
-                    ..Default::default()
-                }],
-            })
-        })
-        .expect("classify");
-        assert_eq!(mode, providers::PROVIDER_MODE_GROK_BUILD_PROXY);
-    }
-
-    #[test]
-    fn cc_switch_import_keeps_generic_without_capability_claim() {
-        let parsed = test_parsed_model(None);
-        let mode = resolve_import_provider_mode_with(&parsed, |_, _| {
-            Ok(providers::RemoteModelsResult {
-                endpoint: "https://relay.example/v1/models".into(),
-                models: vec![providers::RemoteModel {
-                    id: "grok-4.6".into(),
-                    owned_by: None,
-                    supports_backend_search: None,
-                    ..Default::default()
-                }],
-            })
-        })
-        .expect("classify");
-        assert_eq!(mode, providers::PROVIDER_MODE_GENERIC);
-    }
-
-    #[test]
-    fn cc_switch_import_honors_explicit_modes() {
-        let explicit_generic = test_parsed_model(Some(providers::PROVIDER_MODE_GENERIC));
-        let generic = resolve_import_provider_mode_with(&explicit_generic, |_, _| {
-            panic!("explicit generic must not probe")
-        })
-        .expect("generic");
-        assert_eq!(generic, providers::PROVIDER_MODE_GENERIC);
-
-        let explicit_native = test_parsed_model(Some(providers::PROVIDER_MODE_GROK_BUILD_PROXY));
-        let error =
-            resolve_import_provider_mode_with(&explicit_native, |_, _| Err("offline".into()))
-                .expect_err("explicit native must fail closed");
-        assert!(error.contains("capability check failed"));
+        assert!(parsed.extra.iter().all(|(k, _)| k != "app_provider_mode"));
+        let fields = cli_fields(&parsed, "source-relay");
+        assert!(fields.iter().all(|(k, _)| k != "app_provider_mode"));
+        assert!(fields
+            .iter()
+            .any(|(k, v)| k == CC_SOURCE_KEY && v == "source-relay"));
     }
 
     #[test]
@@ -994,7 +1078,7 @@ app_provider_mode = "grok_build_proxy"
             name: "x".into(),
             api_key: "PROXY_MANAGED".into(),
             api_backend: "responses".into(),
-            provider_mode: None,
+            extra: Vec::new(),
         };
         assert!(is_proxy_managed(&p));
     }
@@ -1063,32 +1147,54 @@ app_provider_mode = "grok_build_proxy"
 
         let rows = read_grokbuild_rows(&db).expect("read");
         assert_eq!(rows.len(), 2);
-        let existing = std::collections::HashSet::new();
-        let previews: Vec<_> = rows
+        let previews: Vec<_> = rows_for_preview(rows)
             .into_iter()
-            .map(|r| row_to_preview(r, &existing))
+            .map(|r| row_to_preview(r, &AtlasIndex::empty()))
             .collect();
-        let amux = previews.iter().find(|p| p.name == "Amux").expect("amux");
+        assert_eq!(previews.len(), 1);
+        let amux = &previews[0];
+        assert_eq!(amux.name, "Amux");
         assert_eq!(amux.status, "importable");
         assert_eq!(amux.base_url, "https://api.amux.ai/v1");
         assert!(amux.has_api_key);
-        let off = previews
+        assert!(previews
             .iter()
-            .find(|p| p.category.as_deref() == Some("official"));
-        assert_eq!(off.map(|p| p.status.as_str()), Some("official"));
+            .all(|p| p.category.as_deref() != Some("official")));
     }
 
     #[test]
-    fn import_roundtrip_writes_resolved_native_mode() {
+    fn import_merges_into_atlas_without_touching_default_or_enterprise() {
         let _lock = crate::paths::APP_HOME_ENV_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let app_home = tempfile_dir();
+        let atlas_home = tempfile_dir();
         let cc_home = tempfile_dir();
         let _restore = RestoreEnv::set(&[
-            ("GROK_APP_HOME", app_home.to_string_lossy().as_ref()),
+            (ATLAS_HOME_ENV, atlas_home.to_string_lossy().as_ref()),
             (ENV_DIR, cc_home.to_string_lossy().as_ref()),
         ]);
+
+        let prior = "\
+[models]
+default = \"arch-kimi-for-coding\"
+
+[model.\"arch-kimi-for-coding\"]
+name = \"Kimi\"
+api_key = \"ENC(secret)\"
+
+[model.\"hidden-one\"]
+name = \"Hidden\"
+api_key = \"sk-hidden\"
+hidden = true
+
+[model.\"relay\"]
+model = \"old\"
+base_url = \"https://old.example/v1\"
+name = \"Relay\"
+api_key = \"old-key\"
+api_backend = \"responses\"
+";
+        fs::write(atlas_home.join("config.toml"), prior).expect("seed atlas");
 
         let db = cc_home.join(DB_NAME);
         let conn = Connection::open(&db).expect("create db");
@@ -1106,37 +1212,64 @@ app_provider_mode = "grok_build_proxy"
             );",
         )
         .expect("schema");
-        let config = "[models]\ndefault = \"grok-4.6\"\n\n[model.\"grok-4.6\"]\nmodel = \"grok-4.6\"\nbase_url = \"https://relay.example/v1\"\nname = \"Relay\"\napi_backend = \"responses\"\napi_key = \"runtime-key\"\n".to_string();
-        let settings = serde_json::json!({ "config": config }).to_string();
-        conn.execute(
-            "INSERT INTO providers (id, app_type, name, settings_config, category, is_current)
-             VALUES ('source-relay', 'grokbuild', 'Relay', ?1, 'aggregator', 1)",
-            [settings],
-        )
-        .expect("insert");
+        let relay_cfg = "[models]\ndefault = \"grok-4.6\"\n\n[model.\"grok-4.6\"]\nmodel = \"grok-4.6\"\nbase_url = \"https://relay.example/v1\"\nname = \"Relay\"\napi_backend = \"responses\"\napi_key = \"runtime-key\"\ncontext_window = 500000\nextra_headers = { \"User-Agent\" = \"atlas\" }\napp_provider_mode = \"grok_build_proxy\"\n";
+        let amux_cfg = "[models]\ndefault = \"grok-4.5\"\n\n[model.\"grok-4.5\"]\nmodel = \"grok-4.5\"\nbase_url = \"https://api.amux.ai/v1\"\nname = \"Amux\"\napi_backend = \"responses\"\napi_key = \"sk-amux\"\n";
+        let hidden_cfg = "[models]\ndefault = \"x\"\n\n[model.\"x\"]\nmodel = \"x\"\nbase_url = \"https://hidden.example/v1\"\nname = \"Hidden One\"\napi_key = \"sk-new\"\napi_backend = \"responses\"\n";
+        for (id, name, cfg, category) in [
+            ("source-relay", "Relay", relay_cfg, "aggregator"),
+            ("source-amux", "Amux", amux_cfg, "aggregator"),
+            ("source-hidden", "hidden-one", hidden_cfg, "custom"),
+            ("grokbuild-official", "Grok Official", "", "official"),
+        ] {
+            let settings = serde_json::json!({ "config": cfg }).to_string();
+            conn.execute(
+                "INSERT INTO providers (id, app_type, name, settings_config, category, is_current)
+                 VALUES (?1, 'grokbuild', ?2, ?3, ?4, 0)",
+                rusqlite::params![id, name, settings, category],
+            )
+            .expect("insert");
+        }
         drop(conn);
 
-        let result = import_cc_switch_providers_with(
-            CcSwitchImportRequest {
-                source_ids: vec!["source-relay".into()],
-                on_conflict: Some("overwrite".into()),
-                activate_id: None,
-            },
-            |parsed| {
-                assert_eq!(parsed.model, "grok-4.6");
-                assert_eq!(parsed.base_url, "https://relay.example/v1");
-                Ok(providers::PROVIDER_MODE_GROK_BUILD_PROXY.into())
-            },
-        )
+        let result = import_cc_switch_providers_with(CcSwitchImportRequest {
+            source_ids: vec![
+                "source-relay".into(),
+                "source-amux".into(),
+                "source-hidden".into(),
+                "grokbuild-official".into(),
+            ],
+            on_conflict: Some("overwrite".into()),
+            activate_id: None,
+        })
         .expect("import");
-        assert_eq!(result.imported, 1);
-        assert!(result.failed.is_empty());
+        assert_eq!(result.imported, 2, "{result:?}");
+        assert_eq!(result.failed.len(), 2, "{result:?}");
+        assert!(result.providers.is_none());
+        assert!(result
+            .failed
+            .iter()
+            .any(|f| f.source_id == "grokbuild-official"));
+        assert!(result
+            .failed
+            .iter()
+            .any(|f| f.source_id == "source-hidden" && f.reason.contains("enterprise-managed")));
 
-        let written = fs::read_to_string(app_home.join("agent-home/config.toml")).expect("config");
-        assert!(written.contains("app_provider_mode = \"grok_build_proxy\""));
-        assert!(written.contains("model = \"grok-4.6\""));
+        let written = fs::read_to_string(atlas_home.join("config.toml")).expect("atlas config");
+        assert!(written.contains("default = \"arch-kimi-for-coding\""));
+        assert!(written.contains("api_key = \"ENC(secret)\""));
+        assert!(written.contains("hidden = true"));
+        assert!(written.contains("base_url = \"https://relay.example/v1\""));
+        assert!(written.contains("base_url = \"https://api.amux.ai/v1\""));
+        assert!(written.contains("context_window = 500000"));
+        assert!(written.contains("extra_headers = { \"User-Agent\" = \"atlas\" }"));
+        assert!(written.contains("app_cc_switch_source = \"source-relay\""));
+        assert!(!written.contains("127.0.0.1"));
+        assert!(!written.contains("app_provider_mode"));
+        assert!(!written.contains("https://old.example/v1"));
+        assert!(!written.contains("https://hidden.example/v1"));
+        assert!(providers::get_models_default(&written).as_deref() == Some("arch-kimi-for-coding"));
 
-        let _ = fs::remove_dir_all(&app_home);
+        let _ = fs::remove_dir_all(&atlas_home);
         let _ = fs::remove_dir_all(&cc_home);
     }
 
@@ -1157,18 +1290,6 @@ app_provider_mode = "grok_build_proxy"
     fn expand_tilde() {
         let p = expand_user_path("~/foo/bar");
         assert!(p.ends_with("foo/bar") || p.ends_with(r"foo\bar"));
-    }
-
-    fn test_parsed_model(provider_mode: Option<&str>) -> ParsedModel {
-        ParsedModel {
-            profile: "grok-4.6".into(),
-            model: "grok-4.6".into(),
-            base_url: "https://relay.example/v1".into(),
-            name: "Relay".into(),
-            api_key: "runtime-key".into(),
-            api_backend: "responses".into(),
-            provider_mode: provider_mode.map(str::to_string),
-        }
     }
 
     struct RestoreEnv(Vec<(&'static str, Option<String>)>);

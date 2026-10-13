@@ -12,6 +12,8 @@ export interface AtlasRelayAgentRecord {
   url?: string | null;
   token?: string | null;
   id?: string | null;
+  /** Catalog id for this connection. Empty follows the CLI default. */
+  modelId?: string | null;
   enabled?: boolean;
 }
 

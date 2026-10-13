@@ -359,8 +359,7 @@ pub fn derive_leader_state(
         return (
             "unsupported",
             Some(
-                "This Atlas CLI version does not expose `agent leader` / `leader` commands."
-                    .into(),
+                "This Atlas CLI version does not expose `agent leader` / `leader` commands.".into(),
             ),
         );
     }
@@ -718,9 +717,7 @@ pub async fn leader_list() -> Result<serde_json::Value, String> {
     let result = tauri::async_runtime::spawn_blocking(|| {
         let (cli_found, cli_supports, support_msg) = probe_cli_supports_leader();
         if !cli_found {
-            return soft_list_error(
-                support_msg.unwrap_or_else(|| "Atlas CLI not found".into()),
-            );
+            return soft_list_error(support_msg.unwrap_or_else(|| "Atlas CLI not found".into()));
         }
         if !cli_supports {
             return soft_list_error(support_msg.unwrap_or_else(|| {

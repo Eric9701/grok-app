@@ -1,16 +1,13 @@
-
 /// Scan CC Switch Grok Build providers (read-only SQLite).
 #[tauri::command]
 pub async fn providers_cc_switch_scan(
 ) -> Result<crate::cc_switch_import::CcSwitchScanResult, String> {
-    tauri::async_runtime::spawn_blocking(
-        crate::cc_switch_import::scan_cc_switch_providers,
-    )
-    .await
-    .map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(crate::cc_switch_import::scan_cc_switch_providers)
+        .await
+        .map_err(|e| e.to_string())
 }
 
-/// Import selected CC Switch Grok Build providers into App custom providers.
+/// Import selected CC Switch Grok Build providers into `~/.atlas/config.toml`.
 #[tauri::command]
 pub async fn providers_cc_switch_import(
     app: tauri::AppHandle,
@@ -64,8 +61,7 @@ pub async fn providers_activate(
     recycle_agents: Option<bool>,
 ) -> Result<crate::providers::ProvidersListResult, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let result =
-            crate::providers::activate_provider(&source, provider_id.as_deref())?;
+        let result = crate::providers::activate_provider(&source, provider_id.as_deref())?;
         // Composer model stays a catalog id (UI). Channel is `[models].default`.
         // When leaving a custom route, drop stale provider ids from settings.
         let mut settings = store::load_settings();
@@ -75,8 +71,7 @@ pub async fn providers_activate(
                 || crate::providers::is_custom_provider_id(&cur)
                 || cur == crate::providers::OFFICIAL_DEFAULT_MODEL
             {
-                settings.model_id =
-                    Some(crate::providers::OFFICIAL_CATALOG_MODEL.into());
+                settings.model_id = Some(crate::providers::OFFICIAL_CATALOG_MODEL.into());
                 let _ = store::save_settings(&settings);
             }
         } else if result.active_source == "custom" {
@@ -94,8 +89,7 @@ pub async fn providers_activate(
                         upstream.to_string()
                     });
                 } else {
-                    settings.model_id =
-                        Some(crate::providers::OFFICIAL_CATALOG_MODEL.into());
+                    settings.model_id = Some(crate::providers::OFFICIAL_CATALOG_MODEL.into());
                 }
                 let _ = store::save_settings(&settings);
             }
@@ -152,9 +146,8 @@ pub async fn providers_upsert(
         let normalized_base = crate::providers::normalize_openai_base_url(
             &base_url,
             "responses",
-            base_url_full_path.unwrap_or_else(|| {
-                crate::providers::provider_base_url_full_path_for_id(&id)
-            }),
+            base_url_full_path
+                .unwrap_or_else(|| crate::providers::provider_base_url_full_path_for_id(&id)),
         );
         let remote = crate::providers::list_remote_models(
             normalized_base,
@@ -239,11 +232,10 @@ pub async fn providers_remove(
     mgr: State<'_, Arc<SessionManager>>,
     id: String,
 ) -> Result<crate::providers::ProvidersListResult, String> {
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        crate::providers::remove_custom_provider(&id)
-    })
-    .await
-    .map_err(|e| e.to_string())??;
+    let result =
+        tauri::async_runtime::spawn_blocking(move || crate::providers::remove_custom_provider(&id))
+            .await
+            .map_err(|e| e.to_string())??;
     // Removing a provider (esp. the active one) must not leave warm agents on
     // a deleted route id.
     let mode = store::load_settings_async().await.session_data_mode.clone();
@@ -573,12 +565,8 @@ mod project_inspect_tests {
             }],
             "permissions": { "loaded": 0, "sources": [], "managedSettingsActive": false }
         });
-        let out = build_project_inspect_summary(
-            Some(&raw),
-            Some("/tmp/p"),
-            None,
-            vec!["grok-4".into()],
-        );
+        let out =
+            build_project_inspect_summary(Some(&raw), Some("/tmp/p"), None, vec!["grok-4".into()]);
         let s = out.to_string();
         assert!(s.contains("\"help\""));
         assert!(s.contains("\"ctx\""));

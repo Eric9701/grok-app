@@ -14,6 +14,7 @@ export const ACCOUNT_ENTRIES: readonly SettingsEntry[] = [
       "account.signedIn",
       "account.loginOauth",
       "account.loginDevice",
+      "account.machineCode",
       "account.logout",
       "account.subscription",
       "account.quota",
@@ -26,6 +27,8 @@ export const ACCOUNT_ENTRIES: readonly SettingsEntry[] = [
     keywords: [
       "login",
       "oauth",
+      "machine code",
+      "机器码",
       "supergrok",
       "quota",
       "account",

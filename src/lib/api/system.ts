@@ -342,11 +342,21 @@ export async function atlasRelayAgentConnect(
   url: string,
   agentId: string,
   token?: string,
+  modelId?: string,
 ) {
   return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_connect", {
     url,
     agentId,
     token: token?.trim() || "",
+    modelId: modelId?.trim() || "",
+  });
+}
+
+/** Save one connection's catalog id. Does not drop the socket or restart the CLI. */
+export async function atlasRelayAgentSetModel(agentId: string, modelId: string) {
+  return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_set_model", {
+    agentId,
+    modelId: modelId.trim(),
   });
 }
 

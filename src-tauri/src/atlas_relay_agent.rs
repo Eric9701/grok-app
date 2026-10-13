@@ -15,7 +15,7 @@ use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
-use tokio::sync::Notify;
+use tokio::sync::{mpsc, Notify};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use url::Url;
 
@@ -29,6 +29,9 @@ const MAX_HEALTH_SECS: u64 = 300;
 pub const MAX_RELAY_AGENTS: usize = 4;
 
 static HEALTH_SECS: AtomicU64 = AtomicU64::new(DEFAULT_HEALTH_SECS);
+static INJECT_SEQ: AtomicU64 = AtomicU64::new(1);
+
+const RELAY_MODEL_INJECT_PREFIX: &str = "relay-model-";
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -76,6 +79,12 @@ struct Slot {
     agent_id: String,
     /// Real socket URL, including the token. Status redacts it.
     url: String,
+    /// Catalog id applied to this process. Empty means do not rewrite frames.
+    model_id: String,
+    /// Sessions this process has seen. Cleared when the CLI is replaced.
+    sessions: HashSet<String>,
+    /// Local `session/set_model` lines. `None` until the bridge is in the read loop.
+    inject_tx: Option<mpsc::UnboundedSender<String>>,
     tasks: Vec<AtlasRelayTask>,
     cancel: Arc<Notify>,
 }
@@ -152,6 +161,99 @@ fn clip_text(raw: &str) -> String {
     raw.trim().chars().take(MAX_TASK_TEXT).collect()
 }
 
+/// Catalog id for one relay connection. Empty means the cloud frame is left alone.
+pub fn sanitize_model_id(raw: &str) -> String {
+    raw.replace(['\r', '\n'], "")
+        .trim()
+        .chars()
+        .take(128)
+        .collect()
+}
+
+pub fn relay_model_inject_id(n: u64) -> String {
+    format!("{RELAY_MODEL_INJECT_PREFIX}{n}")
+}
+
+/// CLI replies to a locally injected `session/set_model` must not be forwarded.
+pub fn is_relay_model_inject_frame(frame: &str) -> bool {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(frame) else {
+        return false;
+    };
+    rpc_id(&v).is_some_and(|id| id.starts_with(RELAY_MODEL_INJECT_PREFIX))
+}
+
+fn session_set_model_line(inject_id: &str, session_id: &str, model_id: &str) -> String {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": inject_id,
+        "method": "session/set_model",
+        "params": {
+            "sessionId": session_id,
+            "modelId": model_id,
+        }
+    })
+    .to_string()
+}
+
+/// Force this connection's catalog id onto `session/new` and `session/set_model`.
+/// An empty model returns the frame unchanged.
+pub fn apply_connection_model(frame: &str, model_id: &str) -> String {
+    let model_id = sanitize_model_id(model_id);
+    if model_id.is_empty() {
+        return frame.to_string();
+    }
+    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(frame) else {
+        return frame.to_string();
+    };
+    let method = v
+        .get("method")
+        .and_then(|m| m.as_str())
+        .unwrap_or("")
+        .to_string();
+    let Some(params) = v.get_mut("params").and_then(|p| p.as_object_mut()) else {
+        return frame.to_string();
+    };
+    match method.as_str() {
+        "session/new" => {
+            let meta = params
+                .entry("_meta")
+                .or_insert_with(|| serde_json::json!({}));
+            if !meta.is_object() {
+                *meta = serde_json::json!({});
+            }
+            if let Some(obj) = meta.as_object_mut() {
+                obj.insert("modelId".into(), serde_json::Value::String(model_id));
+            }
+        }
+        "session/set_model" => {
+            params.insert("modelId".into(), serde_json::Value::String(model_id));
+        }
+        _ => return frame.to_string(),
+    }
+    serde_json::to_string(&v).unwrap_or_else(|_| frame.to_string())
+}
+
+/// Session ids this bridge can switch without restarting the CLI.
+pub fn session_id_from_frame(frame: &str, inbound: bool) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(frame).ok()?;
+    let raw = if inbound {
+        let method = v.get("method").and_then(|m| m.as_str()).unwrap_or("");
+        match method {
+            "session/load" | "session/prompt" => v.pointer("/params/sessionId"),
+            "session/new" => v.pointer("/params/_meta/sessionId"),
+            _ => None,
+        }
+    } else {
+        v.pointer("/result/sessionId")
+    }?;
+    let id = raw.as_str().unwrap_or("").trim();
+    if id.is_empty() {
+        None
+    } else {
+        Some(id.to_string())
+    }
+}
+
 fn rpc_id(v: &serde_json::Value) -> Option<String> {
     match v.get("id")? {
         serde_json::Value::String(s) => {
@@ -191,7 +293,10 @@ fn push_task(tasks: &mut Vec<AtlasRelayTask>, task: AtlasRelayTask) {
 }
 
 fn mark_id(tasks: &mut [AtlasRelayTask], id: &str, status: &str, error: Option<String>) {
-    if let Some(task) = tasks.iter_mut().find(|t| t.id == id && t.status == "running") {
+    if let Some(task) = tasks
+        .iter_mut()
+        .find(|t| t.id == id && t.status == "running")
+    {
         task.status = status.to_string();
         task.error = error;
         return;
@@ -343,7 +448,11 @@ pub fn relay_agent_ws_url(raw: &str, agent_id: &str, token: &str) -> Result<Stri
         .map(|(_, v)| sanitize_token(&v))
         .unwrap_or_default();
     let explicit = sanitize_token(token);
-    let token = if explicit.is_empty() { pasted } else { explicit };
+    let token = if explicit.is_empty() {
+        pasted
+    } else {
+        explicit
+    };
     if !keep_agent_path {
         u.set_path("/ws");
     }
@@ -467,6 +576,7 @@ pub fn migrate_relay_agent_settings(settings: &mut crate::store::AppSettings) ->
                         settings.atlas_relay_agent_token.as_deref().unwrap_or(""),
                     ),
                     id,
+                    model_id: String::new(),
                     enabled: settings.atlas_relay_agent_enabled,
                 });
             changed = true;
@@ -482,17 +592,19 @@ pub fn migrate_relay_agent_settings(settings: &mut crate::store::AppSettings) ->
         let id = sanitize_agent_id(&slot.id);
         let url = slot.url.trim().to_string();
         let token = sanitize_token(&slot.token);
+        let model_id = sanitize_model_id(&slot.model_id);
         if id.is_empty() || !seen.insert(id.clone()) {
             changed = true;
             continue;
         }
-        if id != slot.id || url != slot.url || token != slot.token {
+        if id != slot.id || url != slot.url || token != slot.token || model_id != slot.model_id {
             changed = true;
         }
         kept.push(crate::store::AtlasRelayAgentRecord {
             url,
             token,
             id,
+            model_id,
             enabled: slot.enabled,
         });
     }
@@ -529,8 +641,55 @@ pub fn validate_relay_agents(agents: &[crate::store::AtlasRelayAgentRecord]) -> 
     Ok(())
 }
 
+fn live_model(agent_id: &str) -> String {
+    with_hub(|h| {
+        h.slots
+            .get(agent_id)
+            .map(|s| s.model_id.clone())
+            .unwrap_or_default()
+    })
+}
+
+fn remember_session(agent_id: &str, frame: &str, inbound: bool) {
+    let Some(session_id) = session_id_from_frame(frame, inbound) else {
+        return;
+    };
+    with_hub(|h| {
+        if let Some(slot) = h.slots.get_mut(agent_id) {
+            slot.sessions.insert(session_id);
+        }
+    });
+}
+
+/// Remember the catalog id and, when it changes to a real id, switch sessions
+/// the current CLI already has. Does not restart the process or the socket.
+fn set_live_model(agent_id: &str, model_id: &str) {
+    let model_id = sanitize_model_id(model_id);
+    with_hub(|h| {
+        let Some(slot) = h.slots.get_mut(agent_id) else {
+            return;
+        };
+        if slot.model_id == model_id {
+            return;
+        }
+        slot.model_id = model_id.clone();
+        if model_id.is_empty() {
+            return;
+        }
+        let Some(tx) = slot.inject_tx.clone() else {
+            return;
+        };
+        let sessions: Vec<String> = slot.sessions.iter().cloned().collect();
+        for session_id in sessions {
+            let n = INJECT_SEQ.fetch_add(1, Ordering::SeqCst);
+            let frame = session_set_model_line(&relay_model_inject_id(n), &session_id, &model_id);
+            let _ = tx.send(frame);
+        }
+    });
+}
+
 /// Start or replace one agent. Other agents keep running.
-pub fn start(raw_url: &str, agent_id: &str, token: &str) -> Result<(), String> {
+pub fn start(raw_url: &str, agent_id: &str, token: &str, model_id: &str) -> Result<(), String> {
     let saved = crate::store::load_settings();
     set_health_secs(saved.atlas_relay_agent_health_secs);
     let id = sanitize_agent_id(agent_id);
@@ -538,6 +697,7 @@ pub fn start(raw_url: &str, agent_id: &str, token: &str) -> Result<(), String> {
         return Err("empty agent id".into());
     }
     let ws_url = relay_agent_ws_url(raw_url, &id, token)?;
+    let model_id = sanitize_model_id(model_id);
     let (gen, old_pid, cancel) = with_hub(|h| {
         if !h.slots.contains_key(&id) && h.slots.len() >= MAX_RELAY_AGENTS {
             return Err("at most 4 relay agents".to_string());
@@ -552,6 +712,9 @@ pub fn start(raw_url: &str, agent_id: &str, token: &str) -> Result<(), String> {
             cli_alive: false,
             agent_id: id.clone(),
             url: String::new(),
+            model_id: String::new(),
+            sessions: HashSet::new(),
+            inject_tx: None,
             tasks: Vec::new(),
             cancel: Arc::new(Notify::new()),
         });
@@ -562,6 +725,9 @@ pub fn start(raw_url: &str, agent_id: &str, token: &str) -> Result<(), String> {
         slot.cli_alive = false;
         slot.agent_id = id.clone();
         slot.url = ws_url.clone();
+        slot.model_id = model_id.clone();
+        slot.sessions.clear();
+        slot.inject_tx = None;
         slot.cancel.notify_waiters();
         Ok((gen, old_pid, slot.cancel.clone()))
     })?;
@@ -635,9 +801,15 @@ pub fn apply_settings(settings: &crate::store::AppSettings) {
                 .unwrap_or(false)
         });
         if same {
+            set_live_model(&id, &sanitize_model_id(&slot.model_id));
             continue;
         }
-        if let Err(e) = start(slot.url.trim(), &id, &slot.token) {
+        if let Err(e) = start(
+            slot.url.trim(),
+            &id,
+            &slot.token,
+            &sanitize_model_id(&slot.model_id),
+        ) {
             with_hub(|h| {
                 if let Some(s) = h.slots.get_mut(&id) {
                     s.phase = "stopped".into();
@@ -736,7 +908,8 @@ async fn run_once(agent_id: &str, gen: u64, ws_url: &str, cancel: &Notify) -> Ru
     if !slot_is_current(agent_id, gen) {
         return RunEnd::Stopped;
     }
-    let mut child = match spawn_stdio_agent().await {
+    let model_id = live_model(agent_id);
+    let mut child = match spawn_stdio_agent(&model_id).await {
         Ok(child) => child,
         Err(e) => return RunEnd::Disconnected(Some(e)),
     };
@@ -816,7 +989,7 @@ async fn finish_child(agent_id: &str, child: &mut Child, pid: u32) {
     let _ = child.wait().await;
 }
 
-async fn spawn_stdio_agent() -> Result<Child, String> {
+async fn spawn_stdio_agent(model_id: &str) -> Result<Child, String> {
     let settings = crate::store::load_settings();
     let probe = crate::cli_probe::probe_cli(settings.manual_cli_path.as_deref());
     let cli_path = probe
@@ -825,7 +998,11 @@ async fn spawn_stdio_agent() -> Result<Child, String> {
         .ok_or_else(|| "Atlas CLI not found".to_string())?;
     let home: PathBuf = crate::paths::resolve_agent_grok_home(&settings.session_data_mode);
     let mut cmd = Command::new(&cli_path);
-    cmd.arg("agent").arg("--always-approve").arg("stdio");
+    cmd.arg("agent").arg("--always-approve");
+    if !model_id.is_empty() {
+        cmd.arg("--model").arg(model_id);
+    }
+    cmd.arg("stdio");
     crate::process_util::apply_process_group_no_window_tokio(&mut cmd);
     crate::process_util::apply_cli_env_tokio(&mut cmd);
     cmd.env("GROK_HOME", &home);
@@ -899,9 +1076,20 @@ async fn bridge(
         })
     });
 
+    let (inject_tx, mut inject_rx) = mpsc::unbounded_channel::<String>();
+    with_hub(|h| {
+        if let Some(slot) = h.slots.get_mut(agent_id) {
+            if slot.gen == gen {
+                slot.inject_tx = Some(inject_tx);
+                slot.sessions.clear();
+            }
+        }
+    });
+
     let health_sleep = tokio::time::sleep(Duration::from_secs(current_health_secs()));
     tokio::pin!(health_sleep);
     let mut awaiting_pong = false;
+    let mut inject_open = true;
 
     let end = loop {
         tokio::select! {
@@ -927,8 +1115,7 @@ async fn bridge(
                 match incoming {
                     Some(Ok(Message::Text(t))) => {
                         if let Some(body) = inbound_frame_to_line(&t) {
-                            observe_frame(agent_id, &body, true);
-                            if write_line(&mut stdin, &body).await.is_err() {
+                            if write_cloud_frame(agent_id, &mut stdin, &body).await.is_err() {
                                 break RunEnd::Disconnected(Some("CLI stdin closed".into()));
                             }
                         }
@@ -936,8 +1123,7 @@ async fn bridge(
                     Some(Ok(Message::Binary(b))) => {
                         if let Ok(text) = std::str::from_utf8(&b) {
                             if let Some(body) = inbound_frame_to_line(text) {
-                                observe_frame(agent_id, &body, true);
-                                if write_line(&mut stdin, &body).await.is_err() {
+                                if write_cloud_frame(agent_id, &mut stdin, &body).await.is_err() {
                                     break RunEnd::Disconnected(Some("CLI stdin closed".into()));
                                 }
                             }
@@ -960,12 +1146,26 @@ async fn bridge(
             outgoing = line_rx.recv() => {
                 match outgoing {
                     Some(frame) => {
+                        if is_relay_model_inject_frame(&frame) {
+                            continue;
+                        }
+                        remember_session(agent_id, &frame, false);
                         observe_frame(agent_id, &frame, false);
                         if sink.send(Message::Text(frame.into())).await.is_err() {
                             break RunEnd::Disconnected(Some("relay closed".into()));
                         }
                     }
                     None => break RunEnd::Disconnected(Some("CLI stdout closed".into())),
+                }
+            }
+            injected = inject_rx.recv(), if inject_open => {
+                match injected {
+                    Some(body) => {
+                        if write_line(&mut stdin, &body).await.is_err() {
+                            break RunEnd::Disconnected(Some("CLI stdin closed".into()));
+                        }
+                    }
+                    None => inject_open = false,
                 }
             }
             status = child.wait() => {
@@ -978,8 +1178,27 @@ async fn bridge(
     if let Some(task) = stderr_task {
         task.abort();
     }
+    with_hub(|h| {
+        if let Some(slot) = h.slots.get_mut(agent_id) {
+            if slot.gen == gen {
+                slot.inject_tx = None;
+                slot.sessions.clear();
+            }
+        }
+    });
     let _ = stdin.shutdown().await;
     end
+}
+
+async fn write_cloud_frame(
+    agent_id: &str,
+    stdin: &mut tokio::process::ChildStdin,
+    body: &str,
+) -> std::io::Result<()> {
+    remember_session(agent_id, body, true);
+    let body = apply_connection_model(body, &live_model(agent_id));
+    observe_frame(agent_id, &body, true);
+    write_line(stdin, &body).await
 }
 
 async fn write_line(stdin: &mut tokio::process::ChildStdin, body: &str) -> std::io::Result<()> {
@@ -999,11 +1218,13 @@ pub async fn atlas_relay_agent_connect(
     url: String,
     agent_id: String,
     token: String,
+    model_id: Option<String>,
 ) -> Result<AtlasRelayFleetStatus, String> {
     let id = sanitize_agent_id(&agent_id);
     if id.is_empty() {
         return Err("empty agent id".into());
     }
+    let model = sanitize_model_id(model_id.as_deref().unwrap_or(""));
     let given = token;
     let ws = relay_agent_ws_url(url.trim(), &id, &given)?;
     let stored = token_from_ws_url(&ws);
@@ -1016,6 +1237,7 @@ pub async fn atlas_relay_agent_connect(
         slot.url = url.trim().to_string();
         slot.token = stored.clone();
         slot.id = id.clone();
+        slot.model_id = model.clone();
         slot.enabled = true;
     } else {
         if settings.atlas_relay_agents.len() >= MAX_RELAY_AGENTS {
@@ -1027,12 +1249,38 @@ pub async fn atlas_relay_agent_connect(
                 url: url.trim().to_string(),
                 token: stored.clone(),
                 id: id.clone(),
+                model_id: model.clone(),
                 enabled: true,
             });
     }
     validate_relay_agents(&settings.atlas_relay_agents)?;
     crate::store::save_settings_async(&settings).await?;
-    start(url.trim(), &id, &stored)?;
+    start(url.trim(), &id, &stored, &model)?;
+    Ok(status())
+}
+
+/// Save this connection's catalog id. An online bridge keeps its socket and CLI.
+#[tauri::command]
+pub async fn atlas_relay_agent_set_model(
+    agent_id: String,
+    model_id: String,
+) -> Result<AtlasRelayFleetStatus, String> {
+    let id = sanitize_agent_id(&agent_id);
+    if id.is_empty() {
+        return Err("empty agent id".into());
+    }
+    let model = sanitize_model_id(&model_id);
+    let mut settings = crate::store::load_settings();
+    let Some(slot) = settings
+        .atlas_relay_agents
+        .iter_mut()
+        .find(|s| sanitize_agent_id(&s.id) == id)
+    else {
+        return Err("relay agent is not saved".into());
+    };
+    slot.model_id = model.clone();
+    crate::store::save_settings_async(&settings).await?;
+    set_live_model(&id, &model);
     Ok(status())
 }
 
@@ -1065,7 +1313,8 @@ mod tests {
     #[test]
     fn agent_url_from_page_host_and_existing_socket() {
         assert_eq!(
-            relay_agent_ws_url("http://10.1.2.3:2420/build?agent=laptop-a", "laptop-a", "").unwrap(),
+            relay_agent_ws_url("http://10.1.2.3:2420/build?agent=laptop-a", "laptop-a", "")
+                .unwrap(),
             "ws://10.1.2.3:2420/ws?agent_id=laptop-a"
         );
         assert_eq!(
@@ -1257,6 +1506,7 @@ mod tests {
                 url: format!("ws://10.0.0.{i}:2420"),
                 token: String::new(),
                 id: format!("a{i}"),
+                model_id: String::new(),
                 enabled: false,
             });
         }
@@ -1265,6 +1515,7 @@ mod tests {
             url: "ws://10.9.9.9:2420".into(),
             token: String::new(),
             id: "a9".into(),
+            model_id: String::new(),
             enabled: false,
         });
         assert!(validate_relay_agents(&agents).unwrap_err().contains("4"));
@@ -1274,5 +1525,86 @@ mod tests {
         assert!(validate_relay_agents(&agents)
             .unwrap_err()
             .contains("duplicate"));
+    }
+
+    #[test]
+    fn connection_model_rewrites_new_and_set_model_only() {
+        let new_frame = r#"{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":".","_meta":{"modelId":"cloud-model","yoloMode":true}}}"#;
+        let rewritten = apply_connection_model(new_frame, "arch-kimi-code-eric");
+        let v: serde_json::Value = serde_json::from_str(&rewritten).unwrap();
+        assert_eq!(
+            v.pointer("/params/_meta/modelId").and_then(|s| s.as_str()),
+            Some("arch-kimi-code-eric")
+        );
+        assert_eq!(
+            v.pointer("/params/_meta/yoloMode").and_then(|b| b.as_bool()),
+            Some(true)
+        );
+
+        let set_frame = r#"{"jsonrpc":"2.0","id":4,"method":"session/set_model","params":{"sessionId":"s1","modelId":"cloud-model"}}"#;
+        let rewritten = apply_connection_model(set_frame, " arch-kimi-code-eric ");
+        let v: serde_json::Value = serde_json::from_str(&rewritten).unwrap();
+        assert_eq!(
+            v.pointer("/params/modelId").and_then(|s| s.as_str()),
+            Some("arch-kimi-code-eric")
+        );
+        assert_eq!(
+            v.pointer("/params/sessionId").and_then(|s| s.as_str()),
+            Some("s1")
+        );
+
+        let prompt = r#"{"jsonrpc":"2.0","id":5,"method":"session/prompt","params":{"sessionId":"s1"}}"#;
+        assert_eq!(apply_connection_model(prompt, "arch-kimi-code-eric"), prompt);
+        assert_eq!(apply_connection_model(set_frame, "  "), set_frame);
+        assert_eq!(apply_connection_model(set_frame, ""), set_frame);
+    }
+
+    #[test]
+    fn relay_model_inject_reply_is_recognized() {
+        let id = relay_model_inject_id(3);
+        let frame = session_set_model_line(&id, "s1", "arch-kimi-code-eric");
+        assert!(is_relay_model_inject_frame(&frame));
+        let reply = format!(r#"{{"jsonrpc":"2.0","id":"{id}","result":{{}}}}"#);
+        assert!(is_relay_model_inject_frame(&reply));
+        assert!(!is_relay_model_inject_frame(
+            r#"{"jsonrpc":"2.0","id":5,"result":{}}"#
+        ));
+    }
+
+    #[test]
+    fn session_ids_come_from_load_prompt_and_new_result() {
+        assert_eq!(
+            session_id_from_frame(
+                r#"{"method":"session/load","params":{"sessionId":"s1"}}"#,
+                true
+            )
+            .as_deref(),
+            Some("s1")
+        );
+        assert_eq!(
+            session_id_from_frame(
+                r#"{"method":"session/prompt","params":{"sessionId":"s2"}}"#,
+                true
+            )
+            .as_deref(),
+            Some("s2")
+        );
+        assert_eq!(
+            session_id_from_frame(
+                r#"{"method":"session/new","params":{"_meta":{"sessionId":"018f"}}}"#,
+                true
+            )
+            .as_deref(),
+            Some("018f")
+        );
+        assert_eq!(
+            session_id_from_frame(r#"{"id":2,"result":{"sessionId":"s-new"}}"#, false).as_deref(),
+            Some("s-new")
+        );
+        assert!(session_id_from_frame(
+            r#"{"method":"session/prompt","params":{}}"#,
+            true
+        )
+        .is_none());
     }
 }

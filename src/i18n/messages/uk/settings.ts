@@ -161,6 +161,8 @@ export const ukSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 або http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Ідентифікатор агента, напр. laptop-a",
   "settings.atlasRelayAgentTokenPh": "Токен (необов'язково)",
+  "settings.atlasRelayAgentModel": "Модель",
+  "settings.atlasRelayAgentModelDefault": "Як за замовчуванням",
   "settings.atlasRelayAgentConnect": "Підключити",
   "settings.atlasRelayAgentDisconnect": "Відключити",
   "settings.atlasRelayAgentConnecting": "Підключення…",

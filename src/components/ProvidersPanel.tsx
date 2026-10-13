@@ -401,18 +401,13 @@ export function ProvidersPanel({
     setCcImportBusy(true);
     setCcImportMsg(null);
     try {
-      // Always overwrite same id; never auto-activate route after import.
+      // Merge into ~/.atlas/config.toml. Do not refresh the agent-home list.
       const r = await api.providersCcSwitchImport({
         sourceIds: Array.from(ccSelected),
         onConflict: "overwrite",
         activateId: null,
       });
-      if (r.providers) setList(r.providers);
       const failN = r.failed?.length ?? 0;
-      if (r.imported > 0) {
-        await reload();
-        onProvidersChanged?.();
-      }
       // Success with at least one imported → close dialog (toast-style summary optional).
       if (r.imported > 0 && failN === 0) {
         setCcImportOpen(false);

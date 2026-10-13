@@ -1106,11 +1106,7 @@ fn cli_worktree_db_path_blocking(home: PathBuf) -> CliWorktreeDbPathResult {
     match run_grok_cli_args(&["worktree", "db", "path"], CLI_WORKTREE_DB_TIMEOUT_SECS) {
         Ok((stdout, stderr, ok)) => {
             if looks_like_unsupported_worktree_db(&stderr, &stdout) {
-                return soft_db_path_err(
-                    true,
-                    true,
-                    "CLI worktree DB requires Atlas CLI 0.2.117+",
-                );
+                return soft_db_path_err(true, true, "CLI worktree DB requires Atlas CLI 0.2.117+");
             }
             if let Some(path) = parse_cli_worktree_db_path_stdout(&stdout, &home) {
                 let path_ok = PathBuf::from(&path).exists();

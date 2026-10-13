@@ -193,7 +193,7 @@ export function useAccountQuotaChrome(opts: {
           setLoginHint(msg);
           h.showToast(msg, 6000);
         }
-        if (res.deviceUrl) {
+        if (method !== "device" && res.deviceUrl) {
           try {
             await api.openExternalUrl(res.deviceUrl);
           } catch {
@@ -275,7 +275,7 @@ export function useAccountQuotaChrome(opts: {
         setAccountBusy(false);
       }
     }
-    await runAccountLogin("oauth");
+    await runAccountLogin("device");
   }, [account?.profile?.signedIn, hostRef, refreshSavedAccounts, runAccountLogin]);
 
   const runSwitchAccount = useCallback(

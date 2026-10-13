@@ -162,6 +162,8 @@ export const ruSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 или http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Идентификатор агента, напр. laptop-a",
   "settings.atlasRelayAgentTokenPh": "Токен (необязательно)",
+  "settings.atlasRelayAgentModel": "Модель",
+  "settings.atlasRelayAgentModelDefault": "Как по умолчанию",
   "settings.atlasRelayAgentConnect": "Подключить",
   "settings.atlasRelayAgentDisconnect": "Отключить",
   "settings.atlasRelayAgentConnecting": "Подключение…",

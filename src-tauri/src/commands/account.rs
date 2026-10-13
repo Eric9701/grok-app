@@ -30,7 +30,7 @@ pub async fn account_login(
         .or(settings.manual_cli_path)
         .filter(|s| !s.is_empty());
     let method = method.unwrap_or_else(|| "oauth".into());
-    let result = crate::account::account_login(&method, manual.as_deref()).await;
+    let result = crate::account::account_login(Some(&app), &method, manual.as_deref()).await;
     // Bind agent-home to the current route (official syncs OIDC; custom
     // clears it) then drop warm/prewarm so the next send cannot reuse a CLI
     // spawned with stale OIDC (sessionDisconnect alone only parks).
@@ -54,6 +54,19 @@ pub async fn account_login_cancel() -> Result<(), String> {
 #[tauri::command]
 pub async fn account_login_submit_code(code: String) -> Result<(), String> {
     crate::account::account_login_submit_code(&code).await
+}
+
+/// Approve the running CLI device login on the private atlas-server.
+///
+/// Uses the account email, password, and machine code. The CLI keeps polling
+/// and writes `~/.atlas/auth.json` after the server accepts the code.
+#[tauri::command]
+pub async fn account_login_approve_machine(
+    email: String,
+    password: String,
+    machine_code: String,
+) -> Result<(), String> {
+    crate::account::account_login_approve_machine(&email, &password, &machine_code).await
 }
 
 #[tauri::command]

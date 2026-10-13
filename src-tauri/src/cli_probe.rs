@@ -916,9 +916,7 @@ mod tests {
         // Both platforms should consider the official bin dir.
         assert!(
             (joined.contains(".atlas") || joined.contains(".grok"))
-                && (joined.contains("bin")
-                    || joined.contains("atlas")
-                    || joined.contains("grok")),
+                && (joined.contains("bin") || joined.contains("atlas") || joined.contains("grok")),
             "candidates missing official layout: {c:?}"
         );
     }

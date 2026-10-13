@@ -272,6 +272,36 @@
   font-family: var(--font-mono, ui-monospace, monospace);
 }
 
+.account-machine {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+}
+
+.account-machine,
+.account-machine form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-machine__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-machine__field span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.account-machine__code {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+}
+
 /* Multi-account manager modal */
 .account-mgr__hint {
   margin: 0 0 12px;

@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GrokLogo } from "@/components/GrokLogo";
+import { MachineCodeLoginForm } from "@/components/MachineCodeLoginForm";
 import { Select } from "@/components/Select";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -84,6 +85,7 @@ export function SetupWizard({
   const [copied, setCopied] = useState(false);
   const [accountPanel, setAccountPanel] = useState<AccountPanel>("menu");
   const [accountBusy, setAccountBusy] = useState(false);
+  const [machineLogin, setMachineLogin] = useState(false);
   const [authOk, setAuthOk] = useState(
     () => initialCli.cliAuthPresent,
   );
@@ -380,6 +382,7 @@ export function SetupWizard({
 
   const runOauth = useCallback(async () => {
     setAccountBusy(true);
+    setMachineLogin(true);
     clearError();
     try {
       const ok = await onAccountLoginOauth();
@@ -396,6 +399,7 @@ export function SetupWizard({
     } catch (e) {
       reportError(e);
     } finally {
+      setMachineLogin(false);
       setAccountBusy(false);
     }
   }, [clearError, cli.path, onAccountLoginOauth, recheck, reportError, tr]);
@@ -814,6 +818,8 @@ export function SetupWizard({
                   </div>
                 </div>
               )}
+
+              <MachineCodeLoginForm t={tr} active={accountBusy && machineLogin} />
 
               {accountBusy && (
                 <div className="setup-busy">

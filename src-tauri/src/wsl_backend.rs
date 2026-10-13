@@ -378,8 +378,8 @@ echo "$CLI"
             let version_line = lines
                 .find(|l| {
                     l.to_ascii_lowercase().contains("atlas")
-                || l.to_ascii_lowercase().contains("grok")
-                || extract_version_token(l).is_some()
+                        || l.to_ascii_lowercase().contains("grok")
+                        || extract_version_token(l).is_some()
                 })
                 .map(|s| s.to_string())
                 .or_else(|| {
@@ -484,8 +484,8 @@ fn run_wsl_direct_probe(
         .find(|l| {
             !l.is_empty()
                 && (l.to_ascii_lowercase().contains("atlas")
-                || l.to_ascii_lowercase().contains("grok")
-                || extract_version_token(l).is_some())
+                    || l.to_ascii_lowercase().contains("grok")
+                    || extract_version_token(l).is_some())
         })
         .map(|s| s.to_string());
     let ok = success || version.is_some();

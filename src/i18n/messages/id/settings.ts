@@ -160,6 +160,8 @@ export const idSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 atau http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Identitas agen, mis. laptop-a",
   "settings.atlasRelayAgentTokenPh": "Token (opsional)",
+  "settings.atlasRelayAgentModel": "Model",
+  "settings.atlasRelayAgentModelDefault": "Ikuti bawaan",
   "settings.atlasRelayAgentConnect": "Hubungkan",
   "settings.atlasRelayAgentDisconnect": "Putuskan",
   "settings.atlasRelayAgentConnecting": "Menghubungkan…",

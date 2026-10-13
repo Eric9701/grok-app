@@ -5,6 +5,7 @@
  * workbench transcript.
  */
 import { useCallback, useEffect, useState } from "react";
+import { Select, type SelectOption } from "@/components/Select";
 import * as api from "@/lib/api";
 import type { AtlasRelayAgentLive, AtlasRelayAgentRecord, AtlasRelayAgentStatus } from "@/lib/api";
 import type { Vars } from "@/i18n";
@@ -19,6 +20,8 @@ type Row = {
   url: string;
   agentId: string;
   token: string;
+  /** Catalog id. Empty follows the CLI default. */
+  modelId: string;
   /** Id last saved. Empty until this row is stored. */
   savedId: string;
   /** `duplicate` or a host error string. */
@@ -81,6 +84,7 @@ function rowFromSaved(slot: AtlasRelayAgentRecord): Row {
     url: slot.url?.trim() || "",
     agentId: id,
     token: slot.token?.trim() || "",
+    modelId: slot.modelId?.trim() || "",
     savedId: id,
     rowError: "",
   };
@@ -95,6 +99,7 @@ function blankRow(): Row {
     url: "",
     agentId: "",
     token: "",
+    modelId: "",
     savedId: "",
     rowError: "",
   };
@@ -105,6 +110,7 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
   const [healthSecs, setHealthSecs] = useState("15");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [fleet, setFleet] = useState<AtlasRelayAgentStatus | null>(null);
+  const [catalog, setCatalog] = useState<{ id: string; label: string }[]>([]);
 
   const applySaved = useCallback((agents: AtlasRelayAgentRecord[] | undefined) => {
     const saved = (agents ?? []).map(rowFromSaved).filter((r) => r.savedId);
@@ -142,6 +148,23 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
   useEffect(() => {
     void refreshSettings();
     void refreshStatus();
+    if (api.isTauri()) {
+      void api
+        .modelsListAvailable()
+        .then((result) => {
+          setCatalog(
+            (result.models ?? [])
+              .map((model) => ({
+                id: model.id?.trim() || "",
+                label: model.label?.trim() || model.id?.trim() || "",
+              }))
+              .filter((model) => model.id),
+          );
+        })
+        .catch(() => {
+          /* keep a saved id visible even when the catalog is empty */
+        });
+    }
     const id = window.setInterval(() => void refreshStatus(), 2000);
     return () => window.clearInterval(id);
   }, [refreshSettings, refreshStatus]);
@@ -179,7 +202,12 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
         });
       }
       setFleet(
-        await api.atlasRelayAgentConnect(row.url.trim(), id, row.token.trim()),
+        await api.atlasRelayAgentConnect(
+          row.url.trim(),
+          id,
+          row.token.trim(),
+          row.modelId.trim(),
+        ),
       );
       patch(row.key, { rowError: "", savedId: id, agentId: id });
       await refreshSettings();
@@ -243,6 +271,31 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
     } catch {
       /* keep the draft */
     }
+  };
+
+  const changeModel = (row: Row, modelId: string) => {
+    patch(row.key, { modelId, rowError: "" });
+    const savedId = agentKey(row.savedId);
+    if (!savedId || !api.isTauri()) return;
+    void api.atlasRelayAgentSetModel(savedId, modelId).catch((e) => {
+      patch(row.key, { rowError: String(e) });
+    });
+  };
+
+  const modelOptions = (row: Row): SelectOption[] => {
+    const options: SelectOption[] = [
+      { value: "", label: t("settings.atlasRelayAgentModelDefault") },
+    ];
+    const seen = new Set<string>([""]);
+    for (const model of catalog) {
+      if (seen.has(model.id)) continue;
+      seen.add(model.id);
+      options.push({ value: model.id, label: model.label || model.id });
+    }
+    if (row.modelId && !seen.has(row.modelId)) {
+      options.push({ value: row.modelId, label: row.modelId });
+    }
+    return options;
   };
 
   const atCap = rows.length >= MAX_AGENTS;
@@ -314,6 +367,13 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
                 aria-label={t("settings.atlasRelayAgentTokenPh")}
                 spellCheck={false}
                 autoComplete="off"
+              />
+              <Select
+                value={row.modelId}
+                options={modelOptions(row)}
+                onChange={(modelId) => changeModel(row, modelId)}
+                aria-label={t("settings.atlasRelayAgentModel")}
+                disabled={!!busyKey}
               />
               {duplicate ? (
                 <div className="settings-row__desc" role="status">

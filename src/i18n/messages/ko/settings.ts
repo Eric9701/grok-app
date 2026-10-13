@@ -163,6 +163,8 @@ export const koSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 또는 http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Agent 식별자, 예: laptop-a",
   "settings.atlasRelayAgentTokenPh": "토큰(선택)",
+  "settings.atlasRelayAgentModel": "모델",
+  "settings.atlasRelayAgentModelDefault": "기본값 따르기",
   "settings.atlasRelayAgentConnect": "연결",
   "settings.atlasRelayAgentDisconnect": "연결 끊기",
   "settings.atlasRelayAgentConnecting": "연결 중…",

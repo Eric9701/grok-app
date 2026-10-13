@@ -183,6 +183,8 @@ export const enSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 or http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Agent identity, e.g. laptop-a",
   "settings.atlasRelayAgentTokenPh": "Token (optional)",
+  "settings.atlasRelayAgentModel": "Model",
+  "settings.atlasRelayAgentModelDefault": "Follow default",
   "settings.atlasRelayAgentConnect": "Connect",
   "settings.atlasRelayAgentDisconnect": "Disconnect",
   "settings.atlasRelayAgentConnecting": "Connecting…",

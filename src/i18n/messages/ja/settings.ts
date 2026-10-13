@@ -160,6 +160,8 @@ export const jaSettings = {
   "settings.atlasRelayAgentUrlPh": "ws://10.0.0.8:2420 または http://10.0.0.8:2420/build",
   "settings.atlasRelayAgentIdPh": "Agent 識別子（例: laptop-a）",
   "settings.atlasRelayAgentTokenPh": "トークン（任意）",
+  "settings.atlasRelayAgentModel": "モデル",
+  "settings.atlasRelayAgentModelDefault": "デフォルトに従う",
   "settings.atlasRelayAgentConnect": "接続",
   "settings.atlasRelayAgentDisconnect": "切断",
   "settings.atlasRelayAgentConnecting": "接続中…",

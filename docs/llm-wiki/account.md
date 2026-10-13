@@ -93,7 +93,8 @@ Never tell the user that official OAuth alone fixes a bad custom relay key.
 | Command | Role |
 |---------|------|
 | `account_status` | Profile (redacted) + channel + billing snapshot + local heatmap + call logs |
-| `account_login` | Spawn `grok login --oauth` or `--device-auth` |
+| `account_login` | Spawn `atlas login --device-auth`（账户页机器码）或 `--oauth` |
+| `account_login_approve_machine` | 用邮箱、密码和账户机器码，向私有 atlas-server 批准当前 CLI `user_code`。CLI 继续轮询并写入 `~/.atlas/auth.json` |
 | `account_logout` | Spawn `grok logout` (fallback: remove auth.json) |
 | `account_open_usage` | Open `https://grok.com/?_s=usage` |
 | `account_open_subscribe` | Open SuperGrok / subscription manage URL |
@@ -107,6 +108,10 @@ Never tell the user that official OAuth alone fixes a bad custom relay key.
 - Switch copies snapshot → `~/.grok/auth.json` + agent-home, then disconnects live ACP.
 - UI: the sidebar **user menu** lists saved official accounts (honest remaining %, click → `account_switch`). Clicking the active row still opens **Settings → Account**. Custom-provider / signed-out cards stay unchanged. Settings → Account keeps the full switcher / remove / rename UI.
   **「添加账号」** saves the current profile (if signed in) then starts OAuth login.
+
+### 私有机器码登录
+
+账户页主路径不再打开浏览器。Host 启动 `atlas login --device-auth`，并把子进程的 `GROK_HOME` 设成 CLI 实际家目录：已有 `~/.atlas` 用它，否则已有 `~/.grok` 用它，都没有就用 `~/.atlas`。CLI 把验证地址和 `user_code` 打在 **stderr**（单独一行 `XXXX-XXXX`，完整地址里也会带 `user_code=`）。Host 从 stdout 和 stderr 解析后，通过 `account://device-code` 交给界面。用户在应用里填写邮箱、密码和账户页机器码后，Host 先 `POST /api/auth/login` 取得 `atlas_session`，再向 `{CLI 镜像去掉 /cli}/oauth2/device` 提交 `user_code`、`machine_code`、`action=approve`。机器码必须与该登录用户在 atlas-server 上登记的一致。批准后 CLI 把凭证写入 `GROK_HOME/auth.json`。Host 读登录状态时同时看 `~/.atlas/auth.json` 和 `~/.grok/auth.json`。设备码等待上限 15 分钟（`GROK_APP_LOGIN_TIMEOUT_SECS` 仍可缩短测试）。不要把密码、机器码或 session 写入日志。
 
 ### Login failures (Access denied)
 
