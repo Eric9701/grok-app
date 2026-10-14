@@ -312,6 +312,40 @@ export interface AtlasRelayTask {
   atMs: number;
   /** Relay agent that received this prompt. */
   agentId?: string;
+  /** Working directory from the cloud task. Empty when unknown. */
+  cwd?: string;
+  /** App project when the directory matched or created one. */
+  projectId?: string;
+  projectName?: string;
+  projectPath?: string;
+}
+
+/** One folded row of a relay task run. */
+export interface AtlasRelayTraceStep {
+  /** thought | message | tool */
+  kind: string;
+  text: string;
+  toolCallId?: string | null;
+  toolName?: string | null;
+  title?: string | null;
+  status?: string | null;
+}
+
+/** Folded run for one cloud prompt. `found` is false when the id is gone. */
+export interface AtlasRelayTaskTrace {
+  found: boolean;
+  id: string;
+  agentId: string;
+  text: string;
+  status: string;
+  error?: string | null;
+  steps: AtlasRelayTraceStep[];
+  /** CLI agent session id. Empty when the task is gone. */
+  sessionId?: string;
+  /** App project id when the task hangs under a project. */
+  projectId?: string;
+  /** Finished, and no running task still uses this session. */
+  openSession?: boolean;
 }
 
 /** One running relay bridge. */
@@ -336,6 +370,14 @@ export interface AtlasRelayAgentStatus {
 
 export async function atlasRelayAgentStatus() {
   return invoke<AtlasRelayAgentStatus>("atlas_relay_agent_status");
+}
+
+/** Folded agent run for one relay task. Does not open a desktop session. */
+export async function atlasRelayTaskTrace(agentId: string, taskId: string) {
+  return invoke<AtlasRelayTaskTrace>("atlas_relay_task_trace", {
+    agentId,
+    taskId,
+  });
 }
 
 export async function atlasRelayAgentConnect(

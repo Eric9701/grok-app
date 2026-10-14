@@ -231,14 +231,11 @@ export function AccountPanel({
   onCancelLogin,
   onLogout,
   onRefresh,
-  onManageUsage,
-  onSubscribe,
   onOpenSettings,
   onSaveAccount,
   onAddAccount,
   onSwitchAccount,
   onRemoveAccount,
-  onImportChat,
   onImported,
   onOpenSession,
 }: AccountPanelProps) {
@@ -876,44 +873,7 @@ export function AccountPanel({
           </div>
         ) : null}
 
-        {/* Row 3: text links */}
-        {signedIn ? (
-          <div className="account-hero__links">
-            <button
-              type="button"
-              className="account-link"
-              onClick={onManageUsage}
-            >
-              {labels.manageUsage}
-            </button>
-            <button
-              type="button"
-              className="account-link"
-              onClick={onSubscribe}
-            >
-              {labels.subscribe}
-            </button>
-            {onImportChat ? (
-              <button
-                type="button"
-                className="account-link"
-                disabled={busy}
-                onClick={onImportChat}
-              >
-                {labels.importChatBtn}
-              </button>
-            ) : null}
-            {compact && onOpenSettings ? (
-              <button
-                type="button"
-                className="account-link"
-                onClick={onOpenSettings}
-              >
-                {t("settings.nav.account")}
-              </button>
-            ) : null}
-          </div>
-        ) : compact && onOpenSettings ? (
+        {compact && onOpenSettings ? (
           <div className="account-hero__links">
             <button
               type="button"

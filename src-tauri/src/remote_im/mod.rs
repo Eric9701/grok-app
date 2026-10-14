@@ -39,6 +39,16 @@ pub fn set_app_handle(app: AppHandle) {
     app_sessions::set_app_handle(app);
 }
 
+/// Tell the shell a project row was added outside the sidebar.
+pub fn emit_projects_changed() {
+    app_sessions::emit_projects_changed();
+}
+
+/// Tell the shell a session row was added outside the sidebar.
+pub fn emit_session_index_changed(session_id: &str) {
+    app_sessions::emit_session_index_changed(session_id);
+}
+
 /// Keep Remote IM scope bindings on the same App chat after a sidebar move.
 pub fn retarget_bindings_for_app_session(
     session_id: &str,

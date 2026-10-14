@@ -18,6 +18,7 @@ import {
   subscribeFinishedTurns,
 } from "@/lib/sessionFinishedTurns";
 import { useAtlasRelayStatus } from "@/hooks/useAtlasRelayStatus";
+import { RelayTaskTracePanel } from "@/components/RelayTaskTracePanel";
 import {
   buildAgentKanban,
   countAgentKanbanCards,
@@ -60,11 +61,13 @@ function AgentKanbanCardView({
   card,
   t,
   locale,
+  selected,
   onSelect,
 }: {
   card: AgentKanbanCard;
   t: TFn;
   locale: Locale;
+  selected?: boolean;
   onSelect?: (card: AgentKanbanCard) => void;
 }) {
   const isRelay = card.source === "relay";
@@ -81,7 +84,7 @@ function AgentKanbanCardView({
     <li
       className={
         "agent-kanban__card" +
-        (card.isCurrent ? " is-current" : "") +
+        (card.isCurrent || selected ? " is-current" : "") +
         (card.kanbanColumn === "needs_you" ? " is-needs" : "") +
         (card.kanbanColumn === "done" ? " is-done" : "")
       }
@@ -90,7 +93,7 @@ function AgentKanbanCardView({
         type="button"
         className="agent-kanban__card-btn"
         onClick={() => onSelect?.(card)}
-        title={isRelay ? t("kanban.openRelay") : t("dashboard.openSession")}
+        title={isRelay ? t("kanban.openTrace") : t("dashboard.openSession")}
       >
         <span className="agent-kanban__card-title" title={card.title}>
           {card.title}
@@ -178,6 +181,11 @@ export function KanbanBoardPage({
 
   const relayStatus = useAtlasRelayStatus();
   const relayTasks = relayStatus?.tasks ?? [];
+  const [relayTrace, setRelayTrace] = useState<{
+    agentId: string;
+    taskId: string;
+    title: string;
+  } | null>(null);
   const board = useMemo(
     () =>
       mergeRelayTasksIntoKanban(
@@ -229,11 +237,22 @@ export function KanbanBoardPage({
 
   const onOpenCard = (card: AgentKanbanCard) => {
     if (card.source === "relay" && card.relayTaskId) {
-      window.location.hash = "#/atlas-cloud";
+      setRelayTrace({
+        agentId: card.relayAgentId ?? "",
+        taskId: card.relayTaskId,
+        title: card.title,
+      });
       return;
     }
     onSelectSession?.(card.sessionId);
   };
+  const relayTraceKey = relayTrace
+    ? `${relayTrace.agentId}:${relayTrace.taskId}`
+    : "";
+  const cardSelected = (card: AgentKanbanCard) =>
+    card.source === "relay" &&
+    !!card.relayTaskId &&
+    `${card.relayAgentId ?? ""}:${card.relayTaskId}` === relayTraceKey;
 
   return (
     <div className="auto-page agent-kanban-page">
@@ -273,6 +292,7 @@ export function KanbanBoardPage({
         </div>
       </div>
 
+      <div className="agent-kanban-page__split">
       <div className="agent-kanban-page__body">
         <div className="agent-kanban__toolbar">
           <input
@@ -377,6 +397,7 @@ export function KanbanBoardPage({
                         card={card}
                         t={tFn}
                         locale={locale}
+                        selected={cardSelected(card)}
                         onSelect={onOpenCard}
                       />
                     ))}
@@ -421,6 +442,7 @@ export function KanbanBoardPage({
                           card={card}
                           t={tFn}
                           locale={locale}
+                          selected={cardSelected(card)}
                           onSelect={onOpenCard}
                         />
                       ))}
@@ -431,6 +453,19 @@ export function KanbanBoardPage({
             })}
           </div>
         )}
+      </div>
+      {relayTrace ? (
+        <RelayTaskTracePanel
+          locale={locale}
+          tr={tr}
+          agentId={relayTrace.agentId}
+          taskId={relayTrace.taskId}
+          title={relayTrace.title}
+          tasks={relayTasks}
+          onOpenSession={onSelectSession}
+          onClose={() => setRelayTrace(null)}
+        />
+      ) : null}
       </div>
     </div>
   );

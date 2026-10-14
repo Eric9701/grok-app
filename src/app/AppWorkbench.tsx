@@ -4197,6 +4197,12 @@ export function AppWorkbench() {
       }),
     );
     void track(
+      api.listen("projects://changed", () => {
+        if (cancelled) return;
+        void refreshProjects();
+      }),
+    );
+    void track(
       api.listen<{
         title?: string;
         error?: string;

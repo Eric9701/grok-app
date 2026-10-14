@@ -9,6 +9,7 @@ import { Select, type SelectOption } from "@/components/Select";
 import * as api from "@/lib/api";
 import type { AtlasRelayAgentLive, AtlasRelayAgentRecord, AtlasRelayAgentStatus } from "@/lib/api";
 import type { Vars } from "@/i18n";
+import { parseAtlasRelayImport, splitRelayAddress } from "@/lib/atlasRelayImport";
 
 type Props = {
   t: (k: string, vars?: Vars) => string;
@@ -51,32 +52,6 @@ function isLive(phase: string | undefined): boolean {
   return phase === "connecting" || phase === "online" || phase === "reconnecting";
 }
 
-/** Pull `token` / `agent_id` out of a pasted relay address. */
-function splitRelayPaste(raw: string): {
-  url: string;
-  token?: string;
-  agentId?: string;
-} | null {
-  if (!raw.includes("token=") && !raw.includes("agent_id=")) return null;
-  try {
-    const trimmed = raw.trim();
-    const withScheme = trimmed.includes("://") ? trimmed : `ws://${trimmed}`;
-    const parsed = new URL(withScheme);
-    const token = parsed.searchParams.get("token")?.trim() || "";
-    const agentId = parsed.searchParams.get("agent_id")?.trim() || "";
-    if (!token && !agentId) return null;
-    parsed.searchParams.delete("token");
-    parsed.searchParams.delete("agent_id");
-    return {
-      url: parsed.toString(),
-      token: token || undefined,
-      agentId: agentId || undefined,
-    };
-  } catch {
-    return null;
-  }
-}
-
 function rowFromSaved(slot: AtlasRelayAgentRecord): Row {
   const id = slot.id?.trim() || "";
   return {
@@ -111,6 +86,8 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [fleet, setFleet] = useState<AtlasRelayAgentStatus | null>(null);
   const [catalog, setCatalog] = useState<{ id: string; label: string }[]>([]);
+  const [importText, setImportText] = useState("");
+  const [importInvalid, setImportInvalid] = useState(false);
 
   const applySaved = useCallback((agents: AtlasRelayAgentRecord[] | undefined) => {
     const saved = (agents ?? []).map(rowFromSaved).filter((r) => r.savedId);
@@ -299,6 +276,37 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
   };
 
   const atCap = rows.length >= MAX_AGENTS;
+  const blankDraft = [...rows]
+    .reverse()
+    .find((row) => !row.savedId && !row.url.trim() && !agentKey(row.agentId) && !row.token.trim());
+  const canImport = !busyKey && (!atCap || !!blankDraft);
+
+  const applyImport = () => {
+    const parsed = parseAtlasRelayImport(importText);
+    if (!parsed) {
+      setImportInvalid(true);
+      return;
+    }
+    const duplicate = rows.some(
+      (row) => row.key !== blankDraft?.key && agentKey(row.agentId) === agentKey(parsed.agentId),
+    );
+    setImportInvalid(false);
+    setImportText("");
+    setRows((prev) => {
+      const fill = (row: Row): Row => ({
+        ...row,
+        url: parsed.url,
+        agentId: parsed.agentId,
+        token: parsed.token,
+        rowError: duplicate ? "duplicate" : "",
+      });
+      if (blankDraft && prev.some((row) => row.key === blankDraft.key)) {
+        return prev.map((row) => (row.key === blankDraft.key ? fill(row) : row));
+      }
+      if (prev.length >= MAX_AGENTS) return prev;
+      return [...prev, fill(blankRow())];
+    });
+  };
 
   return (
     <div
@@ -327,7 +335,7 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
                 disabled={locked}
                 onChange={(e) => {
                   const next = e.target.value;
-                  const split = splitRelayPaste(next);
+                  const split = splitRelayAddress(next);
                   if (!split) {
                     patch(row.key, { url: next, rowError: "" });
                     return;
@@ -431,6 +439,35 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
             </div>
           );
         })}
+        <div className="settings-acp-field settings-acp-field--stack">
+          <textarea
+            className={"settings-input" + (importInvalid ? " is-invalid" : "")}
+            rows={3}
+            value={importText}
+            placeholder={t("settings.atlasRelayAgentImportPh")}
+            disabled={!canImport}
+            spellCheck={false}
+            autoComplete="off"
+            aria-label={t("settings.atlasRelayAgentImport")}
+            onChange={(e) => {
+              setImportText(e.target.value);
+              if (importInvalid) setImportInvalid(false);
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={!canImport || !importText.trim()}
+            onClick={applyImport}
+          >
+            {t("settings.atlasRelayAgentImportAction")}
+          </button>
+          {importInvalid ? (
+            <div className="settings-row__desc" role="status">
+              {t("settings.atlasRelayAgentImportInvalid")}
+            </div>
+          ) : null}
+        </div>
         <button
           type="button"
           className="btn btn--ghost"

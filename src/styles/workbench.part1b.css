@@ -290,13 +290,144 @@
   align-items: center;
 }
 
+.agent-kanban-page__split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
 .agent-kanban-page__body {
   display: flex;
   flex-direction: column;
   gap: 10px;
   flex: 1;
   min-height: 0;
+  min-width: 0;
   padding: 0 24px 20px;
+}
+
+.relay-trace {
+  display: flex;
+  flex-direction: column;
+  width: min(380px, 42vw);
+  flex: 0 0 min(380px, 42vw);
+  min-height: 0;
+  margin: 0 24px 20px 0;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+  background: var(--bg-elevated, var(--bg-primary, #1c1c1c));
+  overflow: hidden;
+}
+
+.relay-trace__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.14));
+  flex-shrink: 0;
+}
+
+.relay-trace__heading {
+  min-width: 0;
+}
+
+.relay-trace__kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.relay-trace__title {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relay-trace__status {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.relay-trace__error {
+  margin: 0;
+  padding: 8px 12px 0;
+  font-size: 12px;
+  color: var(--danger, #c45c5c);
+}
+
+.relay-trace__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.relay-trace__empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.relay-trace__message,
+.relay-trace__thought {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.relay-trace__thought summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.relay-trace__tool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+  background: var(--bg-hover, rgba(127, 127, 127, 0.05));
+}
+
+.relay-trace__tool-label {
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.relay-trace__tool-status,
+.relay-trace__tool-extra {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.relay-trace__foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.14));
 }
 
 .agent-kanban__title-row {

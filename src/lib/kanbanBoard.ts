@@ -51,6 +51,8 @@ export type AgentKanbanCard = TaskBoardCard & {
   source: AgentKanbanCardSource;
   /** JSON-RPC id when `source` is `relay`. */
   relayTaskId?: string;
+  /** Relay agent that recorded this prompt. */
+  relayAgentId?: string;
 };
 
 export type AgentKanbanBoard = Record<AgentKanbanColumnId, AgentKanbanCard[]>;
@@ -212,6 +214,9 @@ export type RelayKanbanTask = {
   error?: string | null;
   atMs: number;
   agentId?: string;
+  cwd?: string;
+  projectName?: string;
+  projectPath?: string;
 };
 
 /**
@@ -236,6 +241,13 @@ export function relayTaskToKanbanCard(
   const title = task.text.trim() || labels.untitled;
   const error = task.error?.trim() || "";
   const agentId = task.agentId?.trim() || "";
+  const projectPath = task.projectPath?.trim() || "";
+  const named = task.projectName?.trim() || "";
+  const projectName = projectPath
+    ? named || labels.projectName
+    : agentId
+      ? `${labels.projectName} · ${agentId}`
+      : labels.projectName;
   const column: TaskBoardColumn =
     kanbanColumn === "working"
       ? "running"
@@ -245,8 +257,8 @@ export function relayTaskToKanbanCard(
   return {
     sessionId: agentId ? `relay:${agentId}:${id}` : `relay:${id}`,
     title,
-    projectName: agentId ? `${labels.projectName} · ${agentId}` : labels.projectName,
-    projectPath: null,
+    projectName,
+    projectPath: projectPath || null,
     status: kanbanColumn === "working" ? "busy" : kanbanColumn === "needs_you" ? "error" : "idle",
     column,
     liveToolTitle: error || null,
@@ -256,6 +268,7 @@ export function relayTaskToKanbanCard(
     kanbanColumn,
     source: "relay",
     relayTaskId: id,
+    relayAgentId: agentId || undefined,
   };
 }
 

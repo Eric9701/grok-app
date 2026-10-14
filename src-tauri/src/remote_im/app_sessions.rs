@@ -19,6 +19,23 @@ pub fn try_app_handle() -> Option<AppHandle> {
     APP_HANDLE.get().cloned()
 }
 
+/// Sidebar should reload projects after a relay task created one.
+pub fn emit_projects_changed() {
+    if let Some(app) = APP_HANDLE.get() {
+        let _ = app.emit("projects://changed", serde_json::json!({}));
+    }
+}
+
+/// Sidebar should reload after a relay task is imported as an App session.
+pub fn emit_session_index_changed(session_id: &str) {
+    if let Some(app) = APP_HANDLE.get() {
+        let _ = app.emit(
+            "session://index_changed",
+            serde_json::json!({ "sessionId": session_id, "source": "atlas_relay" }),
+        );
+    }
+}
+
 fn emit_index_changed(session_id: &str) {
     if let Some(app) = APP_HANDLE.get() {
         let _ = app.emit(

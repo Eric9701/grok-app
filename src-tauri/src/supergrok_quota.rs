@@ -79,6 +79,7 @@ pub fn default_unused_quota_snapshot() -> AccountQuotaSnapshot {
     AccountQuotaSnapshot::from_used(0.0, None, None, Vec::new(), "empty")
 }
 
+#[allow(dead_code)]
 pub async fn fetch_quota_snapshot(access_token: &str) -> Result<AccountQuotaSnapshot, String> {
     let client = crate::proxy::apply_to_reqwest(reqwest::Client::builder())
         .timeout(SUPERGROK_TIMEOUT)
@@ -140,6 +141,7 @@ pub async fn fetch_quota_snapshot(access_token: &str) -> Result<AccountQuotaSnap
 }
 
 /// Fallback: JSON billing used by Atlas CLI extension.
+#[allow(dead_code)]
 pub async fn fetch_quota_via_cli_proxy(access_token: &str) -> Result<AccountQuotaSnapshot, String> {
     let client = crate::proxy::apply_to_reqwest(reqwest::Client::builder())
         .timeout(SUPERGROK_TIMEOUT)
@@ -230,23 +232,27 @@ pub async fn fetch_quota_via_cli_proxy(access_token: &str) -> Result<AccountQuot
 }
 
 /// Prefer gRPC-web (same as grok-go), fall back to CLI chat proxy JSON.
-pub async fn fetch_quota_best_effort(access_token: &str) -> AccountQuotaSnapshot {
-    match fetch_quota_snapshot(access_token).await {
-        Ok(s) => s,
-        Err(grpc_err) => {
-            tracing::warn!(target: "quota", error = %grpc_err, "gRPC SuperGrok quota failed; trying cli-proxy");
-            match fetch_quota_via_cli_proxy(access_token).await {
-                Ok(s) => s,
-                Err(json_err) => {
-                    tracing::warn!(target: "quota", error = %json_err, "cli-proxy quota failed");
-                    let mut s = default_unused_quota_snapshot();
-                    s.last_error = Some(format!("{grpc_err}; fallback: {json_err}"));
-                    s.source = "error".into();
-                    s
-                }
-            }
-        }
-    }
+/// Network probes are disabled so Atlas sessions do not hit official quota endpoints.
+pub async fn fetch_quota_best_effort(_access_token: &str) -> AccountQuotaSnapshot {
+    // match fetch_quota_snapshot(access_token).await {
+    //     Ok(s) => s,
+    //     Err(grpc_err) => {
+    //         tracing::warn!(target: "quota", error = %grpc_err, "gRPC SuperGrok quota failed; trying cli-proxy");
+    //         match fetch_quota_via_cli_proxy(access_token).await {
+    //             Ok(s) => s,
+    //             Err(json_err) => {
+    //                 tracing::warn!(target: "quota", error = %json_err, "cli-proxy quota failed");
+    //                 let mut s = default_unused_quota_snapshot();
+    //                 s.last_error = Some(format!("{grpc_err}; fallback: {json_err}"));
+    //                 s.source = "error".into();
+    //                 s
+    //             }
+    //         }
+    //     }
+    // }
+    let mut snap = default_unused_quota_snapshot();
+    snap.source = "error".into();
+    snap
 }
 
 fn header_str(headers: &reqwest::header::HeaderMap, name: &str) -> Option<String> {

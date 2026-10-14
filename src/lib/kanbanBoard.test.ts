@@ -391,9 +391,36 @@ describe("relay tasks on the agent kanban", () => {
     expect(card).toMatchObject({
       sessionId: "relay:box-a:9",
       projectName: "Atlas Cloud · box-a",
+      projectPath: null,
       relayTaskId: "9",
+      relayAgentId: "box-a",
       source: "relay",
     });
+  });
+
+  it("groups a task under its project path", () => {
+    const card = relayTaskToKanbanCard(
+      {
+        id: "9",
+        text: "look",
+        status: "done",
+        atMs: 1,
+        agentId: "box-a",
+        projectName: "grok-app",
+        projectPath: "E:/GitHub/grok-app",
+      },
+      labels,
+    );
+    expect(card).toMatchObject({
+      projectName: "grok-app",
+      projectPath: "E:/GitHub/grok-app",
+      source: "relay",
+    });
+    const board = createEmptyAgentKanbanBoard();
+    board.done.push(card!);
+    const groups = groupAgentKanbanByProject(board);
+    expect(groups.map((g) => g.name)).toEqual(["grok-app"]);
+    expect(groups[0]!.path).toBe("E:/GitHub/grok-app");
   });
 });
 

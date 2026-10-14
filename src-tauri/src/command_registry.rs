@@ -59,6 +59,7 @@ pub fn app_invoke_handler(
         commands::acp_test_connection,
         commands::acp_server_probe,
         atlas_relay_agent::atlas_relay_agent_status,
+        atlas_relay_agent::atlas_relay_task_trace,
         atlas_relay_agent::atlas_relay_agent_connect,
         atlas_relay_agent::atlas_relay_agent_disconnect,
         atlas_relay_agent::atlas_relay_agent_set_model,

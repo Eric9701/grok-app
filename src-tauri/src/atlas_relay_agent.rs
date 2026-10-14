@@ -6,7 +6,7 @@
 //! The desktop session client is not involved.
 
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -23,6 +23,8 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_BACKOFF_SECS: u64 = 15;
 const MAX_TASKS: usize = 40;
 const MAX_TASK_TEXT: usize = 240;
+const MAX_TRACE_STEPS: usize = 200;
+const MAX_STEP_TEXT: usize = 4_000;
 const DEFAULT_HEALTH_SECS: u64 = 15;
 const MIN_HEALTH_SECS: u64 = 5;
 const MAX_HEALTH_SECS: u64 = 300;
@@ -46,6 +48,58 @@ pub struct AtlasRelayTask {
     /// Which relay agent recorded this prompt.
     #[serde(default)]
     pub agent_id: String,
+    /// Working directory from `session/new` or this prompt. Empty when unknown.
+    #[serde(default)]
+    pub cwd: String,
+    /// App project id when `cwd` matched or created a project.
+    #[serde(default)]
+    pub project_id: String,
+    #[serde(default)]
+    pub project_name: String,
+    #[serde(default)]
+    pub project_path: String,
+    /// Folded `session/update` rows. Omitted from the fleet status snapshot.
+    #[serde(skip)]
+    pub steps: Vec<AtlasRelayTraceStep>,
+}
+
+/// One folded row of a relay task's agent run.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AtlasRelayTraceStep {
+    /// `thought` | `message` | `tool`
+    pub kind: String,
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+}
+
+/// One task's run, including folded steps. `found` is false when the id is gone.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AtlasRelayTaskTrace {
+    pub found: bool,
+    pub id: String,
+    pub agent_id: String,
+    pub text: String,
+    pub status: String,
+    pub error: Option<String>,
+    pub steps: Vec<AtlasRelayTraceStep>,
+    /// CLI agent session id for this prompt.
+    #[serde(default)]
+    pub session_id: String,
+    /// App project id when the task is hanging under a project.
+    #[serde(default)]
+    pub project_id: String,
+    /// True when this task has finished and no running task shares its session.
+    #[serde(default)]
+    pub open_session: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -83,6 +137,10 @@ struct Slot {
     model_id: String,
     /// Sessions this process has seen. Cleared when the CLI is replaced.
     sessions: HashSet<String>,
+    /// `session/new` or `session/load` RPC id → cwd, until the result arrives.
+    pending_cwd: HashMap<String, String>,
+    /// Agent session id → cwd. Cleared with `sessions` when the CLI is replaced.
+    session_cwd: HashMap<String, String>,
     /// Local `session/set_model` lines. `None` until the bridge is in the read loop.
     inject_tx: Option<mpsc::UnboundedSender<String>>,
     tasks: Vec<AtlasRelayTask>,
@@ -269,6 +327,156 @@ fn rpc_id(v: &serde_json::Value) -> Option<String> {
     }
 }
 
+fn cwd_text(raw: &str) -> String {
+    raw.trim().to_string()
+}
+
+/// `params.cwd`, otherwise `params._meta.cwd`.
+fn params_cwd(params: &serde_json::Value) -> String {
+    let direct = params.get("cwd").and_then(|v| v.as_str()).unwrap_or("");
+    if !direct.trim().is_empty() {
+        return cwd_text(direct);
+    }
+    let meta = params
+        .pointer("/_meta/cwd")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    cwd_text(meta)
+}
+
+/// Remember cwd from `session/new` / `session/load` until the result names a session.
+/// Returns `(sessionId, cwd)` when an outbound result binds a pending directory.
+fn note_cwd_frame(
+    pending: &mut HashMap<String, String>,
+    by_session: &mut HashMap<String, String>,
+    frame: &str,
+    inbound: bool,
+) -> Option<(String, String)> {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(frame) else {
+        return None;
+    };
+    if !inbound {
+        let Some(id) = rpc_id(&v) else {
+            return None;
+        };
+        let Some(session_id) = v
+            .pointer("/result/sessionId")
+            .and_then(|s| s.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        else {
+            return None;
+        };
+        if let Some(cwd) = pending.remove(&id) {
+            by_session.insert(session_id.to_string(), cwd.clone());
+            return Some((session_id.to_string(), cwd));
+        }
+        return None;
+    }
+    let method = v.get("method").and_then(|m| m.as_str()).unwrap_or("");
+    if method != "session/new" && method != "session/load" {
+        return None;
+    }
+    let Some(id) = rpc_id(&v) else {
+        return None;
+    };
+    let cwd = params_cwd(v.get("params").unwrap_or(&serde_json::Value::Null));
+    if !cwd.is_empty() {
+        pending.insert(id, cwd);
+    }
+    None
+}
+
+/// Prompt cwd, or the directory remembered for its session.
+fn prompt_cwd(frame: &str, by_session: &HashMap<String, String>) -> String {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(frame) else {
+        return String::new();
+    };
+    if v.get("method").and_then(|m| m.as_str()) != Some("session/prompt") {
+        return String::new();
+    }
+    let params = v.get("params").cloned().unwrap_or(serde_json::Value::Null);
+    let direct = params_cwd(&params);
+    if !direct.is_empty() {
+        return direct;
+    }
+    let sid = params
+        .get("sessionId")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .trim();
+    by_session.get(sid).cloned().unwrap_or_default()
+}
+
+fn normalize_cwd_key(path: &str) -> String {
+    path.trim()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_string()
+}
+
+fn cwd_paths_match(a: &str, b: &str) -> bool {
+    normalize_cwd_key(a).eq_ignore_ascii_case(&normalize_cwd_key(b))
+}
+
+/// Absolute cwd that is a directory. A missing path is created.
+/// Relative paths and paths that already exist as files are left alone.
+fn ensure_absolute_dir(cwd: &str) -> bool {
+    let cwd = cwd.trim();
+    if cwd.is_empty() {
+        return false;
+    }
+    let path = Path::new(cwd);
+    if !path.is_absolute() {
+        return false;
+    }
+    if path.is_dir() {
+        return true;
+    }
+    if path.exists() {
+        return false;
+    }
+    std::fs::create_dir_all(path).is_ok() && path.is_dir()
+}
+
+struct ResolvedRelayProject {
+    id: String,
+    name: String,
+    path: String,
+}
+
+/// Match an absolute existing directory to a project, or add an untrusted one.
+fn resolve_relay_project(cwd: &str) -> Option<ResolvedRelayProject> {
+    if !ensure_absolute_dir(cwd) {
+        return None;
+    }
+    let cwd = cwd.trim();
+    let projects = crate::store::load_projects();
+    if let Some(hit) = projects.iter().find(|p| cwd_paths_match(&p.path, cwd)) {
+        return Some(ResolvedRelayProject {
+            id: hit.id.clone(),
+            name: hit.name.clone(),
+            path: hit.path.clone(),
+        });
+    }
+    let created_project = crate::store::add_project(cwd.to_string(), false).ok()?;
+    let created = !projects.iter().any(|old| old.id == created_project.id);
+    if created {
+        crate::remote_im::emit_projects_changed();
+    }
+    Some(ResolvedRelayProject {
+        id: created_project.id,
+        name: created_project.name,
+        path: created_project.path,
+    })
+}
+
+fn clear_cli_memory(slot: &mut Slot) {
+    slot.sessions.clear();
+    slot.pending_cwd.clear();
+    slot.session_cwd.clear();
+}
+
 fn prompt_text(params: &serde_json::Value) -> String {
     let Some(blocks) = params.get("prompt").and_then(|p| p.as_array()) else {
         return String::new();
@@ -289,6 +497,217 @@ fn push_task(tasks: &mut Vec<AtlasRelayTask>, task: AtlasRelayTask) {
     tasks.insert(0, task);
     if tasks.len() > MAX_TASKS {
         tasks.truncate(MAX_TASKS);
+    }
+}
+
+fn append_chars(buf: &mut String, extra: &str, max_chars: usize) {
+    let used = buf.chars().count();
+    if used >= max_chars {
+        return;
+    }
+    buf.extend(extra.chars().take(max_chars - used));
+}
+
+fn one_line(raw: &str) -> String {
+    let line = raw
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("")
+        .trim();
+    clip_text(line)
+}
+
+fn content_to_text(content: &serde_json::Value) -> String {
+    if let Some(text) = content.as_str() {
+        return text.to_string();
+    }
+    if let Some(text) = content.get("text").and_then(|t| t.as_str()) {
+        return text.to_string();
+    }
+    let Some(blocks) = content.as_array() else {
+        return String::new();
+    };
+    let mut out = String::new();
+    for block in blocks {
+        if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
+            out.push_str(text);
+        } else if let Some(text) = block.as_str() {
+            out.push_str(text);
+        }
+    }
+    out
+}
+
+fn chunk_text(update: &serde_json::Value) -> String {
+    update
+        .get("content")
+        .map(content_to_text)
+        .unwrap_or_default()
+}
+
+fn trimmed_field(update: &serde_json::Value, key: &str) -> Option<String> {
+    let text = update
+        .get(key)
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    if text.is_empty() {
+        None
+    } else {
+        Some(text.to_string())
+    }
+}
+
+fn tool_call_id(update: &serde_json::Value) -> String {
+    update
+        .get("toolCallId")
+        .or_else(|| update.get("tool_call_id"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+fn tool_name(update: &serde_json::Value) -> Option<String> {
+    let from_meta = update
+        .pointer("/_meta/x.ai/tool/name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    if !from_meta.is_empty() {
+        return Some(from_meta.to_string());
+    }
+    trimmed_field(update, "toolName")
+        .or_else(|| trimmed_field(update, "name"))
+        .or_else(|| trimmed_field(update, "kind"))
+}
+
+fn tool_summary(update: &serde_json::Value) -> Option<String> {
+    if let Some(title) = trimmed_field(update, "title") {
+        let line = one_line(&title);
+        if !line.is_empty() {
+            return Some(line);
+        }
+    }
+    let content = one_line(&chunk_text(update));
+    if !content.is_empty() {
+        return Some(content);
+    }
+    let message = update
+        .pointer("/rawOutput/message")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let line = one_line(message);
+    if line.is_empty() {
+        None
+    } else {
+        Some(line)
+    }
+}
+
+fn append_text_step(task: &mut AtlasRelayTask, kind: &str, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    if let Some(last) = task.steps.last_mut() {
+        if last.kind == kind && last.tool_call_id.is_none() {
+            append_chars(&mut last.text, text, MAX_STEP_TEXT);
+            return;
+        }
+    }
+    if text.trim().is_empty() || task.steps.len() >= MAX_TRACE_STEPS {
+        return;
+    }
+    let mut body = String::new();
+    append_chars(&mut body, text, MAX_STEP_TEXT);
+    task.steps.push(AtlasRelayTraceStep {
+        kind: kind.to_string(),
+        text: body,
+        tool_call_id: None,
+        tool_name: None,
+        title: None,
+        status: None,
+    });
+}
+
+fn apply_tool_step(task: &mut AtlasRelayTask, update: &serde_json::Value, is_update: bool) {
+    let id = tool_call_id(update);
+    let name = tool_name(update);
+    let title = trimmed_field(update, "title");
+    let status = trimmed_field(update, "status");
+    let summary = tool_summary(update);
+    if is_update && !id.is_empty() {
+        if let Some(step) =
+            task.steps.iter_mut().rev().find(|step| {
+                step.kind == "tool" && step.tool_call_id.as_deref() == Some(id.as_str())
+            })
+        {
+            if let Some(status) = status.clone() {
+                step.status = Some(status);
+            }
+            if let Some(summary) = summary.clone() {
+                step.text = summary;
+            }
+            if let Some(title) = title.clone() {
+                step.title = Some(title);
+            }
+            if step.tool_name.is_none() {
+                step.tool_name = name.clone();
+            }
+            return;
+        }
+    }
+    if is_update && id.is_empty() {
+        return;
+    }
+    if task.steps.len() >= MAX_TRACE_STEPS {
+        return;
+    }
+    task.steps.push(AtlasRelayTraceStep {
+        kind: "tool".into(),
+        text: summary.clone().unwrap_or_default(),
+        tool_call_id: if id.is_empty() { None } else { Some(id) },
+        tool_name: name,
+        title: title.or(summary),
+        status,
+    });
+}
+
+/// Append CLI `session/update` rows onto the newest running task for that session.
+fn note_session_update(tasks: &mut [AtlasRelayTask], frame: &serde_json::Value) {
+    let session_id = frame
+        .pointer("/params/sessionId")
+        .or_else(|| frame.pointer("/params/update/sessionId"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if session_id.is_empty() {
+        return;
+    }
+    let Some(update) = frame
+        .pointer("/params/update")
+        .or_else(|| frame.get("update"))
+    else {
+        return;
+    };
+    let kind = update
+        .get("sessionUpdate")
+        .or_else(|| update.get("session_update"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+    let Some(task) = tasks
+        .iter_mut()
+        .find(|task| task.status == "running" && task.session_id == session_id)
+    else {
+        return;
+    };
+    match kind {
+        "agent_thought_chunk" => append_text_step(task, "thought", &chunk_text(update)),
+        "agent_message_chunk" => append_text_step(task, "message", &chunk_text(update)),
+        "tool_call" => apply_tool_step(task, update, false),
+        "tool_call_update" => apply_tool_step(task, update, true),
+        _ => {}
     }
 }
 
@@ -334,6 +753,11 @@ pub fn note_relay_frame(tasks: &mut Vec<AtlasRelayTask>, frame: &str, inbound: b
                     error: None,
                     at_ms,
                     agent_id: String::new(),
+                    cwd: String::new(),
+                    project_id: String::new(),
+                    project_name: String::new(),
+                    project_path: String::new(),
+                    steps: Vec::new(),
                 },
             );
             return;
@@ -356,6 +780,11 @@ pub fn note_relay_frame(tasks: &mut Vec<AtlasRelayTask>, frame: &str, inbound: b
         }
         return;
     }
+    let method = v.get("method").and_then(|m| m.as_str()).unwrap_or("");
+    if method == "session/update" {
+        note_session_update(tasks, &v);
+        return;
+    }
     let Some(id) = rpc_id(&v) else { return };
     if v.get("error").is_some() {
         let message = v
@@ -371,20 +800,172 @@ pub fn note_relay_frame(tasks: &mut Vec<AtlasRelayTask>, frame: &str, inbound: b
     }
 }
 
-fn observe_frame(agent_id: &str, frame: &str, inbound: bool) {
-    let at = unix_ms();
+fn write_task_project(agent_id: &str, task_id: &str, cwd: &str, project: &ResolvedRelayProject) {
     with_hub(|h| {
         let Some(slot) = h.slots.get_mut(agent_id) else {
             return;
         };
-        let before = slot.tasks.len();
-        note_relay_frame(&mut slot.tasks, frame, inbound, at);
-        if slot.tasks.len() > before {
-            if let Some(task) = slot.tasks.first_mut() {
-                task.agent_id = agent_id.to_string();
+        if let Some(task) = slot.tasks.iter_mut().find(|task| task.id == task_id) {
+            if task.cwd.is_empty() {
+                task.cwd = cwd.to_string();
             }
+            task.project_id = project.id.clone();
+            task.project_name = project.name.clone();
+            task.project_path = project.path.clone();
         }
     });
+}
+
+fn assign_project_to_task(agent_id: &str, task_id: &str, cwd: &str) {
+    let Some(project) = resolve_relay_project(cwd) else {
+        return;
+    };
+    write_task_project(agent_id, task_id, cwd, &project);
+}
+
+fn cwd_from_agent_session(session_id: &str, mode: &str) -> Option<String> {
+    let dir = crate::paths::find_agent_session_dir(session_id, None, mode)?;
+    let text = std::fs::read_to_string(dir.join("summary.json")).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    let cwd = value
+        .pointer("/info/cwd")
+        .and_then(|item| item.as_str())
+        .unwrap_or("")
+        .trim();
+    if cwd.is_empty() {
+        None
+    } else {
+        Some(cwd.to_string())
+    }
+}
+
+/// Fill a finished task's project from its cwd or the CLI session summary.
+fn backfill_task_project(agent_id: &str, task_id: &str, session_id: &str, mode: &str) -> String {
+    let known = with_hub(|h| {
+        h.slots.get(agent_id).and_then(|slot| {
+            slot.tasks
+                .iter()
+                .find(|task| task.id == task_id)
+                .map(|task| (task.project_id.clone(), task.cwd.clone()))
+        })
+    });
+    let (project_id, cwd) = known.unwrap_or_default();
+    if !project_id.is_empty() {
+        return project_id;
+    }
+    let cwd = if cwd.is_empty() {
+        cwd_from_agent_session(session_id, mode).unwrap_or_default()
+    } else {
+        cwd
+    };
+    let Some(project) = resolve_relay_project(&cwd) else {
+        return String::new();
+    };
+    write_task_project(agent_id, task_id, &cwd, &project);
+    project.id
+}
+
+/// Copy the finished CLI session into the project. Does not open or connect it.
+fn schedule_finished_session_import(agent_id: String, task_id: String, session_id: String) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if with_hub(|h| session_has_running(h, &session_id)) {
+            return;
+        }
+        let imported = tauri::async_runtime::spawn_blocking(move || {
+            let mode = crate::store::load_settings().session_data_mode;
+            let project_id = backfill_task_project(&agent_id, &task_id, &session_id, &mode);
+            let project = if project_id.is_empty() {
+                None
+            } else {
+                Some(project_id)
+            };
+            crate::cli_sessions::import_cli_session(&session_id, None, project, &mode)
+        })
+        .await;
+        if let Ok(Ok(meta)) = imported {
+            crate::remote_im::emit_session_index_changed(&meta.id);
+        }
+    });
+}
+
+fn observe_frame(agent_id: &str, frame: &str, inbound: bool) {
+    let at = unix_ms();
+    let (assign, finished) = with_hub(|h| {
+        let Some(slot) = h.slots.get_mut(agent_id) else {
+            return (Vec::new(), None);
+        };
+        let bound = note_cwd_frame(&mut slot.pending_cwd, &mut slot.session_cwd, frame, inbound);
+        let mut assign = Vec::new();
+        if let Some((session_id, cwd)) = bound {
+            for task in slot.tasks.iter_mut() {
+                if task.status == "running" && task.session_id == session_id && task.cwd.is_empty()
+                {
+                    task.cwd = cwd.clone();
+                    assign.push((task.id.clone(), cwd.clone()));
+                }
+            }
+        }
+        let prior = if inbound {
+            None
+        } else {
+            serde_json::from_str::<serde_json::Value>(frame)
+                .ok()
+                .and_then(|value| {
+                    let id = rpc_id(&value)?;
+                    let status = slot
+                        .tasks
+                        .iter()
+                        .find(|task| task.id == id)
+                        .map(|task| task.status.clone())?;
+                    Some((id, status))
+                })
+        };
+        let before_len = slot.tasks.len();
+        note_relay_frame(&mut slot.tasks, frame, inbound, at);
+        if slot.tasks.len() > before_len {
+            let cwd = prompt_cwd(frame, &slot.session_cwd);
+            if let Some(task) = slot.tasks.first() {
+                let task_id = task.id.clone();
+                let session_id = task.session_id.clone();
+                if !cwd.is_empty() && !session_id.is_empty() {
+                    slot.session_cwd.insert(session_id, cwd.clone());
+                }
+                if let Some(task) = slot.tasks.first_mut() {
+                    if task.id == task_id {
+                        task.agent_id = agent_id.to_string();
+                        task.cwd = cwd.clone();
+                    }
+                }
+                if !cwd.is_empty() {
+                    assign.push((task_id, cwd));
+                }
+            }
+        }
+        let finished = prior.and_then(|(id, status)| {
+            if status != "running" {
+                return None;
+            }
+            let task = slot.tasks.iter().find(|task| task.id == id)?;
+            if task.status != "done" && task.status != "failed" {
+                return None;
+            }
+            let session_id = task.session_id.clone();
+            if session_id.is_empty() {
+                return None;
+            }
+            Some((task.id.clone(), session_id))
+        });
+        (assign, finished)
+    });
+    let finished =
+        finished.filter(|(_, session_id)| !with_hub(|h| session_has_running(h, session_id)));
+    for (task_id, cwd) in assign {
+        assign_project_to_task(agent_id, &task_id, &cwd);
+    }
+    if let Some((task_id, session_id)) = finished {
+        schedule_finished_session_import(agent_id.to_string(), task_id, session_id);
+    }
 }
 
 /// Trim, drop CR/LF, cap at 128 characters.
@@ -714,6 +1295,8 @@ pub fn start(raw_url: &str, agent_id: &str, token: &str, model_id: &str) -> Resu
             url: String::new(),
             model_id: String::new(),
             sessions: HashSet::new(),
+            pending_cwd: HashMap::new(),
+            session_cwd: HashMap::new(),
             inject_tx: None,
             tasks: Vec::new(),
             cancel: Arc::new(Notify::new()),
@@ -726,7 +1309,7 @@ pub fn start(raw_url: &str, agent_id: &str, token: &str, model_id: &str) -> Resu
         slot.agent_id = id.clone();
         slot.url = ws_url.clone();
         slot.model_id = model_id.clone();
-        slot.sessions.clear();
+        clear_cli_memory(slot);
         slot.inject_tx = None;
         slot.cancel.notify_waiters();
         Ok((gen, old_pid, slot.cancel.clone()))
@@ -1081,7 +1664,7 @@ async fn bridge(
         if let Some(slot) = h.slots.get_mut(agent_id) {
             if slot.gen == gen {
                 slot.inject_tx = Some(inject_tx);
-                slot.sessions.clear();
+                clear_cli_memory(slot);
             }
         }
     });
@@ -1182,7 +1765,7 @@ async fn bridge(
         if let Some(slot) = h.slots.get_mut(agent_id) {
             if slot.gen == gen {
                 slot.inject_tx = None;
-                slot.sessions.clear();
+                clear_cli_memory(slot);
             }
         }
     });
@@ -1210,6 +1793,82 @@ async fn write_line(stdin: &mut tokio::process::ChildStdin, body: &str) -> std::
 #[tauri::command]
 pub fn atlas_relay_agent_status() -> AtlasRelayFleetStatus {
     status()
+}
+
+fn empty_task_trace(agent_id: String, task_id: String) -> AtlasRelayTaskTrace {
+    AtlasRelayTaskTrace {
+        found: false,
+        id: task_id,
+        agent_id,
+        text: String::new(),
+        status: String::new(),
+        error: None,
+        steps: Vec::new(),
+        session_id: String::new(),
+        project_id: String::new(),
+        open_session: false,
+    }
+}
+
+fn session_has_running(hub: &Hub, session_id: &str) -> bool {
+    if session_id.is_empty() {
+        return false;
+    }
+    hub.slots.values().any(|slot| {
+        slot.tasks
+            .iter()
+            .any(|task| task.status == "running" && task.session_id == session_id)
+    })
+}
+
+/// Folded run for one cloud prompt. Missing ids return an empty trace.
+#[tauri::command]
+pub fn atlas_relay_task_trace(agent_id: String, task_id: String) -> AtlasRelayTaskTrace {
+    let agent_id = sanitize_agent_id(&agent_id);
+    let task_id = task_id.trim().to_string();
+    if agent_id.is_empty() || task_id.is_empty() {
+        return empty_task_trace(agent_id, task_id);
+    }
+    with_hub(|h| {
+        let snap = {
+            let Some(slot) = h.slots.get(&agent_id) else {
+                return empty_task_trace(agent_id.clone(), task_id.clone());
+            };
+            let Some(task) = slot.tasks.iter().find(|task| task.id == task_id) else {
+                return empty_task_trace(agent_id.clone(), task_id.clone());
+            };
+            (
+                task.id.clone(),
+                if task.agent_id.is_empty() {
+                    agent_id.clone()
+                } else {
+                    task.agent_id.clone()
+                },
+                task.text.clone(),
+                task.status.clone(),
+                task.error.clone(),
+                task.steps.clone(),
+                task.session_id.clone(),
+                task.project_id.clone(),
+            )
+        };
+        let (id, traced_agent, text, status, error, steps, session_id, project_id) = snap;
+        let open_session = (status == "done" || status == "failed")
+            && !session_id.is_empty()
+            && !session_has_running(h, &session_id);
+        AtlasRelayTaskTrace {
+            found: true,
+            id,
+            agent_id: traced_agent,
+            text,
+            status,
+            error,
+            steps,
+            session_id,
+            project_id,
+            open_session,
+        }
+    })
 }
 
 /// Persist this agent, mark it auto-connect, and open only its bridge.
@@ -1475,6 +2134,119 @@ mod tests {
     }
 
     #[test]
+    fn session_update_folds_into_the_running_task() {
+        let mut tasks = Vec::new();
+        note_relay_frame(
+            &mut tasks,
+            r#"{"jsonrpc":"2.0","id":5,"method":"session/prompt","params":{"sessionId":"s1","prompt":[{"type":"text","text":"look"}]}}"#,
+            true,
+            1,
+        );
+        note_relay_frame(
+            &mut tasks,
+            r#"{"method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"agent_thought_chunk","content":{"type":"text","text":"Think"}}}}"#,
+            false,
+            2,
+        );
+        note_relay_frame(
+            &mut tasks,
+            r#"{"method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"agent_thought_chunk","content":{"type":"text","text":"ing"}}}}"#,
+            false,
+            3,
+        );
+        note_relay_frame(
+            &mut tasks,
+            r#"{"method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Hello "}}}}"#,
+            false,
+            4,
+        );
+        note_relay_frame(
+            &mut tasks,
+            r#"{"method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"world."}}}}"#,
+            false,
+            5,
+        );
+        note_relay_frame(
+            &mut tasks,
+            r#"{"method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call","toolCallId":"tc-1","title":"read","kind":"read","status":"pending"}}}"#,
+            false,
+            6,
+        );
+        note_relay_frame(
+            &mut tasks,
+            r#"{"method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"tool_call_update","toolCallId":"tc-1","title":"read notes.md","status":"completed"}}}"#,
+            false,
+            7,
+        );
+        assert_eq!(tasks[0].steps.len(), 3);
+        assert_eq!(tasks[0].steps[0].kind, "thought");
+        assert_eq!(tasks[0].steps[0].text, "Thinking");
+        assert_eq!(tasks[0].steps[1].kind, "message");
+        assert_eq!(tasks[0].steps[1].text, "Hello world.");
+        assert_eq!(tasks[0].steps[2].kind, "tool");
+        assert_eq!(tasks[0].steps[2].tool_call_id.as_deref(), Some("tc-1"));
+        assert_eq!(tasks[0].steps[2].status.as_deref(), Some("completed"));
+        assert_eq!(tasks[0].steps[2].text, "read notes.md");
+        let snap = serde_json::to_value(&tasks[0]).unwrap();
+        assert!(snap.get("steps").is_none());
+        assert_eq!(snap.get("text").and_then(|v| v.as_str()), Some("look"));
+
+        note_relay_frame(
+            &mut tasks,
+            r#"{"jsonrpc":"2.0","id":5,"result":{"stopReason":"end_turn"}}"#,
+            false,
+            8,
+        );
+        note_relay_frame(
+            &mut tasks,
+            r#"{"method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"late"}}}}"#,
+            false,
+            9,
+        );
+        assert_eq!(tasks[0].status, "done");
+        assert_eq!(tasks[0].steps[1].text, "Hello world.");
+
+        note_relay_frame(
+            &mut tasks,
+            r#"{"jsonrpc":"2.0","id":6,"method":"session/prompt","params":{"sessionId":"s1","prompt":[{"type":"text","text":"next"}]}}"#,
+            true,
+            10,
+        );
+        note_relay_frame(
+            &mut tasks,
+            r#"{"jsonrpc":"2.0","id":7,"method":"session/prompt","params":{"sessionId":"s2","prompt":[{"type":"text","text":"other"}]}}"#,
+            true,
+            11,
+        );
+        note_relay_frame(
+            &mut tasks,
+            r#"{"method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"only-s1"}}}}"#,
+            false,
+            12,
+        );
+        let s1 = tasks.iter().find(|t| t.id == "6").unwrap();
+        let s2 = tasks.iter().find(|t| t.id == "7").unwrap();
+        let done = tasks.iter().find(|t| t.id == "5").unwrap();
+        assert_eq!(s1.steps.len(), 1);
+        assert_eq!(s1.steps[0].text, "only-s1");
+        assert!(s2.steps.is_empty());
+        assert_eq!(done.steps[1].text, "Hello world.");
+
+        let long = "a".repeat(MAX_STEP_TEXT + 40);
+        let frame = format!(
+            r#"{{"method":"session/update","params":{{"sessionId":"s2","update":{{"sessionUpdate":"agent_message_chunk","content":{{"type":"text","text":"{long}"}}}}}}}}"#
+        );
+        note_relay_frame(&mut tasks, &frame, false, 13);
+        assert_eq!(
+            tasks.iter().find(|t| t.id == "7").unwrap().steps[0]
+                .text
+                .chars()
+                .count(),
+            MAX_STEP_TEXT
+        );
+    }
+
+    #[test]
     fn legacy_relay_target_becomes_the_first_agent() {
         let mut settings = crate::store::AppSettings::default();
         settings.atlas_relay_agent_url = Some("ws://10.218.221.203:2420".into());
@@ -1537,7 +2309,8 @@ mod tests {
             Some("arch-kimi-code-eric")
         );
         assert_eq!(
-            v.pointer("/params/_meta/yoloMode").and_then(|b| b.as_bool()),
+            v.pointer("/params/_meta/yoloMode")
+                .and_then(|b| b.as_bool()),
             Some(true)
         );
 
@@ -1553,8 +2326,12 @@ mod tests {
             Some("s1")
         );
 
-        let prompt = r#"{"jsonrpc":"2.0","id":5,"method":"session/prompt","params":{"sessionId":"s1"}}"#;
-        assert_eq!(apply_connection_model(prompt, "arch-kimi-code-eric"), prompt);
+        let prompt =
+            r#"{"jsonrpc":"2.0","id":5,"method":"session/prompt","params":{"sessionId":"s1"}}"#;
+        assert_eq!(
+            apply_connection_model(prompt, "arch-kimi-code-eric"),
+            prompt
+        );
         assert_eq!(apply_connection_model(set_frame, "  "), set_frame);
         assert_eq!(apply_connection_model(set_frame, ""), set_frame);
     }
@@ -1601,10 +2378,97 @@ mod tests {
             session_id_from_frame(r#"{"id":2,"result":{"sessionId":"s-new"}}"#, false).as_deref(),
             Some("s-new")
         );
-        assert!(session_id_from_frame(
-            r#"{"method":"session/prompt","params":{}}"#,
-            true
-        )
-        .is_none());
+        assert!(
+            session_id_from_frame(r#"{"method":"session/prompt","params":{}}"#, true).is_none()
+        );
+    }
+
+    #[test]
+    fn prompt_inherits_cwd_from_session_new_unless_it_sends_its_own() {
+        let mut pending = std::collections::HashMap::new();
+        let mut by_session = std::collections::HashMap::new();
+        note_cwd_frame(
+            &mut pending,
+            &mut by_session,
+            r#"{"jsonrpc":"2.0","id":1,"method":"session/new","params":{"cwd":"C:/work/app"}}"#,
+            true,
+        );
+        assert!(by_session.is_empty());
+        note_cwd_frame(
+            &mut pending,
+            &mut by_session,
+            r#"{"jsonrpc":"2.0","id":1,"result":{"sessionId":"s1"}}"#,
+            false,
+        );
+        let prompt = r#"{"jsonrpc":"2.0","id":5,"method":"session/prompt","params":{"sessionId":"s1","prompt":[{"type":"text","text":"look"}]}}"#;
+        assert_eq!(prompt_cwd(prompt, &by_session), "C:/work/app");
+
+        let own = r#"{"jsonrpc":"2.0","id":6,"method":"session/prompt","params":{"sessionId":"s1","cwd":"D:/other","prompt":[{"type":"text","text":"look"}]}}"#;
+        assert_eq!(prompt_cwd(own, &by_session), "D:/other");
+
+        let meta = r#"{"jsonrpc":"2.0","id":7,"method":"session/prompt","params":{"sessionId":"s1","_meta":{"cwd":"E:/meta"},"prompt":[{"type":"text","text":"look"}]}}"#;
+        assert_eq!(prompt_cwd(meta, &by_session), "E:/meta");
+    }
+
+    #[test]
+    fn relative_cwd_does_not_resolve_a_project() {
+        assert!(resolve_relay_project(".").is_none());
+        assert!(resolve_relay_project("foo").is_none());
+        assert!(resolve_relay_project("").is_none());
+        assert!(cwd_paths_match(r"C:\Work\App\", "c:/work/app"));
+        assert!(!cwd_paths_match(r"C:\Work\App", r"C:\Work\Other"));
+    }
+
+    #[test]
+    fn existing_directory_matches_once_and_is_not_added_twice() {
+        struct Restore(Option<String>, std::path::PathBuf);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                match self.0.take() {
+                    Some(v) => std::env::set_var("GROK_APP_HOME", v),
+                    None => std::env::remove_var("GROK_APP_HOME"),
+                }
+                let _ = std::fs::remove_dir_all(&self.1);
+            }
+        }
+        let _home_lock = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let n = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("grok-app-relay-cwd-{n}"));
+        std::fs::create_dir_all(&home).unwrap();
+        let prev = std::env::var("GROK_APP_HOME").ok();
+        std::env::set_var("GROK_APP_HOME", &home);
+        let _restore = Restore(prev, home.clone());
+        let project_dir = home.join("repo");
+        std::fs::create_dir_all(&project_dir).unwrap();
+        let stored = project_dir.display().to_string();
+        let first = resolve_relay_project(&stored).expect("create");
+        assert!(!first.id.is_empty());
+        let alt = normalize_cwd_key(&stored);
+        let second = resolve_relay_project(&alt).expect("match");
+        assert_eq!(second.id, first.id);
+        assert_eq!(second.path, first.path);
+        let listed = crate::store::load_projects()
+            .into_iter()
+            .filter(|p| cwd_paths_match(&p.path, &stored))
+            .count();
+        assert_eq!(listed, 1);
+
+        let missing = home.join("atlas-work-3");
+        assert!(!missing.exists());
+        let missing_path = missing.display().to_string();
+        let created = resolve_relay_project(&missing_path).expect("mkdir");
+        assert!(missing.is_dir());
+        let again = resolve_relay_project(&normalize_cwd_key(&missing_path)).expect("match");
+        assert_eq!(again.id, created.id);
+        let listed_missing = crate::store::load_projects()
+            .into_iter()
+            .filter(|p| cwd_paths_match(&p.path, &missing_path))
+            .count();
+        assert_eq!(listed_missing, 1);
     }
 }
