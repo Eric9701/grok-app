@@ -717,6 +717,7 @@ impl SessionManager {
                 policy,
                 provider_retry_attempt: 0,
                 provider_retry_aborted: false,
+                last_provider_retry: None,
                 needs_history_bootstrap: false,
                 pending_plan_rpc_id: None,
                 pending_permission_rpc_id: None,
@@ -904,6 +905,16 @@ impl SessionManager {
                                         ));
                                         *pw = PrewarmState::Ready(p);
                                         None
+                                    } else if prewarm_predates_session(
+                                        p.created_wall,
+                                        meta.created_at,
+                                    ) {
+                                        // Launch prewarm scanned skills before
+                                        // this chat existed. Drop it so the
+                                        // cold spawn reads the disk now (#1328).
+                                        stale_prewarm.push(p.acp.clone());
+                                        rejected.push("prewarm: started before this chat".into());
+                                        None
                                     } else if p.acp.route_provider_id() == route
                                         && gate(
                                             p.acp.is_alive(),
@@ -992,23 +1003,14 @@ impl SessionManager {
                     reused_process = %reused_process,
                     "connect prewarm reuse (ownerless process, no cross-session sharing)"
                 );
-                // #528: warm reuse skips cold spawn (no prepare_route_auth).
-                // Shared-mode official uses ~/.grok and must not copy OIDC into
-                // agent-home. Independent mode still prepares like a cold spawn
-                // (no conflict skip — skipping can leave the official chat
-                // signed out at session/load).
-                let process_custom = acp.is_custom_route();
-                let mode = store::load_settings().session_data_mode;
-                if crate::providers::warm_reuse_should_prepare_auth(&mode, process_custom) {
-                    let _route_auth = crate::providers::route_auth_lock().lock().await;
-                    crate::providers::prepare_route_auth_for_agent();
-                } else {
-                    tracing::info!(
-                        target: "session",
-                        session = %meta.id,
-                        "connect warm-reuse skipped agent-home auth rewrite (shared official uses ~/.grok)"
-                    );
-                }
+                // #1293: the process GROK_HOME was sealed at spawn. Rewriting the
+                // shared agent-home auth.json here would race the other chat
+                // and does not change what this process reads.
+                tracing::info!(
+                    target: "session",
+                    session = %meta.id,
+                    "connect warm-reuse kept the process agent home"
+                );
                 // P0: bind the live shell to the reused process *before*
                 // session/load. Load replays stream/tool notifications while
                 // open awaits; if live still held a temporary process_id,
@@ -1036,10 +1038,12 @@ impl SessionManager {
                     }
                 }
                 let cwd_str = cwd.to_string_lossy().to_string();
-                let open_result = Self::with_handshake_budget(acp.open_session_at(
+                let open_result = Self::with_handshake_budget(acp.open_session_for(
                     resume_agent_sid.as_deref(),
                     false,
                     &cwd_str,
+                    // The prewarm stored no chat id. This open is the chat.
+                    Some(meta.id.as_str()),
                 ))
                 .await;
                 match open_result {
@@ -1087,13 +1091,15 @@ impl SessionManager {
                             &session_model,
                             disk_session_model_id(&meta.id).as_deref(),
                         );
-                        if let Err(e) = Self::with_soft_rpc_budget(
-                            acp_align.set_model_for(&agent_sid, &session_model),
+                        apply_connected_model(
+                            self,
+                            &acp_align,
+                            &agent_sid,
+                            &session_model,
+                            resumed,
+                            journal_has_history,
                         )
-                        .await
-                        {
-                            tracing::warn!("acp set_model after warm reuse soft-fail: {e}");
-                        }
+                        .await;
                         if let Err(e) = Self::with_soft_rpc_budget(
                             acp_align.set_mode_for(&agent_sid, &prefs.mode),
                         )
@@ -1293,6 +1299,7 @@ impl SessionManager {
             empty_mcp_servers: false,
             ssh_alias: ssh_alias.clone(),
             folder_trust,
+            app_session_id: Some(meta.id.clone()),
         };
 
         let cwd_str = cwd.to_string_lossy().to_string();
@@ -1549,7 +1556,7 @@ impl SessionManager {
                         let _ = s.fsm.handshake_ok();
                         s.acp = Some(client.clone());
                         s.process_id = process_id.clone();
-                        s.meta.agent_session_id = Some(agent_sid);
+                        s.meta.agent_session_id = Some(agent_sid.clone());
                         s.meta.fork_agent_session = false;
                         s.meta.fork_rewind_prompt_index = None;
                         s.meta.model_id = Some(prefs.model_id.clone());
@@ -1594,9 +1601,15 @@ impl SessionManager {
                     &session_model,
                     disk_session_model_id(&meta.id).as_deref(),
                 );
-                if let Err(e) = Self::with_soft_rpc_budget(client.set_model(&session_model)).await {
-                    tracing::warn!("acp set_model after session open soft-fail: {e}");
-                }
+                apply_connected_model(
+                    self,
+                    &client,
+                    &agent_sid,
+                    &session_model,
+                    resumed,
+                    journal_has_history,
+                )
+                .await;
                 emit_host_exit_heal(&app, &meta.id);
                 Ok(self.snapshot())
             }
@@ -1719,6 +1732,7 @@ impl SessionManager {
             policy: p.policy,
             provider_retry_attempt: 0,
             provider_retry_aborted: false,
+            last_provider_retry: None,
             needs_history_bootstrap: p.needs_history_bootstrap,
             pending_plan_rpc_id: None,
             pending_permission_rpc_id: None,
@@ -1875,6 +1889,7 @@ impl SessionManager {
             extra_rules: crate::official_aux::merge_extra_rules(None),
             ..Default::default()
         };
+        let scanned_at = chrono::Utc::now();
         let (client, mut events) = match AcpClient::spawn_with_options(cli_path, cwd, spawn_opts)
             .await
         {
@@ -1916,6 +1931,7 @@ impl SessionManager {
                     sandbox_profile: Some(effective_sandbox),
                     model_id: Some(prefs.model_id),
                     created_at: Instant::now(),
+                    created_wall: scanned_at,
                     backend: "grok_agent_stdio".into(),
                 });
                 true
@@ -2060,6 +2076,7 @@ impl SessionManager {
             AcpEvent::Stderr { .. } => "stderr",
             AcpEvent::HookActivity { .. } => "hook_activity",
             AcpEvent::GoalUpdated { .. } => "goal_updated",
+            AcpEvent::Subagent(_) => "subagent",
         }
     }
 
@@ -2151,6 +2168,62 @@ pub(crate) fn connect_set_model_argument(
         return raw.to_string();
     }
     crate::providers::session_set_model_id_for(route, raw)
+}
+
+/// `session/set_model` after open. A window chosen on the new-chat composer
+/// rides along on the first empty session. A resumed chat keeps its own window.
+async fn apply_connected_model(
+    mgr: &SessionManager,
+    client: &AcpClient,
+    agent_sid: &str,
+    session_model: &str,
+    resumed: bool,
+    journal_has_history: bool,
+) {
+    let staged = if !resumed && !journal_has_history {
+        (*mgr.pending_context_window.lock()).or_else(|| {
+            crate::models_catalog::list_available_models()
+                .models
+                .iter()
+                .find(|model| model.id == session_model)
+                .and_then(crate::models_catalog::app_default_context_window)
+        })
+    } else {
+        None
+    };
+    if let Some(window) = staged {
+        let supported = crate::models_catalog::list_available_models()
+            .models
+            .iter()
+            .any(|model| {
+                model.id == session_model
+                    && crate::models_catalog::model_supports_context_window(model, window)
+            });
+        if supported {
+            match SessionManager::with_soft_rpc_budget(client.set_context_window_for(
+                agent_sid,
+                session_model,
+                window,
+            ))
+            .await
+            {
+                Ok(()) => {
+                    *mgr.pending_context_window.lock() = None;
+                    return;
+                }
+                Err(e) => {
+                    tracing::warn!("acp set_context_window after session open soft-fail: {e}");
+                }
+            }
+        } else {
+            *mgr.pending_context_window.lock() = None;
+        }
+    }
+    if let Err(e) =
+        SessionManager::with_soft_rpc_budget(client.set_model_for(agent_sid, session_model)).await
+    {
+        tracing::warn!("acp set_model after session open soft-fail: {e}");
+    }
 }
 
 fn disk_session_model_id(session_id: &str) -> Option<String> {
@@ -2408,6 +2481,7 @@ mod connect_preserve_tests {
             policy: PermissionPolicy::default(),
             provider_retry_attempt: 0,
             provider_retry_aborted: false,
+            last_provider_retry: None,
             needs_history_bootstrap: false,
             pending_plan_rpc_id: None,
             pending_permission_rpc_id: None,
@@ -2508,6 +2582,7 @@ mod connect_preserve_tests {
             policy: PermissionPolicy::default(),
             provider_retry_attempt: 0,
             provider_retry_aborted: false,
+            last_provider_retry: None,
             needs_history_bootstrap: false,
             pending_plan_rpc_id: None,
             pending_permission_rpc_id: None,

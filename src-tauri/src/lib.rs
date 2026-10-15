@@ -29,6 +29,8 @@ mod agent_memory_embed;
 
 mod agent_prefs;
 
+mod agent_proc_home;
+
 mod agent_privacy;
 
 mod agent_subagent_wt_snap;
@@ -66,6 +68,10 @@ mod cli_update;
 mod cli_worktrees;
 
 mod customize_commands;
+
+/// Prompts the Host injected into a chat (wakes / external sends): remembered so
+/// the transcript can show them as automatic follow-ups, not user messages.
+mod injected_prompts;
 
 mod wsl_backend;
 
@@ -156,6 +162,10 @@ mod providers;
 mod proxy;
 
 mod relay_stream_proxy;
+
+mod pr_monitor;
+
+mod pr_monitor_i18n;
 
 mod pty_host;
 
@@ -531,6 +541,9 @@ pub fn run() {
         })
 
         .setup(|app| {
+            // Plugin setup already exited any second process. Sweep only here,
+            // so a relaunch cannot delete the running chats' agent-proc homes.
+            agent_proc_home::sweep_orphans();
 
             crate::path_scope::refresh_from_store();
 
@@ -926,6 +939,11 @@ pub fn run() {
                 } else {
                     automation_runner::start(app.handle().clone(), mgr);
                 }
+
+                // PR monitors: poll mounted PRs while the process lives (tray
+                // included) and emit `pr-monitor://update` on real changes.
+                // Mounts are UI-driven and not persisted.
+                pr_monitor::start(app.handle().clone());
             }
 
             // LaunchAgent / helper / oneshot: open into tray so schedules fire without focus steal.

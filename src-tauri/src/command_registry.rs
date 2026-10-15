@@ -5,7 +5,7 @@
 
 use crate::{
     atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub, leader, mirror,
-    os_theme, pet_window, remote_im, serve, session_api, ssh_remote, system_fonts,
+    os_theme, pet_window, pr_monitor, remote_im, serve, session_api, ssh_remote, system_fonts,
     theme_editor_window, tray, updater, voice_host, wallpaper_grok_album,
     wallpaper_remote_commands,
 };
@@ -29,6 +29,7 @@ pub fn app_invoke_handler(
         session_api::session_api_reveal_cli_link,
         commands::session_interject,
         commands::session_stop,
+        commands::session_stop_report,
         commands::session_disconnect,
         commands::session_reattach,
         commands::session_resolve_permission,
@@ -172,6 +173,8 @@ pub fn app_invoke_handler(
         commands::codebase_indexing_set,
         // ── Session model, rewind & fork ──
         commands::session_set_model,
+        commands::session_set_context_window,
+        commands::session_context_info,
         commands::session_rewind_drop_last_user,
         commands::session_rewind_points,
         commands::session_rewind_execute,
@@ -303,6 +306,9 @@ pub fn app_invoke_handler(
         git_pr_hub::git_pr_view,
         git_pr_hub::git_pr_checks,
         git_pr_hub::git_pr_comments,
+        pr_monitor::pr_monitor_watch,
+        pr_monitor::pr_monitor_unwatch,
+        pr_monitor::pr_monitor_state,
         cli_worktrees::cli_worktrees_list,
         cli_worktrees::cli_worktree_db_path,
         cli_worktrees::cli_worktree_db_stats,

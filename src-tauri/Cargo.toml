@@ -1,6 +1,6 @@
 [package]
 name = "grok-app"
-version = "0.2.38"
+version = "0.2.41"
 description = "Atlas — desktop workbench for Atlas CLI"
 authors = ["RongleCat"]
 edition = "2021"

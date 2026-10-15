@@ -73,11 +73,21 @@ impl WsHub {
     }
 
     fn client_left(&self) {
-        let _ = self
-            .clients
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |c| {
-                Some(c.saturating_sub(1))
-            });
+        // Saturating decrement. `AtomicUsize::try_update` is still unstable on
+        // the toolchain this branch builds with (rustc 1.92).
+        let mut current = self.clients.load(Ordering::Relaxed);
+        loop {
+            let next = current.saturating_sub(1);
+            match self.clients.compare_exchange_weak(
+                current,
+                next,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => break,
+                Err(observed) => current = observed,
+            }
+        }
     }
 }
 
