@@ -43,4 +43,15 @@ describe("composer @ panel file names", () => {
     // 上限本身保留：有描述时它负责给目录留位置
     expect(css).toMatch(/\.composer-plus__title\s*\{[^}]*max-width:\s*70%/s);
   });
+
+  it("lays the file name and directory on one full-width row", () => {
+    // __body 不是 flex 时，目录会贴在被裁掉的文件名后面，行尾却是空的。
+    expect(atPanel).toMatch(/className="composer-plus__body"/);
+    expect(css).toMatch(
+      /\.composer-at \.composer-plus__body\s*\{[^}]*display:\s*flex/s,
+    );
+    expect(css).toMatch(
+      /\.composer-at \.composer-plus__title\s*\{[^}]*max-width:\s*100%/s,
+    );
+  });
 });

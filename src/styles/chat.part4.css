@@ -643,6 +643,31 @@
   max-width: 100%;
 }
 
+/*
+ * @ 文件行把文件名和目录包在 __body 里。这一层必须自己横向排开并吃满行宽，
+ * 否则标题的 70% 上限按内容宽度计算，目录会紧贴被裁掉的文件名
+ * （build.ps1 和 src 连成 build.pssrc），面板右侧还留着空白。
+ * 文件名优先：放得下就完整显示，放不下才省略；目录用剩余宽度。
+ */
+.composer-at .composer-plus__body {
+  display: flex;
+  align-items: baseline;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.composer-at .composer-plus__title {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.composer-at .composer-plus__desc {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .composer-plus__desc {
   flex: 1 1 0;
   min-width: 0;

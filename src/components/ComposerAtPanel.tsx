@@ -187,13 +187,16 @@ export function ComposerAtPanel({
                       "composer-plus__title" +
                       (parent ? "" : " composer-plus__title--solo")
                     }
+                    title={entry.name}
                   >
                     <span className="composer-plus__title-text">
                       {entry.name}
                     </span>
                   </span>
                   {parent ? (
-                    <span className="composer-plus__desc">{parent}</span>
+                    <span className="composer-plus__desc" title={parent}>
+                      {parent}
+                    </span>
                   ) : null}
                 </span>
               </button>
