@@ -254,6 +254,18 @@ struct Pending {
 }
 
 const HANDSHAKE_TIMEOUT_SECS: u64 = 45;
+/// session/load replays the full history (and may auto-compact a ~200k-token
+/// context several times) before replying. Field log: 37s ok / >45s timeout on
+/// the same session. Give it its own, larger budget.
+const SESSION_LOAD_TIMEOUT_SECS: u64 = 150;
+
+/// Whether to ask the agent to skip transcript replay on `session/load`.
+fn session_load_no_replay() -> bool {
+    !matches!(
+        std::env::var("GROK_APP_FULL_REPLAY").ok().as_deref(),
+        Some("1") | Some("true")
+    )
+}
 const AUTH_TIMEOUT_SECS: u64 = 12;
 /// Max wait for a single stdin write (JSON-RPC line). A wedged agent with a full
 /// pipe used to block forever here — which froze interject ("引导"), cancel, and
@@ -440,6 +452,10 @@ pub struct AcpClient {
     rewind_supported: ParkingMutex<Option<bool>>,
     /// OpenSSH alias this process was spawned with. Remote cwd is not local.
     ssh_alias: Option<String>,
+    /// True when this process was spawned via `wsl.exe` (`cli_backend=wsl`).
+    /// ACP session cwd must be a Linux path (`/mnt/<drive>/…`); host still
+    /// keeps the Windows `cwd` for local fs / MCP / sandbox reuse checks.
+    wsl_active: bool,
     /// Private `GROK_HOME` sealed for this process (#1293). `None` for
     /// `~/.grok`, official-aux, SSH, and TCP. Discarded in `kill`.
     proc_home: std::sync::Mutex<Option<PathBuf>>,
@@ -679,11 +695,18 @@ impl AcpClient {
         } else {
             crate::paths::resolve_inference_grok_home(session_data_mode, custom_route)
         };
-        let _ = std::fs::create_dir_all(&grok_home);
+        // Host-side mkdir only for native/SSH homes. WSL GROK_HOME is Linux-native
+        // (`~/.grok` in the distro) and is created via `wsl --exec mkdir -p`.
+        if wsl_launch.is_none() {
+            let _ = std::fs::create_dir_all(&grok_home);
+        }
         // Prep agent-home when independent *or* custom (shared+custom still uses agent-home).
         // Side-channel with explicit home: never touch main agent-home auth.
+        // WSL agents use a Linux-native GROK_HOME — skip Windows agent-home rewrites
+        // and agent-proc snapshots (those would land on /mnt and break sandbox binds).
         let agent_home_prep = ssh_alias.is_none()
             && home_override.is_none()
+            && wsl_launch.is_none()
             && crate::paths::needs_agent_home_spawn_prep(session_data_mode, custom_route);
         // Preference syncs write independent-only; for shared+custom force independent
         // so agent-home receives permission / feature pins the relay process needs.
@@ -862,7 +885,7 @@ impl AcpClient {
             }
         }
 
-        // Native: `grok …`; WSL: `wsl.exe [-d] --cd <linux_cwd> -- <linux_cli> …`
+        // Native: `grok …`; WSL: `wsl.exe [-d] --cd <linux_cwd> --exec <linux_cli> …`
         // SSH: collect grok flags first, then wrap as one remote `ssh -T` script.
         // OpenSSH joins the remote command into a single `-c` string — extra
         // argv after `bash -lc` is not a real argv array on the host.
@@ -1055,6 +1078,8 @@ impl AcpClient {
         // custom chat. Seal a private directory so one spawn cannot replace
         // the other's auth.json while nested tools are still reading it.
         let proc_home = if agent_home_prep {
+            // Last writer before the sealed copy. Shared ~/.grok is not this path.
+            let _ = crate::providers::ensure_custom_ids_in_allowed_models();
             match crate::agent_proc_home::create(&grok_home, custom_route) {
                 Ok(dir) => Some(dir),
                 Err(e) => {
@@ -1069,6 +1094,43 @@ impl AcpClient {
             None
         };
         let grok_home = proc_home.clone().unwrap_or(grok_home);
+        let grok_home = if let Some(ref w) = wsl_launch {
+            if home_override.is_some() {
+                // Isolated aux home is still a Windows path; map to /mnt for the
+                // Linux process (aux spawn forces sandbox off).
+                match crate::wsl_backend::windows_path_to_wsl(&grok_home) {
+                    Ok(linux) => std::path::PathBuf::from(linux),
+                    Err(e) => {
+                        if let Some(ref dir) = proc_home {
+                            crate::agent_proc_home::discard(dir);
+                        }
+                        return Err(AgentError::new(
+                            AgentErrorCode::ConnectFailed,
+                            format!("WSL GROK_HOME override map failed: {e}"),
+                        ));
+                    }
+                }
+            } else {
+                match crate::wsl_backend::ensure_linux_grok_home(
+                    w,
+                    settings.wsl_grok_home.as_deref(),
+                    &crate::process_util::user_home().join(".grok"),
+                ) {
+                    Ok(linux) => std::path::PathBuf::from(linux),
+                    Err(e) => {
+                        if let Some(ref dir) = proc_home {
+                            crate::agent_proc_home::discard(dir);
+                        }
+                        return Err(AgentError::new(
+                            AgentErrorCode::ConnectFailed,
+                            format!("WSL Linux GROK_HOME failed: {e}"),
+                        ));
+                    }
+                }
+            }
+        } else {
+            grok_home
+        };
         let discard_proc_home = || {
             if let Some(ref dir) = proc_home {
                 crate::agent_proc_home::discard(dir);
@@ -1103,7 +1165,7 @@ impl AcpClient {
             let (k, v) = sb.env_pair();
             cmd.env(k, v);
         }
-        // Forward selected env into the Linux process (path-translate GROK_HOME).
+        // Forward selected env into the Linux process (GROK_HOME as-is, no /p).
         if wsl_launch.is_some() {
             crate::wsl_backend::apply_wslenv(&mut cmd);
         }
@@ -1189,6 +1251,7 @@ impl AcpClient {
             route_provider_id,
             rewind_supported: ParkingMutex::new(None),
             ssh_alias: ssh_alias.clone(),
+            wsl_active: wsl_launch.is_some(),
             proc_home: std::sync::Mutex::new(proc_home),
         });
 
@@ -1291,6 +1354,7 @@ impl AcpClient {
             route_provider_id: crate::providers::SESSION_PROVIDER_OFFICIAL.to_string(),
             rewind_supported: ParkingMutex::new(None),
             ssh_alias: None,
+            wsl_active: false,
             proc_home: std::sync::Mutex::new(None),
         });
         client.start_read_loop(Box::new(read_half));
@@ -2471,13 +2535,29 @@ impl AcpClient {
         cwd: &str,
         bound_app_session_id: Option<&str>,
     ) -> Result<(String, bool), AgentError> {
-        let cwd = cwd.to_string();
-        if !crate::ssh_remote::acp_session_cwd_ok(self.ssh_alias.as_deref(), &cwd) {
+        let host_cwd = cwd.to_string();
+        if !crate::ssh_remote::acp_session_cwd_ok(self.ssh_alias.as_deref(), &host_cwd) {
             return Err(AgentError::new(
                 AgentErrorCode::AgentCrashed,
-                format!("project cwd is not a directory: {cwd}"),
+                format!("project cwd is not a directory: {host_cwd}"),
             ));
         }
+
+        // WSL: CLI runs in Linux — map Windows drive / \\wsl$ paths for ACP
+        // session/new|load|fork. Host checks + MCP scan keep the Windows path.
+        // --cd at spawn already mapped via the same helper.
+        let cwd = if self.wsl_active {
+            crate::wsl_backend::windows_path_to_wsl(std::path::Path::new(&host_cwd)).map_err(
+                |e| {
+                    AgentError::new(
+                        AgentErrorCode::AgentCrashed,
+                        format!("WSL session cwd path map failed: {e}"),
+                    )
+                },
+            )?
+        } else {
+            host_cwd.clone()
+        };
 
         // Build ACP mcpServers off the async runtime. **Never block connect** on
         // MCP/OAuth: connect builder skips network refresh + CLI list, and a
@@ -2492,7 +2572,7 @@ impl AcpClient {
             }
             serde_json::json!([])
         } else {
-            let project_cwd = cwd.clone();
+            let project_cwd = host_cwd.clone();
             let app_session_id = crate::extensions::resolve_mcp_app_session_id(
                 bound_app_session_id,
                 self.app_session_id.as_deref(),
@@ -2563,9 +2643,17 @@ impl AcpClient {
                         json!({
                             "sessionId": rid,
                             "cwd": cwd,
-                            "mcpServers": mcp_servers.clone()
+                            "mcpServers": mcp_servers.clone(),
+                            // grok-build honours `_meta.noReplay` on session/load
+                            // (mvp_agent/session_setup.rs AttachPolicy): the agent keeps
+                            // full native context but skips streaming the transcript back.
+                            // The App already renders history from its own journal and
+                            // reconciles from chat_history after the turn, so the replay
+                            // only cost time (37s+ / 45s timeouts on ~200k-token chats).
+                            // Older CLIs ignore unknown `_meta`. Opt out: GROK_APP_FULL_REPLAY=1.
+                            "_meta": { "noReplay": session_load_no_replay() }
                         }),
-                        HANDSHAKE_TIMEOUT_SECS,
+                        SESSION_LOAD_TIMEOUT_SECS,
                     )
                     .await
                 {

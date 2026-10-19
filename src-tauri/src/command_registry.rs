@@ -5,9 +5,9 @@
 
 use crate::{
     atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub, leader, mirror,
-    os_theme, pet_window, pr_monitor, remote_im, serve, session_api, ssh_remote, system_fonts,
-    theme_editor_window, tray, updater, voice_host, wallpaper_grok_album,
-    wallpaper_remote_commands,
+    os_theme, pet_quick, pet_window, pr_monitor, remote_im, serve, session_api, ssh_remote,
+    system_fonts, theme_editor_window, tray, updater, voice_host, wallpaper_grok_album,
+    wallpaper_remote_commands, window_min,
 };
 
 /// Single invoke handler consumed by `Builder::invoke_handler` in `run()`.
@@ -513,6 +513,8 @@ pub fn app_invoke_handler(
         commands::side_browser_eval,
         commands::side_browser_snapshot,
         commands::side_browser_install_download_hook,
+        // ── Main window chrome ──
+        window_min::main_hidden_menu_px,
         // ── Desktop pet ──
         pet_window::pet_prefs_get,
         pet_window::pet_prefs_set,
@@ -535,5 +537,14 @@ pub fn app_invoke_handler(
         pet_window::pet_push_tasks,
         pet_window::pet_get_tasks,
         pet_window::pet_set_hit_chrome,
+        // ── Pet quick bar ──
+        pet_quick::pet_quick_recent,
+        pet_quick::pet_quick_show,
+        pet_quick::pet_quick_hide,
+        pet_quick::pet_quick_toggle,
+        pet_quick::pet_quick_send,
+        pet_quick::pet_quick_action,
+        pet_quick::pet_quick_hotkey_get,
+        pet_quick::pet_quick_hotkey_set,
     ]
 }

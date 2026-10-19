@@ -293,6 +293,7 @@ export const RUNTIME_ENTRIES: readonly SettingsEntry[] = [
       "settings.wsl.enableDesc",
       "settings.wsl.distro",
       "settings.wsl.cliPath",
+      "settings.wsl.grokHome",
       "settings.wsl.hint",
     ],
     keywords: [
@@ -303,6 +304,8 @@ export const RUNTIME_ENTRIES: readonly SettingsEntry[] = [
       "ubuntu",
       "distro",
       "cli backend",
+      "GROK_HOME",
+      "wsl grok home",
       "WSL",
       "子系统",
       "子系统",

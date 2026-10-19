@@ -36,6 +36,11 @@ export interface AppSettings {
   wslDistro?: string | null;
   /** Path to atlas inside WSL (e.g. atlas, ~/.atlas/bin/atlas). */
   wslCliPath?: string | null;
+  /**
+   * Linux-native GROK_HOME when cliBackend is wsl.
+   * Empty = distro ~/.grok. Must not be /mnt/… .
+   */
+  wslGrokHome?: string | null;
   permissionPolicy: string;
   modelId: string | null;
   effort: string | null;
