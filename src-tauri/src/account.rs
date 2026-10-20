@@ -612,22 +612,12 @@ fn read_auth_profile_at(path: &std::path::Path) -> Option<AccountProfile> {
         .get("email")
         .and_then(|x| x.as_str())
         .map(str::to_string);
-    let first = entry
-        .get("first_name")
+    let user_id = entry
+        .get("user_id")
+        .or_else(|| entry.get("principal_id"))
         .and_then(|x| x.as_str())
-        .unwrap_or("");
-    let last = entry
-        .get("last_name")
-        .and_then(|x| x.as_str())
-        .unwrap_or("");
-    let display = {
-        let n = format!("{first} {last}").trim().to_string();
-        if n.is_empty() {
-            email.clone()
-        } else {
-            Some(n)
-        }
-    };
+        .map(str::to_string);
+    let display = account_display_name(&entry, email.as_deref());
 
     let expires_at = entry
         .get("expires_at")
@@ -659,11 +649,7 @@ fn read_auth_profile_at(path: &std::path::Path) -> Option<AccountProfile> {
             .map(str::to_string),
         email,
         display_name: display,
-        user_id: entry
-            .get("user_id")
-            .or_else(|| entry.get("principal_id"))
-            .and_then(|x| x.as_str())
-            .map(str::to_string),
+        user_id,
         team_id: entry
             .get("team_id")
             .and_then(|x| x.as_str())
@@ -680,6 +666,35 @@ fn read_auth_profile_at(path: &std::path::Path) -> Option<AccountProfile> {
             .and_then(|x| x.as_str())
             .map(str::to_string),
     })
+}
+
+/// Account title shown in the UI. Prefer `user_id`, then `principal_id`,
+/// then the old given-name pair, then email.
+fn account_display_name(entry: &Value, email: Option<&str>) -> Option<String> {
+    let user_id = entry
+        .get("user_id")
+        .or_else(|| entry.get("principal_id"))
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .trim();
+    if !user_id.is_empty() {
+        return Some(user_id.to_string());
+    }
+    let first = entry
+        .get("first_name")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .trim();
+    let last = entry
+        .get("last_name")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .trim();
+    let name = format!("{first} {last}").trim().to_string();
+    if !name.is_empty() {
+        return Some(name);
+    }
+    email.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
 }
 
 /// Pick the auth.json credential entry that actually holds a usable token
@@ -2359,6 +2374,30 @@ mod tests {
     fn urlencoding_decode_basic() {
         let s = urlencoding_decode("%2FUsers%2Fdemo%2Fproj").unwrap();
         assert_eq!(s, "/Users/demo/proj");
+    }
+
+    #[test]
+    fn account_display_name_prefers_user_id() {
+        let entry = serde_json::json!({
+            "user_id": "user-42",
+            "first_name": "yf",
+            "last_name": "z",
+            "email": "zhangyudeng@myai.tech"
+        });
+        assert_eq!(
+            account_display_name(&entry, Some("zhangyudeng@myai.tech")).as_deref(),
+            Some("user-42")
+        );
+        let named = serde_json::json!({ "first_name": "yf", "last_name": "z" });
+        assert_eq!(
+            account_display_name(&named, Some("a@b.c")).as_deref(),
+            Some("yf z")
+        );
+        let email_only = serde_json::json!({});
+        assert_eq!(
+            account_display_name(&email_only, Some("a@b.c")).as_deref(),
+            Some("a@b.c")
+        );
     }
 
     #[test]

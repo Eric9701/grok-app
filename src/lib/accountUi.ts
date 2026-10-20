@@ -21,6 +21,7 @@ export function accountDisplayName(
   fallback = "Local",
 ): string {
   return (
+    profile.userId?.trim() ||
     profile.displayName?.trim() ||
     profile.email?.trim() ||
     fallback

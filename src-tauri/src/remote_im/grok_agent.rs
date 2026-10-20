@@ -1,4 +1,4 @@
-//! Headless Grok turns for Remote IM (spawn `grok -p` streaming; ACP fallback later).
+//! Headless turns for Remote IM (spawn the Atlas CLI with `-p`).
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -131,22 +131,27 @@ async fn await_stdio_or_cancel<T: Default>(
     }
 }
 
-pub fn resolve_grok_binary() -> PathBuf {
-    if let Ok(p) = which::which("grok") {
-        return p;
+fn remote_cli_fallback_name() -> &'static str {
+    #[cfg(windows)]
+    {
+        "atlas.exe"
     }
-    let home = crate::process_util::user_home();
-    let candidates = [
-        home.join(".grok/bin/grok"),
-        PathBuf::from("/usr/local/bin/grok"),
-        PathBuf::from("/opt/homebrew/bin/grok"),
-    ];
-    for c in candidates {
-        if c.is_file() {
-            return c;
+    #[cfg(not(windows))]
+    {
+        "atlas"
+    }
+}
+
+/// Same CLI the desktop uses: settings path, then `~/.atlas/bin/atlas`, then PATH.
+pub fn resolve_grok_binary() -> PathBuf {
+    let manual = crate::store::load_settings().manual_cli_path;
+    let probe = crate::cli_probe::probe_cli(manual.as_deref());
+    if probe.found {
+        if let Some(path) = probe.path {
+            return PathBuf::from(path);
         }
     }
-    PathBuf::from("grok")
+    PathBuf::from(remote_cli_fallback_name())
 }
 
 /// Same GROK_HOME the App uses for ACP (independent → agent-home, shared → ~/.grok).
@@ -166,22 +171,9 @@ fn apply_agent_env(cmd: &mut Command) {
     if mode != "shared" {
         crate::providers::prepare_route_auth_for_agent();
     }
-    // GUI-spawned processes often lack ~/.grok/bin on PATH.
-    if let Ok(path) = std::env::var("PATH") {
-        let home = crate::process_util::user_home();
-        let extra = [
-            home.join(".grok/bin"),
-            PathBuf::from("/opt/homebrew/bin"),
-            PathBuf::from("/usr/local/bin"),
-        ];
-        let mut parts: Vec<String> = path.split(':').map(|s| s.to_string()).collect();
-        for e in extra {
-            let s = e.to_string_lossy().to_string();
-            if e.is_dir() && !parts.iter().any(|p| p == &s) {
-                parts.insert(0, s);
-            }
-        }
-        cmd.env("PATH", parts.join(":"));
+    // GUI-spawned processes often miss ~/.atlas/bin. Same enriched PATH as ACP.
+    if let Some(path) = crate::process_util::enriched_path_env() {
+        cmd.env("PATH", path);
     }
     // Same proxy injection as ACP spawn (NEW-02) — without this, Remote IM
     // turns go direct and only work when the OS has TUN.
@@ -295,7 +287,7 @@ async fn run_turn_with_binary_and_env(
             return GrokTurnResult {
                 text: String::new(),
                 session_id: None,
-                error: Some(format!("spawn grok failed: {e}")),
+                error: Some(format!("spawn {} failed: {e}", binary.display())),
                 usage: None,
                 compact: None,
                 cancelled: false,
@@ -727,6 +719,12 @@ mod tests {
         );
         let no = simple_turn_cli_args("hi", None, true);
         assert!(!no.iter().any(|a| a == "--resume"));
+    }
+
+    #[test]
+    fn remote_cli_fallback_is_atlas() {
+        let name = remote_cli_fallback_name();
+        assert!(name.starts_with("atlas"), "{name}");
     }
 
     #[test]

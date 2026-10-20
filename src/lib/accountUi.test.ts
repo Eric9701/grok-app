@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
+  accountDisplayName,
   formatChineseCount,
   formatCompactNumber,
   formatLocaleCount,
@@ -14,7 +15,7 @@ import {
   SUPERGROK_BRAND_CACHE_KEY,
   tierLabel,
 } from "./accountUi";
-import type { BillingSnapshot } from "./api";
+import type { AccountProfile, BillingSnapshot } from "./api";
 
 function billing(partial: Partial<BillingSnapshot>): BillingSnapshot {
   return {
@@ -42,6 +43,25 @@ function billing(partial: Partial<BillingSnapshot>): BillingSnapshot {
     ...partial,
   };
 }
+
+describe("accountDisplayName", () => {
+  it("shows user id ahead of the given name", () => {
+    const profile: AccountProfile = {
+      signedIn: true,
+      authMode: "oauth",
+      email: "zhangyudeng@myai.tech",
+      displayName: "yf z",
+      userId: "user-42",
+      teamId: null,
+      principalType: null,
+      expiresAt: null,
+      expired: false,
+      hasRefresh: true,
+      oidcIssuer: null,
+    };
+    expect(accountDisplayName(profile, "本地")).toBe("user-42");
+  });
+});
 
 describe("superGrokBrandKind", () => {
   it("returns null when signed out", () => {

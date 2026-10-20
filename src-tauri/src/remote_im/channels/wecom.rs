@@ -4,11 +4,119 @@ use super::super::outbound::{http_client, secret_or_opt};
 use super::super::types::{ChannelInstance, IncomingMessage};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
+
+/// Official long-connection endpoint. Credentials go in `aibot_subscribe`, not the query string.
+const WECOM_WS_URL: &str = "wss://openws.work.weixin.qq.com";
+const WECOM_SUPERSEDED: &str = "wecom ws: superseded";
+const WECOM_HEARTBEAT: Duration = Duration::from_secs(30);
+
+struct WecomWsReply {
+    req_id: String,
+    text: String,
+}
+
+struct WecomSinkSlot {
+    generation: u64,
+    tx: mpsc::Sender<WecomWsReply>,
+}
+
+static WECOM_SINK_GEN: AtomicU64 = AtomicU64::new(1);
+static WECOM_WS_SINKS: LazyLock<Mutex<HashMap<String, WecomSinkSlot>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+struct WecomSinkGuard {
+    instance_id: String,
+    generation: u64,
+}
+
+impl Drop for WecomSinkGuard {
+    fn drop(&mut self) {
+        let Ok(mut map) = WECOM_WS_SINKS.lock() else {
+            return;
+        };
+        if map
+            .get(&self.instance_id)
+            .is_some_and(|slot| slot.generation == self.generation)
+        {
+            map.remove(&self.instance_id);
+        }
+    }
+}
+
+fn register_wecom_sink(instance_id: &str, tx: mpsc::Sender<WecomWsReply>) -> WecomSinkGuard {
+    let generation = WECOM_SINK_GEN.fetch_add(1, Ordering::Relaxed);
+    if let Ok(mut map) = WECOM_WS_SINKS.lock() {
+        map.insert(
+            instance_id.to_string(),
+            WecomSinkSlot {
+                generation,
+                tx,
+            },
+        );
+    }
+    WecomSinkGuard {
+        instance_id: instance_id.to_string(),
+        generation,
+    }
+}
+
+fn enqueue_wecom_ws_reply(instance_id: &str, req_id: &str, text: &str) -> Result<(), String> {
+    let tx = WECOM_WS_SINKS
+        .lock()
+        .map_err(|_| "wecom ws: reply queue locked".to_string())?
+        .get(instance_id)
+        .map(|slot| slot.tx.clone())
+        .ok_or_else(|| "wecom ws: long connection is not authenticated".to_string())?;
+    tx.try_send(WecomWsReply {
+        req_id: req_id.to_string(),
+        text: text.to_string(),
+    })
+    .map_err(|_| "wecom ws: reply queue unavailable".to_string())
+}
+
+fn wecom_subscribe_frame(bot_id: &str, secret: &str, req_id: &str) -> Value {
+    json!({
+        "cmd": "aibot_subscribe",
+        "headers": { "req_id": req_id },
+        "body": { "bot_id": bot_id, "secret": secret }
+    })
+}
+
+fn wecom_ping_frame(req_id: &str) -> Value {
+    json!({
+        "cmd": "ping",
+        "headers": { "req_id": req_id }
+    })
+}
+
+fn wecom_reply_frame(req_id: &str, stream_id: &str, text: &str) -> Value {
+    json!({
+        "cmd": "aibot_respond_msg",
+        "headers": { "req_id": req_id },
+        "body": {
+            "msgtype": "stream",
+            "stream": { "id": stream_id, "content": text, "finish": true }
+        }
+    })
+}
+
+fn ws_req_id(v: &Value) -> &str {
+    v.pointer("/headers/req_id")
+        .or_else(|| v.get("req_id"))
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+}
+
+fn ws_errcode(v: &Value) -> i64 {
+    v.get("errcode").and_then(|x| x.as_i64()).unwrap_or(0)
+}
 
 pub async fn run(
     inst: ChannelInstance,
@@ -52,6 +160,20 @@ async fn run_websocket(
                     return Ok(());
                 }
             }
+            Err(e) if e == WECOM_SUPERSEDED => {
+                tracing::warn!(
+                    instance = %inst.id,
+                    "wecom ws: replaced by a newer connection; not reconnecting"
+                );
+                loop {
+                    if cancel.changed().await.is_err() {
+                        return Ok(());
+                    }
+                    if *cancel.borrow() {
+                        return Ok(());
+                    }
+                }
+            }
             Err(e) => tracing::error!(instance = %inst.id, "wecom ws: {e}"),
         }
         tokio::select! {
@@ -69,21 +191,28 @@ async fn run_ws_once(
     tx: mpsc::Sender<IncomingMessage>,
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<(), String> {
-    // WeCom aibot long-connection endpoint
-    let ws_url =
-        format!("wss://openws.work.weixin.qq.com/?bot_id={bot_id}&bot_secret={bot_secret}");
-    let (ws, _) = connect_async(&ws_url)
+    let (ws, _) = connect_async(WECOM_WS_URL)
         .await
         .map_err(|e| format!("wecom ws connect: {e}"))?;
     let (mut write, mut read) = ws.split();
+    tracing::info!(instance = %inst.id, "wecom ws: connected");
 
-    // Auth frame (best-effort; some deployments auto-auth via query)
-    let auth = json!({
-        "cmd": "auth",
-        "bot_id": bot_id,
-        "bot_secret": bot_secret
-    });
-    let _ = write.send(Message::Text(auth.to_string().into())).await;
+    let (reply_tx, mut reply_rx) = mpsc::channel::<WecomWsReply>(32);
+    let _sink = register_wecom_sink(&inst.id, reply_tx);
+
+    let subscribe_req = format!("aibot_subscribe_{}", now_millis());
+    let subscribe = wecom_subscribe_frame(bot_id, bot_secret, &subscribe_req);
+    write
+        .send(Message::Text(subscribe.to_string().into()))
+        .await
+        .map_err(|e| format!("wecom ws: subscribe send failed: {e}"))?;
+    tracing::info!(instance = %inst.id, "wecom ws: subscribe frame sent");
+
+    let mut authed = false;
+    let mut missed_pongs = 0u32;
+    let mut ping = tokio::time::interval(WECOM_HEARTBEAT);
+    ping.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    ping.tick().await;
 
     loop {
         tokio::select! {
@@ -93,52 +222,245 @@ async fn run_ws_once(
                     return Ok(());
                 }
             }
+            reply = reply_rx.recv() => {
+                let Some(reply) = reply else { continue };
+                let stream_id = format!("stream_{}", uuid::Uuid::new_v4().simple());
+                let frame = wecom_reply_frame(&reply.req_id, &stream_id, &reply.text);
+                tracing::info!(
+                    instance = %inst.id,
+                    req_id = %reply.req_id,
+                    text_len = reply.text.len(),
+                    "wecom ws: reply frame"
+                );
+                write
+                    .send(Message::Text(frame.to_string().into()))
+                    .await
+                    .map_err(|e| format!("wecom ws: reply send failed: {e}"))?;
+            }
+            _ = ping.tick(), if authed => {
+                if missed_pongs >= 2 {
+                    return Err("wecom ws: heartbeat timeout".into());
+                }
+                missed_pongs += 1;
+                let frame = wecom_ping_frame(&format!("ping_{}", now_millis()));
+                write
+                    .send(Message::Text(frame.to_string().into()))
+                    .await
+                    .map_err(|e| format!("wecom ws: ping send failed: {e}"))?;
+            }
             msg = read.next() => {
                 match msg {
                     Some(Ok(Message::Text(t))) => {
-                        let v: Value = serde_json::from_str(&t).unwrap_or(json!({}));
-                        if let Some(inc) = parse_ws_msg(inst, &v) {
+                        let v: Value = match serde_json::from_str(&t) {
+                            Ok(v) => v,
+                            Err(_) => {
+                                tracing::info!(
+                                    instance = %inst.id,
+                                    bytes = t.len(),
+                                    "wecom ws: non-json text frame"
+                                );
+                                continue;
+                            }
+                        };
+                        let req_id = ws_req_id(&v);
+                        if req_id.starts_with("aibot_subscribe") {
+                            let code = ws_errcode(&v);
+                            if code == 0 {
+                                authed = true;
+                                missed_pongs = 0;
+                                tracing::info!(instance = %inst.id, "wecom ws: subscribed");
+                            } else {
+                                let errmsg = v.get("errmsg").and_then(|x| x.as_str()).unwrap_or("");
+                                return Err(format!("wecom ws: subscribe failed errcode={code} {errmsg}"));
+                            }
+                            continue;
+                        }
+                        if req_id.starts_with("ping") {
+                            if ws_errcode(&v) == 0 {
+                                missed_pongs = 0;
+                            }
+                            continue;
+                        }
+                        if is_disconnected_event(&v) {
+                            return Err(WECOM_SUPERSEDED.into());
+                        }
+                        let summary = wecom_ws_frame_summary(&v);
+                        let parsed = parse_ws_msg(inst, &v);
+                        tracing::info!(
+                            instance = %inst.id,
+                            bytes = t.len(),
+                            cmd = %summary.cmd,
+                            errcode = summary.errcode,
+                            keys = %summary.keys,
+                            body_keys = %summary.body_keys,
+                            msgtype = %summary.msgtype,
+                            has_text = summary.has_text,
+                            parsed = parsed.is_some(),
+                            "wecom ws: frame"
+                        );
+                        if let Some(inc) = parsed {
+                            tracing::info!(
+                                instance = %inst.id,
+                                chat = %inc.chat_id,
+                                sender = %inc.sender_id,
+                                content_len = inc.content.len(),
+                                "wecom ws: inbound message"
+                            );
                             let _ = tx.send(inc).await;
                         }
                     }
-                    Some(Ok(Message::Close(_))) | None => return Ok(()),
+                    Some(Ok(Message::Binary(b))) => {
+                        tracing::info!(
+                            instance = %inst.id,
+                            bytes = b.len(),
+                            "wecom ws: binary frame"
+                        );
+                    }
+                    Some(Ok(Message::Close(frame))) => {
+                        let code = frame.as_ref().map(|f| u16::from(f.code)).unwrap_or(0);
+                        tracing::info!(instance = %inst.id, code, "wecom ws: server closed");
+                        return Ok(());
+                    }
+                    None => {
+                        tracing::info!(instance = %inst.id, "wecom ws: stream ended");
+                        return Ok(());
+                    }
                     Some(Ok(Message::Ping(p))) => { let _ = write.send(Message::Pong(p)).await; }
                     Some(Err(e)) => return Err(e.to_string()),
-                    _ => {}
+                    _ => {
+                        tracing::info!(instance = %inst.id, "wecom ws: ignored frame");
+                    }
                 }
             }
         }
     }
 }
 
+fn now_millis() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
+
+fn is_disconnected_event(v: &Value) -> bool {
+    v.pointer("/body/msgtype").and_then(|x| x.as_str()) == Some("event")
+        && v.pointer("/body/event/eventtype").and_then(|x| x.as_str()) == Some("disconnected_event")
+}
+
+struct WecomWsFrameSummary {
+    cmd: String,
+    errcode: i64,
+    keys: String,
+    body_keys: String,
+    msgtype: String,
+    has_text: bool,
+}
+
+/// Shape only. Values such as Secret and message text stay out of the log.
+fn wecom_ws_frame_summary(v: &Value) -> WecomWsFrameSummary {
+    let body = v.get("body");
+    let text_at = |pointer: &str| {
+        v.pointer(pointer)
+            .and_then(|x| x.as_str())
+            .is_some_and(|s| !s.trim().is_empty())
+    };
+    let has_text = text_at("/text/content")
+        || v
+            .get("content")
+            .and_then(|x| x.as_str())
+            .is_some_and(|s| !s.trim().is_empty())
+        || text_at("/body/text/content");
+    WecomWsFrameSummary {
+        cmd: v
+            .get("cmd")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string(),
+        errcode: v.get("errcode").and_then(|x| x.as_i64()).unwrap_or(-1),
+        keys: json_key_list(v),
+        body_keys: body.map(json_key_list).unwrap_or_default(),
+        msgtype: v
+            .get("msgtype")
+            .or_else(|| body.and_then(|b| b.get("msgtype")))
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string(),
+        has_text,
+    }
+}
+
+fn json_key_list(v: &Value) -> String {
+    let Some(map) = v.as_object() else {
+        return String::new();
+    };
+    let mut keys: Vec<&str> = map.keys().map(|s| s.as_str()).collect();
+    keys.sort_unstable();
+    keys.join(",")
+}
+
 fn parse_ws_msg(inst: &ChannelInstance, v: &Value) -> Option<IncomingMessage> {
-    let text = v
-        .pointer("/text/content")
+    let cmd = v.get("cmd").and_then(|x| x.as_str()).unwrap_or("");
+    if !cmd.is_empty() && cmd != "aibot_msg_callback" {
+        return None;
+    }
+    let body = v.get("body").filter(|b| b.is_object());
+    if body.and_then(|b| b.get("msgtype")).and_then(|x| x.as_str()) == Some("event") {
+        return None;
+    }
+    let text = body
+        .and_then(|b| b.pointer("/text/content"))
+        .or_else(|| v.pointer("/text/content"))
         .or_else(|| v.get("content"))
         .and_then(|x| x.as_str())
         .unwrap_or("")
+        .trim()
         .to_string();
     if text.is_empty() {
         return None;
     }
-    let sender = v
-        .get("from")
+    let sender = body
+        .and_then(|b| b.get("from"))
+        .or_else(|| v.get("from"))
         .and_then(|f| f.get("userid").or_else(|| f.get("user_id")))
         .and_then(|x| x.as_str())
         .unwrap_or("")
         .to_string();
-    let chat = v
-        .get("chatid")
-        .or_else(|| v.get("chat_id"))
+    let chat = body
+        .and_then(|b| b.get("chatid").or_else(|| b.get("chat_id")))
+        .or_else(|| v.get("chatid").or_else(|| v.get("chat_id")))
         .and_then(|x| x.as_str())
-        .unwrap_or(&sender)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(sender.as_str())
         .to_string();
+    let chat_type = match body.and_then(|b| b.get("chattype")).and_then(|x| x.as_str()) {
+        Some("group") => "group",
+        Some(_) => "p2p",
+        None if body
+            .and_then(|b| b.get("chatid"))
+            .and_then(|x| x.as_str())
+            .is_some_and(|s| !s.is_empty()) =>
+        {
+            "group"
+        }
+        None => "p2p",
+    };
+    let req_id = ws_req_id(v);
+    let message_id = if req_id.is_empty() {
+        body.and_then(|b| b.get("msgid"))
+            .or_else(|| v.get("msgid"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string()
+    } else {
+        req_id.to_string()
+    };
     Some(IncomingMessage {
         channel: inst.channel.clone(),
         instance_id: inst.id.clone(),
-        message_id: v.get("msgid").and_then(|x| x.as_str()).unwrap_or("").into(),
+        message_id,
         chat_id: chat,
-        chat_type: "p2p".into(),
+        chat_type: chat_type.into(),
         sender_id: sender,
         content: text,
         mentioned_bot: true,
@@ -485,8 +807,9 @@ async fn run_webhook(
 }
 
 pub async fn send_text(
-    secrets: &std::collections::HashMap<String, String>,
+    secrets: &HashMap<String, String>,
     chat_id: &str,
+    reply_to: Option<&str>,
     text: &str,
 ) -> Result<(), String> {
     if let Some(hook) = secrets.get("webhook") {
@@ -541,7 +864,12 @@ pub async fn send_text(
         }
         return Ok(());
     }
-    Ok(())
+    let req_id = reply_to.map(str::trim).filter(|s| !s.is_empty());
+    let Some(req_id) = req_id else {
+        return Err("wecom: no outbound route".into());
+    };
+    let instance_id = secrets.get("_instance_id").map(String::as_str).unwrap_or("");
+    enqueue_wecom_ws_reply(instance_id, req_id, text)
 }
 
 pub fn protocol_name() -> &'static str {
@@ -563,6 +891,129 @@ mod tests {
             h.update(p.as_bytes());
         }
         hex::encode(h.finalize())
+    }
+
+    #[test]
+    fn ws_frame_summary_records_shape_without_secret_or_text() {
+        let v = json!({
+            "cmd": "aibot_msg_callback",
+            "headers": { "req_id": "r1" },
+            "body": {
+                "msgid": "m1",
+                "msgtype": "text",
+                "secret": "do-not-log",
+                "text": { "content": "hello from wecom" }
+            }
+        });
+        let summary = wecom_ws_frame_summary(&v);
+        let line = format!(
+            "cmd={} errcode={} keys={} body_keys={} msgtype={} has_text={}",
+            summary.cmd,
+            summary.errcode,
+            summary.keys,
+            summary.body_keys,
+            summary.msgtype,
+            summary.has_text
+        );
+        assert_eq!(summary.cmd, "aibot_msg_callback");
+        assert_eq!(summary.msgtype, "text");
+        assert!(summary.has_text);
+        assert!(summary.body_keys.contains("text"));
+        assert!(!line.contains("do-not-log"));
+        assert!(!line.contains("hello from wecom"));
+    }
+
+    fn sample_inst() -> ChannelInstance {
+        ChannelInstance {
+            id: "wecom-1".into(),
+            channel: "wecom".into(),
+            name: "t".into(),
+            enabled: true,
+            secrets: HashMap::new(),
+            options: json!({}),
+            acl: json!({}),
+            project_scope: json!({}),
+        }
+    }
+
+    #[test]
+    fn subscribe_frame_matches_aibot_protocol() {
+        let frame = wecom_subscribe_frame("bot", "sec", "aibot_subscribe_1");
+        assert_eq!(frame["cmd"], "aibot_subscribe");
+        assert_eq!(frame["headers"]["req_id"], "aibot_subscribe_1");
+        assert_eq!(frame["body"]["bot_id"], "bot");
+        assert_eq!(frame["body"]["secret"], "sec");
+        assert!(frame.get("bot_secret").is_none());
+        assert_eq!(WECOM_WS_URL, "wss://openws.work.weixin.qq.com");
+    }
+
+    #[test]
+    fn parse_ws_msg_reads_body_and_keeps_req_id() {
+        let v = json!({
+            "cmd": "aibot_msg_callback",
+            "headers": { "req_id": "req-9" },
+            "body": {
+                "msgid": "m1",
+                "aibotid": "bot",
+                "chattype": "single",
+                "msgtype": "text",
+                "from": { "userid": "user-1" },
+                "text": { "content": " hello " }
+            }
+        });
+        let msg = parse_ws_msg(&sample_inst(), &v).expect("text callback");
+        assert_eq!(msg.message_id, "req-9");
+        assert_eq!(msg.sender_id, "user-1");
+        assert_eq!(msg.chat_id, "user-1");
+        assert_eq!(msg.chat_type, "p2p");
+        assert_eq!(msg.content, "hello");
+    }
+
+    #[test]
+    fn parse_ws_msg_skips_events_and_reads_group_chat() {
+        let event = json!({
+            "cmd": "aibot_event_callback",
+            "headers": { "req_id": "ev-1" },
+            "body": { "msgtype": "event", "event": { "eventtype": "enter_chat" } }
+        });
+        assert!(parse_ws_msg(&sample_inst(), &event).is_none());
+        let group = json!({
+            "cmd": "aibot_msg_callback",
+            "headers": { "req_id": "req-g" },
+            "body": {
+                "chatid": "wr-group",
+                "chattype": "group",
+                "msgtype": "text",
+                "from": { "userid": "user-2" },
+                "text": { "content": "@bot hi" }
+            }
+        });
+        let msg = parse_ws_msg(&sample_inst(), &group).expect("group text");
+        assert_eq!(msg.chat_id, "wr-group");
+        assert_eq!(msg.chat_type, "group");
+        assert_eq!(msg.message_id, "req-g");
+    }
+
+    #[test]
+    fn reply_frame_echoes_req_id_as_finished_stream() {
+        let frame = wecom_reply_frame("req-9", "stream-1", "done");
+        assert_eq!(frame["cmd"], "aibot_respond_msg");
+        assert_eq!(frame["headers"]["req_id"], "req-9");
+        assert_eq!(frame["body"]["msgtype"], "stream");
+        assert_eq!(frame["body"]["stream"]["id"], "stream-1");
+        assert_eq!(frame["body"]["stream"]["content"], "done");
+        assert_eq!(frame["body"]["stream"]["finish"], true);
+    }
+
+    #[test]
+    fn disconnected_event_is_recognized() {
+        let v = json!({
+            "body": {
+                "msgtype": "event",
+                "event": { "eventtype": "disconnected_event" }
+            }
+        });
+        assert!(is_disconnected_event(&v));
     }
 
     #[test]

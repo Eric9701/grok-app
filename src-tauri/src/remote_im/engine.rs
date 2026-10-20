@@ -994,7 +994,7 @@ impl Engine {
                 let s = self.store.get_or_create(scope, default_wd);
                 let binary = grok_agent::resolve_grok_binary();
                 let text = format!(
-                    "**Status**\n- project: `{}`\n- work_dir: `{}`\n- agent_session: `{}`\n- mode: {:?}\n- turns: {}\n- grok: `{}`\n- channel: `{}`",
+                    "**Status**\n- project: `{}`\n- work_dir: `{}`\n- agent_session: `{}`\n- mode: {:?}\n- turns: {}\n- cli: `{}`\n- channel: `{}`",
                     s.project_id.as_deref().unwrap_or("-"),
                     s.work_dir,
                     s.agent_session_id.as_deref().unwrap_or("-"),

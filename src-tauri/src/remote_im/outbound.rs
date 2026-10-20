@@ -93,7 +93,9 @@ impl OutboundRouter {
             "discord" => super::channels::discord::send_text(&cred.secrets, chat_id, text).await,
             "slack" => super::channels::slack::send_text(&cred.secrets, chat_id, text).await,
             "dingtalk" => super::channels::dingtalk::send_text(&cred.secrets, chat_id, text).await,
-            "wecom" => super::channels::wecom::send_text(&cred.secrets, chat_id, text).await,
+            "wecom" => {
+                super::channels::wecom::send_text(&cred.secrets, chat_id, reply_to, text).await
+            }
             "weixin" => super::channels::weixin::send_text(&cred.secrets, chat_id, text).await,
             "qq" => super::channels::qq::send_text(&cred.secrets, chat_id, text).await,
             "qqbot" => super::channels::qqbot::send_text(&cred.secrets, chat_id, text).await,
