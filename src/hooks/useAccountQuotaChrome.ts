@@ -15,16 +15,14 @@ import {
 import { createT } from "@/i18n";
 import * as api from "@/lib/api";
 import type { AppDialog } from "@/lib/app/appDialogTypes";
-import {
-  canFetchOfficialQuota,
-  mergeAccountStatusPreservingLocalUsage,
-} from "@/lib/accountQuotaRefresh";
+import { mergeAccountStatusPreservingLocalUsage } from "@/lib/accountQuotaRefresh";
 import {
   quotaFromHostItem,
   type SwitcherQuota,
 } from "@/lib/accountSwitcherQuota";
 import { isAccountConnected } from "@/lib/accountUi";
-import { useAccountQuotaAutoRefresh } from "@/hooks/useAccountQuotaAutoRefresh";
+// 10-minute background SuperGrok quota probe is disabled.
+// import { useAccountQuotaAutoRefresh } from "@/hooks/useAccountQuotaAutoRefresh";
 
 type TFn = ReturnType<typeof createT>;
 
@@ -346,8 +344,9 @@ export function useAccountQuotaChrome(opts: {
       const isCurrent = () => !cancelled;
       await refreshAccount({ refreshBilling: false, isCurrent });
       if (cancelled) return;
-      await refreshAccount({ refreshBilling: true, isCurrent });
-      if (cancelled) return;
+      // Disabled: do not probe subscription/quota when the app opens.
+      // await refreshAccount({ refreshBilling: true, isCurrent });
+      // if (cancelled) return;
       await refreshSavedAccounts();
     })();
     return () => {
@@ -357,21 +356,23 @@ export function useAccountQuotaChrome(opts: {
 
   useEffect(() => {
     if (!opts.accountSettingsOpen) return;
-    void refreshAccount({ refreshBilling: true });
+    // Disabled: do not probe subscription/quota when the Account page opens.
+    // void refreshAccount({ refreshBilling: true });
     void refreshSavedAccounts();
-  }, [opts.accountSettingsOpen, refreshAccount, refreshSavedAccounts]);
+  }, [opts.accountSettingsOpen, refreshSavedAccounts]);
 
-  useAccountQuotaAutoRefresh({
-    enabled: api.isTauri(),
-    canFetch: canFetchOfficialQuota(account),
-    refresh: (isCurrent) =>
-      refreshAccount({
-        refreshBilling: true,
-        quiet: true,
-        includeLocalUsage: false,
-        isCurrent,
-      }),
-  });
+  // Disabled: do not poll cli-chat-proxy subscription/quota every 10 minutes.
+  // useAccountQuotaAutoRefresh({
+  //   enabled: api.isTauri(),
+  //   canFetch: canFetchOfficialQuota(account),
+  //   refresh: (isCurrent) =>
+  //     refreshAccount({
+  //       refreshBilling: true,
+  //       quiet: true,
+  //       includeLocalUsage: false,
+  //       isCurrent,
+  //     }),
+  // });
 
   return {
     account,
