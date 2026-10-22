@@ -8,6 +8,7 @@ export {
   listen,
 } from "./api/host";
 
+export * from "./api/agentRuntimes";
 export * from "./api/session";
 export * from "./api/system";
 export * from "./api/project";

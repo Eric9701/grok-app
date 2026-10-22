@@ -775,6 +775,7 @@ pub async fn session_create(
     scheduled: Option<bool>,
 ) -> Result<SessionMeta, String> {
     let meta = store::create_session(project_id, title, scheduled.unwrap_or(false))?;
+    crate::agent_runtimes::apply_desktop_default(&meta.id);
     let id = meta.id.clone();
     Ok(crate::workspace_store::bind_default_workspace_if_unbound(&id).unwrap_or(meta))
 }

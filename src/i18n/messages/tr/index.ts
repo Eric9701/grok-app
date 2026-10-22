@@ -16,6 +16,7 @@ import { trSettingsAgent } from "./settings-agent";
 import { trSettingsCode } from "./settings-code";
 import { trSettingsMemory } from "./settings-memory";
 import { trSettingsPet } from "./settings-pet";
+import { trAgentCli } from "./agentCli";
 import { trSettingsRemoteIm } from "./settings-remoteIm";
 import { trSettingsUi } from "./settings-ui";
 import { trSettings } from "./settings";
@@ -44,6 +45,7 @@ export const tr: Record<MessageKey, string> = {
   ...trSettingsCode,
   ...trSettingsMemory,
   ...trSettingsPet,
+  ...trAgentCli,
   ...trSettingsRemoteIm,
   ...trSettingsUi,
   ...trSettings,

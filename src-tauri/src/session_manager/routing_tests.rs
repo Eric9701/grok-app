@@ -471,7 +471,23 @@ fn hint(app: &str, process: &str, agent: Option<&str>, pif: bool) -> SessionRout
         process_id: process.into(),
         agent_session_id: agent.map(|s| s.into()),
         prompt_in_flight: pif,
+        exclusive_process: false,
     }
+}
+
+#[test]
+fn route_exclusive_process_keeps_stamped_updates_without_atlas_id() {
+    let mut live = hint("app", "proc", None, true);
+    live.exclusive_process = true;
+    assert_eq!(
+        resolve_turn_event_route("proc", Some("cli-session"), Some(&live), &[], &[]),
+        TurnEventRoute::Live
+    );
+    live.exclusive_process = false;
+    assert_eq!(
+        resolve_turn_event_route("proc", Some("cli-session"), Some(&live), &[], &[]),
+        TurnEventRoute::Drop
+    );
 }
 
 #[test]

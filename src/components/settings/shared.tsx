@@ -15,6 +15,7 @@ import {
   IconKeyboard,
   IconMinimize,
   IconPuzzle,
+  IconRobot,
   IconSettings,
   IconUser,
 } from "@/components/icons";
@@ -41,6 +42,7 @@ export function NavIcon({
   if (name === "remote_im") return <IconChat size={size} />;
   if (name === "doctor") return <IconDoctor size={size} />;
   if (name === "cloud") return <IconCloud size={size} />;
+  if (name === "agents") return <IconRobot size={size} />;
   if (name === "info") return <IconInfo size={size} />;
   if (name === "pet") return <IconPet size={size} />;
   return <IconSettings size={size} />;

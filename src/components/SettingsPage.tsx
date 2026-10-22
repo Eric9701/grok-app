@@ -217,6 +217,7 @@ import { ArchivedSection } from "@/components/settings/ArchivedSection";
 import { ExtensionsSection } from "@/components/settings/ExtensionsSection";
 import { RemoteImSection } from "@/components/settings/RemoteImSection";
 import { RuntimeSection } from "@/components/settings/RuntimeSection";
+import { AgentCliSection } from "@/components/settings/AgentCliSection";
 import { AtlasSection } from "@/components/settings/AtlasSection";
 import { ShortcutsSection } from "@/components/settings/ShortcutsSection";
 import { AboutSection } from "@/components/settings/AboutSection";
@@ -1978,6 +1979,7 @@ export function SettingsPage({
         {section === "remote_im" && <RemoteImSection />}
         {section === "runtime" && <RuntimeSection />}
         {section === "atlas" && <AtlasSection />}
+        {section === "agent_cli" && <AgentCliSection />}
         {section === "shortcuts" && <ShortcutsSection />}
         {section === "about" && <AboutSection />}
       </main>

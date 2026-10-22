@@ -61,6 +61,11 @@ import {
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ComposerModelMenu } from "@/components/ComposerModelMenu";
+import {
+  AgentRuntimeChip,
+  sessionUsesForeignRuntime,
+  useAgentRuntimesFile,
+} from "@/components/composer/AgentRuntimeChip";
 import { WorkbenchComposerShell } from "@/app/WorkbenchComposerShell";
 import { MultiRootWorkspaceModal } from "@/components/MultiRootWorkspaceModal";
 import { useMultiRootWorkspace } from "@/hooks/useMultiRootWorkspace";
@@ -364,6 +369,11 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
     handleEffortPick,
   } = p;
   const multiRoot = useMultiRootWorkspace();
+  const runtimeFile = useAgentRuntimesFile();
+  const foreignRuntime = sessionUsesForeignRuntime(
+    runtimeFile,
+    session.sessionId ?? null,
+  );
   const [permBusy, setPermBusy] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
   const askUserSettlingRpcRef = useRef<number | null>(null);
@@ -990,7 +1000,15 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
                 className="composer__model-bar composer__chip-shell"
                 aria-label={tr("composer.model")}
               >
-                <ComposerModelMenu
+                <AgentRuntimeChip
+                  sessionId={session.sessionId ?? null}
+                  busy={
+                    session.state === "streaming" ||
+                    session.state === "awaiting_permission"
+                  }
+                  tr={tr}
+                />
+                {foreignRuntime ? null : <ComposerModelMenu
                   locale={locale}
                   modelId={modelId}
                   effort={effort}
@@ -1037,7 +1055,7 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
                     void handleModelPick(pick);
                   }}
                   onEffort={handleEffortPick}
-                />
+                />}
               </div>
             </div>
             ) : null}

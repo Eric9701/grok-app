@@ -251,6 +251,9 @@ impl SessionManager {
     /// the index. The in-memory shell is updated to those disk values so a
     /// later snapshot write cannot put the spawn-time pair back.
     fn persist_connect_meta(&self, meta: &mut store::SessionMeta) {
+        if crate::agent_runtimes::hides_meta_for_session(&meta.id) {
+            meta.agent_session_id = None;
+        }
         match store::update_session_meta_preserving_composer(meta) {
             Ok(written) => {
                 {
@@ -546,6 +549,13 @@ impl SessionManager {
             }
         }
 
+        let runtime_choice = crate::agent_runtimes::session_runtime(&meta.id);
+        let want_runtime = match &runtime_choice {
+            crate::agent_runtimes::RuntimeChoice::Ready(profile) => Some(profile.id.clone()),
+            crate::agent_runtimes::RuntimeChoice::Broken(_) => Some("__missing__".into()),
+            crate::agent_runtimes::RuntimeChoice::Legacy => None,
+        };
+
         // Target already parked (warm multi-session) → unpark.
         if !pending_fork && self.parked.lock().contains_key(&meta.id) {
             // Park current live if needed (busy → demote to background / park).
@@ -562,7 +572,11 @@ impl SessionManager {
                     .acp
                     .as_ref()
                     .is_none_or(|acp| acp.route_provider_id() == route);
-                if !effort_ok || !policy_ok || !route_ok {
+                let runtime_ok = live
+                    .acp
+                    .as_ref()
+                    .is_none_or(|acp| acp.runtime_profile_id() == want_runtime.as_deref());
+                if !effort_ok || !policy_ok || !route_ok || !runtime_ok {
                     tracing::info!(
                         session = %meta.id,
                         parked_effort = ?live.effort,
@@ -811,7 +825,10 @@ impl SessionManager {
         // Prewarm also omits folder `--trust`, per-session `--rules`,
         // `--system-prompt-override`, and `--plugin-dir`. Reusing it for those
         // connects would silently drop AGENTS.md / session rules.
-        if !pending_fork && ssh_alias.is_none() {
+        if !pending_fork
+            && ssh_alias.is_none()
+            && matches!(runtime_choice, crate::agent_runtimes::RuntimeChoice::Legacy)
+        {
             let project_row_early = meta
                 .project_id
                 .as_deref()
@@ -1087,9 +1104,12 @@ impl SessionManager {
                             let mut guard = self.inner.lock();
                             if let Some(s) = guard.as_mut() {
                                 let _ = s.fsm.handshake_ok();
+                                let hide_agent = acp.hides_agent_session_meta();
                                 s.acp = Some(acp);
                                 s.process_id = reused_process.clone();
-                                s.meta.agent_session_id = Some(agent_sid.clone());
+                                if !hide_agent {
+                                    s.meta.agent_session_id = Some(agent_sid.clone());
+                                }
                                 s.model_id = Some(prefs.model_id.clone());
                                 s.effort = Some(prefs.effort.clone());
                                 s.product_mode = Some(prefs.mode.clone());
@@ -1245,29 +1265,6 @@ impl SessionManager {
             Self::emit_state(&app, &snap);
             return Ok(snap);
         }
-        let cli_path = if ssh_alias.is_some() {
-            std::path::PathBuf::from("grok")
-        } else {
-            let probe = crate::wsl_backend::probe_cli_for_settings(
-                &settings,
-                settings.manual_cli_path.as_deref(),
-            );
-            if !probe.found {
-                {
-                    let mut guard = self.inner.lock();
-                    if let Some(s) = guard.as_mut() {
-                        let _ = s.fsm.connect_failed(AgentError::new(
-                            AgentErrorCode::CliNotFound,
-                            "Atlas CLI not found. Install Atlas CLI or set path in Settings.",
-                        ));
-                    }
-                }
-                let snap = self.snapshot();
-                Self::emit_state(&app, &snap);
-                return Ok(snap);
-            }
-            std::path::PathBuf::from(probe.path.unwrap())
-        };
         // Effective sandbox: project override > app Settings (affects --sandbox / GROK_SANDBOX).
         let project_row = meta
             .project_id
@@ -1346,11 +1343,70 @@ impl SessionManager {
         };
 
         let cwd_str = cwd.to_string_lossy().to_string();
-        let spawn_result = tokio::time::timeout(
-            Duration::from_secs(CONNECT_HANDSHAKE_BUDGET_SECS),
-            AcpClient::spawn_with_options(cli_path, cwd, spawn_opts),
-        )
-        .await;
+        let cwd_for_pipe = cwd.clone();
+        let session_for_pipe = meta.id.clone();
+        let spawn_result = match &runtime_choice {
+            crate::agent_runtimes::RuntimeChoice::Legacy => {
+                let cli_path = if ssh_alias.is_some() {
+                    std::path::PathBuf::from("grok")
+                } else {
+                    let probe = crate::wsl_backend::probe_cli_for_settings(
+                        &settings,
+                        settings.manual_cli_path.as_deref(),
+                    );
+                    if !probe.found {
+                        {
+                            let mut guard = self.inner.lock();
+                            if let Some(s) = guard.as_mut() {
+                                let _ = s.fsm.connect_failed(AgentError::new(
+                                    AgentErrorCode::CliNotFound,
+                                    "Atlas CLI not found. Install Atlas CLI or set path in Settings.",
+                                ));
+                            }
+                        }
+                        let snap = self.snapshot();
+                        Self::emit_state(&app, &snap);
+                        return Ok(snap);
+                    }
+                    std::path::PathBuf::from(probe.path.unwrap())
+                };
+                tokio::time::timeout(
+                    Duration::from_secs(CONNECT_HANDSHAKE_BUDGET_SECS),
+                    AcpClient::spawn_with_options(cli_path, cwd, spawn_opts),
+                )
+                .await
+            }
+            crate::agent_runtimes::RuntimeChoice::Broken(message) => Ok(Err(AgentError::new(
+                AgentErrorCode::ConnectFailed,
+                message.clone(),
+            ))),
+            crate::agent_runtimes::RuntimeChoice::Ready(profile) => {
+                if ssh_alias.is_some() {
+                    Ok(Err(AgentError::new(
+                        AgentErrorCode::ConnectFailed,
+                        "This chat's CLI runs on this computer. Open a local folder.",
+                    )))
+                } else {
+                    let profile = profile.clone();
+                    let cwd_pipe = cwd_for_pipe;
+                    let sid = session_for_pipe;
+                    tokio::time::timeout(
+                        Duration::from_secs(CONNECT_HANDSHAKE_BUDGET_SECS),
+                        async move {
+                            let pipe = crate::agent_runtimes::spawn_acp_pipe(
+                                &profile,
+                                &cwd_pipe,
+                                Some(sid.as_str()),
+                            )
+                            .await
+                            .map_err(|e| AgentError::new(AgentErrorCode::CliNotFound, e))?;
+                            AcpClient::from_acp_pipe(pipe, cwd_pipe, Some(sid)).await
+                        },
+                    )
+                    .await
+                }
+            }
+        };
         let (client, mut events) = match spawn_result {
             Ok(Ok(v)) => {
                 tracing::info!(
@@ -1599,7 +1655,9 @@ impl SessionManager {
                         let _ = s.fsm.handshake_ok();
                         s.acp = Some(client.clone());
                         s.process_id = process_id.clone();
-                        s.meta.agent_session_id = Some(agent_sid.clone());
+                        if !client.hides_agent_session_meta() {
+                            s.meta.agent_session_id = Some(agent_sid.clone());
+                        }
                         s.meta.fork_agent_session = false;
                         s.meta.fork_rewind_prompt_index = None;
                         s.meta.model_id = Some(prefs.model_id.clone());

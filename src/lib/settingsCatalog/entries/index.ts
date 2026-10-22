@@ -1,5 +1,6 @@
 import type { SettingsEntry } from "../types";
 import { ABOUT_ENTRIES } from "./about";
+import { AGENT_CLI_ENTRIES } from "./agentCli";
 import { ATLAS_ENTRIES } from "./atlas";
 import { ACCOUNT_ENTRIES } from "./account";
 import { APPEARANCE_ENTRIES } from "./appearance";
@@ -27,6 +28,7 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   ...RUNTIME_ENTRIES,
   ...RUNTIME_TOOLS_ENTRIES,
   ...ATLAS_ENTRIES,
+  ...AGENT_CLI_ENTRIES,
   ...REMOTE_IM_ENTRIES,
   ...SHORTCUTS_ENTRIES,
   ...ABOUT_ENTRIES,

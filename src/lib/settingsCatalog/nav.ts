@@ -99,6 +99,13 @@ export const SETTINGS_NAV: readonly SettingsNavDef[] = [
     tabs: [],
   },
   {
+    id: "agent_cli",
+    icon: "agents",
+    labelKey: "settings.nav.agentCli",
+    group: "system",
+    tabs: [],
+  },
+  {
     id: "remote_im",
     icon: "remote_im",
     labelKey: "settings.nav.remoteIm",

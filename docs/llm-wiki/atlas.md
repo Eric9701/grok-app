@@ -58,6 +58,8 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 登记：`settingsCatalog` 的 `atlas.relayAgent`。任务带 `agentId`。看板卡片 id 是 `relay:${agentId}:${taskId}`。侧栏「Atlas云端」在任意一条为 `online` 时显示已连接。
 
+执行端可由设置 → 智能体 CLI 里的独立运行时 profile 替换（见 [agent-runtimes.md](./agent-runtimes.md)）。未绑定则仍是本机 Atlas。
+
 同页的 **Atlas云端站点**（`atlasCloudSiteUrl`，`atlas.cloudSite`）是侧栏「Atlas云端」打开的网页。只接受 http 或 https；留空则显示去设置的入口，不挂空白网页。切换菜单时页面保持，地址栏不显示，刷新和用系统应用打开仍在。看板里点中继卡片会在看板内打开该任务的本机执行过程，面板里可以再打开 `#/atlas-cloud`。
 
 智能体看板把这条桥上的 `session/prompt` 当作带来源标记的卡片放进现有列：进行中、已完成、失败（需要你）。取消的不进看板。任务记下 `session/new` 或这条 prompt 的 `cwd`。绝对路径时，目录相同就挂到已有项目；目录还不存在就先建这个目录，再新建一条未信任项目。相对路径和空目录仍挂在「Atlas云端」。任务变成已完成或失败、且这个会话上没有别的进行中任务时，把该 CLI 会话导入这个项目，侧栏项目下出现这条会话，不自动打开。点卡片在看板内打开只读执行过程（本机 CLI 的 `session/update`）。进行中只看这个面板。面板里仍可以打开已经导入的桌面会话；已经导入过就打开原来那条。打开 `#/atlas-cloud` 是面板里的次要动作。过程只留在内存，跟任务一起最多 40 条，重启后清空。侧栏用的状态快照不含步骤；打开面板时另拉 `atlas_relay_task_trace`。

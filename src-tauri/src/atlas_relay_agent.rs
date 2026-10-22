@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, Notify};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -1492,11 +1492,11 @@ async fn run_once(agent_id: &str, gen: u64, ws_url: &str, cancel: &Notify) -> Ru
         return RunEnd::Stopped;
     }
     let model_id = live_model(agent_id);
-    let mut child = match spawn_stdio_agent(&model_id).await {
-        Ok(child) => child,
+    let mut spawned = match spawn_stdio_agent(agent_id, &model_id).await {
+        Ok(spawned) => spawned,
         Err(e) => return RunEnd::Disconnected(Some(e)),
     };
-    let pid = child.id().unwrap_or(0);
+    let pid = spawned.pid;
     with_hub(|h| {
         if let Some(slot) = h.slots.get_mut(agent_id) {
             if slot.gen == gen {
@@ -1506,17 +1506,17 @@ async fn run_once(agent_id: &str, gen: u64, ws_url: &str, cancel: &Notify) -> Ru
         }
     });
     if !slot_is_current(agent_id, gen) {
-        finish_child(agent_id, &mut child, pid).await;
+        finish_child(agent_id, &mut spawned.child, pid).await;
         return RunEnd::Stopped;
     }
 
     let ws = tokio::select! {
         _ = cancelled(agent_id, gen, cancel) => {
-            finish_child(agent_id, &mut child, pid).await;
+            finish_child(agent_id, &mut spawned.child, pid).await;
             return RunEnd::Stopped;
         }
         _ = tokio::time::sleep(CONNECT_TIMEOUT) => {
-            finish_child(agent_id, &mut child, pid).await;
+            finish_child(agent_id, &mut spawned.child, pid).await;
             return RunEnd::Disconnected(Some(format!(
                 "connect timed out ({}s)",
                 CONNECT_TIMEOUT.as_secs()
@@ -1526,14 +1526,14 @@ async fn run_once(agent_id: &str, gen: u64, ws_url: &str, cancel: &Notify) -> Ru
             match result {
                 Ok((ws, _)) => ws,
                 Err(e) => {
-                    finish_child(agent_id, &mut child, pid).await;
+                    finish_child(agent_id, &mut spawned.child, pid).await;
                     return RunEnd::Disconnected(Some(format!("connect failed: {e}")));
                 }
             }
         }
     };
     if !slot_is_current(agent_id, gen) {
-        finish_child(agent_id, &mut child, pid).await;
+        finish_child(agent_id, &mut spawned.child, pid).await;
         return RunEnd::Stopped;
     }
     with_hub(|h| {
@@ -1548,12 +1548,30 @@ async fn run_once(agent_id: &str, gen: u64, ws_url: &str, cancel: &Notify) -> Ru
     let safe_url = redact_relay_url(ws_url);
     tracing::info!(url = %safe_url, pid, agent_id, "atlas relay agent online");
 
-    let stdin = child.stdin.take();
-    let stdout = child.stdout.take();
-    let stderr = child.stderr.take();
-    let end = bridge(agent_id, gen, cancel, ws, stdin, stdout, stderr, &mut child).await;
-    finish_child(agent_id, &mut child, pid).await;
+    let stdin = spawned.stdin;
+    let stdout = spawned.stdout;
+    let stderr = spawned.stderr;
+    let end = bridge(
+        agent_id,
+        gen,
+        cancel,
+        ws,
+        stdin,
+        stdout,
+        stderr,
+        &mut spawned.child,
+    )
+    .await;
+    finish_child(agent_id, &mut spawned.child, pid).await;
     end
+}
+
+struct RelayProc {
+    child: Child,
+    pid: u32,
+    stdin: Box<dyn AsyncWrite + Unpin + Send>,
+    stdout: Box<dyn AsyncRead + Unpin + Send>,
+    stderr: Option<Box<dyn AsyncRead + Unpin + Send>>,
 }
 
 async fn finish_child(agent_id: &str, child: &mut Child, pid: u32) {
@@ -1572,7 +1590,29 @@ async fn finish_child(agent_id: &str, child: &mut Child, pid: u32) {
     let _ = child.wait().await;
 }
 
-async fn spawn_stdio_agent(model_id: &str) -> Result<Child, String> {
+async fn spawn_stdio_agent(agent_id: &str, model_id: &str) -> Result<RelayProc, String> {
+    match crate::agent_runtimes::relay_runtime(agent_id) {
+        crate::agent_runtimes::RuntimeChoice::Ready(mut profile) => {
+            if !model_id.is_empty() {
+                profile.model = model_id.to_string();
+            }
+            let cwd = if profile.home.is_empty() {
+                std::env::temp_dir()
+            } else {
+                std::path::PathBuf::from(&profile.home)
+            };
+            let pipe = crate::agent_runtimes::spawn_acp_pipe(&profile, &cwd, None).await?;
+            return Ok(RelayProc {
+                pid: pipe.pid,
+                stdin: pipe.stdin,
+                stdout: pipe.stdout,
+                stderr: pipe.stderr,
+                child: pipe.child,
+            });
+        }
+        crate::agent_runtimes::RuntimeChoice::Broken(message) => return Err(message),
+        crate::agent_runtimes::RuntimeChoice::Legacy => {}
+    }
     let settings = crate::store::load_settings();
     let probe = crate::cli_probe::probe_cli(settings.manual_cli_path.as_deref());
     let cli_path = probe
@@ -1599,8 +1639,26 @@ async fn spawn_stdio_agent(model_id: &str) -> Result<Child, String> {
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true);
-    cmd.spawn()
-        .map_err(|e| format!("failed to spawn Atlas agent stdio: {e}"))
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("failed to spawn Atlas agent stdio: {e}"))?;
+    let pid = child.id().unwrap_or(0);
+    let stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| "CLI stdin missing".to_string())?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "CLI stdout missing".to_string())?;
+    let stderr = child.stderr.take();
+    Ok(RelayProc {
+        child,
+        pid,
+        stdin: Box::new(stdin),
+        stdout: Box::new(stdout),
+        stderr: stderr.map(|pipe| Box::new(pipe) as Box<dyn AsyncRead + Unpin + Send>),
+    })
 }
 
 async fn bridge(
@@ -1610,17 +1668,11 @@ async fn bridge(
     ws: tokio_tungstenite::WebSocketStream<
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
     >,
-    stdin: Option<tokio::process::ChildStdin>,
-    stdout: Option<tokio::process::ChildStdout>,
-    stderr: Option<tokio::process::ChildStderr>,
+    mut stdin: Box<dyn AsyncWrite + Unpin + Send>,
+    stdout: Box<dyn AsyncRead + Unpin + Send>,
+    stderr: Option<Box<dyn AsyncRead + Unpin + Send>>,
     child: &mut Child,
 ) -> RunEnd {
-    let Some(mut stdin) = stdin else {
-        return RunEnd::Disconnected(Some("CLI stdin missing".into()));
-    };
-    let Some(stdout) = stdout else {
-        return RunEnd::Disconnected(Some("CLI stdout missing".into()));
-    };
     let (mut sink, mut stream) = ws.split();
     let (line_tx, mut line_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let stdout_task = tokio::spawn(async move {
@@ -1775,7 +1827,7 @@ async fn bridge(
 
 async fn write_cloud_frame(
     agent_id: &str,
-    stdin: &mut tokio::process::ChildStdin,
+    stdin: &mut (dyn AsyncWrite + Unpin + Send),
     body: &str,
 ) -> std::io::Result<()> {
     remember_session(agent_id, body, true);
@@ -1784,7 +1836,10 @@ async fn write_cloud_frame(
     write_line(stdin, &body).await
 }
 
-async fn write_line(stdin: &mut tokio::process::ChildStdin, body: &str) -> std::io::Result<()> {
+async fn write_line(
+    stdin: &mut (dyn AsyncWrite + Unpin + Send),
+    body: &str,
+) -> std::io::Result<()> {
     stdin.write_all(body.as_bytes()).await?;
     stdin.write_all(b"\n").await?;
     stdin.flush().await
@@ -1963,6 +2018,30 @@ pub async fn atlas_relay_agent_disconnect(
     crate::store::save_settings_async(&settings).await?;
     stop_agent(&id);
     Ok(status())
+}
+
+/// Point one relay agent at a runtime profile and reconnect only that agent.
+#[tauri::command]
+pub async fn agent_runtimes_set_relay_binding(
+    agent_id: String,
+    profile_id: String,
+) -> Result<crate::agent_runtimes::AgentRuntimesFile, String> {
+    let id = sanitize_agent_id(&agent_id);
+    if id.is_empty() {
+        return Err("empty agent id".into());
+    }
+    let file = crate::agent_runtimes::set_relay_binding(&id, &profile_id)?;
+    let settings = crate::store::load_settings();
+    if let Some(slot) = settings
+        .atlas_relay_agents
+        .iter()
+        .find(|s| sanitize_agent_id(&s.id) == id)
+    {
+        if slot.enabled {
+            start(&slot.url, &slot.id, &slot.token, &slot.model_id)?;
+        }
+    }
+    Ok(file)
 }
 
 #[cfg(test)]
