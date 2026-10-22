@@ -344,6 +344,12 @@ pub async fn models_list_available() -> Result<crate::models_catalog::AvailableM
     Ok(crate::models_catalog::list_available_models())
 }
 
+/// `atlas models refresh`, then the same catalog `models_list_available` reads.
+#[tauri::command]
+pub async fn models_refresh_catalog() -> Result<crate::models_catalog::AvailableModelsResult, String> {
+    crate::models_catalog::refresh_cli_model_catalog().await
+}
+
 #[tauri::command]
 pub async fn composer_prefs_resolve(
     project_id: Option<String>,

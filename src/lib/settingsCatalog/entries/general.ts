@@ -34,7 +34,7 @@ export const GENERAL_ENTRIES: readonly SettingsEntry[] = [
     anchorId: "settings-anchor-availableModels",
     labelKey: "settings.availableModels",
     descKeys: ["settings.availableModelsDesc"],
-    keywords: ["models", "model list", "模型", "模型列表", "模型清單", "可用模型"],
+    keywords: ["models", "model list", "refresh", "atlas models refresh", "模型", "模型列表", "模型清單", "可用模型", "刷新"],
   },
   {
     id: "general.composerMinRows",

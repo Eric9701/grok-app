@@ -101,6 +101,18 @@ describe("GeneralSection voice — custom STT", () => {
     expect(html).toContain('c-select__value">settings.sttLanguage.zhCN');
   });
 
+  it("offers a refresh control on the available-models row", () => {
+    const html = renderSection(
+      buildModel({
+        activeTab: "composer",
+        composerMinRows: "3",
+        availableModels: [{ id: "glm-5", label: "glm-5" }],
+      }),
+    );
+    expect(html).toContain("settings.availableModelsRefresh");
+    expect(html).toContain("glm-5");
+  });
+
   it("key field ships a show/hide reveal button (same as provider keys)", () => {
     const html = renderSection(buildModel({ sttEngine: "custom" }));
     // Default state is hidden → the reveal button offers "show" (shared label

@@ -49,7 +49,7 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
     activeAccountId, activeProject, agentCatalog, agentIdleMinutes, agentProfilePath, agentsJson,
     allowUnverifiedCliInstall, allowedTools, applyComposerPrefs, applyGlobalSandboxProfile, applyPermissionPolicy, applySkinChoice,
     applyThemeChoice, applyThemeScheduleChoice, applyWallpaperAdjustChoice, applyWallpaperChoice, applyWallpaperMediaSize, applyWallpaperScrimChoice, applyWallpaperBlurChoice,
-    archivedGroups, askUserTimeoutSec, auditLedgerRetentionDays, autoWakeEnabled, availableModels, backgroundWaitPolicy,
+    archivedGroups, askUserTimeoutSec, auditLedgerRetentionDays, autoWakeEnabled, availableModels, onAvailableModels, backgroundWaitPolicy,
     backgroundWaitTimeoutSec, cancelAccountLogin, cliAgentSkewRepairing, cliInfo, closeToTray, compactionDetail,
     compactionMode, composerEditor, confirmArchiveOlderThan, defaultOpenTarget, deleteSessionsConfirm, disableWebSearch, disallowedTools,
     effectiveProjectPath, experimentalMemory, goalOrchUiEnabled, handleClearAllSessionMutes, handleClearAllSessionUnread, importChatTranscript,
@@ -263,6 +263,7 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
           .catch(() => {});
           }}
           availableModels={availableModels}
+          onAvailableModels={onAvailableModels}
           manualCliPath={manualCliPath}
           onManualCliPath={setManualCliPath}
           onCliBlur={(v) => {

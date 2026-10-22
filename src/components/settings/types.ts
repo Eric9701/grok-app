@@ -126,6 +126,8 @@ export interface SettingsPageProps {
   prefsScope?: ComposerPrefsScope | string;
   onPrefsScope?: (v: ComposerPrefsScope) => void;
   availableModels?: ModelOption[];
+  /** Replace the shared catalog after `atlas models refresh`. */
+  onAvailableModels?: (models: ModelOption[]) => void;
   manualCliPath: string;
   onManualCliPath: (v: string) => void;
   onCliBlur: (v: string) => void;

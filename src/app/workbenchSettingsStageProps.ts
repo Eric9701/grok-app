@@ -73,6 +73,7 @@ export type WorkbenchSettingsStageProps = {
   auditLedgerRetentionDays: number;
   autoWakeEnabled: boolean;
   availableModels: ModelOption[];
+  onAvailableModels: (models: ModelOption[]) => void;
   backgroundWaitPolicy: string;
   backgroundWaitTimeoutSec: number;
   cancelAccountLogin: () => Promise<void>;

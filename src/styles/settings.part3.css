@@ -181,6 +181,15 @@
   color: var(--text-secondary);
 }
 
+.settings-models-refresh {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.settings-models-refresh__error {
+  color: var(--danger, #e07040);
+}
+
 .settings-models-list {
   display: flex;
   flex-direction: column;

@@ -96,7 +96,7 @@ Atlas 企业环境常常**没有** `models_cache.json`（或托管 ENC 校验失
 
 默认：`[models].default`（例如 `arch-kimi-for-coding`）。展示名用明文 `name`，跳过 `ENC(...)` 与 `hidden = true`。密钥不下发前端。
 
-立刻刷新企业目录：终端 `atlas models refresh`（或会话 `/refresh-model`），然后重开 Composer / 再进设置。
+立刻刷新企业目录：设置 → 常规 → 对话偏好里「可用模型」的刷新按钮会跑 `atlas models refresh`，然后重读这份目录（Composer 下拉用同一份）。终端 `atlas models refresh` 或会话 `/refresh-model` 仍然有效。
 
 ## 账号主路
 

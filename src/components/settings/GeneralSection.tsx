@@ -6,7 +6,7 @@ import { useSettingsModel } from "@/providers/SettingsModelContext";
 
 import { Select } from "@/components/Select";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { IconLanguage, IconShield } from "@/components/icons";
+import { IconLanguage, IconRefresh, IconShield } from "@/components/icons";
 import {
   COMMON_DISALLOWED_TOOLS,
   isToolDisallowed,
@@ -87,6 +87,7 @@ import { CodebaseSearchPanel } from "@/components/CodebaseSearchPanel";
 import { AgentConfigTomlPanel } from "@/components/AgentConfigTomlPanel";
 import { CliSessionsPanel } from "./CliSessionsPanel";
 import { SettingsTabStrip, UiCheck } from "./shared";
+import { catalogFromAvailableModels } from "@/lib/availableModelsCatalog";
 import { resolveLocale } from "@/i18n";
 import type { MessageKey } from "@/i18n";
 import * as api from "@/lib/api";
@@ -110,6 +111,7 @@ export function GeneralSection() {
     askUserTimeoutSec,
     autoWakeEnabled,
     availableModels = [],
+    onAvailableModels,
     backgroundWaitPolicy,
     backgroundWaitTimeoutSec = 600,
     clearMemoryBusy,
@@ -252,6 +254,10 @@ export function GeneralSection() {
   // blur only — never on keystroke; the stored value never comes back to the
   // webview, mirroring the big-model key fields).
   const [sttCustomApiKeyDraft, setSttCustomApiKeyDraft] = useState("");
+  const [modelsRefreshBusy, setModelsRefreshBusy] = useState(false);
+  const [modelsRefreshError, setModelsRefreshError] = useState<string | null>(
+    null,
+  );
   // Whether the key field shows plaintext (session-only, like ProvidersPanel).
   const [sttCustomKeyVisible, setSttCustomKeyVisible] = useState(false);
   // Per-provider "a key is saved" presence from the host (masked).
@@ -322,11 +328,53 @@ export function GeneralSection() {
               >
                 <div className="settings-row__text">
                   <div className="settings-row__label">
-                    {t("settings.availableModels")}
+                    <span>{t("settings.availableModels")}</span>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm settings-models-refresh"
+                      disabled={modelsRefreshBusy}
+                      aria-label={t("settings.availableModelsRefresh")}
+                      onClick={() => {
+                        if (modelsRefreshBusy) return;
+                        setModelsRefreshBusy(true);
+                        setModelsRefreshError(null);
+                        void api
+                          .modelsRefreshCatalog()
+                          .then((res) => {
+                            const next = catalogFromAvailableModels(res);
+                            if (next.length > 0) onAvailableModels?.(next);
+                          })
+                          .catch((err: unknown) => {
+                            const detail =
+                              err instanceof Error
+                                ? err.message
+                                : String(err ?? "");
+                            const failed = t(
+                              "settings.availableModelsRefreshFailed",
+                            );
+                            setModelsRefreshError(
+                              detail && detail !== failed
+                                ? `${failed} ${detail}`
+                                : failed,
+                            );
+                          })
+                          .finally(() => setModelsRefreshBusy(false));
+                      }}
+                    >
+                      <IconRefresh size={14} />
+                      {modelsRefreshBusy
+                        ? t("settings.availableModelsRefreshing")
+                        : t("settings.availableModelsRefresh")}
+                    </button>
                   </div>
                   <div className="settings-row__desc">
                     {t("settings.availableModelsDesc")}
                   </div>
+                  {modelsRefreshError ? (
+                    <div className="settings-row__desc settings-models-refresh__error">
+                      {modelsRefreshError}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="settings-models-list" role="list">
                   {availableModels.length === 0 ? (
