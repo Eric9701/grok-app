@@ -131,6 +131,7 @@ export const ruSettings = {
   "settings.cliUpdate": "Обновления CLI",
   "settings.cliUpdateDesc": "Проверить обновления CLI (`atlas update --check --json`), сменить каналы stable/alpha (CLI 0.2.117+) или зафиксировать версию.",
   "settings.cliUpdateCheck": "Проверить обновления CLI",
+  "settings.cliUpdateRun": "Проверить и обновить",
   "settings.cliUpdateChecking": "Проверка…",
   "settings.cliUpdateLatest": "Установлена актуальная версия CLI ({version}).",
   "settings.cliUpdateAvailable": "Доступна CLI {latest} (установлена {current}).",

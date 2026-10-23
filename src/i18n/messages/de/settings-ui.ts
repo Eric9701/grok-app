@@ -772,5 +772,5 @@ export const deSettingsUi = {
   "settings.wallpaperSource.attribution": "Quelle und Lizenz",
   "settings.wallpaperSource.loadingMore": "Weitere werden geladen…",
   "settings.remoteUpdatesDisabled": "Remote-Updates sind deaktiviert",
-  "settings.remoteUpdatesDisabledDesc": "Dieser Atlas-Build prüft nicht GitHub und führt kein atlas update aus.",
+  "settings.remoteUpdatesDisabledDesc": "Dieser Atlas-Build prüft GitHub nicht im Hintergrund. Die Schaltfläche führt atlas update aus.",
 } as const;

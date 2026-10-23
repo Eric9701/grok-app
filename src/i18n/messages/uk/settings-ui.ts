@@ -771,5 +771,5 @@ export const ukSettingsUi = {
   "settings.wallpaperSource.attribution": "Джерело й ліцензія",
   "settings.wallpaperSource.loadingMore": "Завантаження…",
   "settings.remoteUpdatesDisabled": "Віддалені оновлення вимкнено",
-  "settings.remoteUpdatesDisabledDesc": "Ця збірка Atlas не перевіряє GitHub і не запускає atlas update.",
+  "settings.remoteUpdatesDisabledDesc": "Ця збірка Atlas не перевіряє GitHub у фоні. Кнопка запускає atlas update.",
 } as const;

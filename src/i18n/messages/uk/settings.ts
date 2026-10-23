@@ -130,6 +130,7 @@ export const ukSettings = {
   "settings.cliUpdate": "Оновлення CLI",
   "settings.cliUpdateDesc": "Перевірте наявність оновлень CLI (`atlas update --check --json`), перемкніть стабільний/альфа-канал (CLI 0.2.117+) або закріпіть версію.",
   "settings.cliUpdateCheck": "Перевірити оновлення CLI",
+  "settings.cliUpdateRun": "Перевірити й оновити",
   "settings.cliUpdateChecking": "Перевірка…",
   "settings.cliUpdateLatest": "CLI актуальний ({version}).",
   "settings.cliUpdateAvailable": "CLI {latest} доступно (у вас {current}).",

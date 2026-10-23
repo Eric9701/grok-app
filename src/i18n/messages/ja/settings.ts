@@ -129,6 +129,7 @@ export const jaSettings = {
   "settings.cliUpdate": "CLI 更新",
   "settings.cliUpdateDesc": "CLI 更新を確認（`atlas update --check --json`）、stable/alpha チャネルを切り替える（CLI 0.2.117+）、またはバージョンをピンします。",
   "settings.cliUpdateCheck": "CLI 更新を確認",
+  "settings.cliUpdateRun": "確認して更新",
   "settings.cliUpdateChecking": "確認中…",
   "settings.cliUpdateLatest": "CLI は最新です（{version}）。",
   "settings.cliUpdateAvailable": "CLI {latest} が利用できます（現在 {current}）。",

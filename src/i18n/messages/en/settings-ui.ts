@@ -771,5 +771,5 @@ export const enSettingsUi = {
   "settings.wallpaperSource.attribution": "Source and license",
   "settings.wallpaperSource.loadingMore": "Loading more…",
   "settings.remoteUpdatesDisabled": "Remote updates are off",
-  "settings.remoteUpdatesDisabledDesc": "This Atlas build does not check GitHub or run atlas update.",
+  "settings.remoteUpdatesDisabledDesc": "This Atlas build does not check GitHub in the background. The button runs atlas update.",
 } as const;

@@ -129,6 +129,7 @@ export const itSettings = {
   "settings.cliUpdate": "Aggiornamenti CLI",
   "settings.cliUpdateDesc": "Controlla aggiornamenti CLI (`atlas update --check --json`), cambia canali stable/alpha (CLI 0.2.117+) o fissa una versione.",
   "settings.cliUpdateCheck": "Controlla aggiornamenti CLI",
+  "settings.cliUpdateRun": "Controlla e aggiorna",
   "settings.cliUpdateChecking": "Controllo…",
   "settings.cliUpdateLatest": "La CLI è aggiornata ({version}).",
   "settings.cliUpdateAvailable": "CLI {latest} è disponibile (hai {current}).",

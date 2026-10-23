@@ -152,6 +152,7 @@ export const enSettings = {
   "settings.cliUpdate": "CLI updates",
   "settings.cliUpdateDesc": "Check for CLI updates (`atlas update --check --json`), switch stable/alpha channels (CLI 0.2.117+), or pin a version.",
   "settings.cliUpdateCheck": "Check for CLI updates",
+  "settings.cliUpdateRun": "Check and update",
   "settings.cliUpdateChecking": "Checking…",
   "settings.cliUpdateLatest": "CLI is up to date ({version}).",
   "settings.cliUpdateAvailable": "CLI {latest} is available (you have {current}).",

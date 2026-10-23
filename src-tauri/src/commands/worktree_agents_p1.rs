@@ -564,6 +564,17 @@ pub async fn cli_update_install(
     crate::cli_update::install_cli_update(app, opts).await
 }
 
+/// Run `atlas update` only. Does not probe GitHub or fall back to the App installer.
+#[tauri::command]
+pub async fn cli_update_run() -> Result<crate::cli_install::CliInstallResult, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let settings = store::load_settings();
+        crate::cli_update::run_plain_atlas_update(settings.manual_cli_path.as_deref())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Recycle every warm agent process so the next send spawns fresh binaries.
 /// Used after a CLI upgrade — running children keep executing the old image
 /// until restarted (NEW-05). Chat history is untouched; sessions reconnect

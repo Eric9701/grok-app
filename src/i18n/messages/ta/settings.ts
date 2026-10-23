@@ -131,6 +131,7 @@ export const taSettings = {
   "settings.cliUpdate": "CLI புதுப்பிப்புகள்",
   "settings.cliUpdateDesc": "CLI புதுப்பிப்புகளைச் சரிபார்க்கவும் (`atlas update --check --json`), நிலையான/ஆல்ஃபா சேனல்களை மாற்றவும் (CLI 0.2.117+), அல்லது பதிப்பைப் பின் செய்யவும்.",
   "settings.cliUpdateCheck": "CLI புதுப்பிப்புகளைச் சரிபார்க்கவும்",
+  "settings.cliUpdateRun": "சரிபார்த்து புதுப்பி",
   "settings.cliUpdateChecking": "சரிபார்க்கிறது…",
   "settings.cliUpdateLatest": "CLI புதுப்பித்த நிலையில் உள்ளது ({version}).",
   "settings.cliUpdateAvailable": "CLI {latest} கிடைக்கிறது (உங்களிடம் {current} உள்ளது).",

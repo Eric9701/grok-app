@@ -131,6 +131,7 @@ export const koSettings = {
   "settings.cliUpdate": "CLI 업데이트",
   "settings.cliUpdateDesc": "CLI 업데이트를 확인하고(`atlas update --check --json`), stable/alpha 채널을 전환하거나(CLI 0.2.117+), 버전을 고정하세요.",
   "settings.cliUpdateCheck": "CLI 업데이트 확인",
+  "settings.cliUpdateRun": "확인하고 업데이트",
   "settings.cliUpdateChecking": "확인 중…",
   "settings.cliUpdateLatest": "CLI가 최신입니다({version}).",
   "settings.cliUpdateAvailable": "CLI {latest}을(를) 사용할 수 있습니다(현재 {current}).",

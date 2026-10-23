@@ -771,5 +771,5 @@ export const taSettingsUi = {
   "settings.wallpaperSource.attribution": "மூலம் மற்றும் உரிமம்",
   "settings.wallpaperSource.loadingMore": "மேலும் ஏற்றுகிறது…",
   "settings.remoteUpdatesDisabled": "தொலை புதுப்பிப்புகள் அணைக்கப்பட்டுள்ளன",
-  "settings.remoteUpdatesDisabledDesc": "இந்த Atlas உருவாக்கம் GitHub-ஐ சரிபார்க்காது, atlas update-ஐ இயக்காது.",
+  "settings.remoteUpdatesDisabledDesc": "இந்த Atlas உருவாக்கம் பின்னணியில் GitHub-ஐ சரிபார்க்காது. பொத்தான் atlas update-ஐ இயக்கும்.",
 } as const;

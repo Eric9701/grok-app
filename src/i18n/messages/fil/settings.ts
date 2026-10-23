@@ -129,6 +129,7 @@ export const filSettings = {
   "settings.cliUpdate": "Mga update ng CLI",
   "settings.cliUpdateDesc": "Tingnan kung may update ng CLI (`atlas update --check --json`), palitan ang stable/alpha channel (CLI 0.2.117+), o i-pin ang bersyon.",
   "settings.cliUpdateCheck": "Tingnan kung may update ng CLI",
+  "settings.cliUpdateRun": "Suriin at i-update",
   "settings.cliUpdateChecking": "Tinitingnan…",
   "settings.cliUpdateLatest": "Updated na ang CLI ({version}).",
   "settings.cliUpdateAvailable": "Available ang CLI {latest} (nasa {current} ka).",

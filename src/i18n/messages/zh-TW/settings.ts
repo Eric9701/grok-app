@@ -152,6 +152,7 @@ export const zhTWSettings = {
   "settings.cliUpdate": "CLI 更新",
   "settings.cliUpdateDesc": "檢查 CLI 更新（`atlas update --check --json`），切換 stable/alpha 通道（CLI 0.2.117+），或固定版本。",
   "settings.cliUpdateCheck": "檢查 CLI 更新",
+  "settings.cliUpdateRun": "檢查並升級",
   "settings.cliUpdateChecking": "檢查中…",
   "settings.cliUpdateLatest": "CLI 已是最新（{version}）。",
   "settings.cliUpdateAvailable": "有新 CLI 版本 {latest}（目前 {current}）。",

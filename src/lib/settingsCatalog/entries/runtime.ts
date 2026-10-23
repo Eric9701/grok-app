@@ -403,6 +403,7 @@ export const RUNTIME_ENTRIES: readonly SettingsEntry[] = [
     ],
     keywords: [
       "cli update",
+      "atlas update",
       "grok update",
       "channel",
       "alpha",

@@ -771,5 +771,5 @@ export const zhSettingsUi = {
   "settings.wallpaperSource.attribution": "来源与许可",
   "settings.wallpaperSource.loadingMore": "正在加载更多…",
   "settings.remoteUpdatesDisabled": "远程更新已关闭",
-  "settings.remoteUpdatesDisabledDesc": "本 Atlas 构建不会检查 GitHub，也不会执行 atlas update。",
+  "settings.remoteUpdatesDisabledDesc": "本 Atlas 构建不会在后台检查 GitHub。按钮会执行 atlas update。",
 } as const;

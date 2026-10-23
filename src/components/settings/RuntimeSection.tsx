@@ -306,6 +306,19 @@ export function RuntimeSection() {
                     t={t}
                     cliFound={cliInfo.found}
                     autoCheck
+                    onAfterInstall={() => {
+                      void (async () => {
+                        try {
+                          const mod = await import("@/lib/api");
+                          const probed = await mod.probeCli(
+                            manualCliPath || undefined,
+                          );
+                          onCliInfoRefresh?.(probed);
+                        } catch {
+                          /* version chip stays until the next probe */
+                        }
+                      })();
+                    }}
                   />
                 </div>
               </div>

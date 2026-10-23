@@ -129,6 +129,7 @@ export const deSettings = {
   "settings.cliUpdate": "CLI-Updates",
   "settings.cliUpdateDesc": "Auf CLI-Updates prüfen (`atlas update --check --json`), stable/alpha-Kanäle wechseln (CLI 0.2.117+) oder eine Version pinnen.",
   "settings.cliUpdateCheck": "Auf CLI-Updates prüfen",
+  "settings.cliUpdateRun": "Prüfen und aktualisieren",
   "settings.cliUpdateChecking": "Prüfen…",
   "settings.cliUpdateLatest": "CLI ist aktuell ({version}).",
   "settings.cliUpdateAvailable": "CLI {latest} ist verfügbar (du hast {current}).",

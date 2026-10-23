@@ -771,5 +771,5 @@ export const filSettingsUi = {
   "settings.wallpaperSource.attribution": "Source at lisensya",
   "settings.wallpaperSource.loadingMore": "Naglo-load pa…",
   "settings.remoteUpdatesDisabled": "Naka-off ang remote updates",
-  "settings.remoteUpdatesDisabledDesc": "Ang Atlas build na ito ay hindi tumitingin sa GitHub at hindi nagpapatakbo ng atlas update.",
+  "settings.remoteUpdatesDisabledDesc": "Ang Atlas build na ito ay hindi tumitingin sa GitHub sa background. Ang button ay nagpapatakbo ng atlas update.",
 } as const;

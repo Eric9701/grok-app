@@ -246,6 +246,38 @@ export function CliUpdateRow({
           ? t("settings.cliUpdate.appBehindTitle")
           : t("settings.cliUpdate");
 
+  const runAtlasUpdate = async () => {
+    if (!api.isTauri()) {
+      setError("not in Tauri");
+      return;
+    }
+    if (cliFound === false) {
+      setError(t("settings.cliUpdateNeedCli"));
+      return;
+    }
+    setBusy("install");
+    setError(null);
+    setInstallMsg(null);
+    try {
+      const r = await api.cliUpdateRun();
+      if (r.ok === false) {
+        setError(r.message || r.error || "update failed");
+        return;
+      }
+      const version = r.version || "—";
+      setInstallMsg(
+        r.message ||
+          t("settings.cliUpdateDone", { version: String(version) }),
+      );
+      setNeedsRestart(true);
+      onAfterInstall?.();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (!REMOTE_UPDATES_ENABLED) {
     return (
       <div
@@ -260,6 +292,47 @@ export function CliUpdateRow({
           <div className="settings-row__desc">
             {t("settings.remoteUpdatesDisabledDesc")}
           </div>
+        </div>
+        <div className="settings-cli-update">
+          <div className="settings-cli-update__actions">
+            <button
+              type="button"
+              className="btn btn--solid"
+              disabled={busy !== null || restarting}
+              onClick={() => void runAtlasUpdate()}
+            >
+              {busy === "install"
+                ? t("settings.cliUpdateInstalling")
+                : t("settings.cliUpdateRun")}
+            </button>
+          </div>
+          {error ? (
+            <div className="settings-cli-update__err" role="alert">
+              {t("settings.cliUpdateInstallFailed", { error })}
+            </div>
+          ) : null}
+          {installMsg && !error ? (
+            <div className="settings-cli-update__status" role="status">
+              {installMsg}
+            </div>
+          ) : null}
+          {needsRestart && !error ? (
+            <div className="settings-cli-update__status" role="status">
+              <span className="settings-cli-update__status-text">
+                {t("settings.cliUpdateRestartHint")}
+              </span>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={restarting}
+                onClick={() => void restartSessions()}
+              >
+                {restarting
+                  ? t("settings.cliUpdateRestarting")
+                  : t("settings.cliUpdateRestartAction")}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     );

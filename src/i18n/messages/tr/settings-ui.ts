@@ -777,6 +777,6 @@ export const trSettingsUi = {
   "settings.wallpaperSource.loadingMore": "Daha fazla yükleniyor…",
   "settings.nav.atlas": "Atlas",
   "settings.remoteUpdatesDisabled": "Remote updates are off",
-  "settings.remoteUpdatesDisabledDesc": "This Atlas build does not check GitHub or run atlas update.",
+  "settings.remoteUpdatesDisabledDesc": "Bu Atlas derlemesi arka planda GitHub kontrol etmez. Düğme atlas update çalıştırır.",
 
 };

@@ -771,5 +771,5 @@ export const idSettingsUi = {
   "settings.wallpaperSource.attribution": "Sumber dan lisensi",
   "settings.wallpaperSource.loadingMore": "Memuat lainnya…",
   "settings.remoteUpdatesDisabled": "Pembaruan jarak jauh nonaktif",
-  "settings.remoteUpdatesDisabledDesc": "Build Atlas ini tidak memeriksa GitHub dan tidak menjalankan atlas update.",
+  "settings.remoteUpdatesDisabledDesc": "Build Atlas ini tidak memeriksa GitHub di latar belakang. Tombol menjalankan atlas update.",
 } as const;

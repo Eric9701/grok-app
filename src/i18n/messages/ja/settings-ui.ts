@@ -771,5 +771,5 @@ export const jaSettingsUi = {
   "settings.wallpaperSource.attribution": "ソースとライセンス",
   "settings.wallpaperSource.loadingMore": "さらに読み込み中…",
   "settings.remoteUpdatesDisabled": "リモート更新はオフです",
-  "settings.remoteUpdatesDisabledDesc": "この Atlas ビルドは GitHub を確認せず、atlas update も実行しません。",
+  "settings.remoteUpdatesDisabledDesc": "この Atlas ビルドはバックグラウンドで GitHub を確認しません。ボタンは atlas update を実行します。",
 } as const;

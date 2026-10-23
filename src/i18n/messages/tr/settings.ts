@@ -158,6 +158,7 @@ export const trSettings = {
   "settings.cliUpdate": "CLI güncellemeleri",
   "settings.cliUpdateDesc": "CLI güncellemelerini denetleyin (`grok update --check --json`), kararlı/alfa kanalları arasında geçin (CLI 0.2.117+) ya da bir sürüm sabitleyin.",
   "settings.cliUpdateCheck": "CLI güncellemelerini denetle",
+  "settings.cliUpdateRun": "Kontrol et ve güncelle",
   "settings.cliUpdateChecking": "Denetleniyor…",
   "settings.cliUpdateLatest": "CLI güncel ({version}).",
   "settings.cliUpdateAvailable": "CLI {latest} mevcut (sizdeki {current}).",

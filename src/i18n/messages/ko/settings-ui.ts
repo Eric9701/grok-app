@@ -771,5 +771,5 @@ export const koSettingsUi = {
   "settings.wallpaperSource.attribution": "출처 및 라이선스",
   "settings.wallpaperSource.loadingMore": "더 불러오는 중…",
   "settings.remoteUpdatesDisabled": "원격 업데이트가 꺼져 있습니다",
-  "settings.remoteUpdatesDisabledDesc": "이 Atlas 빌드는 GitHub를 확인하지 않으며 atlas update도 실행하지 않습니다.",
+  "settings.remoteUpdatesDisabledDesc": "이 Atlas 빌드는 백그라운드에서 GitHub를 확인하지 않습니다. 버튼은 atlas update를 실행합니다.",
 } as const;

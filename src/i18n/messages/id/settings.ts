@@ -129,6 +129,7 @@ export const idSettings = {
   "settings.cliUpdate": "Pembaruan CLI",
   "settings.cliUpdateDesc": "Periksa pembaruan CLI (`atlas update --check --json`), alihkan saluran stable/alpha (CLI 0.2.117+), atau kunci versi.",
   "settings.cliUpdateCheck": "Periksa pembaruan CLI",
+  "settings.cliUpdateRun": "Periksa dan perbarui",
   "settings.cliUpdateChecking": "Memeriksa…",
   "settings.cliUpdateLatest": "CLI sudah mutakhir ({version}).",
   "settings.cliUpdateAvailable": "CLI {latest} tersedia (Anda punya {current}).",

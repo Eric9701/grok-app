@@ -771,5 +771,5 @@ export const ruSettingsUi = {
   "settings.wallpaperSource.attribution": "Источник и лицензия",
   "settings.wallpaperSource.loadingMore": "Загрузка…",
   "settings.remoteUpdatesDisabled": "Удалённые обновления отключены",
-  "settings.remoteUpdatesDisabledDesc": "Эта сборка Atlas не проверяет GitHub и не запускает atlas update.",
+  "settings.remoteUpdatesDisabledDesc": "Эта сборка Atlas не проверяет GitHub в фоне. Кнопка запускает atlas update.",
 } as const;

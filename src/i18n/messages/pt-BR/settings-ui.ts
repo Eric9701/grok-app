@@ -771,5 +771,5 @@ export const ptBRSettingsUi = {
   "settings.wallpaperSource.attribution": "Fonte e licença",
   "settings.wallpaperSource.loadingMore": "Carregando mais…",
   "settings.remoteUpdatesDisabled": "Atualizações remotas desativadas",
-  "settings.remoteUpdatesDisabledDesc": "Este build do Atlas não consulta o GitHub nem executa atlas update.",
+  "settings.remoteUpdatesDisabledDesc": "Este build do Atlas não consulta o GitHub em segundo plano. O botão executa atlas update.",
 } as const;

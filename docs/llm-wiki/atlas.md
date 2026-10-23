@@ -41,7 +41,7 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 本白标**不**向 GitHub / 官方 updater 探活，也**不**在启动后跑 `atlas update --check`：
 
 - 应用：无后台检查、设置 → 关于 无「检查更新」、侧栏无更新徽章
-- CLI：设置里的更新行只说明已关闭；不代跑 `atlas update` / 切通道 / 钉版本
+- CLI：设置 → CLI / 运行时 的「CLI 更新」有按钮，点击才执行 `atlas update`。不在启动时检查，不切通道，不钉版本，也不走 GitHub App 更新。子进程会去掉 `npm_config_user_agent`，避免 `npm run dev` 把内部安装误判成 npm（Windows 上会报 `program not found`）
 - 首次安装 CLI 仍走企业 `atlas/cli` 基址（`cli_install`），与「远程更新」探测分开
 
 开关：`src/lib/remoteUpdates.ts` 与 `src-tauri/src/remote_updates.rs` 的 `REMOTE_UPDATES_ENABLED`（当前 `false`）。

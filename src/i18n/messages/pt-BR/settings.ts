@@ -129,6 +129,7 @@ export const ptBRSettings = {
   "settings.cliUpdate": "Atualizações da CLI",
   "settings.cliUpdateDesc": "Verificar atualizações da CLI (`atlas update --check --json`), trocar canais stable/alpha (CLI 0.2.117+), ou fixar uma versão.",
   "settings.cliUpdateCheck": "Verificar atualizações da CLI",
+  "settings.cliUpdateRun": "Verificar e atualizar",
   "settings.cliUpdateChecking": "Verificando…",
   "settings.cliUpdateLatest": "A CLI está atualizada ({version}).",
   "settings.cliUpdateAvailable": "CLI {latest} está disponível (você tem {current}).",

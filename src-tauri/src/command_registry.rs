@@ -68,6 +68,7 @@ pub fn app_invoke_handler(
         commands::cli_install_commands,
         commands::cli_update_check,
         commands::cli_update_install,
+        commands::cli_update_run,
         commands::pick_cli_binary,
         commands::pick_agent_profile,
         commands::open_external_url,
