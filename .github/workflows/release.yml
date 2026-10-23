@@ -290,6 +290,10 @@ jobs:
           GROK_UPDATER_ENDPOINT: https://github.com/${{ github.repository }}/releases/download/grok-desktop-latest/latest.json
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Vite/tsc runs inside beforeBuildCommand. Default Node heap aborts
+          # with exit 134 on the 7 GB macOS runner after "built". Stay under
+          # the machine RAM so the OS does not SIGKILL the process (137).
+          NODE_OPTIONS: --max-old-space-size=6144
         with:
           # Root package.json + src-tauri/ layout (create-tauri-app style)
           projectPath: .
