@@ -93,7 +93,7 @@ Checksum: missing sidecar may offer **Install without checksum**; **mismatch nev
 | Manual | `~` expansion | `~` / `%USERPROFILE%` / auto-append `.exe` |
 | Home dir | `$HOME` | **`USERPROFILE` first** (not MSYS `$HOME`) |
 
-`--version` is preferred; a runnable binary without version still counts as found.
+`--version` 必须退出码为 0 并输出版本。非 0、超时、无法启动或没有输出版本都视为未安装，继续试下一个候选。
 
 ## Commands
 

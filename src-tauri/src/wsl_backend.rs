@@ -243,10 +243,15 @@ pub fn probe_wsl_cli(settings: &AppSettings) -> CliProbeResult {
 
     let (path_out, version_out, ok) = run_wsl_cli_probe(&wsl, &launch);
     let display = wsl_display_path(&launch).display().to_string();
-    let path = path_out
-        .filter(|p| !p.is_empty())
-        .or_else(|| Some(display.clone()));
     let version = version_out.filter(|v| !v.trim().is_empty());
+    let installed = crate::cli_probe::version_probe_installed(ok, version.as_deref());
+    let path = if installed {
+        path_out
+            .filter(|p| !p.is_empty())
+            .or_else(|| Some(display.clone()))
+    } else {
+        None
+    };
     let version_supported = version.as_deref().and_then(cli_version_supported);
     let meets_recommended = version.as_deref().and_then(cli_meets_recommended);
 
@@ -255,7 +260,7 @@ pub fn probe_wsl_cli(settings: &AppSettings) -> CliProbeResult {
     let cli_auth_present = false;
 
     CliProbeResult {
-        found: ok || version.is_some(),
+        found: installed,
         path,
         version: version.clone(),
         source: "wsl".into(),
@@ -509,17 +514,21 @@ fn run_wsl_direct_probe(
     process_util::apply_no_window_std(&mut cmd);
     let mut child = cmd.spawn().ok()?;
     let (out, success) = wait_wsl_probe(&mut child)?;
-    let version = out
-        .lines()
-        .map(str::trim)
-        .find(|l| {
-            !l.is_empty()
-                && (l.to_ascii_lowercase().contains("atlas")
-                    || l.to_ascii_lowercase().contains("grok")
-                    || extract_version_token(l).is_some())
-        })
-        .map(|s| s.to_string());
-    let ok = success || version.is_some();
+    // Failed `--version` is not an install, even when stderr names atlas/grok.
+    let version = if success {
+        out.lines()
+            .map(str::trim)
+            .find(|l| {
+                !l.is_empty()
+                    && (l.to_ascii_lowercase().contains("atlas")
+                        || l.to_ascii_lowercase().contains("grok")
+                        || extract_version_token(l).is_some())
+            })
+            .map(|s| s.to_string())
+    } else {
+        None
+    };
+    let ok = version.is_some();
     Some((Some(launch.linux_cli.clone()), version, ok))
 }
 
