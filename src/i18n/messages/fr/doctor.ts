@@ -1,6 +1,6 @@
 /** fr messages — domain: doctor */
 export const frDoctor = {
-  "setup.title": "Bienvenue dans Atlas",
+  "setup.title": "Bienvenue dans AtlasBuddy",
   "setup.subtitle": "MIT · Bureau non officiel pour Atlas CLI",
   "setup.step.runtime": "Exécution",
   "setup.step.account": "Compte",

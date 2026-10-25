@@ -190,7 +190,7 @@ export const deSettings = {
   "settings.atlasRelayAgentImportInvalid": "In diesem Text fehlt eine Relay-Adresse mit Agent-ID.",
   "settings.atlasCloudSite": "Atlas-Cloud-Seite",
   "settings.atlasCloudSiteDesc": "Seite, die der Eintrag Atlas Cloud in der Seitenleiste öffnet. Beim Wechseln der Menüs bleibt die Seite erhalten und die Adresse bleibt ausgeblendet.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "Gib eine http- oder https-Adresse ein.",
   "settings.acpSetupHint": "Auf dem Gerät, das den Agenten ausführt, stdio über TCP exponieren (Beispiel mit socat):",
   "settings.maxConcurrentAgents": "Max. gleichzeitige Agenten",

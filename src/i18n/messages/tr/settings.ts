@@ -598,7 +598,7 @@ export const trSettings = {
   "settings.atlasRelayAgentImportInvalid": "That text has no relay address with an agent id.",
   "settings.atlasCloudSite": "Atlas Cloud site",
   "settings.atlasCloudSiteDesc": "Page opened by the Atlas Cloud item in the sidebar. Switching menus keeps the page and hides the address.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "Enter an http or https address.",
   "settings.atlasCliMirror": "Atlas CLI install base",
   "settings.atlasCliMirrorDesc": "Enterprise atlas/cli URL for App-managed install and the copy-install command. Empty uses ATLAS_CLI_MIRROR or the built-in default.",

@@ -4,7 +4,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Atlas",
+        "title": "AtlasBuddy",
         "visible": false,
         "create": false,
         "width": 1200,

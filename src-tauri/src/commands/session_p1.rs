@@ -846,8 +846,8 @@ pub fn open_session_window(
         .as_ref()
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
-        .map(|t| format!("Grok · {t}"))
-        .unwrap_or_else(|| "Atlas".to_string());
+        .map(|t| format!("AtlasBuddy · {t}"))
+        .unwrap_or_else(|| "AtlasBuddy".to_string());
 
     if let Some(w) = app.get_webview_window(&label) {
         let _ = w.set_title(&win_title);

@@ -1,6 +1,6 @@
 /** ru messages — domain: doctor */
 export const ruDoctor = {
-  "setup.title": "Добро пожаловать в Atlas",
+  "setup.title": "Добро пожаловать в AtlasBuddy",
   "setup.subtitle": "MIT · Неофициальная настольная рабочая среда для Atlas CLI",
   "setup.step.runtime": "Среда выполнения",
   "setup.step.account": "Аккаунт",

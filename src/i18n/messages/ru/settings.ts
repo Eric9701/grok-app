@@ -192,7 +192,7 @@ export const ruSettings = {
   "settings.atlasRelayAgentImportInvalid": "В этом тексте нет адреса relay с ID агента.",
   "settings.atlasCloudSite": "Сайт Atlas Cloud",
   "settings.atlasCloudSiteDesc": "Страница пункта Atlas Cloud на боковой панели. При смене меню страница сохраняется, адрес скрыт.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "Укажите адрес http или https.",
   "settings.acpSetupHint": "На машине, где работает агент, откройте stdio по TCP (пример с socat):",
   "settings.maxConcurrentAgents": "Максимум одновременных агентов",

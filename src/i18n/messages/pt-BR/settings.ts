@@ -190,7 +190,7 @@ export const ptBRSettings = {
   "settings.atlasRelayAgentImportInvalid": "Esse texto não tem um endereço de relay com ID do agente.",
   "settings.atlasCloudSite": "Site Atlas Cloud",
   "settings.atlasCloudSiteDesc": "Página aberta pelo item Atlas Cloud na barra lateral. Trocar de menu mantém a página e oculta o endereço.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "Informe um endereço http ou https.",
   "settings.acpSetupHint": "Na máquina que executa o agente, exponha o stdio via TCP (exemplo com socat):",
   "settings.maxConcurrentAgents": "Máx. de agentes simultâneos",

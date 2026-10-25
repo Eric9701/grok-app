@@ -1,6 +1,6 @@
 /** ta messages — domain: doctor */
 export const taDoctor = {
-  "setup.title": "Atlas க்கு வரவேற்கிறோம்",
+  "setup.title": "AtlasBuddy க்கு வரவேற்கிறோம்",
   "setup.subtitle": "MIT · Atlas CLIக்கான அதிகாரப்பூர்வமற்ற டெஸ்க்டாப் வொர்க்பெஞ்ச்",
   "setup.step.runtime": "இயக்கநேரம்",
   "setup.step.account": "கணக்கு",

@@ -213,7 +213,7 @@ export const zhTWSettings = {
   "settings.atlasRelayAgentImportInvalid": "這段文字裡沒有帶 Agent ID 的中繼位址。",
   "settings.atlasCloudSite": "Atlas雲端站點",
   "settings.atlasCloudSiteDesc": "側欄「Atlas雲端」開啟的網頁。切換選單時保留頁面，不顯示地址。",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "請填寫 http 或 https 地址。",
   "settings.acpSetupHint": "在執行 agent 的機器上，用類似 socat 的方式把 stdio 暴露到 TCP：",
   "settings.maxConcurrentAgents": "最大並發 Agent 數",

@@ -192,7 +192,7 @@ export const koSettings = {
   "settings.atlasRelayAgentImportInvalid": "이 텍스트에 에이전트 ID가 있는 릴레이 주소가 없습니다.",
   "settings.atlasCloudSite": "Atlas 클라우드 사이트",
   "settings.atlasCloudSiteDesc": "사이드바의 Atlas 클라우드가 여는 페이지입니다. 메뉴를 바꿔도 페이지는 유지되고 주소는 표시하지 않습니다.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "http 또는 https 주소를 입력하세요.",
   "settings.acpSetupHint": "에이전트를 실행하는 컴퓨터에서 TCP로 stdio를 노출하세요(socat 예):",
   "settings.maxConcurrentAgents": "최대 동시 에이전트",

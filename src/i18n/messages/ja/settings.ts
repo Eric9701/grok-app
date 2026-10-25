@@ -190,7 +190,7 @@ export const jaSettings = {
   "settings.atlasRelayAgentImportInvalid": "この文字列に Agent ID 付きのリレーアドレスがありません。",
   "settings.atlasCloudSite": "Atlasクラウドサイト",
   "settings.atlasCloudSiteDesc": "サイドバーの「Atlasクラウド」が開くページ。メニューを切り替えてもページは保持され、アドレスは表示しません。",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "http または https のアドレスを入力してください。",
   "settings.acpSetupHint": "エージェントを動かすマシンで、stdio を TCP に公開します（socat の例）:",
   "settings.maxConcurrentAgents": "同時エージェント最大数",

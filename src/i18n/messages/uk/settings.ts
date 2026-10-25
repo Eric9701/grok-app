@@ -191,7 +191,7 @@ export const ukSettings = {
   "settings.atlasRelayAgentImportInvalid": "У цьому тексті немає адреси relay з ID агента.",
   "settings.atlasCloudSite": "Сайт Atlas Cloud",
   "settings.atlasCloudSiteDesc": "Сторінка пункту Atlas Cloud на бічній панелі. Під час зміни меню сторінка зберігається, адресу приховано.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "Вкажіть адресу http або https.",
   "settings.acpSetupHint": "На машині, на якій працює агент, відкрийте stdio через TCP (приклад із socat):",
   "settings.maxConcurrentAgents": "Макс. одночасних агентів",

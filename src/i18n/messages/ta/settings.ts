@@ -192,7 +192,7 @@ export const taSettings = {
   "settings.atlasRelayAgentImportInvalid": "அந்த உரையில் முகவர் ID உள்ள ரிலே முகவரி இல்லை.",
   "settings.atlasCloudSite": "Atlas Cloud தளம்",
   "settings.atlasCloudSiteDesc": "பக்கப்பட்டியில் உள்ள Atlas Cloud திறக்கும் பக்கம். பட்டியை மாற்றினாலும் பக்கம் இருக்கும், முகவரி தெரியாது.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "http அல்லது https முகவரியை உள்ளிடுங்கள்.",
   "settings.acpSetupHint": "முகவரை இயக்கும் கணினியில், TCPக்கு மேல் stdio ஐ வெளிப்படுத்தவும் (சோகாட் உடன் உதாரணம்):",
   "settings.maxConcurrentAgents": "அதிகபட்ச ஒரே நேரத்தில் முகவர்கள்",

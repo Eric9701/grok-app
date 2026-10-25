@@ -190,7 +190,7 @@ export const filSettings = {
   "settings.atlasRelayAgentImportInvalid": "Walang relay address na may agent id sa tekstong iyon.",
   "settings.atlasCloudSite": "Site ng Atlas Cloud",
   "settings.atlasCloudSiteDesc": "Pahinang binubuksan ng item na Atlas Cloud sa sidebar. Kapag lumipat ng menu, nananatili ang pahina at hindi ipinapakita ang address.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "Maglagay ng http o https na address.",
   "settings.acpSetupHint": "Sa machine na nagpapatakbo ng agent, ilantad ang stdio sa TCP (halimbawa gamit ang socat):",
   "settings.maxConcurrentAgents": "Max na sabayang agent",

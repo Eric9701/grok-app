@@ -17,6 +17,8 @@ pub async fn settings_set(
 ) -> Result<AppSettings, String> {
     let prev = store::load_settings_async().await;
     let mut settings = settings;
+    settings.atlas_cloud_site_url =
+        crate::store::effective_atlas_cloud_site_url(&settings.atlas_cloud_site_url);
     settings.composer_editor =
         store::normalize_composer_editor(&settings.composer_editor).to_string();
     settings.wallpaper_x_search_mode =

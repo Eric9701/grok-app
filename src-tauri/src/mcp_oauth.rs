@@ -1062,7 +1062,7 @@ pub fn mcp_oauth_start(server_name: &str) -> Result<McpOauthStartResult, String>
     // Dynamic client registration when available
     let client = if let Some(reg_url) = as_meta.registration_endpoint.as_deref() {
         let body = json!({
-            "client_name": "Atlas",
+            "client_name": "AtlasBuddy",
             "redirect_uris": [&redirect_uri],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],

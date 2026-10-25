@@ -1,6 +1,6 @@
 /** it messages — domain: doctor */
 export const itDoctor = {
-  "setup.title": "Benvenuto in Atlas",
+  "setup.title": "Benvenuto in AtlasBuddy",
   "setup.subtitle": "MIT · Workbench desktop non ufficiale per Atlas CLI",
   "setup.step.runtime": "Runtime",
   "setup.step.account": "Account",

@@ -1,6 +1,6 @@
 /** uk messages — domain: doctor */
 export const ukDoctor = {
-  "setup.title": "Ласкаво просимо до Atlas",
+  "setup.title": "Ласкаво просимо до AtlasBuddy",
   "setup.subtitle": "MIT · Неофіційна настільна робоча область для Atlas CLI",
   "setup.step.runtime": "Середовище",
   "setup.step.account": "Обліковий запис",

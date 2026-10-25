@@ -33,6 +33,7 @@ import {
   IconWorld,
 } from "@/components/icons";
 import { createT } from "@/i18n";
+import { useRemoteChromeVisible } from "@/lib/api/launchChrome";
 import {
   isDesktopHost,
   type AccountStatus,
@@ -208,6 +209,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
     onSwitchAccount,
     onUserMenuOpened,
   } = props;
+  const remoteChromeVisible = useRemoteChromeVisible();
 
   const providerSupportsBalance =
     !!activeCustomProvider &&
@@ -372,7 +374,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
                   activeCustomProvider
                     ? activeCustomProvider.name.trim() ||
                       activeCustomProvider.id
-                    : "Atlas"
+                    : tr("app.name")
                 }
               />
             </span>
@@ -410,7 +412,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
             </span>
             {tr("sidebar.kanban")}
           </button>
-          {isDesktopHost() ? (
+          {isDesktopHost() && remoteChromeVisible ? (
             <button
               type="button"
               className="nav-item"

@@ -236,7 +236,7 @@ export const jaWorkspace = {
   "changes.workspace.loadError": "ワークスペースの git ステータスを読み込めませんでした",
   "changes.workspace.loadErrorHint": "プロジェクトパスを確認してから更新してください。セッションのツール編集があれば、上に表示されます。",
   "changes.workspace.hostOnly": "ワークスペースの git ステータスにはデスクトップアプリが必要です",
-  "changes.workspace.hostOnlyHint": "ワークスペースの変更を確認するには Atlas デスクトップを開いてください。",
+  "changes.workspace.hostOnlyHint": "ワークスペースの変更を確認するには AtlasBuddy デスクトップを開いてください。",
   "changes.workspace.unavailableHint": "このプロジェクトの git ステータスを読み取れませんでした。",
   "changes.workspace.refresh": "ワークスペースの状態を更新",
   "changes.workspace.branch": "ブランチ {branch}",

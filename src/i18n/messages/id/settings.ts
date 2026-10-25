@@ -190,7 +190,7 @@ export const idSettings = {
   "settings.atlasRelayAgentImportInvalid": "Teks itu tidak berisi alamat relay dengan ID agen.",
   "settings.atlasCloudSite": "Situs Atlas Cloud",
   "settings.atlasCloudSiteDesc": "Halaman yang dibuka item Atlas Cloud di bilah sisi. Beralih menu mempertahankan halaman dan menyembunyikan alamat.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "Masukkan alamat http atau https.",
   "settings.acpSetupHint": "Di mesin yang menjalankan agen, ekspos stdio lewat TCP (contoh dengan socat):",
   "settings.maxConcurrentAgents": "Maks agen bersamaan",

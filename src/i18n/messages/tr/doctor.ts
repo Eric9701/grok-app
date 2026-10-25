@@ -1,6 +1,6 @@
 /** tr messages — domain: doctor. */
 export const trDoctor = {
-  "setup.title": "Atlas'a hoş geldiniz",
+  "setup.title": "AtlasBuddy'ye hoş geldiniz",
   "setup.subtitle": "MIT · Grok Build için resmî olmayan masaüstü çalışma tezgâhı",
   "setup.step.runtime": "Çalışma zamanı",
   "setup.step.account": "Hesap",

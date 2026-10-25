@@ -422,8 +422,9 @@ pub struct AppSettings {
     /// Host clamps to 5–300.
     #[serde(default = "default_atlas_relay_health_secs")]
     pub atlas_relay_agent_health_secs: u32,
-    /// Page opened by the sidebar Atlas Cloud item. Empty hides the webview.
-    #[serde(default)]
+    /// Page opened by the sidebar Atlas Cloud item.
+    /// Empty or missing becomes [`DEFAULT_ATLAS_CLOUD_SITE_URL`].
+    #[serde(default = "default_atlas_cloud_site_url")]
     pub atlas_cloud_site_url: String,
     /// Max warm/live agent processes (I02). Default 3.
     #[serde(default = "default_max_concurrent_agents")]
@@ -944,7 +945,7 @@ impl Default for AppSettings {
             atlas_relay_agent_enabled: false,
             atlas_relay_agents: Vec::new(),
             atlas_relay_agent_health_secs: default_atlas_relay_health_secs(),
-            atlas_cloud_site_url: String::new(),
+            atlas_cloud_site_url: default_atlas_cloud_site_url(),
             max_concurrent_agents: default_max_concurrent_agents(),
             agent_idle_minutes: default_agent_idle_minutes(),
             // Fresh installs already start on the current default.
@@ -1146,9 +1147,26 @@ pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), Str
     crate::store_lock::write_bytes_atomic(path, s.as_bytes())
 }
 
+pub const DEFAULT_ATLAS_CLOUD_SITE_URL: &str = "https://atlas.myai.tech";
+
+fn default_atlas_cloud_site_url() -> String {
+    DEFAULT_ATLAS_CLOUD_SITE_URL.to_string()
+}
+
+/// Blank stored values open the built-in Atlas Cloud site.
+pub fn effective_atlas_cloud_site_url(stored: &str) -> String {
+    let trimmed = stored.trim();
+    if trimmed.is_empty() {
+        DEFAULT_ATLAS_CLOUD_SITE_URL.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 pub fn load_settings() -> AppSettings {
     let _ = ensure_app_dirs();
     let mut s: AppSettings = read_json(&settings_file());
+    s.atlas_cloud_site_url = effective_atlas_cloud_site_url(&s.atlas_cloud_site_url);
     // Compatibility: `use` was an effective network decision label, never a
     // persisted settings mode. Some local snapshots nevertheless contain it.
     // A valid saved URL is the only evidence that it represented Manual.

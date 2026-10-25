@@ -1,6 +1,6 @@
 /** de messages — domain: doctor */
 export const deDoctor = {
-  "setup.title": "Willkommen bei Atlas",
+  "setup.title": "Willkommen bei AtlasBuddy",
   "setup.subtitle": "MIT · Inoffizielle Desktop-Workbench für Atlas CLI",
   "setup.step.runtime": "Runtime",
   "setup.step.account": "Konto",

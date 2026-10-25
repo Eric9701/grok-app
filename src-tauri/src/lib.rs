@@ -109,6 +109,8 @@ mod integration_test;
 
 mod journal_throttle;
 
+mod launch_chrome;
+
 mod leader;
 
 mod logging;

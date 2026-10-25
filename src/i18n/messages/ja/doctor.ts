@@ -1,6 +1,6 @@
 /** ja messages — domain: doctor */
 export const jaDoctor = {
-  "setup.title": "Atlas へようこそ",
+  "setup.title": "AtlasBuddy へようこそ",
   "setup.subtitle": "MIT · Atlas CLI 向けの非公式デスクトップワークベンチ",
   "setup.step.runtime": "ランタイム",
   "setup.step.account": "アカウント",

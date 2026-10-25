@@ -190,7 +190,7 @@ export const frSettings = {
   "settings.atlasRelayAgentImportInvalid": "Ce texte n’a pas d’adresse de relais avec un ID d’agent.",
   "settings.atlasCloudSite": "Site Atlas Cloud",
   "settings.atlasCloudSiteDesc": "Page ouverte par l’entrée Atlas Cloud de la barre latérale. Changer de menu conserve la page et masque l’adresse.",
-  "settings.atlasCloudSitePh": "https://example.com/",
+  "settings.atlasCloudSitePh": "https://atlas.myai.tech",
   "settings.atlasCloudSiteInvalid": "Saisissez une adresse http ou https.",
   "settings.acpSetupHint": "Sur la machine qui exécute l’agent, exposez stdio via TCP (exemple avec socat) :",
   "settings.maxConcurrentAgents": "Agents concurrents max",
