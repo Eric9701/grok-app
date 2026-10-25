@@ -19,7 +19,8 @@ if [[ -z "$PRODUCT" ]]; then
   exit 1
 fi
 
-# productName is Atlas (or Grok upstream). Cargo package name may still be grok-app.exe.
+# cargo build keeps the crate name grok-app.exe. mainBinaryName renames the
+# bundled exe; this zip copies whichever release binary it finds to ${PRODUCT}.exe.
 find_release_exe() {
   local name
   for name in "${PRODUCT}.exe" grok-app.exe Grok.exe; do
@@ -53,7 +54,7 @@ echo "using EXE=$EXE"
 STAGE="dist-portable/${PRODUCT}_${VER}_x64-portable"
 rm -rf dist-portable
 mkdir -p "$STAGE"
-# Ship under the product name (Atlas.exe on this fork).
+# Ship under the product name (AtlasBuddy.exe).
 cp "$EXE" "$STAGE/${PRODUCT}.exe"
 python3 - "$VER" "$STAGE" "$PRODUCT" <<'PY'
 import sys

@@ -133,9 +133,11 @@ describe("window chrome", () => {
   it("base product identity is AtlasBuddy", () => {
     const conf = JSON.parse(readFileSync(CONF_PATH, "utf8")) as {
       productName?: string;
+      mainBinaryName?: string;
       app: { windows: Array<{ title?: string }> };
     };
     expect(conf.productName).toBe("AtlasBuddy");
+    expect(conf.mainBinaryName).toBe("AtlasBuddy");
     expect(conf.app.windows[0]!.title).toBe("AtlasBuddy");
   });
 

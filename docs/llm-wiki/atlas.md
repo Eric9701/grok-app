@@ -64,7 +64,7 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 ## 安装包文件名
 
-Release 门禁认 `src-tauri/tauri.conf.json` 的 `productName`，也就是 **AtlasBuddy**。四个平台都要有：
+Release 门禁认 `src-tauri/tauri.conf.json` 的 `productName`，也就是 **AtlasBuddy**。安装包里的可执行文件用同一名字（`mainBinaryName`）：Windows `AtlasBuddy.exe`，macOS `Contents/MacOS/AtlasBuddy`，Linux `usr/bin/AtlasBuddy`。Cargo 包名仍是 `grok-app`，`target/release` 里未改名的编译产物还叫 `grok-app`；绿色版打包时再复制成 `AtlasBuddy.exe`。四个平台都要有：
 
 - `AtlasBuddy_<版本>_aarch64.dmg`、`AtlasBuddy_<版本>_x64.dmg`
 - `AtlasBuddy_<版本>_x64-setup.exe`、`AtlasBuddy_<版本>_x64-portable.zip`

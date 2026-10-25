@@ -201,7 +201,7 @@ Install the runtime packages the `.deb` already expects, plus EGL/GLES (confirme
 sudo apt-get install -y libegl1 libgles2 libwebkit2gtk-4.1-0 libayatana-appindicator3-1
 ```
 
-Then `chmod +x` and run the AppImage (or the extracted `usr/bin/grok-app`). The `.deb` already lists `libwebkit2gtk-4.1-0` and `libgtk-3-0`.
+Then `chmod +x` and run the AppImage (or the extracted `usr/bin/AtlasBuddy`). The `.deb` already lists `libwebkit2gtk-4.1-0` and `libgtk-3-0`.
 
 This is a **missing shared library at process start**. It is not the Wayland black-window / `EGL_BAD_PARAMETER` case in [Linux Display Notes](#linux-display-notes-webkitgtk--wayland). See issue [#899](https://github.com/RongleCat/grok-app/issues/899).
 

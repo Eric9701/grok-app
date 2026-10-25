@@ -134,14 +134,14 @@ Stop-InstalledApp
 Start-Process -Wait -FilePath $setup.FullName -ArgumentList "/S"
 
 $exe = $null
-foreach ($name in @("grok-app.exe", "${ProductName}.exe")) {
+foreach ($name in @("AtlasBuddy.exe", "${ProductName}.exe", "grok-app.exe")) {
   $candidate = Join-Path $InstallDir $name
   if (Test-Path $candidate) {
     $exe = $candidate
     break
   }
 }
-if (-not $exe) { throw "missing grok-app.exe under $InstallDir" }
+if (-not $exe) { throw "missing AtlasBuddy.exe under $InstallDir" }
 $item = Get-Item $exe
 if ($item.Length -lt 1MB) { throw "exe too small: $($item.Length)" }
 if ($item.LastWriteTime -lt $setup.LastWriteTime.AddMinutes(-5)) {

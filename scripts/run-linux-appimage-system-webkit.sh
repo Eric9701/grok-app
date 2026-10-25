@@ -79,7 +79,9 @@ fi
 
 EXTRACT_DIR="${GROK_APPIMAGE_EXTRACT_DIR:-$PWD/Grok-appimage-extract}"
 BIN=""
-if [[ -x "$EXTRACT_DIR/usr/bin/grok-app" ]]; then
+if [[ -x "$EXTRACT_DIR/usr/bin/AtlasBuddy" ]]; then
+  BIN="$EXTRACT_DIR/usr/bin/AtlasBuddy"
+elif [[ -x "$EXTRACT_DIR/usr/bin/grok-app" ]]; then
   BIN="$EXTRACT_DIR/usr/bin/grok-app"
 elif [[ -x "$EXTRACT_DIR/usr/bin/Grok" ]]; then
   BIN="$EXTRACT_DIR/usr/bin/Grok"
@@ -102,12 +104,14 @@ if [[ -z "$BIN" || "${GROK_APPIMAGE_FORCE_EXTRACT:-}" == "1" ]]; then
   )
   trap - EXIT
   rm -rf "$WORK"
-  if [[ -x "$EXTRACT_DIR/usr/bin/grok-app" ]]; then
+  if [[ -x "$EXTRACT_DIR/usr/bin/AtlasBuddy" ]]; then
+    BIN="$EXTRACT_DIR/usr/bin/AtlasBuddy"
+  elif [[ -x "$EXTRACT_DIR/usr/bin/grok-app" ]]; then
     BIN="$EXTRACT_DIR/usr/bin/grok-app"
   elif [[ -x "$EXTRACT_DIR/usr/bin/Grok" ]]; then
     BIN="$EXTRACT_DIR/usr/bin/Grok"
   else
-    echo "error: binary not found under $EXTRACT_DIR/usr/bin (expected grok-app or Grok)" >&2
+    echo "error: binary not found under $EXTRACT_DIR/usr/bin (expected AtlasBuddy)" >&2
     ls -la "$EXTRACT_DIR/usr/bin" 2>/dev/null || true
     exit 1
   fi

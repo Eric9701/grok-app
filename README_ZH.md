@@ -201,7 +201,7 @@ error while loading shared libraries: libEGL.so.1: cannot open shared object fil
 sudo apt-get install -y libegl1 libgles2 libwebkit2gtk-4.1-0 libayatana-appindicator3-1
 ```
 
-然后 `chmod +x` 再运行 AppImage（或解压后的 `usr/bin/grok-app`）。`.deb` 已声明 `libwebkit2gtk-4.1-0` 与 `libgtk-3-0`。
+然后 `chmod +x` 再运行 AppImage（或解压后的 `usr/bin/AtlasBuddy`）。`.deb` 已声明 `libwebkit2gtk-4.1-0` 与 `libgtk-3-0`。
 
 这是**进程启动时缺共享库**，不是下面 [Linux 渲染提示](#linux-渲染提示-webkitgtk) 的 Wayland / `EGL_BAD_PARAMETER` 情况。见 [#899](https://github.com/RongleCat/grok-app/issues/899)。
 
