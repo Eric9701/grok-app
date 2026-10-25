@@ -1,22 +1,22 @@
-//! Process argv for chrome that is hidden for one launch.
+//! Process argv for chrome that stays hidden unless this launch asks for it.
 //!
-//! `--hide-remote` hides the sidebar "Connect device" entry and the
-//! Settings "Remote control" section together. Absent means both stay visible.
+//! `--show-remote` shows the sidebar "Connect device" entry and the
+//! Settings "Remote control" section together. Absent means both stay hidden.
 //! The choice is not written to settings.
 
 use serde::Serialize;
 
-pub const HIDE_REMOTE_FLAG: &str = "--hide-remote";
+pub const SHOW_REMOTE_FLAG: &str = "--show-remote";
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LaunchChrome {
-    /// False when this process was started with `--hide-remote`.
+    /// True only when this process was started with `--show-remote`.
     pub remote: bool,
 }
 
 pub fn remote_visible_from(argv: &[String]) -> bool {
-    !argv.iter().any(|arg| arg == HIDE_REMOTE_FLAG)
+    argv.iter().any(|arg| arg == SHOW_REMOTE_FLAG)
 }
 
 pub fn remote_visible() -> bool {
@@ -35,14 +35,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn remote_stays_visible_without_the_flag() {
+    fn remote_stays_hidden_without_the_flag() {
         let argv = vec!["atlasbuddy".into(), "--start-in-tray".into()];
-        assert!(remote_visible_from(&argv));
+        assert!(!remote_visible_from(&argv));
     }
 
     #[test]
-    fn hide_remote_flag_hides_the_chrome() {
-        let argv = vec!["atlasbuddy".into(), "--hide-remote".into()];
-        assert!(!remote_visible_from(&argv));
+    fn show_remote_flag_shows_the_chrome() {
+        let argv = vec!["atlasbuddy".into(), "--show-remote".into()];
+        assert!(remote_visible_from(&argv));
     }
 }

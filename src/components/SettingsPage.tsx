@@ -1046,7 +1046,8 @@ export function SettingsPage({
   const activeTab = localTab ?? tabFromProps;
   const sectionNav = useMemo(() => getNavDef(section), [section]);
 
-  const remoteChromeVisible = useRemoteChromeVisible();
+  const remoteChrome = useRemoteChromeVisible();
+  const remoteChromeVisible = remoteChrome.visible;
 
   const navigateTo = useCallback(
     (
@@ -1087,10 +1088,9 @@ export function SettingsPage({
   );
 
   useEffect(() => {
-    if (!remoteChromeVisible && section === "remote_im") {
-      navigateTo("general");
-    }
-  }, [remoteChromeVisible, section, navigateTo]);
+    if (!remoteChrome.ready || remoteChromeVisible || section !== "remote_im") return;
+    navigateTo("general");
+  }, [remoteChrome.ready, remoteChromeVisible, section, navigateTo]);
 
   const openSection = useCallback(
     (id: SettingsSectionId) => {

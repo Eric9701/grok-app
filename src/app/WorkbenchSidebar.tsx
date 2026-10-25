@@ -209,7 +209,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
     onSwitchAccount,
     onUserMenuOpened,
   } = props;
-  const remoteChromeVisible = useRemoteChromeVisible();
+  const remoteChromeVisible = useRemoteChromeVisible().visible;
 
   const providerSupportsBalance =
     !!activeCustomProvider &&

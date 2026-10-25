@@ -15,6 +15,8 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 个人：`general` · `appearance` · `account` · `archived` · `pet`（展示名「宠物」）  
 系统：`extensions` · `runtime` · `atlas` · `remote_im`（展示名「远程控制」）· `shortcuts` · `about`
 
+本次进程带 `--show-remote` 时，侧栏「连接设备」和设置「远程控制」一起显示。不带这个参数时两处都隐藏：左栏、搜索命中没有这一节，直接打开 `#/settings/remote_im` 回到常规设置。目录注册表仍保留 `remote_im`，只按本次启动结果过滤，不写入设置。
+
 **不要**再往 `SETTINGS_NAV` 塞重复 `runtime`。
 
 ## 页内 Tab
