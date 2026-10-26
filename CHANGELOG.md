@@ -13,6 +13,20 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.43] - 2026-10-26
+
+> **Highlight:** The desktop pet can dictate, send, and stop a chat.
+>
+> **中文 · 亮点：** 桌面宠物可以听写、发送，以及停掉对话。
+
+### Added
+- The desktop pet can dictate, send a prompt, and stop the chat.
+- Turkish is now an interface language.
+
+**中文 · 新增**
+- 桌面宠物可以听写、发送提示，以及停掉对话。
+- 界面语言现在可以选择土耳其语。
+
 ## [0.2.42] - 2026-10-19
 
 > **Highlight:** The desktop pet can dictate, send, and stop a chat.
