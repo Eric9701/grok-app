@@ -410,7 +410,7 @@ export const ukSettings = {
   "settings.skinDesc": "Палітра акцентів і поверхонь (працює зі світлим/темним)",
   "settings.doctorDesc": "Діагностика CLI, автентифікації та з’єднання з провайдером",
   "settings.runDoctor": "Запустити діагностику",
-  "settings.aboutApp": "Про Atlas",
+  "settings.aboutApp": "Про AtlasBuddy",
   "settings.developerMode": "Режим розробника",
   "settings.developerModeDesc": "Показати інструменти розробника у застосунку (симуляція оновлення та інша діагностика). За замовчуванням вимкнено. Не відкриває DevTools.",
   "settings.updateSim": "Імітувати оновлення застосунку",

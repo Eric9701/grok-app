@@ -432,7 +432,7 @@ export const zhSettings = {
   "settings.skinDesc": "强调色与表面色板（可与浅/深色叠加）",
   "settings.doctorDesc": "诊断 CLI、鉴权与供应商连通性",
   "settings.runDoctor": "运行 Doctor",
-  "settings.aboutApp": "关于 Atlas",
+  "settings.aboutApp": "关于 AtlasBuddy",
   "settings.developerMode": "开发模式",
   "settings.developerModeDesc": "在应用内显示开发者工具（更新模拟等诊断项）。默认关闭。不会打开系统开发者工具。",
   "settings.updateSim": "模拟应用更新",

@@ -7,6 +7,10 @@
 /// When `false`, Host does not query GitHub or run `atlas update --check`.
 pub const REMOTE_UPDATES_ENABLED: bool = false;
 
+/// Desktop self-update from the enterprise atlas-server (`self_update`).
+/// Independent of GitHub / CLI checks above.
+pub const DESKTOP_SELF_UPDATE_ENABLED: bool = true;
+
 pub fn disabled_message() -> &'static str {
     "Remote updates are disabled on this Atlas build"
 }

@@ -409,7 +409,7 @@ export const filSettings = {
   "settings.skinDesc": "Accent at surface palette (gumagana sa maliwanag/madilim)",
   "settings.doctorDesc": "I-diagnose ang CLI, auth, at connectivity ng provider",
   "settings.runDoctor": "Patakbuhin ang Doctor",
-  "settings.aboutApp": "Tungkol sa Atlas",
+  "settings.aboutApp": "Tungkol sa AtlasBuddy",
   "settings.developerMode": "Mode ng developer",
   "settings.developerModeDesc": "Ipakita ang mga tool ng developer sa app (simulation ng update at iba pang diagnostics). Naka-off bilang default. Hindi binubuksan ang DevTools.",
   "settings.updateSim": "I-simulate ang update ng app",

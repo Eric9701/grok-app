@@ -55,6 +55,8 @@ STAGE="dist-portable/${PRODUCT}_${VER}_x64-portable"
 rm -rf dist-portable
 mkdir -p "$STAGE"
 # Ship under the product name (AtlasBuddy.exe).
+# README-portable.txt is the marker the self-updater uses to recognize this
+# folder. Keep the file name; the green build updates by replacing this directory.
 cp "$EXE" "$STAGE/${PRODUCT}.exe"
 python3 - "$VER" "$STAGE" "$PRODUCT" <<'PY'
 import sys

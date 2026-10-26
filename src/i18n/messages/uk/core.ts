@@ -4,7 +4,7 @@ export const ukCore = {
   "image.loadingOriginal": "Завантаження оригіналу…",
   "image.originalFailed": "Не вдалося завантажити оригінал. Попередній перегляд залишається доступним.",
   "app.tagline": "MIT · Неофіційний · Сестринський проєкт grok-go",
-  "app.versionFooter": "Atlas {version} · MIT · Неофіційний · Сестринський проєкт grok-go",
+  "app.versionFooter": "{version}",
   "window.minimize": "Згорнути",
   "window.maximize": "Розгорнути",
   "window.restore": "Відновити",

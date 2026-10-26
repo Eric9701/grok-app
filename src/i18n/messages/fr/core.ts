@@ -4,7 +4,7 @@ export const frCore = {
   "image.loadingOriginal": "Chargement de l’original…",
   "image.originalFailed": "Impossible de charger l’original. L’aperçu reste disponible.",
   "app.tagline": "MIT · Non officiel · Projet sœur grok-go",
-  "app.versionFooter": "Atlas {version} · MIT · Non officiel · Projet sœur grok-go",
+  "app.versionFooter": "{version}",
   "window.minimize": "Réduire",
   "window.maximize": "Agrandir",
   "window.restore": "Restaurer",

@@ -411,7 +411,7 @@ export const taSettings = {
   "settings.skinDesc": "உச்சரிப்பு மற்றும் மேற்பரப்பு தட்டு (ஒளி/இருட்டுடன் வேலை செய்கிறது)",
   "settings.doctorDesc": "CLI, அங்கீகாரம் மற்றும் வழங்குநர் இணைப்பு ஆகியவற்றைக் கண்டறியவும்",
   "settings.runDoctor": "Doctor ஐ இயக்கு",
-  "settings.aboutApp": "Atlas செயலி பற்றி",
+  "settings.aboutApp": "AtlasBuddy செயலி பற்றி",
   "settings.developerMode": "டெவலப்பர் பயன்முறை",
   "settings.developerModeDesc": "பயன்பாட்டில் டெவலப்பர் கருவிகளைக் காட்டு (புதுப்பித்தல் உருவகப்படுத்துதல் மற்றும் பிற கண்டறிதல்கள்). இயல்பாக ஆஃப். DevTools ஐ திறக்காது.",
   "settings.updateSim": "பயன்பாட்டு புதுப்பிப்பை உருவகப்படுத்தவும்",

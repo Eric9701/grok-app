@@ -4,7 +4,7 @@ export const trCore = {
   "image.loadingOriginal": "Orijinal yükleniyor...",
   "image.originalFailed": "Orijinal yüklenemedi. Önizleme hâlâ kullanılabilir.",
   "app.tagline": "MIT · Resmî değil · Kardeş proje grok-go",
-  "app.versionFooter": "Grok {version} · MIT · Resmî değil · Kardeş proje grok-go",
+  "app.versionFooter": "{version}",
   "window.minimize": "Simge durumuna küçült",
   "window.maximize": "Ekranı kapla",
   "window.restore": "Geri yükle",

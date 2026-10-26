@@ -4,6 +4,9 @@
  * - Signed release binaries (plugin enabled): Tauri check → download → confirm →
  *   install → relaunch. About “Check for updates” stops at `ready`.
  * - Local / unsigned / plugin off: GitHub Releases via `app_check_update` → open page.
+ * - Atlas (`SELF_UPDATE_MODE`): Host `self_update_*` against atlas-server — same
+ *   states, background download to `ready`, install only after the user
+ *   confirms in the "Update ready" card.
  *
  * P0: `prepare_for_app_update` runs only AFTER successful `install()`, so a failed
  * install never kills agents / voice / IM / mirror.
@@ -13,13 +16,29 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { isDesktopHost, type AppUpdateCheck } from "@/lib/api";
 import {
   planUserCheckUpdate,
   shouldInstallWhenReady,
 } from "@/lib/appUpdateHonesty";
 import { DEVELOPER_MODE_CHANGE_EVENT } from "@/lib/developerModePref";
-import { REMOTE_UPDATES_ENABLED } from "@/lib/remoteUpdates";
+import {
+  APP_UPDATES_ACTIVE,
+  REMOTE_UPDATES_ENABLED,
+  SELF_UPDATE_MODE,
+} from "@/lib/remoteUpdates";
+import {
+  SELF_UPDATE_PROGRESS_EVENT,
+  selfUpdateAckFailure,
+  selfUpdateCheck,
+  selfUpdateHandle,
+  selfUpdateStatus,
+  type SelfUpdateCheck,
+  type SelfUpdateProgress,
+  type SelfUpdateStatus,
+  type UpdateHandle,
+} from "@/lib/selfUpdate";
 import {
   UPDATE_SIM_CHANGE_EVENT,
   UPDATE_SIM_VERSION,
@@ -52,6 +71,8 @@ export type UpdateStatus =
     };
 
 const BACKGROUND_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+/** Self-update waits after launch so the first check never competes with boot. */
+const SELF_UPDATE_FIRST_CHECK_DELAY_MS = 30 * 1000;
 const BACKGROUND_BLOCKED_STATES = new Set<UpdateStatus["state"]>([
   "checking",
   "available",
@@ -157,7 +178,12 @@ export function useUpdater() {
     endpoint: "",
   });
   const statusRef = useRef<UpdateStatus>(initialUpdateStatus());
-  const updateRef = useRef<Update | null>(null);
+  const updateRef = useRef<Update | UpdateHandle | null>(null);
+  const [selfStatus, setSelfStatus] = useState<SelfUpdateStatus | null>(null);
+  const [selfCheck, setSelfCheck] = useState<SelfUpdateCheck | null>(null);
+  const [selfProgress, setSelfProgress] = useState<SelfUpdateProgress | null>(null);
+  /** "Not now" in the Update ready card: skip re-prompting this version this run. */
+  const [promptDismissedVersion, setPromptDismissedVersion] = useState<string | null>(null);
   const checkInFlightRef = useRef(false);
   const downloadInFlightRef = useRef(false);
   const installInFlightRef = useRef(false);
@@ -190,7 +216,7 @@ export function useUpdater() {
   }, []);
 
   /** Replace updateRef, closing any previous handle first. */
-  const adoptUpdate = useCallback(async (next: Update | null) => {
+  const adoptUpdate = useCallback(async (next: Update | UpdateHandle | null) => {
     const prev = updateRef.current;
     updateRef.current = next;
     if (prev && prev !== next) {
@@ -378,9 +404,54 @@ export function useUpdater() {
     [applyGithubResult, setStatus],
   );
 
+  const runSelfUpdateCheck = useCallback(
+    async ({ background, gen }: { background: boolean; gen: number }) => {
+      const stale = () => generationRef.current !== gen || !aliveRef.current;
+      const shouldShow = () => !background || manualResultRequestedRef.current;
+      let r: SelfUpdateCheck;
+      try {
+        r = await selfUpdateCheck();
+      } catch (err) {
+        if (stale()) return;
+        // Background failures stay quiet; About shows them on manual check.
+        if (shouldShow()) {
+          installWhenReadyRef.current = false;
+          setStatus({ state: "error", message: toErrorMessage(err) });
+        }
+        return;
+      }
+      if (stale()) return;
+      setSelfCheck(r);
+      if (!r.updateAvailable) {
+        if (shouldShow()) {
+          installWhenReadyRef.current = false;
+          setStatus({ state: "up-to-date", version: r.currentVersion });
+        }
+        return;
+      }
+      if (r.canAutoInstall) {
+        await adoptUpdate(selfUpdateHandle(r.version));
+        if (stale()) return;
+        setStatus({ state: "available", version: r.version });
+        void downloadUpdate(r.version);
+        return;
+      }
+      installWhenReadyRef.current = false;
+      await adoptUpdate(null);
+      if (stale()) return;
+      setStatus({
+        state: "manual-required",
+        version: r.version,
+        releaseUrl: r.installerUrl ?? "",
+        downloadUrl: r.installerUrl,
+      });
+    },
+    [adoptUpdate, downloadUpdate, setStatus],
+  );
+
   const runUpdateCheck = useCallback(
     async ({ background }: { background: boolean }) => {
-      if (!REMOTE_UPDATES_ENABLED) {
+      if (!APP_UPDATES_ACTIVE) {
         return;
       }
       const simMode = readUpdateSimMode();
@@ -463,6 +534,11 @@ export function useUpdater() {
       try {
         if (!background) {
           setStatus({ state: "checking" });
+        }
+
+        if (SELF_UPDATE_MODE) {
+          await runSelfUpdateCheck({ background, gen });
+          return;
         }
 
         const pluginOn = await isUpdaterPluginEnabled();
@@ -554,7 +630,14 @@ export function useUpdater() {
         }
       }
     },
-    [adoptUpdate, closeUpdate, downloadUpdate, runGithubFallback, setStatus],
+    [
+      adoptUpdate,
+      closeUpdate,
+      downloadUpdate,
+      runGithubFallback,
+      runSelfUpdateCheck,
+      setStatus,
+    ],
   );
 
   const checkForUpdate = useCallback(async () => {
@@ -628,7 +711,24 @@ export function useUpdater() {
   }, [downloadUpdate, installAndRelaunch, runUpdateCheck]);
 
   const refreshChannelInfo = useCallback(async () => {
-    if (!REMOTE_UPDATES_ENABLED) {
+    if (SELF_UPDATE_MODE && readUpdateSimMode() === "off") {
+      if (!isDesktopHost()) return;
+      try {
+        const s = await selfUpdateStatus();
+        if (!aliveRef.current) return;
+        setSelfStatus(s);
+        setChannelInfo({
+          channel: s.blocker ? "unsupported" : "silent",
+          pluginEnabled: s.enabled,
+          platformSupported: !s.blocker,
+          endpoint: s.feedUrl,
+        });
+      } catch {
+        /* ignore — About still works via status machine */
+      }
+      return;
+    }
+    if (!REMOTE_UPDATES_ENABLED && !SELF_UPDATE_MODE) {
       setChannelInfo({
         channel: "disabled",
         pluginEnabled: false,
@@ -709,7 +809,7 @@ export function useUpdater() {
 
     void refreshChannelInfo();
 
-    if (!REMOTE_UPDATES_ENABLED) {
+    if (!APP_UPDATES_ACTIVE) {
       return () => {
         aliveRef.current = false;
         generationRef.current += 1;
@@ -718,7 +818,24 @@ export function useUpdater() {
     }
 
     // Startup + periodic discovery (download only; no silent install).
-    void checkForUpdateInBackground();
+    const firstCheckId = window.setTimeout(
+      () => {
+        if (generationRef.current !== gen) return;
+        void checkForUpdateInBackground();
+      },
+      SELF_UPDATE_MODE ? SELF_UPDATE_FIRST_CHECK_DELAY_MS : 0,
+    );
+
+    let unlistenProgress: (() => void) | null = null;
+    if (SELF_UPDATE_MODE && isDesktopHost()) {
+      void listen<SelfUpdateProgress>(SELF_UPDATE_PROGRESS_EVENT, (e) => {
+        if (generationRef.current !== gen) return;
+        setSelfProgress(e.payload);
+      }).then((un) => {
+        if (generationRef.current !== gen) un();
+        else unlistenProgress = un;
+      });
+    }
 
     const intervalId = window.setInterval(() => {
       if (generationRef.current !== gen) return;
@@ -737,7 +854,9 @@ export function useUpdater() {
     return () => {
       aliveRef.current = false;
       generationRef.current += 1;
+      window.clearTimeout(firstCheckId);
       window.clearInterval(intervalId);
+      unlistenProgress?.();
       window.removeEventListener(UPDATE_SIM_CHANGE_EVENT, onPrefsChange);
       window.removeEventListener(DEVELOPER_MODE_CHANGE_EVENT, onPrefsChange);
       void closeUpdate();
@@ -749,6 +868,21 @@ export function useUpdater() {
     reseedFromPrefs,
   ]);
 
+  /** "Not now" / "Update" in the Update ready card — once per version per run. */
+  const dismissReadyPrompt = useCallback(
+    (version: string) => {
+      setPromptDismissedVersion(version);
+      if (selfStatus?.lastFailed?.notify) {
+        void selfUpdateAckFailure().catch(() => undefined);
+        setSelfStatus({
+          ...selfStatus,
+          lastFailed: { ...selfStatus.lastFailed, notify: false },
+        });
+      }
+    },
+    [selfStatus],
+  );
+
   return {
     status,
     channelInfo,
@@ -756,5 +890,13 @@ export function useUpdater() {
     installAndRelaunch,
     applyAvailableUpdate,
     githubReleasesUrl: GITHUB_RELEASES_URL,
+    selfUpdate: {
+      enabled: SELF_UPDATE_MODE,
+      status: selfStatus,
+      check: selfCheck,
+      progress: selfProgress,
+      promptDismissedVersion,
+      dismissReadyPrompt,
+    },
   };
 }

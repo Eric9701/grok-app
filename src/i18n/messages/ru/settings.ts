@@ -411,7 +411,7 @@ export const ruSettings = {
   "settings.skinDesc": "Палитра акцента и поверхностей (работает со светлой/тёмной)",
   "settings.doctorDesc": "Диагностика CLI, авторизации и подключения провайдеров",
   "settings.runDoctor": "Запустить диагностику",
-  "settings.aboutApp": "О Atlas",
+  "settings.aboutApp": "Об AtlasBuddy",
   "settings.developerMode": "Режим разработчика",
   "settings.developerModeDesc": "Показывать инструменты разработчика в приложении (симуляция обновления и другая диагностика). По умолчанию выкл. DevTools не открывает.",
   "settings.updateSim": "Симулировать обновление приложения",

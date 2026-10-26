@@ -409,7 +409,7 @@ export const deSettings = {
   "settings.skinDesc": "Akzent- und Oberflächenpalette (funktioniert mit Hell/Dunkel)",
   "settings.doctorDesc": "CLI, Auth und Anbieter-Konnektivität diagnostizieren",
   "settings.runDoctor": "Doctor ausführen",
-  "settings.aboutApp": "Über Atlas",
+  "settings.aboutApp": "Über AtlasBuddy",
   "settings.developerMode": "Entwicklermodus",
   "settings.developerModeDesc": "Entwicklerwerkzeuge in der App zeigen (Update-Simulation und andere Diagnosen). Standard aus. Öffnet DevTools nicht.",
   "settings.updateSim": "App-Update simulieren",

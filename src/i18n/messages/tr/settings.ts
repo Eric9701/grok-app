@@ -414,7 +414,7 @@ export const trSettings = {
   "settings.skinDesc": "Vurgu ve yüzey paleti (açık/koyu ile çalışır)",
   "settings.doctorDesc": "CLI, kimlik doğrulama ve sağlayıcı bağlantısını tanıla",
   "settings.runDoctor": "Tanılamayı çalıştır",
-  "settings.aboutApp": "Grok App hakkında",
+  "settings.aboutApp": "AtlasBuddy hakkında",
   "settings.developerMode": "Geliştirici modu",
   "settings.developerModeDesc": "Uygulamada geliştirici araçlarını gösterir (güncelleme simülasyonu ve diğer tanılamalar). Varsayılan kapalı. DevTools'u açmaz.",
   "settings.updateSim": "Uygulama güncellemesini simüle et",

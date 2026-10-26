@@ -36,15 +36,17 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 例外：设置里的 **从 CC Switch 导入** 会把自定义 `[model.<id>]` 合并进共享 `~/.atlas/config.toml`，供终端 `atlas` 按段 id 选用。不改 `[models].default`，不覆盖 `api_key = "ENC(...)"` 或 `hidden = true` 的企业段，也不导入 Grok Official。其它写入仍禁止改 shared CLI home。
 
-## 远程更新（已关闭）
+## 远程更新
 
-本白标**不**向 GitHub / 官方 updater 探活，也**不**在启动后跑 `atlas update --check`：
+本白标**不**向 GitHub / 官方 updater 探活，也**不**在启动后跑 `atlas update --check`。桌面应用改走企业 atlas-server 的**自更新**（无签名，靠 SHA-256 校验）：
 
-- 应用：无后台检查、设置 → 关于 无「检查更新」、侧栏无更新徽章
+- 应用：Host `self_update_*`（`src-tauri/src/self_update/`）。启动 30 秒后检查，之后每 6 小时检查一次。Feed 由 CLI 镜像推导：`…/atlas/cli` → `…/atlas/desktop/stable/update.json`，可用 `ATLAS_DESKTOP_UPDATE_URL` 覆盖。下载在后台进行（支持 Range 断点续传，校验大小和 SHA-256），完成后弹出「更新已就绪」卡片（`UpdateReadyPrompt`，选项为「暂不」/「更新」）。只有用户点击「更新」才会安装：Windows 安装版用 NSIS `/P /R /UPDATE` 接力后退出；Windows 绿色版（目录里有 `README-portable.txt`）下载 `*-portable.zip`，退出后由辅助脚本覆盖该目录再打开。macOS 原地替换 `.app` 后重启。设置 → 关于 显示来源、阻塞原因、进度，并提供手动下载安装包的入口
+- 不能自更新的情况（开发版、既不是安装版也不是绿色版目录、macOS 隔离运行、目录不可写、服务器缺少本平台包）只提示下载安装包，不会静默失败。同一版本连续失败 2 次后不再自动弹卡片，关于页仍可手动重试
+- 服务端发布见 atlas-server `scripts/publish-desktop.*` 与 `docs/CLI-发布.md`
 - CLI：设置 → CLI / 运行时 的「CLI 更新」有按钮，点击才执行 `atlas update`。不在启动时检查，不切通道，不钉版本，也不走 GitHub App 更新。子进程会去掉 `npm_config_user_agent`，避免 `npm run dev` 把内部安装误判成 npm（Windows 上会报 `program not found`）
 - 首次安装 CLI 仍走企业 `atlas/cli` 基址（`cli_install`），与「远程更新」探测分开
 
-开关：`src/lib/remoteUpdates.ts` 与 `src-tauri/src/remote_updates.rs` 的 `REMOTE_UPDATES_ENABLED`（当前 `false`）。
+开关：`src/lib/remoteUpdates.ts` 与 `src-tauri/src/remote_updates.rs`。`REMOTE_UPDATES_ENABLED`（GitHub / CLI 检查）当前为 `false`；`DESKTOP_SELF_UPDATE_ENABLED`（企业自更新）当前为 `true`，两处须保持一致。
 
 ## Relay Agent
 

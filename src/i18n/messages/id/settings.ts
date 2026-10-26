@@ -409,7 +409,7 @@ export const idSettings = {
   "settings.skinDesc": "Palet aksen dan permukaan (bekerja dengan terang/gelap)",
   "settings.doctorDesc": "Diagnosis CLI, autentikasi, dan konektivitas penyedia",
   "settings.runDoctor": "Jalankan Doctor",
-  "settings.aboutApp": "Tentang Atlas",
+  "settings.aboutApp": "Tentang AtlasBuddy",
   "settings.developerMode": "Mode pengembang",
   "settings.developerModeDesc": "Tampilkan alat pengembang di aplikasi (simulasi pembaruan dan diagnostik lain). Mati secara bawaan. Tidak membuka DevTools.",
   "settings.updateSim": "Simulasikan pembaruan aplikasi",

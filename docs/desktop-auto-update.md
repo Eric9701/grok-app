@@ -21,6 +21,27 @@ CI release
 
 Unsigned / local builds keep the previous GitHub “open release page” path.
 
+## Atlas 白标：无签名自更新
+
+`feat-atlas` 不使用 tauri-plugin-updater（它要求 minisign 公钥），改用 Host 自带的更新器 `src-tauri/src/self_update/`，前端仍复用 `useUpdater` 的状态机。
+
+```
+atlas-server  /atlas/desktop/{channel}/update.json   （按请求来源生成 URL，含 sha256 + size）
+              /atlas/desktop/{channel}/<安装包>      （http.ServeFile，支持 Range）
+                 ▲
+                 │ self_update_check → self_update_download（.part 断点续传 → 校验 → 改名）
+        Host  updates/<version>/   pending.json（启动时判定上次安装成功或失败）
+                 │ 用户在「更新已就绪」卡片点击「更新」
+                 │ self_update_install：重新校验哈希 → 写 pending →
+                 │   Windows 安装版：prepare_for_app_update → NSIS /P /R /UPDATE → 退出
+                 │   Windows 绿色版：解压 *-portable.zip → 辅助脚本等进程退出后覆盖目录并重新打开
+                 │   macOS：tar 解包 → 去 quarantine → 替换 .app（失败回滚）→ 前端 prepare + relaunch
+```
+
+- 信任模型：只校验服务器 feed 里的 SHA-256 和大小，payload URL 必须与 feed 同源、同目录。没有签名，所以生产环境应使用 HTTPS 镜像
+- Windows 安装版发布 `*-setup.exe`（NSIS，currentUser），平台键 `windows-x86_64`。绿色版另发布 `*-portable.zip`，平台键 `windows-x86_64-portable`，目录里要保留 `README-portable.txt`。macOS 发布 `.app.tar.gz`（未签名的 `.app` 首次安装仍需用户手动放行，之后的更新会去掉 quarantine 属性）
+- 失败计数：同一版本安装失败 2 次后不再自动弹窗，关于页仍可手动重试，或下载安装包
+
 ## App pieces
 
 | Piece | Location |

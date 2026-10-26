@@ -409,7 +409,7 @@ export const jaSettings = {
   "settings.skinDesc": "アクセントとサーフェスのパレット（ライト/ダークと併用）",
   "settings.doctorDesc": "CLI、認証、プロバイダー接続を診断",
   "settings.runDoctor": "Doctor を実行",
-  "settings.aboutApp": "Atlas について",
+  "settings.aboutApp": "AtlasBuddy について",
   "settings.developerMode": "開発者モード",
   "settings.developerModeDesc": "アプリに開発者ツールを表示します（更新シミュレーションなどの診断）。既定はオフ。DevTools は開きません。",
   "settings.updateSim": "アプリ更新をシミュレート",

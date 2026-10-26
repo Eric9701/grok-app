@@ -36,7 +36,7 @@ import {
   resolveLocalePreference,
 } from "@/i18n";
 import { isValidPolicy, isValidPrefsScope } from "@/lib/grokCatalog";
-import { appDisplayVersion } from "@/lib/appDisplayVersion";
+import { APP_VERSION } from "@/lib/whatsNew";
 import { mapProbeToCliInfo } from "@/lib/cliVersionStatus";
 import type { SessionRow } from "@/lib/app/sidebarModels";
 import type { WorkbenchSettingsStageProps } from "@/app/workbenchSettingsStageProps";
@@ -744,7 +744,7 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
           onOpenShortcutsHelp={() => setShowShortcuts(true)}
           onOpenProductTutorial={() => setShowProductTutorial(true)}
           versionFooter={tr("app.versionFooter", {
-            version: appDisplayVersion(),
+            version: APP_VERSION,
           })}
           account={account}
           accountLoading={accountLoading}

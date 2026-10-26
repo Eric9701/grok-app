@@ -411,7 +411,7 @@ export const koSettings = {
   "settings.skinDesc": "액센트 및 표면 팔레트(라이트/다크와 함께 동작)",
   "settings.doctorDesc": "CLI, 인증, 공급자 연결을 진단합니다",
   "settings.runDoctor": "Doctor 실행",
-  "settings.aboutApp": "Atlas 정보",
+  "settings.aboutApp": "AtlasBuddy 정보",
   "settings.developerMode": "개발자 모드",
   "settings.developerModeDesc": "앱에 개발자 도구를 표시합니다(업데이트 시뮬레이션 및 기타 진단). 기본값은 꺼짐입니다. DevTools를 열지 않습니다.",
   "settings.updateSim": "앱 업데이트 시뮬레이션",

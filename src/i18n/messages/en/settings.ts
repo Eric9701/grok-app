@@ -432,7 +432,7 @@ export const enSettings = {
   "settings.skinDesc": "Accent and surface palette (works with light/dark)",
   "settings.doctorDesc": "Diagnose CLI, auth, and provider connectivity",
   "settings.runDoctor": "Run Doctor",
-  "settings.aboutApp": "About Atlas",
+  "settings.aboutApp": "About AtlasBuddy",
   "settings.developerMode": "Developer mode",
   "settings.developerModeDesc": "Show developer tools in the app (update simulation and other diagnostics). Off by default. Does not open DevTools.",
   "settings.updateSim": "Simulate app update",

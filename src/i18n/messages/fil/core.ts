@@ -4,7 +4,7 @@ export const filCore = {
   "image.loadingOriginal": "Nilo-load ang orihinal…",
   "image.originalFailed": "Hindi ma-load ang orihinal. Makikita pa rin ang preview.",
   "app.tagline": "MIT · Hindi opisyal · Sister project grok-go",
-  "app.versionFooter": "Atlas {version} · MIT · Hindi opisyal · Sister project grok-go",
+  "app.versionFooter": "{version}",
   "window.minimize": "I-minimize",
   "window.maximize": "I-maximize",
   "window.restore": "Ibalik",

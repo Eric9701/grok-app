@@ -26,7 +26,14 @@ import {
   type AppUpdateStatusLike,
 } from "@/lib/appUpdateHonesty";
 import type { MessageKey } from "@/i18n";
-import { REMOTE_UPDATES_ENABLED } from "@/lib/remoteUpdates";
+import { REMOTE_UPDATES_ENABLED, SELF_UPDATE_MODE } from "@/lib/remoteUpdates";
+import {
+  feedHost,
+  selfUpdateBlockerKey,
+  selfUpdateErrorKey,
+  selfUpdatePercent,
+} from "@/lib/selfUpdate";
+import { useSelfUpdateConfirmCopy } from "@/components/UpdateReadyPrompt";
 
 export function AboutUpdateRow({
   t,
@@ -40,9 +47,11 @@ export function AboutUpdateRow({
     checkForUpdate,
     installAndRelaunch,
     githubReleasesUrl,
+    selfUpdate,
   } = useUpdaterContext();
   const [openError, setOpenError] = useState<string | null>(null);
   const [confirmInstall, setConfirmInstall] = useState(false);
+  const selfMode = SELF_UPDATE_MODE && selfUpdate.enabled;
 
   const openRelease = async (url: string) => {
     try {
@@ -65,8 +74,21 @@ export function AboutUpdateRow({
   const channelLabelKey = updateChannelLabelKey(channel);
   const channelExtraKey = channelExtraBodyKey(channel);
 
+  const selfPercent =
+    selfMode &&
+    status.state === "downloading" &&
+    selfUpdate.progress?.version === status.version
+      ? selfUpdatePercent(selfUpdate.progress)
+      : null;
+
   const statusText = (() => {
     if (!copy.titleKey || status.state === "error") return null;
+    if (selfPercent !== null && status.state === "downloading") {
+      return t("settings.selfUpdate.downloading", {
+        version: status.version,
+        percent: selfPercent,
+      });
+    }
     // Idle: honest empty line (no invented "up to date").
     if (status.state === "idle") {
       return t(copy.titleKey);
@@ -81,6 +103,9 @@ export function AboutUpdateRow({
     if (!copy.bodyKey) return null;
     // Error body is shown under the alert line separately.
     if (status.state === "error") return null;
+    if (selfMode && status.state === "ready") {
+      return t("settings.selfUpdate.ready", { version: status.version });
+    }
     // Agents note only on auto path; manual path uses manual body.
     if (
       copy.bodyKey === "settings.autoUpdateBody.agentsNote" &&
@@ -104,8 +129,9 @@ export function AboutUpdateRow({
   const downloadUrl = manualUrls?.downloadUrl ?? null;
   const assetNames = manualUrls?.assetNames;
   const toneClass = updateStatusToneClass(copy.severity);
+  const selfConfirmCopy = useSelfUpdateConfirmCopy(t, copy.version ?? undefined);
 
-  if (!REMOTE_UPDATES_ENABLED) {
+  if (!REMOTE_UPDATES_ENABLED && !selfMode) {
     return (
       <div
         className="settings-row settings-row--stack"
@@ -129,14 +155,48 @@ export function AboutUpdateRow({
       ? updateErrorBodyKey(openErrorKind)
       : null;
 
+  const selfBlockerKey = selfMode
+    ? selfUpdateBlockerKey(selfUpdate.check?.blocker ?? selfUpdate.status?.blocker)
+    : null;
+  const selfHost = selfMode ? feedHost(selfUpdate.status?.feedUrl ?? "") : "";
+  const selfErrorKey =
+    selfMode && status.state === "error" ? selfUpdateErrorKey(status.message) : null;
+  const selfLastFailed = selfMode ? selfUpdate.status?.lastFailed ?? null : null;
+
   return (
     <div
       className="settings-row settings-row--stack"
       id="settings-anchor-remoteUpdates"
     >
       <div className="settings-row__text">
-        <div className="settings-row__label">{t("settings.checkUpdate")}</div>
-        <div className="settings-row__desc">{t("settings.checkUpdateDesc")}</div>
+        <div className="settings-row__label">
+          {selfMode ? t("settings.selfUpdate.title") : t("settings.checkUpdate")}
+        </div>
+        <div className="settings-row__desc">
+          {selfMode ? t("settings.selfUpdate.desc") : t("settings.checkUpdateDesc")}
+        </div>
+        {selfMode ? (
+          <>
+            {selfHost ? (
+              <div className="settings-row__hint" data-updater-channel="self">
+                {t("settings.selfUpdate.channel", { host: selfHost })}
+              </div>
+            ) : null}
+            {selfBlockerKey ? (
+              <div
+                className="settings-row__hint settings-about-update__channel-note"
+                data-self-update-blocker={selfUpdate.check?.blocker ?? selfUpdate.status?.blocker ?? ""}
+              >
+                {t(selfBlockerKey)}
+              </div>
+            ) : null}
+            {selfLastFailed ? (
+              <div className="settings-row__hint settings-about-update__channel-note">
+                {t("settings.selfUpdate.lastFailed", { version: selfLastFailed.version })}
+              </div>
+            ) : null}
+          </>
+        ) : (
         <div
           className="settings-row__hint"
           data-updater-channel={channel}
@@ -147,7 +207,8 @@ export function AboutUpdateRow({
             ? ` · ${channelInfo.endpoint.replace(/^https:\/\//, "")}`
             : ""}
         </div>
-        {channelExtraKey ? (
+        )}
+        {!selfMode && channelExtraKey ? (
           <div
             className="settings-row__hint settings-about-update__channel-note"
             data-update-channel-note={channelExtraKey}
@@ -188,7 +249,7 @@ export function AboutUpdateRow({
                 void installAndRelaunch();
               }}
             >
-              {t("settings.autoUpdateInstall")}
+              {selfMode ? t("settings.selfUpdate.update") : t("settings.autoUpdateInstall")}
             </button>
           ) : null}
           {showOpenRelease && downloadUrl ? (
@@ -200,7 +261,7 @@ export function AboutUpdateRow({
               {t("settings.checkUpdateDownload")}
             </button>
           ) : null}
-          {showOpenRelease ? (
+          {showOpenRelease && !selfMode ? (
             <button
               type="button"
               className="btn btn--ghost"
@@ -240,7 +301,11 @@ export function AboutUpdateRow({
             {t("settings.autoUpdateError", {
               error: copy.errorMessage ?? status.message,
             })}
-            {copy.bodyKey ? (
+            {selfErrorKey ? (
+              <div className="settings-about-update__err-hint">
+                {t(selfErrorKey)}
+              </div>
+            ) : copy.bodyKey && !selfMode ? (
               <div className="settings-about-update__err-hint">
                 {t(copy.bodyKey)}
               </div>
@@ -270,6 +335,7 @@ export function AboutUpdateRow({
       <UpdateInstallConfirmModal
         open={confirmInstall}
         version={copy.version}
+        copy={selfConfirmCopy}
         t={t}
         onClose={() => setConfirmInstall(false)}
         onConfirm={() => {

@@ -433,7 +433,7 @@ export const zhTWSettings = {
   "settings.skinDesc": "強調色與表面色板（可與淺/深色疊加）",
   "settings.doctorDesc": "診斷 CLI、驗證與供應商連通性",
   "settings.runDoctor": "執行 Doctor",
-  "settings.aboutApp": "關於 Atlas",
+  "settings.aboutApp": "關於 AtlasBuddy",
   "settings.developerMode": "開發模式",
   "settings.developerModeDesc": "在應用程式內顯示開發者工具（更新模擬等診斷項目）。預設關閉。不會開啟系統開發者工具。",
   "settings.updateSim": "模擬應用程式更新",

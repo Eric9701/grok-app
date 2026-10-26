@@ -9,6 +9,10 @@ import { useCallback, useState } from "react";
 import { IconCircleArrowUp } from "@/components/icons";
 import { Tip } from "@/components/ui/tooltip";
 import { UpdateInstallConfirmModal } from "@/components/UpdateInstallConfirmModal";
+import {
+  UpdateReadyPrompt,
+  useSelfUpdateConfirmCopy,
+} from "@/components/UpdateReadyPrompt";
 import { useUpdaterContext } from "@/hooks/UpdaterProvider";
 import type { UpdateStatus } from "@/hooks/useUpdater";
 import {
@@ -66,6 +70,7 @@ export function SidebarUpdateButton({
   const tipLabel = t(tipKey(status), {
     version: version ? ` (${version})` : "",
   });
+  const selfConfirmCopy = useSelfUpdateConfirmCopy(t, version);
 
   const runApply = useCallback(async () => {
     if (busyClick) return;
@@ -100,7 +105,7 @@ export function SidebarUpdateButton({
 
   // Desktop host, or update sim (browser can still exercise the UI).
   if (!visible || (!api.isDesktopHost() && !isUpdateSimActive())) {
-    return null;
+    return <UpdateReadyPrompt t={t} />;
   }
 
   const busy =
@@ -139,9 +144,11 @@ export function SidebarUpdateButton({
           />
         </button>
       </Tip>
+      <UpdateReadyPrompt t={t} />
       <UpdateInstallConfirmModal
         open={confirmInstall}
         version={version}
+        copy={selfConfirmCopy}
         t={t}
         onClose={() => setConfirmInstall(false)}
         onConfirm={() => {

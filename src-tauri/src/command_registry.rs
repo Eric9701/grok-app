@@ -6,7 +6,8 @@
 use crate::{
     atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub, launch_chrome,
     leader, mirror,
-    os_theme, pet_quick, pet_window, pr_monitor, remote_im, serve, session_api, ssh_remote,
+    os_theme, pet_quick, pet_window, pr_monitor, remote_im, self_update, serve, session_api,
+    ssh_remote,
     system_fonts, theme_editor_window, tray, updater, voice_host, wallpaper_grok_album,
     wallpaper_remote_commands, window_min,
 };
@@ -79,6 +80,11 @@ pub fn app_invoke_handler(
         updater::is_updater_plugin_enabled,
         updater::updater_status,
         updater::prepare_for_app_update,
+        self_update::self_update_status,
+        self_update::self_update_ack_failure,
+        self_update::self_update_check,
+        self_update::self_update_download,
+        self_update::self_update_install,
         // ── Voice (status & transcribe) ──
         commands::voice_status,
         commands::voice_transcribe,

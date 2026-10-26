@@ -409,7 +409,7 @@ export const ptBRSettings = {
   "settings.skinDesc": "Paleta de destaque e superfície (funciona com claro/escuro)",
   "settings.doctorDesc": "Diagnosticar CLI, autenticação e conectividade do provedor",
   "settings.runDoctor": "Executar Doctor",
-  "settings.aboutApp": "Sobre o Atlas",
+  "settings.aboutApp": "Sobre o AtlasBuddy",
   "settings.developerMode": "Modo desenvolvedor",
   "settings.developerModeDesc": "Mostrar ferramentas de desenvolvedor no app (simulação de atualização e outros diagnósticos). Desligado por padrão. Não abre o DevTools.",
   "settings.updateSim": "Simular atualização do app",

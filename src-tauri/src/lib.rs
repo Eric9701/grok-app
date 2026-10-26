@@ -137,6 +137,8 @@ mod paths;
 
 mod remote_updates;
 
+mod self_update;
+
 mod plan_chrome;
 
 mod permission;
@@ -548,6 +550,8 @@ pub fn run() {
             // Plugin setup already exited any second process. Sweep only here,
             // so a relaunch cannot delete the running chats' agent-proc homes.
             agent_proc_home::sweep_orphans();
+
+            self_update::run_on_startup();
 
             crate::path_scope::refresh_from_store();
 

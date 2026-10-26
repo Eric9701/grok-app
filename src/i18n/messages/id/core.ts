@@ -4,7 +4,7 @@ export const idCore = {
   "image.loadingOriginal": "Memuat berkas asli…",
   "image.originalFailed": "Berkas asli tidak dapat dimuat. Pratinjau tetap tersedia.",
   "app.tagline": "MIT · Tidak resmi · Proyek saudara grok-go",
-  "app.versionFooter": "Atlas {version} · MIT · Tidak resmi · Proyek saudara grok-go",
+  "app.versionFooter": "{version}",
   "window.minimize": "Perkecil",
   "window.maximize": "Perbesar",
   "window.restore": "Pulihkan",

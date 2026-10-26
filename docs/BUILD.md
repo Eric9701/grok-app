@@ -288,7 +288,7 @@ Release body = 下载表 + 该版本 CHANGELOG + 安装说明（含 `xattr`）�
 - `src-tauri/tauri.conf.json` → `version`
 - `src-tauri/Cargo.toml` → `[package].version`
 
-About 页版本（`app.versionFooter` 的 `{version}`）在 Vite 构建时注入：恰好是 `vX.Y.Z` release tag 则显示该 tag，否则显示 short commit hash。
+About 页版本（`app.versionFooter` 的 `{version}`）显示 `package.json` 的 semver。
 
 Tag 格式：`v0.1.1`（前缀 `v` + semver）。
 
