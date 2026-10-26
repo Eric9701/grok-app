@@ -89,7 +89,18 @@ else
 fi
 ls -lah "$OUT"
 if command -v gh >/dev/null 2>&1 && [[ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]]; then
-  gh release upload "$TAG" "$OUT" --clobber
+  REPO_ARGS=()
+  if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+    REPO_ARGS=(--repo "$GITHUB_REPOSITORY")
+  fi
+  if ! gh release view "$TAG" "${REPO_ARGS[@]}" >/dev/null 2>&1; then
+    echo "::error::GitHub Release ${TAG} does not exist, so ${OUT} was not uploaded."
+    echo "tauri-action creates the Release from tauri.conf.json when this workflow is not a tag push."
+    echo "package.json, tauri.conf.json, and Cargo.toml must use the same version."
+    gh release list "${REPO_ARGS[@]}" --limit 5 || true
+    exit 1
+  fi
+  gh release upload "$TAG" "$OUT" "${REPO_ARGS[@]}" --clobber
   echo "uploaded $OUT to $TAG"
 else
   echo "skip upload (gh/token missing); artifact at $OUT"

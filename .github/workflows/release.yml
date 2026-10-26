@@ -74,6 +74,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # tauri-action names the Release from tauri.conf.json (`v__VERSION__`).
+      # The portable zip step names its tag from package.json. If those differ,
+      # `gh release upload` fails with "release not found" after a full build.
+      - name: Require lockstep app version
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, pathlib, re, sys
+          pkg = json.load(open("package.json", encoding="utf-8"))["version"]
+          tauri = json.load(open("src-tauri/tauri.conf.json", encoding="utf-8"))["version"]
+          cargo = re.search(
+              r'(?m)^version = "([^"]+)"',
+              pathlib.Path("src-tauri/Cargo.toml").read_text(encoding="utf-8"),
+          )
+          cargo = cargo.group(1) if cargo else ""
+          if not (pkg == tauri == cargo):
+              print(
+                  f"::error::App version mismatch: package.json={pkg} "
+                  f"tauri.conf.json={tauri} Cargo.toml={cargo}. "
+                  "These three must match before a Release build."
+              )
+              sys.exit(1)
+          print(f"app version {pkg}")
+          PY
+
       - name: Setup pnpm
         # Do not hardcode version — package.json packageManager (pnpm@9.15.9)
         # is the single source. Dual version input fails with:
@@ -361,7 +387,7 @@ jobs:
 
       # 绿色版：免安装 zip（单文件 exe + 说明）。WebView2 仍由系统提供。
       - name: Windows portable zip (绿色版)
-        if: matrix.platform == 'windows-latest'
+        if: success() && matrix.platform == 'windows-latest'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
