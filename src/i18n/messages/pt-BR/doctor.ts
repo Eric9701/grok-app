@@ -1,6 +1,6 @@
 /** pt-BR messages — domain: doctor */
 export const ptBRDoctor = {
-  "setup.title": "Boas-vindas ao Atlas",
+  "setup.title": "Boas-vindas ao AtlasBuddy",
   "setup.subtitle": "MIT · Bancada de desktop não oficial para o Atlas CLI",
   "setup.step.runtime": "Runtime",
   "setup.step.account": "Conta",

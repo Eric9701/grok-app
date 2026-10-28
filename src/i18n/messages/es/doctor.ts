@@ -1,6 +1,6 @@
 /** es messages — domain: doctor */
 export const esDoctor = {
-  "setup.title": "Te damos la bienvenida a Atlas",
+  "setup.title": "Te damos la bienvenida a AtlasBuddy",
   "setup.subtitle": "MIT · Banco de trabajo de escritorio no oficial para Atlas CLI",
   "setup.step.runtime": "Ejecución",
   "setup.step.account": "Cuenta",

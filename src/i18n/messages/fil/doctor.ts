@@ -1,6 +1,6 @@
 /** fil messages — domain: doctor */
 export const filDoctor = {
-  "setup.title": "Maligayang pagdating sa Atlas",
+  "setup.title": "Maligayang pagdating sa AtlasBuddy",
   "setup.subtitle": "MIT · Hindi opisyal na desktop workbench para sa Atlas CLI",
   "setup.step.runtime": "Runtime",
   "setup.step.account": "Account",

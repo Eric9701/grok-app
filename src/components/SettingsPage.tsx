@@ -55,6 +55,7 @@ import {
   loadUiFontFamily,
   saveUiFontFamily,
 } from "@/lib/uiFontPref";
+import { useRemoteChromeVisible } from "@/lib/api/launchChrome";
 import {
   DEFAULT_TERMINAL_FONT_SIZE,
   loadTerminalFontFamily,
@@ -309,6 +310,7 @@ export function SettingsPage({
   prefsScope = "global",
   onPrefsScope,
   availableModels = [],
+  onAvailableModels,
   manualCliPath,
   onManualCliPath,
   onCliBlur,
@@ -1045,6 +1047,9 @@ export function SettingsPage({
   const activeTab = localTab ?? tabFromProps;
   const sectionNav = useMemo(() => getNavDef(section), [section]);
 
+  const remoteChrome = useRemoteChromeVisible();
+  const remoteChromeVisible = remoteChrome.visible;
+
   const navigateTo = useCallback(
     (
       id: SettingsSectionId,
@@ -1082,6 +1087,11 @@ export function SettingsPage({
     },
     [onSection, phoneLayout, section],
   );
+
+  useEffect(() => {
+    if (!remoteChrome.ready || remoteChromeVisible || section !== "remote_im") return;
+    navigateTo("general");
+  }, [remoteChrome.ready, remoteChromeVisible, section, navigateTo]);
 
   const openSection = useCallback(
     (id: SettingsSectionId) => {
@@ -1136,17 +1146,17 @@ export function SettingsPage({
   /** English catalog: keeps "theme" / "permission" searchable in a zh UI too. */
   const tEn = useMemo(() => createT("en"), []);
 
-  const searchHits = useMemo(
-    () =>
-      trimmedQuery
-        ? searchSettingsEntries(
-            trimmedQuery,
-            (k) => t(k),
-            (k) => tEn(k),
-          )
-        : [],
-    [trimmedQuery, t, tEn],
-  );
+  const searchHits = useMemo(() => {
+    const hits = trimmedQuery
+      ? searchSettingsEntries(
+          trimmedQuery,
+          (k) => t(k),
+          (k) => tEn(k),
+        )
+      : [];
+    if (remoteChromeVisible) return hits;
+    return hits.filter((hit) => hit.entry.section !== "remote_im");
+  }, [trimmedQuery, t, tEn, remoteChromeVisible]);
 
   const hitSections = useMemo(() => {
     if (!trimmedQuery) return null;
@@ -1154,9 +1164,12 @@ export function SettingsPage({
   }, [trimmedQuery, searchHits]);
 
   const nav = useMemo(() => {
-    if (!hitSections) return [...SETTINGS_NAV];
-    return SETTINGS_NAV.filter((n) => hitSections.has(n.id));
-  }, [hitSections]);
+    const base = remoteChromeVisible
+      ? SETTINGS_NAV
+      : SETTINGS_NAV.filter((n) => n.id !== "remote_im");
+    if (!hitSections) return [...base];
+    return base.filter((n) => hitSections.has(n.id));
+  }, [hitSections, remoteChromeVisible]);
 
   const personalNav = useMemo(
     () => nav.filter((n) => n.group === "personal"),
@@ -1525,6 +1538,7 @@ export function SettingsPage({
     prefsScope,
     onPrefsScope,
     availableModels,
+    onAvailableModels,
     manualCliPath,
     onManualCliPath,
     onCliBlur,
@@ -1976,7 +1990,7 @@ export function SettingsPage({
         {section === "archived" && <ArchivedSection />}
         {section === "pet" && <PetSection />}
         {section === "extensions" && <ExtensionsSection />}
-        {section === "remote_im" && <RemoteImSection />}
+        {section === "remote_im" && remoteChromeVisible && <RemoteImSection />}
         {section === "runtime" && <RuntimeSection />}
         {section === "atlas" && <AtlasSection />}
         {section === "agent_cli" && <AgentCliSection />}

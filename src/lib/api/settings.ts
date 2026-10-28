@@ -345,6 +345,11 @@ export async function modelsListAvailable() {
   return invoke<AvailableModelsResult>("models_list_available");
 }
 
+/** Run `atlas models refresh`, then return the catalog the composer reads. */
+export async function modelsRefreshCatalog() {
+  return invoke<AvailableModelsResult>("models_refresh_catalog");
+}
+
 export async function composerPrefsResolve(opts?: {
   projectId?: string | null;
   sessionId?: string | null;

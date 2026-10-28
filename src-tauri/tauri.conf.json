@@ -1,7 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Atlas",
-  "version": "0.2.42",
+  "productName": "AtlasBuddy",
+  "mainBinaryName": "AtlasBuddy",
+  "version": "0.2.43",
   "identifier": "com.atlasapp.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev:ui",
@@ -13,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Atlas",
+        "title": "AtlasBuddy",
         "visible": false,
         "create": false,
         "width": 1200,

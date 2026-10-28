@@ -14,6 +14,14 @@ export function publishAtlasCloudSite(url: string) {
   );
 }
 
+export const DEFAULT_ATLAS_CLOUD_SITE_URL = "https://atlas.myai.tech";
+
+/** Blank means the built-in Atlas Cloud site. */
+export function effectiveAtlasCloudSiteUrl(raw: string | null | undefined): string {
+  const text = raw?.trim() ?? "";
+  return text || DEFAULT_ATLAS_CLOUD_SITE_URL;
+}
+
 /** Empty string clears the site. http(s) only. */
 export function parseAtlasCloudSiteUrl(raw: string): string | null {
   const text = raw.trim();
@@ -41,7 +49,7 @@ function AtlasCloudSiteField({
     if (!api.isTauri()) return;
     try {
       const settings = await api.settingsGet();
-      const next = settings.atlasCloudSiteUrl?.trim() || "";
+      const next = effectiveAtlasCloudSiteUrl(settings.atlasCloudSiteUrl);
       setUrl(next);
       setError("");
     } catch {
@@ -93,7 +101,7 @@ function AtlasCloudSiteField({
         <input
           className="settings-input"
           value={url}
-          placeholder={t("settings.atlasCloudSitePh")}
+          placeholder={DEFAULT_ATLAS_CLOUD_SITE_URL}
           onChange={(e) => {
             setUrl(e.target.value);
             setError("");

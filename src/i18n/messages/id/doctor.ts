@@ -1,6 +1,6 @@
 /** id messages — domain: doctor */
 export const idDoctor = {
-  "setup.title": "Selamat datang di Atlas",
+  "setup.title": "Selamat datang di AtlasBuddy",
   "setup.subtitle": "MIT · Workbench desktop tidak resmi untuk Atlas CLI",
   "setup.step.runtime": "Runtime",
   "setup.step.account": "Akun",

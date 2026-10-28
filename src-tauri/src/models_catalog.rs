@@ -605,6 +605,53 @@ pub fn list_available_models() -> AvailableModelsResult {
     }
 }
 
+/// Run `atlas models refresh`, then re-read the catalog the composer uses.
+///
+/// The CLI writes `models_cache.json` and enterprise `[model.*]` under its
+/// home (`~/.atlas` when that directory exists). This does not set `GROK_HOME`.
+pub async fn refresh_cli_model_catalog() -> Result<AvailableModelsResult, String> {
+    let settings = store::load_settings();
+    let probe = crate::cli_probe::probe_cli(settings.manual_cli_path.as_deref());
+    let cli = probe
+        .path
+        .filter(|p| !p.trim().is_empty())
+        .ok_or_else(|| "Atlas CLI not found. Install or set CLI path in Settings.".to_string())?;
+
+    let mut cmd = tokio::process::Command::new(&cli);
+    cmd.args(["models", "refresh"])
+        .kill_on_drop(true)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    crate::process_util::apply_cli_env_tokio(&mut cmd);
+    crate::proxy::apply_to_tokio_command(&mut cmd);
+
+    let child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to run atlas models refresh: {e}"))?;
+    let finished = tokio::time::timeout(std::time::Duration::from_secs(90), child.wait_with_output())
+        .await;
+    let output = match finished {
+        Ok(Ok(output)) => output,
+        Ok(Err(e)) => return Err(format!("Failed to run atlas models refresh: {e}")),
+        Err(_) => return Err("atlas models refresh timed out after 90s".into()),
+    };
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let detail = stderr
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .or_else(|| stdout.lines().rev().find(|l| !l.trim().is_empty()))
+            .unwrap_or("models refresh failed")
+            .trim();
+        let detail: String = detail.chars().take(240).collect();
+        return Err(format!("atlas models refresh failed: {detail}"));
+    }
+    Ok(list_available_models())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

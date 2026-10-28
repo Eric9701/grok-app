@@ -265,7 +265,7 @@ mod tests {
             appdir
         ));
         assert!(!is_appimage_webkit_helper(
-            &appdir.join("usr/bin/grok-app"),
+            &appdir.join("usr/bin/AtlasBuddy"),
             appdir
         ));
     }

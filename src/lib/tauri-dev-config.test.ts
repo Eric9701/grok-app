@@ -21,7 +21,7 @@ describe("tauri dev identifier overlay", () => {
     };
     expect(base.identifier).toBe("com.atlasapp.desktop");
     expect(dev.identifier).toBe("com.atlasapp.desktop.dev");
-    expect(dev.productName).toBe("Atlas Dev");
+    expect(dev.productName).toBe("AtlasBuddy Dev");
   });
 
   it("wires pnpm dev to merge the overlay", () => {

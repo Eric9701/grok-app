@@ -1,6 +1,6 @@
 /** ko messages — domain: doctor */
 export const koDoctor = {
-  "setup.title": "Atlas에 오신 것을 환영합니다",
+  "setup.title": "AtlasBuddy에 오신 것을 환영합니다",
   "setup.subtitle": "MIT · Atlas CLI용 비공식 데스크톱 작업대",
   "setup.step.runtime": "런타임",
   "setup.step.account": "계정",

@@ -17,6 +17,8 @@ pub async fn settings_set(
 ) -> Result<AppSettings, String> {
     let prev = store::load_settings_async().await;
     let mut settings = settings;
+    settings.atlas_cloud_site_url =
+        crate::store::effective_atlas_cloud_site_url(&settings.atlas_cloud_site_url);
     settings.composer_editor =
         store::normalize_composer_editor(&settings.composer_editor).to_string();
     settings.wallpaper_x_search_mode =
@@ -342,6 +344,12 @@ pub async fn settings_set(
 #[tauri::command]
 pub async fn models_list_available() -> Result<crate::models_catalog::AvailableModelsResult, String> {
     Ok(crate::models_catalog::list_available_models())
+}
+
+/// `atlas models refresh`, then the same catalog `models_list_available` reads.
+#[tauri::command]
+pub async fn models_refresh_catalog() -> Result<crate::models_catalog::AvailableModelsResult, String> {
+    crate::models_catalog::refresh_cli_model_catalog().await
 }
 
 #[tauri::command]

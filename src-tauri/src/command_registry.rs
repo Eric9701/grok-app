@@ -4,11 +4,10 @@
 //! new `// ── Domain ──` section rather than appending at a random spot.
 
 use crate::{
-    agent_runtimes, atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub, leader,
-    mirror,
-    os_theme, pet_quick, pet_window, pr_monitor, remote_im, serve, session_api, ssh_remote,
-    system_fonts, theme_editor_window, tray, updater, voice_host, wallpaper_grok_album,
-    wallpaper_remote_commands, window_min,
+    agent_runtimes, atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub,
+    launch_chrome, leader, mirror, os_theme, pet_quick, pet_window, pr_monitor, remote_im,
+    self_update, serve, session_api, ssh_remote, system_fonts, theme_editor_window, tray, updater,
+    voice_host, wallpaper_grok_album, wallpaper_remote_commands, window_min,
 };
 
 /// Single invoke handler consumed by `Builder::invoke_handler` in `run()`.
@@ -42,6 +41,7 @@ pub fn app_invoke_handler(
         commands::session_agent_plan_snapshot,
         commands::session_resolve_ask_user,
         // ── CLI & environment probe ──
+        launch_chrome::launch_chrome_get,
         commands::probe_cli,
         commands::wsl_status,
         // ── SSH remote hosts ──
@@ -74,6 +74,7 @@ pub fn app_invoke_handler(
         commands::cli_install_commands,
         commands::cli_update_check,
         commands::cli_update_install,
+        commands::cli_update_run,
         commands::pick_cli_binary,
         commands::pick_agent_profile,
         commands::open_external_url,
@@ -82,6 +83,11 @@ pub fn app_invoke_handler(
         updater::is_updater_plugin_enabled,
         updater::updater_status,
         updater::prepare_for_app_update,
+        self_update::self_update_status,
+        self_update::self_update_ack_failure,
+        self_update::self_update_check,
+        self_update::self_update_download,
+        self_update::self_update_install,
         // ── Voice (status & transcribe) ──
         commands::voice_status,
         commands::voice_transcribe,
@@ -164,6 +170,7 @@ pub fn app_invoke_handler(
         commands::settings_remember_last_session,
         // ── Models, agents catalog & composer prefs ──
         commands::models_list_available,
+        commands::models_refresh_catalog,
         commands::agents_catalog,
         commands::composer_prefs_resolve,
         commands::composer_prefs_set,

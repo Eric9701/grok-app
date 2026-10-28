@@ -371,6 +371,45 @@ fn normalize_ver(s: &str) -> String {
     s.trim().trim_start_matches(['v', 'V']).to_ascii_lowercase()
 }
 
+/// Run plain `atlas update` (no `--check`, no GitHub App probe, no install fallback).
+///
+/// Used by the Settings button while background update checks stay off.
+pub fn run_plain_atlas_update(
+    manual_path: Option<&str>,
+) -> Result<crate::cli_install::CliInstallResult, String> {
+    let probe = cli_probe::probe_cli(manual_path);
+    let path = probe.path.filter(|_| probe.found).ok_or_else(|| {
+        "Atlas CLI not found — install or set the path under Runtime".to_string()
+    })?;
+    let stdout = run_cli_with_timeout(Path::new(&path), &["update"], UPDATE_TIMEOUT)?;
+    let after = cli_probe::probe_cli(manual_path);
+    let version = after
+        .version
+        .map(|v| strip_grok_prefix(&v))
+        .or_else(|| extract_version_hint(&stdout));
+    let detail = stdout
+        .lines()
+        .rev()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("")
+        .trim();
+    let detail: String = detail.chars().take(240).collect();
+    let message = if detail.is_empty() {
+        "Updated via `atlas update`".into()
+    } else {
+        detail
+    };
+    Ok(crate::cli_install::CliInstallResult {
+        ok: true,
+        path: after.path.or(Some(path)),
+        version,
+        mirror_used: Some("atlas-update".into()),
+        message,
+        sha256: None,
+        checksum_verified: None,
+    })
+}
+
 /// Resolve CLI binary and run `update --check --json`.
 pub fn check_cli_update(manual_path: Option<&str>) -> Result<CliUpdateCheck, String> {
     if !crate::remote_updates::REMOTE_UPDATES_ENABLED {
@@ -571,6 +610,12 @@ fn extract_version_hint(stdout: &str) -> Option<String> {
     None
 }
 
+/// Parent-npm hints that must not classify the Atlas CLI install.
+///
+/// `npm run dev` sets `npm_config_user_agent` on the desktop process. The CLI
+/// reads it before `config.toml` and then tries to spawn `npm`.
+const NPM_INSTALLER_HINT_VARS: &[&str] = &["npm_config_user_agent"];
+
 fn run_cli_with_timeout(bin: &Path, args: &[&str], timeout: Duration) -> Result<String, String> {
     let bin = bin.to_path_buf();
     let args_owned: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
@@ -581,6 +626,13 @@ fn run_cli_with_timeout(bin: &Path, args: &[&str], timeout: Duration) -> Result<
         cmd.args(&args_owned);
         // PATH + HOME (Windows GUI often lacks $HOME; CLI hub / update cache needs it).
         process_util::apply_cli_env_std(&mut cmd);
+        // `npm run dev` injects `npm_config_user_agent` into this GUI process.
+        // Atlas treats that as "installed via npm" ahead of `~/.atlas/config.toml`
+        // (`installer = "internal"`), then `Command::new("npm")`. On Windows that
+        // is `npm.cmd`, so CreateProcess fails with "program not found".
+        for key in NPM_INSTALLER_HINT_VARS {
+            cmd.env_remove(key);
+        }
         // `grok update` downloads over the network — honor the proxy (NEW-02).
         crate::proxy::apply_to_std_command(&mut cmd);
         let result = cmd.output();
@@ -624,6 +676,11 @@ fn run_cli_with_timeout(bin: &Path, args: &[&str], timeout: Duration) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cli_update_drops_npm_dev_server_installer_hint() {
+        assert!(NPM_INSTALLER_HINT_VARS.contains(&"npm_config_user_agent"));
+    }
 
     const SAMPLE_UP_TO_DATE: &str = r#"{
   "currentVersion": "0.2.111",

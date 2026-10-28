@@ -130,13 +130,15 @@ describe("window chrome", () => {
     expect(inner).toContain("ActivationPolicy::Regular");
   });
 
-  it("base product identity is Atlas", () => {
+  it("base product identity is AtlasBuddy", () => {
     const conf = JSON.parse(readFileSync(CONF_PATH, "utf8")) as {
       productName?: string;
+      mainBinaryName?: string;
       app: { windows: Array<{ title?: string }> };
     };
-    expect(conf.productName).toBe("Atlas");
-    expect(conf.app.windows[0]!.title).toBe("Atlas");
+    expect(conf.productName).toBe("AtlasBuddy");
+    expect(conf.mainBinaryName).toBe("AtlasBuddy");
+    expect(conf.app.windows[0]!.title).toBe("AtlasBuddy");
   });
 
   it("uses window-vibrancy for native frosted glass on macOS", () => {

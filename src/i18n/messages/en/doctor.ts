@@ -1,6 +1,6 @@
 /** English messages — domain: doctor */
 export const enDoctor = {
-  "setup.title": "Welcome to Atlas",
+  "setup.title": "Welcome to AtlasBuddy",
   "setup.subtitle": "MIT · Unofficial desktop workbench for Atlas CLI",
   "setup.step.runtime": "Runtime",
   "setup.step.account": "Account",

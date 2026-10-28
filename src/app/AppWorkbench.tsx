@@ -12237,7 +12237,7 @@ export function AppWorkbench() {
         askUserTimeoutSec={askUserTimeoutSec}
         auditLedgerRetentionDays={auditLedgerRetentionDays}
         autoWakeEnabled={autoWakeEnabled}
-        availableModels={availableModels}
+        availableModels={availableModels} onAvailableModels={setAvailableModels}
         backgroundWaitPolicy={backgroundWaitPolicy}
         backgroundWaitTimeoutSec={backgroundWaitTimeoutSec}
         cancelAccountLogin={cancelAccountLogin}

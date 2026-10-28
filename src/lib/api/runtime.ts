@@ -51,6 +51,11 @@ export async function cliUpdateCheck() {
  * Channel/version soft-fail without inventing channels.
  * When App is behind (#1009), pass `acknowledgeAppBehind: true` after UI confirm.
  */
+/** Run `atlas update` and return the CLI's result. No GitHub App check. */
+export async function cliUpdateRun() {
+  return invoke<CliUpdateCheck>("cli_update_run");
+}
+
 export async function cliUpdateInstall(opts?: CliUpdateInstallOpts | null) {
   return invoke<CliUpdateCheck>("cli_update_install", {
     channel: opts?.channel ?? null,

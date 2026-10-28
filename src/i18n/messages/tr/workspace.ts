@@ -237,7 +237,7 @@ export const trWorkspace = {
   "changes.workspace.loadError": "Çalışma alanı git durumu yüklenemedi",
   "changes.workspace.loadErrorHint": "Proje yolunu kontrol edip yenilemeyi deneyin. Oturumdaki araç düzenlemeleri varsa yine yukarıda görünür.",
   "changes.workspace.hostOnly": "Çalışma alanı git durumu masaüstü uygulamasını gerektirir",
-  "changes.workspace.hostOnlyHint": "Çalışma alanı değişikliklerini incelemek için Grok masaüstü uygulamasını açın.",
+  "changes.workspace.hostOnlyHint": "Çalışma alanı değişikliklerini incelemek için AtlasBuddy masaüstü uygulamasını açın.",
   "changes.workspace.unavailableHint": "Bu proje için git durumu okunamadı.",
   "changes.workspace.refresh": "Çalışma alanı durumunu yenile",
   "changes.workspace.branch": "{branch} dalında",

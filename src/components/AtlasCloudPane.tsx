@@ -5,7 +5,10 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { EmbeddedBrowser } from "@/components/EmbeddedBrowser";
-import { ATLAS_CLOUD_SITE_EVENT } from "@/components/settings/AtlasSection";
+import {
+  ATLAS_CLOUD_SITE_EVENT,
+  effectiveAtlasCloudSiteUrl,
+} from "@/components/settings/AtlasSection";
 import type { Locale, createT } from "@/i18n";
 import * as api from "@/lib/api";
 
@@ -30,22 +33,24 @@ export function AtlasCloudPane({
   /** Test override. Undefined loads the saved setting. */
   siteUrl?: string;
 }) {
-  const [url, setUrl] = useState(siteUrl?.trim() ?? "");
+  const [url, setUrl] = useState(() =>
+    siteUrl === undefined ? "" : effectiveAtlasCloudSiteUrl(siteUrl),
+  );
 
   useEffect(() => {
     if (siteUrl != null) {
-      setUrl(siteUrl.trim());
+      setUrl(effectiveAtlasCloudSiteUrl(siteUrl));
       return;
     }
     let stop = false;
     const load = () => {
       if (!api.isTauri()) return;
       void api.settingsGet().then((settings) => {
-        if (!stop) setUrl(settings.atlasCloudSiteUrl?.trim() || "");
+        if (!stop) setUrl(effectiveAtlasCloudSiteUrl(settings.atlasCloudSiteUrl));
       }).catch(() => undefined);
     };
     const onSite = (event: Event) => {
-      if (!stop) setUrl(readSiteDetail(event));
+      if (!stop) setUrl(effectiveAtlasCloudSiteUrl(readSiteDetail(event)));
     };
     load();
     window.addEventListener(ATLAS_CLOUD_SITE_EVENT, onSite);

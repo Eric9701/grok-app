@@ -236,7 +236,7 @@ export const enWorkspace = {
   "changes.workspace.loadError": "Could not load workspace git status",
   "changes.workspace.loadErrorHint": "Check the project path and try refresh. Session tool edits still appear above when present.",
   "changes.workspace.hostOnly": "Workspace git status needs the desktop app",
-  "changes.workspace.hostOnlyHint": "Open Atlas desktop to inspect workspace changes.",
+  "changes.workspace.hostOnlyHint": "Open AtlasBuddy desktop to inspect workspace changes.",
   "changes.workspace.unavailableHint": "Git status could not be read for this project.",
   "changes.workspace.refresh": "Refresh workspace status",
   "changes.workspace.branch": "On {branch}",

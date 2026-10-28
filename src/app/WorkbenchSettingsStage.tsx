@@ -36,7 +36,7 @@ import {
   resolveLocalePreference,
 } from "@/i18n";
 import { isValidPolicy, isValidPrefsScope } from "@/lib/grokCatalog";
-import { appDisplayVersion } from "@/lib/appDisplayVersion";
+import { APP_VERSION } from "@/lib/whatsNew";
 import { mapProbeToCliInfo } from "@/lib/cliVersionStatus";
 import type { SessionRow } from "@/lib/app/sidebarModels";
 import type { WorkbenchSettingsStageProps } from "@/app/workbenchSettingsStageProps";
@@ -49,7 +49,7 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
     activeAccountId, activeProject, agentCatalog, agentIdleMinutes, agentProfilePath, agentsJson,
     allowUnverifiedCliInstall, allowedTools, applyComposerPrefs, applyGlobalSandboxProfile, applyPermissionPolicy, applySkinChoice,
     applyThemeChoice, applyThemeScheduleChoice, applyWallpaperAdjustChoice, applyWallpaperChoice, applyWallpaperMediaSize, applyWallpaperScrimChoice, applyWallpaperBlurChoice,
-    archivedGroups, askUserTimeoutSec, auditLedgerRetentionDays, autoWakeEnabled, availableModels, backgroundWaitPolicy,
+    archivedGroups, askUserTimeoutSec, auditLedgerRetentionDays, autoWakeEnabled, availableModels, onAvailableModels, backgroundWaitPolicy,
     backgroundWaitTimeoutSec, cancelAccountLogin, cliAgentSkewRepairing, cliInfo, closeToTray, compactionDetail,
     compactionMode, composerEditor, confirmArchiveOlderThan, defaultOpenTarget, deleteSessionsConfirm, disableWebSearch, disallowedTools,
     effectiveProjectPath, experimentalMemory, goalOrchUiEnabled, handleClearAllSessionMutes, handleClearAllSessionUnread, importChatTranscript,
@@ -263,6 +263,7 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
           .catch(() => {});
           }}
           availableModels={availableModels}
+          onAvailableModels={onAvailableModels}
           manualCliPath={manualCliPath}
           onManualCliPath={setManualCliPath}
           onCliBlur={(v) => {
@@ -743,7 +744,7 @@ export function WorkbenchSettingsStage(p: WorkbenchSettingsStageProps) {
           onOpenShortcutsHelp={() => setShowShortcuts(true)}
           onOpenProductTutorial={() => setShowProductTutorial(true)}
           versionFooter={tr("app.versionFooter", {
-            version: appDisplayVersion(),
+            version: APP_VERSION,
           })}
           account={account}
           accountLoading={accountLoading}

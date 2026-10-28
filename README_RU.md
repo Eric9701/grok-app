@@ -201,7 +201,7 @@ error while loading shared libraries: libEGL.so.1: cannot open shared object fil
 sudo apt-get install -y libegl1 libgles2 libwebkit2gtk-4.1-0 libayatana-appindicator3-1
 ```
 
-Затем `chmod +x` и запустите AppImage (или распакованный `usr/bin/grok-app`). В `.deb` уже указаны `libwebkit2gtk-4.1-0` и `libgtk-3-0`.
+Затем `chmod +x` и запустите AppImage (или распакованный `usr/bin/AtlasBuddy`). В `.deb` уже указаны `libwebkit2gtk-4.1-0` и `libgtk-3-0`.
 
 Это **отсутствие shared library при старте**, а не чёрное окно Wayland / `EGL_BAD_PARAMETER` из раздела [графика в Linux](#особенности-графики-в-linux-webkitgtk--wayland). См. issue [#899](https://github.com/RongleCat/grok-app/issues/899).
 

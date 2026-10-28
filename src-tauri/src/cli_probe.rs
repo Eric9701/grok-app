@@ -594,17 +594,11 @@ fn read_version(path: &Path) -> Option<String> {
                     }
                     s
                 };
-                if status.success() {
-                    let line = stdout.lines().next()?.trim().to_string();
-                    return if line.is_empty() { None } else { Some(line) };
+                // Non-zero, including a banner on stderr, is not an install.
+                if !status.success() {
+                    return None;
                 }
-                // Some builds print version on stderr
-                let line = stderr.lines().next()?.trim().to_string();
-                let lower = line.to_ascii_lowercase();
-                if !line.is_empty() && (lower.contains("atlas") || lower.contains("grok")) {
-                    return Some(line);
-                }
-                return None;
+                return first_banner_line(&stdout).or_else(|| first_banner_line(&stderr));
             }
             Ok(None) => {
                 if Instant::now() >= deadline {
@@ -622,6 +616,18 @@ fn read_version(path: &Path) -> Option<String> {
             Err(_) => return None,
         }
     }
+}
+
+fn first_banner_line(text: &str) -> Option<String> {
+    text.lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(|line| line.to_string())
+}
+
+/// `--version` counts as installed only on exit 0 with a non-empty banner.
+pub fn version_probe_installed(exit_ok: bool, banner: Option<&str>) -> bool {
+    exit_ok && banner.is_some_and(|line| !line.trim().is_empty())
 }
 
 fn classify_source(path: &Path, manual_first: bool) -> String {
@@ -643,9 +649,9 @@ pub fn probe_cli(manual_path: Option<&str>) -> CliProbeResult {
     let cli_auth_present = cli_auth_json_present();
     let manual_set = manual_path.map(|m| !m.trim().is_empty()).unwrap_or(false);
 
-    // Prefer a candidate that both looks runnable AND answers --version.
-    let mut fallback: Option<(PathBuf, String)> = None;
-
+    // Installed only when some candidate's `--version` exits 0 and prints a
+    // banner. A runnable file whose probe fails (non-zero, timeout, spawn
+    // error, empty output) is skipped — it is not an install.
     for (i, path) in candidates.iter().enumerate() {
         if !is_executable(path) {
             continue;
@@ -664,23 +670,6 @@ pub fn probe_cli(manual_path: Option<&str>) -> CliProbeResult {
                 version_supported,
             );
         }
-        if fallback.is_none() {
-            fallback = Some((path.clone(), source));
-        }
-    }
-
-    // Runnable file that failed --version still counts as "found" so the user
-    // can try connecting; UI can show missing version.
-    if let Some((path, source)) = fallback {
-        return finish_probe_result(
-            true,
-            Some(path.display().to_string()),
-            None,
-            source,
-            tried,
-            cli_auth_present,
-            None,
-        );
     }
 
     finish_probe_result(
@@ -840,11 +829,10 @@ mod tests {
         assert!(!r.candidates_tried.is_empty() || r.found);
         if r.found {
             assert!(r.path.is_some());
-            assert!(r
-                .version
-                .as_ref()
-                .map(|v| v.contains("atlas") || v.contains("grok") || !v.is_empty())
-                .unwrap_or(true));
+            assert!(
+                r.version.as_ref().is_some_and(|v| !v.trim().is_empty()),
+                "found requires a successful --version banner"
+            );
         }
     }
 
@@ -892,6 +880,63 @@ mod tests {
     #[test]
     fn expand_user_path_empty() {
         assert!(expand_user_path("  ").as_os_str().is_empty());
+    }
+
+    #[test]
+    fn version_probe_requires_successful_exit_and_banner() {
+        assert!(!version_probe_installed(false, Some("atlas 0.2.134")));
+        assert!(!version_probe_installed(true, None));
+        assert!(!version_probe_installed(true, Some("  ")));
+        assert!(version_probe_installed(true, Some("atlas 0.2.134")));
+    }
+
+    #[test]
+    fn failed_version_command_is_not_installed() {
+        let dir = std::env::temp_dir().join(format!(
+            "atlas-probe-fail-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        fs::create_dir_all(&dir).expect("temp dir");
+        let bin = if cfg!(target_os = "windows") {
+            dir.join("atlas.cmd")
+        } else {
+            dir.join("atlas")
+        };
+        let script = if cfg!(target_os = "windows") {
+            "@echo off\r\necho atlas 0.2.134 1>&2\r\nexit /b 1\r\n"
+        } else {
+            "#!/bin/sh\necho 'atlas 0.2.134' >&2\nexit 1\n"
+        };
+        fs::write(&bin, script).expect("write failing cli");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&bin).expect("meta").permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&bin, perms).expect("chmod");
+        }
+
+        assert!(
+            read_version(&bin).is_none(),
+            "non-zero --version must not yield a banner"
+        );
+        let probed = probe_cli(Some(&bin.to_string_lossy()));
+        if probed.found {
+            assert_ne!(
+                probed.path.as_deref(),
+                Some(bin.to_string_lossy().as_ref()),
+                "failing --version must not be reported as the install"
+            );
+            assert!(probed.version.as_ref().is_some_and(|v| !v.trim().is_empty()));
+        } else {
+            assert!(probed.version.is_none());
+            assert_eq!(probed.source, "not_found");
+        }
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

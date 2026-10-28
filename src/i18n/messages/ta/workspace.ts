@@ -236,7 +236,7 @@ export const taWorkspace = {
   "changes.workspace.loadError": "பணியிட ஜிட் நிலையை ஏற்ற முடியவில்லை",
   "changes.workspace.loadErrorHint": "திட்டப் பாதையைச் சரிபார்த்து, புதுப்பிக்க முயற்சிக்கவும். அமர்வு கருவி திருத்தங்கள் இருக்கும் போது மேலே தோன்றும்.",
   "changes.workspace.hostOnly": "பணியிட கிட் நிலைக்கு டெஸ்க்டாப் பயன்பாடு தேவை",
-  "changes.workspace.hostOnlyHint": "பணியிட மாற்றங்களை ஆய்வு செய்ய Atlas செயலி டெஸ்க்டாப்பைத் திறக்கவும்.",
+  "changes.workspace.hostOnlyHint": "பணியிட மாற்றங்களை ஆய்வு செய்ய AtlasBuddy செயலி டெஸ்க்டாப்பைத் திறக்கவும்.",
   "changes.workspace.unavailableHint": "இந்த திட்டத்திற்கான Git நிலையை படிக்க முடியவில்லை.",
   "changes.workspace.refresh": "பணியிட நிலையைப் புதுப்பி",
   "changes.workspace.branch": "{branch} இல்",

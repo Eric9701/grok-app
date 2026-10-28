@@ -6,10 +6,19 @@ import { GlassModal } from "@/components/GlassModal";
 import { updateInstallConfirmCopyKeys } from "@/lib/appUpdateHonesty";
 import type { MessageKey } from "@/i18n";
 
+/** Already-localized strings that replace the default confirm copy. */
+export type UpdateInstallConfirmCopy = {
+  title: string;
+  message: string;
+  cancel: string;
+  confirm: string;
+};
+
 export function UpdateInstallConfirmModal({
   open,
   version,
   busy = false,
+  copy,
   t,
   onClose,
   onConfirm,
@@ -17,6 +26,7 @@ export function UpdateInstallConfirmModal({
   open: boolean;
   version?: string | null;
   busy?: boolean;
+  copy?: UpdateInstallConfirmCopy | null;
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
   onClose: () => void;
   onConfirm: () => void;
@@ -33,7 +43,7 @@ export function UpdateInstallConfirmModal({
     <GlassModal
       open={open}
       onClose={close}
-      title={t(keys.titleKey)}
+      title={copy?.title ?? t(keys.titleKey)}
       size="sm"
       closeLabel={t("common.close")}
       closeOnOverlay={!busy}
@@ -48,7 +58,7 @@ export function UpdateInstallConfirmModal({
             disabled={busy}
             onClick={onClose}
           >
-            {t(keys.cancelKey)}
+            {copy?.cancel ?? t(keys.cancelKey)}
           </button>
           <button
             type="button"
@@ -56,13 +66,13 @@ export function UpdateInstallConfirmModal({
             disabled={busy}
             onClick={onConfirm}
           >
-            {t(keys.confirmKey)}
+            {copy?.confirm ?? t(keys.confirmKey)}
           </button>
         </>
       }
     >
       <p className="settings-row__desc" style={{ margin: 0 }}>
-        {t(keys.messageKey, { version: versionLabel })}
+        {copy?.message ?? t(keys.messageKey, { version: versionLabel })}
       </p>
     </GlassModal>
   );

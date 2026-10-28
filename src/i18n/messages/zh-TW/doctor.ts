@@ -1,6 +1,6 @@
 /** Traditional Chinese messages — domain: doctor */
 export const zhTWDoctor = {
-  "setup.title": "歡迎使用 Atlas",
+  "setup.title": "歡迎使用 AtlasBuddy",
   "setup.subtitle": "MIT · 非官方 · 本機 Atlas CLI 桌面控制台",
   "setup.step.runtime": "執行環境",
   "setup.step.account": "帳戶",

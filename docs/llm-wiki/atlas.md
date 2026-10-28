@@ -36,15 +36,17 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 例外：设置里的 **从 CC Switch 导入** 会把自定义 `[model.<id>]` 合并进共享 `~/.atlas/config.toml`，供终端 `atlas` 按段 id 选用。不改 `[models].default`，不覆盖 `api_key = "ENC(...)"` 或 `hidden = true` 的企业段，也不导入 Grok Official。其它写入仍禁止改 shared CLI home。
 
-## 远程更新（已关闭）
+## 远程更新
 
-本白标**不**向 GitHub / 官方 updater 探活，也**不**在启动后跑 `atlas update --check`：
+本白标**不**向 GitHub / 官方 updater 探活，也**不**在启动后跑 `atlas update --check`。桌面应用改走企业 atlas-server 的**自更新**（无签名，靠 SHA-256 校验）：
 
-- 应用：无后台检查、设置 → 关于 无「检查更新」、侧栏无更新徽章
-- CLI：设置里的更新行只说明已关闭；不代跑 `atlas update` / 切通道 / 钉版本
+- 应用：Host `self_update_*`（`src-tauri/src/self_update/`）。启动 30 秒后检查，之后每 6 小时检查一次。Feed 由 CLI 镜像推导：`…/atlas/cli` → `…/atlas/desktop/stable/update.json`，可用 `ATLAS_DESKTOP_UPDATE_URL` 覆盖。下载在后台进行（支持 Range 断点续传，校验大小和 SHA-256），完成后弹出「更新已就绪」卡片（`UpdateReadyPrompt`，选项为「暂不」/「更新」）。只有用户点击「更新」才会安装：Windows 安装版用 NSIS `/P /R /UPDATE` 接力后退出；Windows 绿色版（目录里有 `README-portable.txt`）下载 `*-portable.zip`，退出后由辅助脚本覆盖该目录再打开。macOS 原地替换 `.app` 后重启。设置 → 关于 显示来源、阻塞原因、进度，并提供手动下载安装包的入口
+- 不能自更新的情况（开发版、既不是安装版也不是绿色版目录、macOS 隔离运行、目录不可写、服务器缺少本平台包）只提示下载安装包，不会静默失败。同一版本连续失败 2 次后不再自动弹卡片，关于页仍可手动重试
+- 服务端发布见 atlas-server `scripts/publish-desktop.*` 与 `docs/CLI-发布.md`
+- CLI：设置 → CLI / 运行时 的「CLI 更新」有按钮，点击才执行 `atlas update`。不在启动时检查，不切通道，不钉版本，也不走 GitHub App 更新。子进程会去掉 `npm_config_user_agent`，避免 `npm run dev` 把内部安装误判成 npm（Windows 上会报 `program not found`）
 - 首次安装 CLI 仍走企业 `atlas/cli` 基址（`cli_install`），与「远程更新」探测分开
 
-开关：`src/lib/remoteUpdates.ts` 与 `src-tauri/src/remote_updates.rs` 的 `REMOTE_UPDATES_ENABLED`（当前 `false`）。
+开关：`src/lib/remoteUpdates.ts` 与 `src-tauri/src/remote_updates.rs`。`REMOTE_UPDATES_ENABLED`（GitHub / CLI 检查）当前为 `false`；`DESKTOP_SELF_UPDATE_ENABLED`（企业自更新）当前为 `true`，两处须保持一致。
 
 ## Relay Agent
 
@@ -60,19 +62,19 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 执行端可由设置 → 智能体 CLI 里的独立运行时 profile 替换（见 [agent-runtimes.md](./agent-runtimes.md)）。未绑定则仍是本机 Atlas。
 
-同页的 **Atlas云端站点**（`atlasCloudSiteUrl`，`atlas.cloudSite`）是侧栏「Atlas云端」打开的网页。只接受 http 或 https；留空则显示去设置的入口，不挂空白网页。切换菜单时页面保持，地址栏不显示，刷新和用系统应用打开仍在。看板里点中继卡片会在看板内打开该任务的本机执行过程，面板里可以再打开 `#/atlas-cloud`。
+同页的 **Atlas云端站点**（`atlasCloudSiteUrl`，`atlas.cloudSite`）是侧栏「Atlas云端」打开的网页。只接受 http 或 https。没填或清空后再保存，下次打开用 `https://atlas.myai.tech`。切换菜单时页面保持，地址栏不显示，刷新和用系统应用打开仍在。看板里点中继卡片会在看板内打开该任务的本机执行过程，面板里可以再打开 `#/atlas-cloud`。
 
 智能体看板把这条桥上的 `session/prompt` 当作带来源标记的卡片放进现有列：进行中、已完成、失败（需要你）。取消的不进看板。任务记下 `session/new` 或这条 prompt 的 `cwd`。绝对路径时，目录相同就挂到已有项目；目录还不存在就先建这个目录，再新建一条未信任项目。相对路径和空目录仍挂在「Atlas云端」。任务变成已完成或失败、且这个会话上没有别的进行中任务时，把该 CLI 会话导入这个项目，侧栏项目下出现这条会话，不自动打开。点卡片在看板内打开只读执行过程（本机 CLI 的 `session/update`）。进行中只看这个面板。面板里仍可以打开已经导入的桌面会话；已经导入过就打开原来那条。打开 `#/atlas-cloud` 是面板里的次要动作。过程只留在内存，跟任务一起最多 40 条，重启后清空。侧栏用的状态快照不含步骤；打开面板时另拉 `atlas_relay_task_trace`。
 
 ## 安装包文件名
 
-Release 门禁认 `src-tauri/tauri.conf.json` 的 `productName`，也就是 **Atlas**。四个平台都要有：
+Release 门禁认 `src-tauri/tauri.conf.json` 的 `productName`，也就是 **AtlasBuddy**。安装包里的可执行文件用同一名字（`mainBinaryName`）：Windows `AtlasBuddy.exe`，macOS `Contents/MacOS/AtlasBuddy`，Linux `usr/bin/AtlasBuddy`。Cargo 包名仍是 `grok-app`，`target/release` 里未改名的编译产物还叫 `grok-app`；绿色版打包时再复制成 `AtlasBuddy.exe`。四个平台都要有：
 
-- `Atlas_<版本>_aarch64.dmg`、`Atlas_<版本>_x64.dmg`
-- `Atlas_<版本>_x64-setup.exe`、`Atlas_<版本>_x64-portable.zip`
-- `Atlas_<版本>_amd64.AppImage`、`.deb`、以及 `Atlas_<版本>-1.x86_64.rpm`
+- `AtlasBuddy_<版本>_aarch64.dmg`、`AtlasBuddy_<版本>_x64.dmg`
+- `AtlasBuddy_<版本>_x64-setup.exe`、`AtlasBuddy_<版本>_x64-portable.zip`
+- `AtlasBuddy_<版本>_amd64.AppImage`、`.deb`、以及 `AtlasBuddy_<版本>-1.x86_64.rpm`
 
-同一 tag 上残留的 `Grok_*` 安装包不算数。绿色版 zip 和官网别名（`Atlas_mac_x64.dmg` 等）用同一前缀。
+同一 tag 上残留的 `Grok_*` 或旧的 `Atlas_*` 安装包不算数。绿色版 zip 和官网别名（`AtlasBuddy_mac_x64.dmg` 等）用同一前缀。
 
 ## 安装 / 更新通道
 
@@ -98,7 +100,7 @@ Atlas 企业环境常常**没有** `models_cache.json`（或托管 ENC 校验失
 
 默认：`[models].default`（例如 `arch-kimi-for-coding`）。展示名用明文 `name`，跳过 `ENC(...)` 与 `hidden = true`。密钥不下发前端。
 
-立刻刷新企业目录：终端 `atlas models refresh`（或会话 `/refresh-model`），然后重开 Composer / 再进设置。
+立刻刷新企业目录：设置 → 常规 → 对话偏好里「可用模型」的刷新按钮会跑 `atlas models refresh`，然后重读这份目录（Composer 下拉用同一份）。终端 `atlas models refresh` 或会话 `/refresh-model` 仍然有效。
 
 ## 账号主路
 
@@ -110,7 +112,7 @@ Atlas 企业环境常常**没有** `models_cache.json`（或托管 ENC 校验失
 
 | | Atlas（本分支） | 官方 Grok App |
 |--|----------------|---------------|
-| `productName` | Atlas | Grok |
+| `productName` | AtlasBuddy | Grok |
 | identifier | `com.atlasapp.desktop`（dev：`.dev`） | `com.grokapp.desktop` |
 | App 数据 | `atlasapp` / `atlas-app`（`GROK_APP_HOME` 仍可覆盖） | `grokapp` / `grok-app` |
 | CLI home（shared） | `~/.atlas` | `~/.grok` |
