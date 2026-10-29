@@ -64,7 +64,9 @@ export function AgentRuntimeChip({
   ];
 
   const commit = (profileId: string) => {
-    void api.agentRuntimesSetSessionBinding(sessionId, profileId);
+    void api.agentRuntimesSetSessionBinding(sessionId, profileId).then(() =>
+      api.sessionConnect({ sessionId }),
+    );
   };
 
   return (

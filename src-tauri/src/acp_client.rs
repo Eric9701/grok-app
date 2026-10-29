@@ -267,6 +267,9 @@ fn session_load_no_replay() -> bool {
     )
 }
 const AUTH_TIMEOUT_SECS: u64 = 12;
+/// Cursor `authenticate { methodId: cursor_login }` may open a browser when the
+/// headless credential check fails. Keep this longer than the Atlas token probe.
+const CURSOR_LOGIN_TIMEOUT_SECS: u64 = 120;
 /// Max wait for a single stdin write (JSON-RPC line). A wedged agent with a full
 /// pipe used to block forever here — which froze interject ("引导"), cancel, and
 /// any other Host→agent RPC before the request-level timeout could start.
@@ -1393,7 +1396,10 @@ impl AcpClient {
             profile_kind,
         } = pipe;
         let (event_tx, event_rx) = mpsc::unbounded_channel();
-        let hides = profile_kind != "atlas";
+        let foreign = profile_kind != "atlas";
+        // Cursor's ACP session id is a real prompt target. Claude's translator
+        // id stays off the chat row; its resume id lives on the runtime binding.
+        let hides_meta = foreign && profile_kind != "cursor";
         let client = Arc::new(Self {
             child: AsyncMutex::new(Some(child)),
             child_pid: Some(pid).filter(|pid| *pid != 0),
@@ -1411,7 +1417,7 @@ impl AcpClient {
             stderr_tail: ParkingMutex::new(Vec::new()),
             last_update_by_session: ParkingMutex::new(HashMap::new()),
             last_update_unstamped: ParkingMutex::new(None),
-            empty_mcp_servers: hides,
+            empty_mcp_servers: foreign,
             app_session_id,
             sandbox_profile: ParkingMutex::new(None),
             custom_route: false,
@@ -1421,7 +1427,7 @@ impl AcpClient {
             wsl_active: false,
             proc_home: std::sync::Mutex::new(None),
             runtime_profile_id: Some(profile_id),
-            hides_agent_session_meta: hides,
+            hides_agent_session_meta: hides_meta,
         });
         client.start_read_loop(stdout);
         if let Some(stderr) = stderr {
@@ -2354,6 +2360,13 @@ impl AcpClient {
     /// killed healthy multi-image / multi-tool turns past 4 hours.
     async fn request_prompt(&self, params: Value) -> Result<Value, String> {
         let method = "session/prompt";
+        tracing::info!(
+            target: "session",
+            session = self.app_session_id.as_deref().unwrap_or("-"),
+            runtime = self.runtime_profile_id.as_deref().unwrap_or("legacy-atlas"),
+            binary = %self.cli_path.display(),
+            "session turn cli"
+        );
         if !self.reader_alive.load(Ordering::SeqCst) {
             return Err(format!(
                 "agent stdout closed before {method}; {}",
@@ -2518,6 +2531,21 @@ impl AcpClient {
             initialize_advertises_rewind(&init),
         );
         *self.rewind_supported.lock() = initialize_advertises_rewind(&init);
+
+        // Cursor Agent's ACP server rejects Atlas `cached_token`. It accepts
+        // `cursor_login` and, when the CLI is already signed in, returns
+        // immediately. A missing login opens the browser inside this call.
+        if init_offers_auth_method(&init, "cursor_login") {
+            self.request_timeout(
+                "authenticate",
+                json!({ "methodId": "cursor_login" }),
+                CURSOR_LOGIN_TIMEOUT_SECS,
+            )
+            .await
+            .map_err(|e| self.map_handshake_err("authenticate", e))?;
+            info!("acp authenticate cursor_login ok");
+            return Ok(init);
+        }
 
         // Live per-model context windows (ClaudeCode `_meta.modelState`).
         // Soft-fail silently when absent — Grok CLI does not expose this yet.
@@ -3481,6 +3509,16 @@ pub enum AskUserOutcome {
 // ── Wire builders / pure decoders (locked by tests/fixtures/acp/) ────────────
 
 /// Host → agent `initialize` params. Golden: `handshake_initialize.json`.
+pub fn init_offers_auth_method(init: &Value, method_id: &str) -> bool {
+    init.pointer("/authMethods")
+        .and_then(|v| v.as_array())
+        .is_some_and(|methods| {
+            methods
+                .iter()
+                .any(|method| method.get("id").and_then(|id| id.as_str()) == Some(method_id))
+        })
+}
+
 pub fn wire_initialize_params() -> Value {
     json!({
         "protocolVersion": 1,

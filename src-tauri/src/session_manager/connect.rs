@@ -503,30 +503,58 @@ impl SessionManager {
             );
         }
 
+        let runtime_choice = crate::agent_runtimes::session_runtime(&meta.id);
+        let want_runtime = match &runtime_choice {
+            crate::agent_runtimes::RuntimeChoice::Ready(profile) => Some(profile.id.clone()),
+            crate::agent_runtimes::RuntimeChoice::Broken(_) => Some("__missing__".into()),
+            crate::agent_runtimes::RuntimeChoice::Legacy => None,
+        };
+
         // Already live on this App session with a healthy agent → no-op.
         // Includes mid-turn (streaming / open tools): never respawn or cancel.
         // Never no-op on Disconnected/Idle — leftover busy flags after fail_with
         // must not block reconnect (see `should_preserve_live_process`).
+        // A runtime binding change is not hot-swappable: drop the process and
+        // cold-spawn the CLI this chat is actually bound to.
         if !pending_fork {
             let mut guard = self.inner.lock();
             if let Some(s) = guard.as_mut() {
                 if s.app_session_id == meta.id && s.acp.as_ref().is_some_and(|c| c.is_alive()) {
                     let preserve = Self::should_preserve_live_process(s);
+                    let live_runtime = s
+                        .acp
+                        .as_ref()
+                        .and_then(|c| c.runtime_profile_id())
+                        .map(str::to_string);
+                    let runtime_ok = live_runtime.as_deref() == want_runtime.as_deref();
                     let ready_match = matches!(s.fsm.state(), SessionState::Ready)
                         && !Self::live_session_is_busy(s)
                         && s.project_path == project_path
-                        && s.effort.as_deref() == Some(prefs.effort.as_str());
+                        && s.effort.as_deref() == Some(prefs.effort.as_str())
+                        && runtime_ok;
                     if preserve || ready_match {
                         Self::touch_activity_locked(s);
                         tracing::info!(
-                            "acp connect no-op: already live session={} state={:?} busy={} preserve={}",
-                            meta.id,
-                            s.fsm.state(),
-                            Self::live_session_is_busy(s),
-                            preserve
+                            target: "session",
+                            session = %meta.id,
+                            state = ?s.fsm.state(),
+                            busy = Self::live_session_is_busy(s),
+                            preserve,
+                            runtime = live_runtime.as_deref().unwrap_or("legacy-atlas"),
+                            want = want_runtime.as_deref().unwrap_or("legacy-atlas"),
+                            "acp connect no-op: already live"
                         );
                         // `inner` is held — never `self.snapshot()` (non-reentrant).
                         return Ok(Self::snapshot_from_live(s));
+                    }
+                    if !runtime_ok {
+                        tracing::info!(
+                            target: "session",
+                            session = %meta.id,
+                            runtime = live_runtime.as_deref().unwrap_or("legacy-atlas"),
+                            want = want_runtime.as_deref().unwrap_or("legacy-atlas"),
+                            "connect runtime mismatch — cold spawn"
+                        );
                     }
                 }
             }
@@ -542,19 +570,24 @@ impl SessionManager {
             // takes `inner` (the old inline if-let held both — ABBA deadlock
             // against try_park_live's inner→background order).
             if self.promote_background_to_live(&meta.id) {
-                let snap = self.snapshot();
-                Self::emit_state(&app, &snap);
-                tracing::info!("acp promoted background session to live sid={}", meta.id);
-                return Ok(snap);
+                let runtime_ok = self.inner.lock().as_ref().is_none_or(|s| {
+                    s.acp
+                        .as_ref()
+                        .is_none_or(|acp| acp.runtime_profile_id() == want_runtime.as_deref())
+                });
+                if runtime_ok {
+                    let snap = self.snapshot();
+                    Self::emit_state(&app, &snap);
+                    tracing::info!("acp promoted background session to live sid={}", meta.id);
+                    return Ok(snap);
+                }
+                tracing::info!(
+                    target: "session",
+                    session = %meta.id,
+                    "promote runtime mismatch — cold spawn"
+                );
             }
         }
-
-        let runtime_choice = crate::agent_runtimes::session_runtime(&meta.id);
-        let want_runtime = match &runtime_choice {
-            crate::agent_runtimes::RuntimeChoice::Ready(profile) => Some(profile.id.clone()),
-            crate::agent_runtimes::RuntimeChoice::Broken(_) => Some("__missing__".into()),
-            crate::agent_runtimes::RuntimeChoice::Legacy => None,
-        };
 
         // Target already parked (warm multi-session) → unpark.
         if !pending_fork && self.parked.lock().contains_key(&meta.id) {
@@ -1370,6 +1403,14 @@ impl SessionManager {
                     }
                     std::path::PathBuf::from(probe.path.unwrap())
                 };
+                tracing::info!(
+                    target: "session",
+                    session = %meta.id,
+                    kind = "atlas",
+                    binary = %cli_path.display(),
+                    ssh = ?ssh_alias,
+                    "session cli spawn legacy"
+                );
                 tokio::time::timeout(
                     Duration::from_secs(CONNECT_HANDSHAKE_BUDGET_SECS),
                     AcpClient::spawn_with_options(cli_path, cwd, spawn_opts),
@@ -2316,6 +2357,32 @@ pub(crate) fn set_model_refusal_is_allowlist(err: &str) -> bool {
             || lower.contains("not allowed"))
 }
 
+/// Where `session/set_model` should read its id after a foreign CLI connects.
+///
+/// Atlas keeps the catalog id (`Catalog`). Cursor and Claude use the model
+/// saved on that runtime profile. An empty profile model must not receive the
+/// chat's Atlas id — Cursor rejects values such as `arch-kimi-for-coding`.
+#[derive(Debug)]
+pub(crate) enum ConnectedModelSource {
+    Catalog,
+    Profile(String),
+    Skip,
+}
+
+pub(crate) fn connected_model_source(
+    runtime_kind: Option<&str>,
+    profile_model: Option<&str>,
+) -> ConnectedModelSource {
+    let foreign = runtime_kind.is_some_and(|kind| !kind.is_empty() && kind != "atlas");
+    if !foreign {
+        return ConnectedModelSource::Catalog;
+    }
+    match profile_model.map(str::trim).filter(|model| !model.is_empty()) {
+        Some(model) => ConnectedModelSource::Profile(model.to_string()),
+        None => ConnectedModelSource::Skip,
+    }
+}
+
 /// `session/set_model` after open. A window chosen on the new-chat composer
 /// rides along on the first empty session. A resumed chat keeps its own window.
 ///
@@ -2329,6 +2396,36 @@ async fn apply_connected_model(
     resumed: bool,
     journal_has_history: bool,
 ) -> Result<(), String> {
+    let runtime_kind = client
+        .runtime_profile_id()
+        .and_then(crate::agent_runtimes::profile_kind);
+    let profile_model = client
+        .runtime_profile_id()
+        .and_then(crate::agent_runtimes::profile_model);
+    match connected_model_source(runtime_kind.as_deref(), profile_model.as_deref()) {
+        ConnectedModelSource::Skip => {
+            tracing::info!(
+                target: "session",
+                "acp set_model skipped: this CLI keeps its own default model"
+            );
+            return Ok(());
+        }
+        ConnectedModelSource::Profile(model) => {
+            return match SessionManager::with_soft_rpc_budget(
+                client.set_model_for(agent_sid, &model),
+            )
+            .await
+            {
+                Ok(()) => Ok(()),
+                Err(e) if set_model_refusal_is_allowlist(&e) => Err(e),
+                Err(e) => {
+                    tracing::warn!("acp set_model after session open soft-fail: {e}");
+                    Ok(())
+                }
+            };
+        }
+        ConnectedModelSource::Catalog => {}
+    }
     let staged = if !resumed && !journal_has_history {
         (*mgr.pending_context_window.lock()).or_else(|| {
             crate::models_catalog::list_available_models()
@@ -2417,6 +2514,30 @@ mod connect_preserve_tests {
             cold_start_route_provider_id(None, crate::providers::SESSION_PROVIDER_OFFICIAL),
             crate::providers::SESSION_PROVIDER_OFFICIAL
         );
+    }
+
+    #[test]
+    fn foreign_runtime_does_not_inherit_the_atlas_model() {
+        assert!(matches!(
+            connected_model_source(None, None),
+            ConnectedModelSource::Catalog
+        ));
+        assert!(matches!(
+            connected_model_source(Some("atlas"), Some("composer-2")),
+            ConnectedModelSource::Catalog
+        ));
+        assert!(matches!(
+            connected_model_source(Some("cursor"), None),
+            ConnectedModelSource::Skip
+        ));
+        assert!(matches!(
+            connected_model_source(Some("claude"), Some("  ")),
+            ConnectedModelSource::Skip
+        ));
+        match connected_model_source(Some("cursor"), Some(" composer-2 ")) {
+            ConnectedModelSource::Profile(model) => assert_eq!(model, "composer-2"),
+            other => panic!("expected profile model, got {other:?}"),
+        }
     }
 
     #[test]

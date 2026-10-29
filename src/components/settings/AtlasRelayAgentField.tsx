@@ -7,7 +7,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Select, type SelectOption } from "@/components/Select";
 import * as api from "@/lib/api";
-import type { AtlasRelayAgentLive, AtlasRelayAgentRecord, AtlasRelayAgentStatus } from "@/lib/api";
+import type {
+  AtlasRelayAgentLive,
+  AtlasRelayAgentRecord,
+  AtlasRelayAgentStatus,
+  RuntimeProfile,
+} from "@/lib/api";
 import type { Vars } from "@/i18n";
 import { parseAtlasRelayImport, splitRelayAddress } from "@/lib/atlasRelayImport";
 
@@ -86,6 +91,9 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [fleet, setFleet] = useState<AtlasRelayAgentStatus | null>(null);
   const [catalog, setCatalog] = useState<{ id: string; label: string }[]>([]);
+  const [profiles, setProfiles] = useState<RuntimeProfile[]>([]);
+  const [profileByAgent, setProfileByAgent] = useState<Record<string, string>>({});
+  const [draftProfile, setDraftProfile] = useState<Record<string, string>>({});
   const [importText, setImportText] = useState("");
   const [importInvalid, setImportInvalid] = useState(false);
 
@@ -113,6 +121,22 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
     }
   }, [applySaved]);
 
+  const refreshRuntimes = useCallback(async () => {
+    if (!api.isDesktopHost()) return;
+    try {
+      const file = await api.agentRuntimesGet();
+      setProfiles(file.profiles ?? []);
+      const next: Record<string, string> = {};
+      for (const binding of file.relayBindings ?? []) {
+        const id = agentKey(binding.relayAgentId ?? "");
+        if (id) next[id] = binding.profileId ?? "";
+      }
+      setProfileByAgent(next);
+    } catch {
+      /* keep the last list */
+    }
+  }, []);
+
   const refreshStatus = useCallback(async () => {
     if (!api.isTauri()) return;
     try {
@@ -124,6 +148,7 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
 
   useEffect(() => {
     void refreshSettings();
+    void refreshRuntimes();
     void refreshStatus();
     if (api.isTauri()) {
       void api
@@ -144,7 +169,7 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
     }
     const id = window.setInterval(() => void refreshStatus(), 2000);
     return () => window.clearInterval(id);
-  }, [refreshSettings, refreshStatus]);
+  }, [refreshSettings, refreshRuntimes, refreshStatus]);
 
   const liveOf = (agentId: string): AtlasRelayAgentLive | undefined =>
     fleet?.agents?.find((a) => a.agentId === agentKey(agentId));
@@ -157,6 +182,58 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
     const id = agentKey(agentId);
     if (!id) return false;
     return rows.some((other) => other.key !== row.key && agentKey(other.agentId) === id);
+  };
+
+  const selectedProfile = (row: Row): string => {
+    if (Object.prototype.hasOwnProperty.call(draftProfile, row.key)) {
+      return draftProfile[row.key] ?? "";
+    }
+    const saved = agentKey(row.savedId);
+    return saved ? profileByAgent[saved] ?? "" : "";
+  };
+
+  const showsAtlasModel = (profileId: string): boolean => {
+    if (!profileId) return true;
+    const profile = profiles.find((item) => item.id === profileId);
+    return !profile || profile.kind === "atlas";
+  };
+
+  const runtimeOptions = (current: string): SelectOption[] => {
+    const options: SelectOption[] = [
+      { value: "", label: t("settings.agentCli.defaultEmpty") },
+    ];
+    const seen = new Set<string>([""]);
+    for (const profile of profiles) {
+      if (!profile.enabled || seen.has(profile.id)) continue;
+      seen.add(profile.id);
+      options.push({
+        value: profile.id,
+        label: profile.label.trim() || profile.kind,
+      });
+    }
+    if (current && !seen.has(current)) {
+      options.push({ value: current, label: current });
+    }
+    return options;
+  };
+
+  const changeRuntime = (row: Row, profileId: string) => {
+    const saved = agentKey(row.savedId);
+    if (!saved) {
+      setDraftProfile((prev) => ({ ...prev, [row.key]: profileId }));
+      return;
+    }
+    setDraftProfile((prev) => {
+      if (!(row.key in prev)) return prev;
+      const next = { ...prev };
+      delete next[row.key];
+      return next;
+    });
+    setProfileByAgent((prev) => ({ ...prev, [saved]: profileId }));
+    if (!api.isTauri()) return;
+    void api.agentRuntimesSetRelayBinding(saved, profileId).catch((e) => {
+      patch(row.key, { rowError: String(e) });
+    });
   };
 
   const connect = async (row: Row) => {
@@ -177,6 +254,13 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
             (slot) => agentKey(slot.id ?? "") !== agentKey(row.savedId),
           ),
         });
+        await api.agentRuntimesSetRelayBinding(agentKey(row.savedId), "");
+      }
+      const chosen = selectedProfile(row);
+      const already = agentKey(row.savedId) === id ? (profileByAgent[id] ?? "") : "";
+      if (chosen && chosen !== already) {
+        await api.agentRuntimesSetRelayBinding(id, chosen);
+        setProfileByAgent((prev) => ({ ...prev, [id]: chosen }));
       }
       setFleet(
         await api.atlasRelayAgentConnect(
@@ -187,7 +271,14 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
         ),
       );
       patch(row.key, { rowError: "", savedId: id, agentId: id });
+      setDraftProfile((prev) => {
+        if (!(row.key in prev)) return prev;
+        const next = { ...prev };
+        delete next[row.key];
+        return next;
+      });
       await refreshSettings();
+      await refreshRuntimes();
     } catch (e) {
       patch(row.key, { rowError: String(e) });
     } finally {
@@ -217,13 +308,15 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
     setBusyKey(row.key);
     try {
       if (row.savedId && api.isTauri()) {
+        const saved = agentKey(row.savedId);
         const current = await api.settingsGet();
         await api.settingsSet({
           ...current,
           atlasRelayAgents: (current.atlasRelayAgents ?? []).filter(
-            (slot) => agentKey(slot.id ?? "") !== agentKey(row.savedId),
+            (slot) => agentKey(slot.id ?? "") !== saved,
           ),
         });
+        await api.agentRuntimesSetRelayBinding(saved, "");
       }
       setRows((prev) => prev.filter((r) => r.key !== row.key));
     } catch (e) {
@@ -377,12 +470,25 @@ export function AtlasRelayAgentField({ t, rowHighlight }: Props) {
                 autoComplete="off"
               />
               <Select
-                value={row.modelId}
-                options={modelOptions(row)}
-                onChange={(modelId) => changeModel(row, modelId)}
-                aria-label={t("settings.atlasRelayAgentModel")}
+                value={selectedProfile(row)}
+                options={runtimeOptions(selectedProfile(row))}
+                onChange={(profileId) => changeRuntime(row, profileId)}
+                aria-label={t("settings.agentCli.kind")}
                 disabled={!!busyKey}
               />
+              {showsAtlasModel(selectedProfile(row)) ? (
+                <Select
+                  value={row.modelId}
+                  options={modelOptions(row)}
+                  onChange={(modelId) => changeModel(row, modelId)}
+                  aria-label={t("settings.atlasRelayAgentModel")}
+                  disabled={!!busyKey}
+                />
+              ) : (
+                <div className="settings-row__desc" role="status">
+                  {t("settings.atlasRelayAgentModelDefault")}
+                </div>
+              )}
               {duplicate ? (
                 <div className="settings-row__desc" role="status">
                   {t("settings.atlasRelayAgentDuplicate")}

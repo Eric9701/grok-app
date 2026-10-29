@@ -28,8 +28,8 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | account | `official` · `providers` · `extras`（「拓展」：官方工具注入开关） |
 | extensions | `plugins`（含 Discover **+** 本地路径安装 `settings-anchor-ext-plugins-install`）· `mcp` · `skills`（含 **探测 Claude/Cursor 技能** 开关，`#/settings/extensions/skills` → `settings-anchor-ext-skills-discover`）· `rules`（Cursor 式规则编辑，写 CLI 真实文件）· `commands`（斜杠命令 markdown）· `agents` · `hooks`（**无** `market` / `apps`；`#/settings/extensions/market` → `plugins` 可安装目录锚点） |
 | runtime | `cli` · `connection` · `ssh` · `network` · `pool` · `tools` · `privacy` |
-| atlas | 无 tab（Relay 执行端 + 云端站点） |
-| agent_cli | 无 tab（多 CLI 运行时、新建会话默认、每条 Relay 的执行端） |
+| atlas | 无 tab（每条 Relay 选 CLI 与模型、云端站点） |
+| agent_cli | 无 tab（多 CLI 运行时、新建会话默认） |
 | remote_im（远程控制） | `im`（IM 通信）· `mirror`（手机镜像） |
 | pet | `look`（外观设置：顶栏开关+尺寸，左侧预览，右侧形体/表情/颜色/眼睛）· `bubbles`（气泡设置：提示框、进度条、自动关闭、形状/背景） |
 | 其余 | 无 tab（单页） |
@@ -75,8 +75,8 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | 管理 Skills/MCP/Plugins/Hooks/Agents + 插件页内目录 | **扩展** | 可写开关、安装、移除；无独立市场 Tab |
 | 只读 project inspect 摘要 | **运行时 · 诊断** | 保留；文案链到扩展 |
 | CLI 路径 / **Atlas CLI 安装基址** (`runtime.atlasCliMirror`) / ACP / 进程池 / Doctor / Managed setup / Privacy center | **运行时** | 不进扩展 |
-| Atlas Relay 执行端 + 云端站点 URL | **Atlas** | `atlas.relayAgent` / `atlas.relayAgentHealth` / `atlas.cloudSite`；CLI 安装基址仍在运行时 |
-| 多 CLI 运行时（二进制 / 家目录 / 新建会话默认 / 每条 Relay 的执行端） | **智能体 CLI** | `agent-runtimes.json`，不进 App 设置 |
+| Atlas Relay（每条选 CLI 与模型）+ 云端站点 URL | **Atlas** | `atlas.relayAgent` / `atlas.relayAgentHealth` / `atlas.cloudSite`；CLI 安装基址仍在运行时 |
+| 多 CLI 运行时（二进制 / 家目录 / 新建会话默认） | **智能体 CLI** | `agent-runtimes.json`，不进 App 设置 |
 | 本机会话列表 + 按 id 续跑（#626 第一刀） | **运行时 · 连接** | `runtime.sessionApi`；见 [session-api.md](./session-api.md) |
 
 ## 新增设置 — 强制清单

@@ -1,6 +1,7 @@
 /**
- * Settings → Agent CLIs. Profiles, new-chat default, and per-relay executor.
+ * Settings → Agent CLIs. Profiles and the new-chat default.
  * Stored in agent-runtimes.json, separate from App settings.
+ * Per-relay CLI is chosen on the Atlas Relay row.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Select, type SelectOption } from "@/components/Select";
@@ -25,7 +26,6 @@ function newProfile(kind: string): RuntimeProfile {
 export function AgentCliSection() {
   const { t, rowHighlight } = useSettingsModel();
   const [file, setFile] = useState<AgentRuntimesFile | null>(null);
-  const [relays, setRelays] = useState<{ id: string; label: string }[]>([]);
   const [error, setError] = useState("");
   const fileRef = useRef<AgentRuntimesFile | null>(null);
   const saveGen = useRef(0);
@@ -39,20 +39,9 @@ export function AgentCliSection() {
   const reload = useCallback(async () => {
     if (!api.isDesktopHost()) return;
     try {
-      const [runtimes, settings] = await Promise.all([
-        api.agentRuntimesGet(),
-        api.settingsGet(),
-      ]);
+      const runtimes = await api.agentRuntimesGet();
       fileRef.current = runtimes;
       setFile(runtimes);
-      setRelays(
-        (settings.atlasRelayAgents ?? [])
-          .map((row) => ({
-            id: (row.id ?? "").trim(),
-            label: (row.id ?? "").trim(),
-          }))
-          .filter((row) => row.id),
-      );
       setError("");
     } catch (e) {
       setError(String(e));
@@ -287,41 +276,6 @@ export function AgentCliSection() {
               persist({ ...current, desktopDefaultProfileId }, true);
             }}
           />
-        </div>
-      </div>
-
-      <div
-        className={"settings-card" + rowHighlight("settings-anchor-agentCliRelay")}
-        id="settings-anchor-agentCliRelay"
-      >
-        <div className="settings-row settings-row--stack">
-          <div className="settings-row__text">
-            <div className="settings-row__label">{t("settings.agentCli.relay")}</div>
-            <div className="settings-row__desc">
-              {relays.length === 0
-                ? t("settings.agentCli.relayEmpty")
-                : t("settings.agentCli.relayLegacy")}
-            </div>
-          </div>
-          {relays.map((relay) => {
-            const current =
-              file.relayBindings.find((row) => row.relayAgentId === relay.id)
-                ?.profileId ?? "";
-            return (
-              <Select
-                key={relay.id}
-                value={current}
-                options={profileOptions}
-                aria-label={relay.label}
-                onChange={(profileId) => {
-                  void api
-                    .agentRuntimesSetRelayBinding(relay.id, profileId)
-                    .then(remember)
-                    .catch((e) => setError(String(e)));
-                }}
-              />
-            );
-          })}
         </div>
       </div>
     </>

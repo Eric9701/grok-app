@@ -1593,7 +1593,9 @@ async fn finish_child(agent_id: &str, child: &mut Child, pid: u32) {
 async fn spawn_stdio_agent(agent_id: &str, model_id: &str) -> Result<RelayProc, String> {
     match crate::agent_runtimes::relay_runtime(agent_id) {
         crate::agent_runtimes::RuntimeChoice::Ready(mut profile) => {
-            if !model_id.is_empty() {
+            // Only Atlas honors this relay's model. Cursor and Claude keep
+            // the model configured on that CLI profile.
+            if profile.kind == "atlas" && !model_id.is_empty() {
                 profile.model = model_id.to_string();
             }
             let cwd = if profile.home.is_empty() {
@@ -1619,6 +1621,14 @@ async fn spawn_stdio_agent(agent_id: &str, model_id: &str) -> Result<RelayProc, 
         .path
         .filter(|_| probe.found)
         .ok_or_else(|| "Atlas CLI not found".to_string())?;
+    tracing::info!(
+        target: "session",
+        relay = %agent_id,
+        kind = "atlas",
+        binary = %cli_path,
+        model = %model_id,
+        "relay cli spawn legacy"
+    );
     let home: PathBuf = crate::paths::resolve_agent_grok_home(&settings.session_data_mode);
     let mut cmd = Command::new(&cli_path);
     cmd.arg("agent").arg("--always-approve");

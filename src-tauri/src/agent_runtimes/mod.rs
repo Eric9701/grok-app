@@ -1,6 +1,6 @@
 //! Multi-CLI runtime. Desktop chats and the Atlas relay speak ACP.
-//! Atlas is a byte pipe. Claude Code and Cursor Agent are translated
-//! from their stream-json CLIs. Config lives in `agent-runtimes.json`.
+//! Atlas and Cursor Agent are byte pipes. Claude Code is translated from
+//! stream-json. Config lives in `agent-runtimes.json`.
 
 mod translate;
 
@@ -220,6 +220,32 @@ pub fn relay_runtime(agent_id: &str) -> RuntimeChoice {
     choice_for_profile(&file, &binding.profile_id)
 }
 
+pub fn profile_kind(profile_id: &str) -> Option<String> {
+    let id = profile_id.trim();
+    if id.is_empty() {
+        return None;
+    }
+    load()
+        .profiles
+        .into_iter()
+        .find(|profile| profile.id == id)
+        .map(|profile| profile.kind)
+}
+
+/// Model configured on a runtime profile. Empty means the CLI keeps its default.
+pub fn profile_model(profile_id: &str) -> Option<String> {
+    let id = profile_id.trim();
+    if id.is_empty() {
+        return None;
+    }
+    load()
+        .profiles
+        .into_iter()
+        .find(|profile| profile.id == id)
+        .map(|profile| profile.model.trim().to_string())
+        .filter(|model| !model.is_empty())
+}
+
 pub fn session_profile_id(session_id: &str) -> Option<String> {
     match session_runtime(session_id) {
         RuntimeChoice::Ready(profile) => Some(profile.id),
@@ -382,6 +408,12 @@ pub fn atlas_stdio_args(model: &str) -> Vec<String> {
     args
 }
 
+/// Cursor Agent exposes a native ACP server (`cursor-agent acp`).
+/// Its print mode rejects `--input-format` / `--verbose`.
+pub fn cursor_acp_args() -> Vec<String> {
+    vec!["acp".into()]
+}
+
 fn stream_json_args(profile: &RuntimeProfile, resume: Option<&str>) -> Vec<String> {
     let mut args = vec![
         "-p".into(),
@@ -391,11 +423,7 @@ fn stream_json_args(profile: &RuntimeProfile, resume: Option<&str>) -> Vec<Strin
         "stream-json".into(),
         "--verbose".into(),
     ];
-    if profile.kind == "cursor" {
-        if profile.permission != "ask" {
-            args.push("--force".into());
-        }
-    } else if profile.permission != "ask" {
+    if profile.permission != "ask" {
         args.push("--permission-mode".into());
         args.push("bypassPermissions".into());
     } else {
@@ -420,24 +448,31 @@ pub async fn spawn_acp_pipe(
 ) -> Result<AcpPipe, String> {
     let binary = resolve_binary(profile)?;
     let resume = app_session_id.and_then(cli_session_for);
+    let args = match profile.kind.as_str() {
+        "atlas" => atlas_stdio_args(&profile.model),
+        "cursor" => cursor_acp_args(),
+        _ => stream_json_args(profile, resume.as_deref()),
+    };
     let mut cmd = Command::new(&binary);
+    cmd.args(&args);
     if profile.kind == "atlas" {
-        cmd.args(atlas_stdio_args(&profile.model));
         if !profile.home.is_empty() {
             cmd.env("GROK_HOME", &profile.home);
         }
-    } else {
-        cmd.args(stream_json_args(profile, resume.as_deref()));
-        if profile.kind == "claude" && !profile.home.is_empty() {
-            cmd.env("CLAUDE_CONFIG_DIR", &profile.home);
-        }
+    } else if profile.kind == "claude" && !profile.home.is_empty() {
+        cmd.env("CLAUDE_CONFIG_DIR", &profile.home);
     }
     // Chat folder wins. Home is only GROK_HOME / CLAUDE_CONFIG_DIR.
     // The relay passes the profile home when it has no chat folder yet.
-    if cwd.is_dir() {
-        cmd.current_dir(cwd);
+    let work_dir = if cwd.is_dir() {
+        Some(cwd.to_path_buf())
     } else if !profile.home.is_empty() && Path::new(&profile.home).is_dir() {
-        cmd.current_dir(&profile.home);
+        Some(PathBuf::from(&profile.home))
+    } else {
+        None
+    };
+    if let Some(dir) = &work_dir {
+        cmd.current_dir(dir);
     }
     crate::process_util::apply_process_group_no_window_tokio(&mut cmd);
     crate::process_util::ensure_home_env_tokio(&mut cmd);
@@ -449,10 +484,36 @@ pub async fn spawn_acp_pipe(
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true);
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("failed to spawn {} CLI: {e}", profile.kind))?;
+    let mut child = cmd.spawn().map_err(|e| {
+        tracing::warn!(
+            target: "session",
+            session = app_session_id.unwrap_or("-"),
+            profile_id = %profile.id,
+            kind = %profile.kind,
+            label = %profile.label,
+            binary = %binary,
+            args = %args.join(" "),
+            error = %e,
+            "session cli spawn failed"
+        );
+        format!("failed to spawn {} CLI: {e}", profile.kind)
+    })?;
     let pid = child.id().unwrap_or(0);
+    tracing::info!(
+        target: "session",
+        session = app_session_id.unwrap_or("-"),
+        profile_id = %profile.id,
+        kind = %profile.kind,
+        label = %profile.label,
+        binary = %binary,
+        args = %args.join(" "),
+        cwd = %work_dir
+            .as_ref()
+            .map(|dir| dir.display().to_string())
+            .unwrap_or_else(|| "-".into()),
+        pid,
+        "session cli spawn"
+    );
     let stdin = child
         .stdin
         .take()
@@ -462,7 +523,7 @@ pub async fn spawn_acp_pipe(
         .take()
         .ok_or_else(|| "CLI stdout missing".to_string())?;
     let stderr = child.stderr.take();
-    if profile.kind == "atlas" {
+    if profile.kind == "atlas" || profile.kind == "cursor" {
         return Ok(AcpPipe {
             child,
             pid,
@@ -697,6 +758,11 @@ mod tests {
             assert!(matches!(relay_runtime("relay-b"), RuntimeChoice::Legacy));
             assert!(matches!(relay_runtime("relay-a"), RuntimeChoice::Ready(_)));
         });
+    }
+
+    #[test]
+    fn cursor_uses_native_acp_not_stream_json() {
+        assert_eq!(cursor_acp_args(), vec!["acp".to_string()]);
     }
 
     #[test]
