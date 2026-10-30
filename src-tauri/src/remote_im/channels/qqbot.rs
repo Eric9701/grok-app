@@ -176,6 +176,7 @@ fn parse_dispatch(inst: &ChannelInstance, d: &Value) -> Option<IncomingMessage> 
         content,
         mentioned_bot: true,
         thread_id: None,
+        media_refs: Vec::new(),
     })
 }
 

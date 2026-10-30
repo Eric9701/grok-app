@@ -1904,12 +1904,14 @@ dependencies = [
 name = "grok-app"
 version = "0.2.43"
 dependencies = [
+ "aes",
  "arboard",
  "async-stream",
  "axum",
  "base64 0.22.1",
  "block2",
  "bytes",
+ "cbc",
  "chrono",
  "clipboard-win",
  "directories",

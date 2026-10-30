@@ -13,6 +13,12 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+### Added
+- WeCom can receive a file or image in chat and hand it to the agent with the next message.
+
+**中文 · 新增**
+- 企业微信可以接收文件或图片，并在下一条消息里交给 Agent。
+
 ## [0.2.43] - 2026-10-26
 
 > **Highlight:** The desktop pet can dictate, send, and stop a chat.

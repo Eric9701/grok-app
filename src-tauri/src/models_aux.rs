@@ -661,6 +661,49 @@ pub fn vision_aux_reachable(text: &str, list: &crate::providers::ProvidersListRe
         .any(|p| p.id == target && !p.base_url.trim().is_empty() && p.has_api_key)
 }
 
+/// Config the spawned agent actually reads (`~/.atlas` in shared mode).
+fn read_spawned_agent_config() -> String {
+    let mode = crate::store::load_settings().session_data_mode;
+    let home = crate::paths::resolve_agent_grok_home(&mode);
+    std::fs::read_to_string(home.join("config.toml")).unwrap_or_default()
+}
+
+fn model_section_field(config_text: &str, id: &str, key: &str) -> Option<String> {
+    for table in [format!("model.{id}"), format!("model.\"{id}\"")] {
+        if let Some(value) = crate::agent_home_config::get_table_string(config_text, &table, key) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+/// Whether `[models].default` in a CLI `config.toml` cannot accept image pixels.
+///
+/// Empty or Grok-like defaults stay multimodal. A custom section is text-only
+/// unless its name, model id, or `app_supports_vision` says otherwise.
+/// GLM / MiniMax / Kimi fall in the text-only bucket, matching the CLI which
+/// drops `image_url` before those APIs.
+pub fn cli_config_main_is_text_only(config_text: &str) -> bool {
+    let Some(def) = crate::providers::get_models_default(config_text) else {
+        return false;
+    };
+    let def = def.trim();
+    if def.is_empty() || looks_vision_model(def) {
+        return false;
+    }
+    let name = model_section_field(config_text, def, "name").unwrap_or_default();
+    let model = model_section_field(config_text, def, "model").unwrap_or_default();
+    if looks_vision_model(&name) || looks_vision_model(&model) {
+        return false;
+    }
+    if model_section_field(config_text, def, "app_supports_vision")
+        .is_some_and(|value| value.eq_ignore_ascii_case("true"))
+    {
+        return false;
+    }
+    true
+}
+
 pub fn main_is_text_only(text: &str, list: &crate::providers::ProvidersListResult) -> bool {
     if list.active_source == "official" {
         return false;
@@ -1233,10 +1276,25 @@ pub async fn prepare_agent_prompt_for_main_detailed(
     prompt: &str,
     progress: Option<crate::official_aux::OfficialProgressCb>,
 ) -> HostVisionPrep {
+    // Shared mode spawns with ~/.atlas, whose default may be GLM/MiniMax while
+    // App agent-home is missing and therefore looks like the official route.
+    let spawned = read_spawned_agent_config();
+    let force_text_only = crate::providers::get_models_default(&spawned)
+        .is_some_and(|def| !def.trim().is_empty())
+        && cli_config_main_is_text_only(&spawned);
     let config = read_config_text();
-    let list = match list_custom_providers() {
-        Ok(l) => l,
-        Err(_) => {
+    let list = list_custom_providers().ok();
+    if !force_text_only {
+        let Some(list) = list.as_ref() else {
+            return HostVisionPrep {
+                prompt: prompt.to_string(),
+                ran: false,
+                ok: false,
+                detail: String::new(),
+                description: String::new(),
+            };
+        };
+        if !main_is_text_only(&config, list) {
             return HostVisionPrep {
                 prompt: prompt.to_string(),
                 ran: false,
@@ -1245,15 +1303,11 @@ pub async fn prepare_agent_prompt_for_main_detailed(
                 description: String::new(),
             };
         }
-    };
-    if !main_is_text_only(&config, &list) {
-        return HostVisionPrep {
-            prompt: prompt.to_string(),
-            ran: false,
-            ok: false,
-            detail: String::new(),
-            description: String::new(),
-        };
+    } else {
+        tracing::info!(
+            target: "models_aux",
+            "host vision: spawned CLI default is text-only"
+        );
     }
 
     let images = extract_image_at_paths(prompt);
@@ -1274,7 +1328,11 @@ pub async fn prepare_agent_prompt_for_main_detailed(
     // 1) Official ACP vision (isolated GROK_HOME + auth; stream → chip) — preferred.
     if crate::official_aux::official_aux_available() {
         let paths = batch.clone();
-        match crate::official_aux::vision_describe_async(&paths, None, progress).await {
+        let question = {
+            let q = stripped.trim();
+            if q.is_empty() { None } else { Some(q) }
+        };
+        match crate::official_aux::vision_describe_async(&paths, question, progress).await {
             Ok(text) => {
                 tracing::info!(
                     target: "models_aux",
@@ -1293,7 +1351,9 @@ pub async fn prepare_agent_prompt_for_main_detailed(
     // 2) Fallback: HTTP vision via image_description slot (Amux/Yun/…).
     if blocks.is_empty() || blocks.iter().all(|b| b.contains("failed")) {
         blocks.clear();
-        let ep = resolve_vision_endpoint(&config, &list);
+        let ep = list
+            .as_ref()
+            .and_then(|list| resolve_vision_endpoint(&config, list));
         if let Some(ref endpoint) = ep {
             for path in &batch {
                 match describe_image_http(endpoint, path).await {
@@ -1586,6 +1646,66 @@ yolo = false
         assert!(
             !off.contains("api.deepseek.com"),
             "official section must not use deepseek host: {off}"
+        );
+    }
+
+    #[test]
+    fn cli_glm_default_is_text_only() {
+        let cfg = r#"
+[model."arch-glm-5.2"]
+model = "glm-5.2"
+name = "arch-glm-5.2"
+base_url = "https://example.invalid/v1"
+
+[models]
+default = "arch-glm-5.2"
+"#;
+        assert!(cli_config_main_is_text_only(cfg));
+    }
+
+    #[test]
+    fn cli_minimax_default_is_text_only() {
+        let cfg = r#"
+[model.arch-minimax]
+model = "MiniMax-M2.7"
+name = "MiniMax-M2.7"
+base_url = "https://example.invalid/anthropic/v1"
+
+[models]
+default = "arch-minimax"
+"#;
+        assert!(cli_config_main_is_text_only(cfg));
+    }
+
+    #[test]
+    fn cli_grok_default_keeps_native_vision() {
+        let cfg = "[models]\ndefault = \"grok-4.7\"\n";
+        assert!(!cli_config_main_is_text_only(cfg));
+        assert!(!cli_config_main_is_text_only(""));
+    }
+
+    #[test]
+    fn cli_opt_in_vision_keeps_pixels() {
+        let cfg = r#"
+[model.relay]
+model = "custom-v1"
+name = "relay"
+base_url = "https://example.invalid/v1"
+app_supports_vision = true
+
+[models]
+default = "relay"
+"#;
+        assert!(!cli_config_main_is_text_only(cfg));
+    }
+
+    #[test]
+    fn windows_image_ref_is_extracted() {
+        let prompt = "描述下这张照片\n@E:\\work\\atlas-work\\.remote\\msg\\photo.jpg\n";
+        let found = extract_image_at_paths(prompt);
+        assert_eq!(
+            found,
+            vec!["E:\\work\\atlas-work\\.remote\\msg\\photo.jpg".to_string()]
         );
     }
 

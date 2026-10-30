@@ -931,7 +931,10 @@ mod tests {
                 Some(bin.to_string_lossy().as_ref()),
                 "failing --version must not be reported as the install"
             );
-            assert!(probed.version.as_ref().is_some_and(|v| !v.trim().is_empty()));
+            assert!(probed
+                .version
+                .as_ref()
+                .is_some_and(|v| !v.trim().is_empty()));
         } else {
             assert!(probed.version.is_none());
             assert_eq!(probed.source, "not_found");

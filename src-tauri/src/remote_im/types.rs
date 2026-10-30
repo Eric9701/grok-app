@@ -30,6 +30,55 @@ pub struct IncomingMessage {
     pub mentioned_bot: bool,
     /// Telegram forum / private-topic thread (`message_thread_id`).
     pub thread_id: Option<String>,
+    /// Encrypted media to download after the sender passes ACL.
+    pub media_refs: Vec<InboundMediaRef>,
+}
+
+/// AES key whose `Debug` output never includes the secret.
+#[derive(Clone)]
+pub struct RedactedSecret(String);
+
+impl RedactedSecret {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for RedactedSecret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RedactedSecret([redacted])")
+    }
+}
+
+/// Inbound file that still has to be downloaded. `Debug` keeps the host only.
+#[derive(Clone)]
+pub struct InboundMediaRef {
+    pub kind: String,
+    pub url: String,
+    pub aes_key: RedactedSecret,
+    pub filename: Option<String>,
+}
+
+impl std::fmt::Debug for InboundMediaRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InboundMediaRef")
+            .field("kind", &self.kind)
+            .field("host", &media_url_host(&self.url))
+            .field("aes_key", &self.aes_key)
+            .field("filename", &self.filename)
+            .finish()
+    }
+}
+
+fn media_url_host(url: &str) -> String {
+    url::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(|h| h.to_string()))
+        .unwrap_or_default()
 }
 
 impl IncomingMessage {

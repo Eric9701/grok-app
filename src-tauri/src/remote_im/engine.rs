@@ -9,10 +9,11 @@ use super::control_plane::{
     self, apply_project_pick, apply_session_pick, binding_after_agent_turn,
     channel_uses_cards_with_options, format_project_menu, format_session_menu,
     list_sessions_for_project, parse_card_action, resolve_turn_intent, AppSessionEntry, CardAction,
-    PendingMode, ScopeBinding, TurnIntent,
+    PendingAttachment, PendingMode, ScopeBinding, TurnIntent,
 };
 use super::grok_agent;
 use super::i18n::{self, MessageKey};
+use super::inbound_files::{self, AfterDownload};
 use super::outbound::{self, OutboundRouter};
 use super::projects;
 use super::resilience::{
@@ -287,7 +288,7 @@ impl Engine {
         };
 
         let content = msg.content.trim().to_string();
-        if content.is_empty() {
+        if content.is_empty() && msg.media_refs.is_empty() {
             return;
         }
 
@@ -326,37 +327,56 @@ impl Engine {
                 .or_else(|| g.get(&alt_scope).cloned())
         };
         // Slash commands always win over number-pick mode (e.g. `/account 2` while listing).
-        if let Some(cmd) = slash::parse_slash(&content) {
-            if pending.is_some() {
-                let mut g = self.pending.lock();
-                g.remove(&scope);
-                g.remove(&alt_scope);
-            }
-            tracing::info!(?cmd, "remote_im: slash command");
-            self.handle_slash(cmd, &msg, &scope, &default_wd, registered.take())
-                .await;
-            tracing::info!("remote_im: slash done");
-            return;
-        }
-
-        if let Some(pending) = pending {
-            if content == "0" || content.eq_ignore_ascii_case("cancel") {
-                {
+        // A file attached to the slash is saved, but the command does not consume it.
+        if !content.is_empty() {
+            if let Some(cmd) = slash::parse_slash(&content) {
+                if pending.is_some() {
                     let mut g = self.pending.lock();
                     g.remove(&scope);
                     g.remove(&alt_scope);
                 }
-                let t = if self.lang() == "en" {
-                    "Cancelled."
-                } else {
-                    "已取消。"
-                };
-                let _ = self.reply_msg(&msg, t).await;
+                tracing::info!(?cmd, "remote_im: slash command");
+                if !msg.media_refs.is_empty() {
+                    if let Some(files) = self.download_inbound(&msg, &scope, &default_wd).await {
+                        self.append_pending_attachments(&scope, files);
+                    } else {
+                        return;
+                    }
+                }
+                self.handle_slash(cmd, &msg, &scope, &default_wd, registered.take())
+                    .await;
+                tracing::info!("remote_im: slash done");
                 return;
             }
-            self.handle_text_pick(&pending, &content, &scope, &msg, &default_wd)
-                .await;
-            return;
+        }
+
+        if !content.is_empty() {
+            if let Some(pending) = pending {
+                if content == "0" || content.eq_ignore_ascii_case("cancel") {
+                    {
+                        let mut g = self.pending.lock();
+                        g.remove(&scope);
+                        g.remove(&alt_scope);
+                    }
+                    let t = if self.lang() == "en" {
+                        "Cancelled."
+                    } else {
+                        "已取消。"
+                    };
+                    let _ = self.reply_msg(&msg, t).await;
+                    return;
+                }
+                if !msg.media_refs.is_empty() {
+                    if let Some(files) = self.download_inbound(&msg, &scope, &default_wd).await {
+                        self.append_pending_attachments(&scope, files);
+                    } else {
+                        return;
+                    }
+                }
+                self.handle_text_pick(&pending, &content, &scope, &msg, &default_wd)
+                    .await;
+                return;
+            }
         }
 
         // Soft inbound rate limit — honest reply, never silent drop.
@@ -378,10 +398,49 @@ impl Engine {
             let _ = self.reply_msg(&msg, &t).await;
             return;
         }
-        tracing::info!("remote_im: agent turn");
-        self.run_agent_turn(&msg, &scope, &default_wd, &content, registered.take())
-            .await;
-        tracing::info!("remote_im: agent turn done");
+        let downloaded = match self.download_inbound(&msg, &scope, &default_wd).await {
+            Some(files) => files,
+            None => return,
+        };
+        let pending_atts = self
+            .store
+            .get(&scope)
+            .map(|binding| binding.pending_attachments)
+            .unwrap_or_default();
+        let had_refs = !msg.media_refs.is_empty();
+        match inbound_files::after_download(&content, pending_atts, downloaded.clone(), had_refs) {
+            AfterDownload::Failed => {
+                let _ = self
+                    .reply_msg(&msg, i18n::t(&self.lang(), MessageKey::AttachmentFailed))
+                    .await;
+            }
+            AfterDownload::Hold(files) => {
+                self.set_pending_attachments(&scope, files);
+                if !downloaded.is_empty() {
+                    let names = downloaded
+                        .iter()
+                        .map(|file| file.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let _ = self
+                        .reply_msg(&msg, &i18n::format_received(&self.lang(), &names))
+                        .await;
+                }
+            }
+            AfterDownload::Speak { text, attachments } => {
+                tracing::info!("remote_im: agent turn");
+                self.run_agent_turn(
+                    &msg,
+                    &scope,
+                    &default_wd,
+                    &text,
+                    registered.take(),
+                    attachments,
+                )
+                .await;
+                tracing::info!("remote_im: agent turn done");
+            }
+        }
     }
 
     async fn handle_card_action(&self, action: CardAction, msg: &IncomingMessage) {
@@ -1414,6 +1473,74 @@ impl Engine {
         }
     }
 
+    async fn download_inbound(
+        &self,
+        msg: &IncomingMessage,
+        scope: &str,
+        default_wd: &str,
+    ) -> Option<Vec<PendingAttachment>> {
+        if msg.media_refs.is_empty() {
+            return Some(Vec::new());
+        }
+        let binding = self.ensure_binding(msg, scope, default_wd).await?;
+        Some(
+            super::wecom_media::materialize(
+                std::path::Path::new(&binding.work_dir),
+                &msg.message_id,
+                &msg.media_refs,
+            )
+            .await,
+        )
+    }
+
+    async fn ensure_binding(
+        &self,
+        msg: &IncomingMessage,
+        scope: &str,
+        default_wd: &str,
+    ) -> Option<ScopeBinding> {
+        let scoped = self.scoped_projects_for(&msg.instance_id);
+        let binding = match self.store.get(scope) {
+            Some(binding) => binding,
+            None if default_wd.is_empty() || scoped.is_empty() => {
+                let _ = self
+                    .reply_msg(msg, i18n::t(&self.lang(), MessageKey::NoAvailableProject))
+                    .await;
+                return None;
+            }
+            None => self.store.get_or_create(scope, default_wd),
+        };
+        if !projects::binding_allowed_in_scope(
+            binding.project_id.as_deref(),
+            &binding.work_dir,
+            &scoped,
+        ) {
+            self.store.remove(scope);
+            let _ = self
+                .reply_msg(msg, i18n::t(&self.lang(), MessageKey::NoAvailableProject))
+                .await;
+            return None;
+        }
+        Some(binding)
+    }
+
+    fn append_pending_attachments(&self, scope: &str, files: Vec<PendingAttachment>) {
+        if files.is_empty() {
+            return;
+        }
+        if let Some(mut binding) = self.store.get(scope) {
+            binding.pending_attachments.extend(files);
+            self.store.set(scope, binding);
+        }
+    }
+
+    fn set_pending_attachments(&self, scope: &str, files: Vec<PendingAttachment>) {
+        if let Some(mut binding) = self.store.get(scope) {
+            binding.pending_attachments = files;
+            self.store.set(scope, binding);
+        }
+    }
+
     async fn run_agent_turn(
         &self,
         msg: &IncomingMessage,
@@ -1421,6 +1548,7 @@ impl Engine {
         default_wd: &str,
         prompt: &str,
         registered: Option<RegisteredTurn>,
+        attachments: Vec<PendingAttachment>,
     ) {
         let scoped = self.scoped_projects_for(&msg.instance_id);
         let existing = self.store.get(scope);
@@ -1451,6 +1579,11 @@ impl Engine {
         if grok_agent::cancellation_signaled(&mut cancel_rx) {
             return;
         }
+        let mut binding = binding;
+        if !binding.pending_attachments.is_empty() {
+            binding.pending_attachments.clear();
+            self.store.set(scope, binding.clone());
+        }
 
         let thinking = if self.lang() == "en" {
             "Working…"
@@ -1458,6 +1591,17 @@ impl Engine {
             "处理中…"
         };
         let _ = self.reply_msg(msg, thinking).await;
+
+        let stored_attachments: Vec<crate::store::MessageAttachmentStored> = attachments
+            .iter()
+            .map(|file| crate::store::MessageAttachmentStored {
+                path: file.path.clone(),
+                name: file.name.clone(),
+                is_dir: false,
+            })
+            .collect();
+        let agent_prompt = inbound_files::prompt_with_paths(prompt, &attachments);
+        let agent_prompt = crate::models_aux::prepare_agent_prompt_for_main(&agent_prompt).await;
 
         let intent = resolve_turn_intent(&binding);
         let (wd, resume_id) = match &intent {
@@ -1470,7 +1614,7 @@ impl Engine {
 
         let result = grok_agent::run_turn(
             &PathBuf::from(&wd),
-            prompt,
+            &agent_prompt,
             resume_id.as_deref(),
             self.allow_remote_yolo,
             Some(cancel_rx),
@@ -1546,7 +1690,14 @@ impl Engine {
 
         let is_error = had_error || text.starts_with("Error:");
         // Sync into App sessions_index + messages.json so sidebar /r and App UI share state.
-        next = app_sessions::sync_turn_to_app(&next, prompt, &text, is_error, &msg.channel);
+        next = app_sessions::sync_turn_to_app(
+            &next,
+            prompt,
+            &text,
+            is_error,
+            &msg.channel,
+            &stored_attachments,
+        );
         if let Some(compact) = compact.as_ref() {
             app_sessions::sync_compact_to_app(&next, compact);
         }
@@ -2010,6 +2161,7 @@ mod tests {
             content: "/stop".into(),
             mentioned_bot: true,
             thread_id: None,
+            media_refs: Vec::new(),
         };
         engine
             .handle_slash(BuiltinCommand::Stop, &stop_message, "scope-a", "", None)
@@ -2193,6 +2345,7 @@ mod tests {
             content: "/p".into(),
             mentioned_bot: true,
             thread_id: None,
+            media_refs: Vec::new(),
         };
         // Pre-fix: nested pending.lock() in or_else deadlocked forever here.
         tokio::time::timeout(Duration::from_secs(3), engine.handle(msg))

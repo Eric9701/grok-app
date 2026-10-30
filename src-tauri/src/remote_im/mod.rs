@@ -14,6 +14,7 @@ mod feishu_reg;
 mod fixture_http;
 mod grok_agent;
 mod i18n;
+mod inbound_files;
 mod outbound;
 mod pb_frame;
 mod projects;
@@ -25,6 +26,7 @@ mod session;
 mod slash;
 mod types;
 mod validate;
+mod wecom_media;
 #[cfg(test)]
 mod weixin_flow_tests;
 mod weixin_reg;

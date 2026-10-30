@@ -34,6 +34,17 @@ pub struct ScopeBinding {
     /// Last manual/automatic compaction observed for this agent session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_compact: Option<ContextCompactSnapshot>,
+    /// WeCom files saved under `.remote` and not yet handed to an agent turn.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pending_attachments: Vec<PendingAttachment>,
+}
+
+/// A file already on disk, waiting for the next text turn.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingAttachment {
+    pub path: String,
+    pub name: String,
 }
 
 impl ScopeBinding {
@@ -47,6 +58,7 @@ impl ScopeBinding {
             turn_count: 0,
             context_usage: None,
             last_compact: None,
+            pending_attachments: Vec::new(),
         }
     }
 }
@@ -88,6 +100,7 @@ pub fn binding_after_app_session_move(
     next.work_dir = work_dir.to_string();
     next.agent_session_id = None;
     next.pending_mode = PendingMode::New;
+    next.pending_attachments.clear();
     Some(next)
 }
 
@@ -105,6 +118,7 @@ pub fn binding_after_project_select(
         turn_count: 0,
         context_usage: None,
         last_compact: None,
+        pending_attachments: Vec::new(),
     }
 }
 
@@ -982,12 +996,17 @@ mod tests {
         b.agent_session_id = Some("agent-old".into());
         b.pending_mode = PendingMode::Continue;
         b.turn_count = 4;
+        b.pending_attachments.push(PendingAttachment {
+            path: "/tmp/old/.remote/1/aa.doc".into(),
+            name: "aa.doc".into(),
+        });
         let next = binding_after_app_session_move(&b, "app-1", Some("new".into()), "/tmp/new")
             .expect("match");
         assert_eq!(next.project_id.as_deref(), Some("new"));
         assert_eq!(next.work_dir, "/tmp/new");
         assert!(next.agent_session_id.is_none());
         assert_eq!(next.pending_mode, PendingMode::New);
+        assert!(next.pending_attachments.is_empty());
         assert!(
             binding_after_app_session_move(&b, "other", Some("new".into()), "/tmp/new").is_none()
         );
@@ -999,6 +1018,10 @@ mod tests {
         b.agent_session_id = Some("old-agent".into());
         b.pending_mode = PendingMode::Continue;
         b.turn_count = 3;
+        b.pending_attachments.push(PendingAttachment {
+            path: "/tmp/old/.remote/1/aa.doc".into(),
+            name: "aa.doc".into(),
+        });
         let p = proj("p1", "Demo", "/Users/me/demo");
         let next = binding_after_project_select(&b, &p);
         assert_eq!(next.project_id.as_deref(), Some("p1"));
@@ -1006,6 +1029,7 @@ mod tests {
         assert!(next.agent_session_id.is_none());
         assert_eq!(next.pending_mode, PendingMode::New);
         assert_eq!(next.turn_count, 0);
+        assert!(next.pending_attachments.is_empty());
         match resolve_turn_intent(&next) {
             TurnIntent::NewSession { work_dir } => assert_eq!(work_dir, "/Users/me/demo"),
             other => panic!("expected NewSession, got {other:?}"),
@@ -1023,6 +1047,7 @@ mod tests {
             turn_count: 0,
             context_usage: None,
             last_compact: None,
+            pending_attachments: Vec::new(),
         };
         let s = sess("app-sess-1", "p1", "Prior chat", Some("grok-agent-99"));
         let next = binding_after_session_resume(&b, &s);
@@ -1293,6 +1318,7 @@ mod tests {
             turn_count: 0,
             context_usage: None,
             last_compact: None,
+            pending_attachments: Vec::new(),
         };
         let s = sess("app1", "p1", "Chat", Some("agent-xyz"));
         let b1 = binding_after_session_resume(&b0, &s);

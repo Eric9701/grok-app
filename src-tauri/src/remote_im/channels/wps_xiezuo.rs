@@ -168,6 +168,7 @@ fn parse_event(inst: &ChannelInstance, v: &Value) -> Option<IncomingMessage> {
         content: text.into(),
         mentioned_bot: true,
         thread_id: None,
+        media_refs: Vec::new(),
     })
 }
 

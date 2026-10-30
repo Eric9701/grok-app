@@ -186,6 +186,7 @@ mod tests {
             content: "hi".into(),
             mentioned_bot: true,
             thread_id: thread_id.map(str::to_string),
+            media_refs: Vec::new(),
         }
     }
 

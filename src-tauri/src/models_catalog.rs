@@ -629,8 +629,8 @@ pub async fn refresh_cli_model_catalog() -> Result<AvailableModelsResult, String
     let child = cmd
         .spawn()
         .map_err(|e| format!("Failed to run atlas models refresh: {e}"))?;
-    let finished = tokio::time::timeout(std::time::Duration::from_secs(90), child.wait_with_output())
-        .await;
+    let finished =
+        tokio::time::timeout(std::time::Duration::from_secs(90), child.wait_with_output()).await;
     let output = match finished {
         Ok(Ok(output)) => output,
         Ok(Err(e)) => return Err(format!("Failed to run atlas models refresh: {e}")),

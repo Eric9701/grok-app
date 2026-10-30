@@ -53,13 +53,7 @@ impl Drop for WecomSinkGuard {
 fn register_wecom_sink(instance_id: &str, tx: mpsc::Sender<WecomWsReply>) -> WecomSinkGuard {
     let generation = WECOM_SINK_GEN.fetch_add(1, Ordering::Relaxed);
     if let Ok(mut map) = WECOM_WS_SINKS.lock() {
-        map.insert(
-            instance_id.to_string(),
-            WecomSinkSlot {
-                generation,
-                tx,
-            },
-        );
+        map.insert(instance_id.to_string(), WecomSinkSlot { generation, tx });
     }
     WecomSinkGuard {
         instance_id: instance_id.to_string(),
@@ -366,8 +360,7 @@ fn wecom_ws_frame_summary(v: &Value) -> WecomWsFrameSummary {
             .is_some_and(|s| !s.trim().is_empty())
     };
     let has_text = text_at("/text/content")
-        || v
-            .get("content")
+        || v.get("content")
             .and_then(|x| x.as_str())
             .is_some_and(|s| !s.trim().is_empty())
         || text_at("/body/text/content");
@@ -408,15 +401,10 @@ fn parse_ws_msg(inst: &ChannelInstance, v: &Value) -> Option<IncomingMessage> {
     if body.and_then(|b| b.get("msgtype")).and_then(|x| x.as_str()) == Some("event") {
         return None;
     }
-    let text = body
-        .and_then(|b| b.pointer("/text/content"))
-        .or_else(|| v.pointer("/text/content"))
-        .or_else(|| v.get("content"))
-        .and_then(|x| x.as_str())
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    if text.is_empty() {
+    let payload = body.unwrap_or(v);
+    let text = wecom_text(payload, v);
+    let media_refs = wecom_media_refs(payload);
+    if text.is_empty() && media_refs.is_empty() {
         return None;
     }
     let sender = body
@@ -433,7 +421,10 @@ fn parse_ws_msg(inst: &ChannelInstance, v: &Value) -> Option<IncomingMessage> {
         .filter(|s| !s.is_empty())
         .unwrap_or(sender.as_str())
         .to_string();
-    let chat_type = match body.and_then(|b| b.get("chattype")).and_then(|x| x.as_str()) {
+    let chat_type = match body
+        .and_then(|b| b.get("chattype"))
+        .and_then(|x| x.as_str())
+    {
         Some("group") => "group",
         Some(_) => "p2p",
         None if body
@@ -465,7 +456,114 @@ fn parse_ws_msg(inst: &ChannelInstance, v: &Value) -> Option<IncomingMessage> {
         content: text,
         mentioned_bot: true,
         thread_id: None,
+        media_refs,
     })
+}
+
+fn wecom_text(payload: &Value, root: &Value) -> String {
+    let msgtype = payload
+        .get("msgtype")
+        .and_then(|x| x.as_str())
+        .unwrap_or("");
+    if msgtype == "voice" {
+        return payload
+            .pointer("/voice/content")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+    }
+    if msgtype == "mixed" {
+        let mut parts = Vec::new();
+        if let Some(items) = payload
+            .pointer("/mixed/msg_item")
+            .and_then(|x| x.as_array())
+        {
+            for item in items {
+                if item.get("msgtype").and_then(|x| x.as_str()) != Some("text") {
+                    continue;
+                }
+                if let Some(text) = item.pointer("/text/content").and_then(|x| x.as_str()) {
+                    let text = text.trim();
+                    if !text.is_empty() {
+                        parts.push(text.to_string());
+                    }
+                }
+            }
+        }
+        return parts.join("\n");
+    }
+    payload
+        .pointer("/text/content")
+        .or_else(|| root.pointer("/text/content"))
+        .or_else(|| root.get("content"))
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+fn wecom_media_refs(payload: &Value) -> Vec<super::super::types::InboundMediaRef> {
+    let mut out = Vec::new();
+    let msgtype = payload
+        .get("msgtype")
+        .and_then(|x| x.as_str())
+        .unwrap_or("");
+    match msgtype {
+        "image" | "file" | "video" => push_media(&mut out, msgtype, payload.get(msgtype)),
+        "mixed" => {
+            if let Some(items) = payload
+                .pointer("/mixed/msg_item")
+                .and_then(|x| x.as_array())
+            {
+                for item in items {
+                    let kind = item.get("msgtype").and_then(|x| x.as_str()).unwrap_or("");
+                    if matches!(kind, "image" | "file" | "video") {
+                        push_media(&mut out, kind, item.get(kind));
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
+fn push_media(
+    out: &mut Vec<super::super::types::InboundMediaRef>,
+    kind: &str,
+    node: Option<&Value>,
+) {
+    use super::super::types::{InboundMediaRef, RedactedSecret};
+    let Some(node) = node else {
+        return;
+    };
+    let url = node
+        .get("url")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .trim();
+    let key = node
+        .get("aeskey")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .trim();
+    if url.is_empty() || key.is_empty() {
+        return;
+    }
+    let filename = node
+        .get("filename")
+        .or_else(|| node.get("name"))
+        .and_then(|x| x.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    out.push(InboundMediaRef {
+        kind: kind.to_string(),
+        url: url.to_string(),
+        aes_key: RedactedSecret::new(key),
+        filename,
+    });
 }
 
 /// Default local webhook port for WeCom callback mode.
@@ -796,7 +894,9 @@ async fn run_webhook(
                                 sender_id: user.into(),
                                 content: text.into(),
                                 mentioned_bot: true,
-                                thread_id: None,                            }).await;
+                                thread_id: None,
+                                media_refs: Vec::new(),
+                            }).await;
                         }
                     }
                     let _ = socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\nsuccess").await;
@@ -868,7 +968,10 @@ pub async fn send_text(
     let Some(req_id) = req_id else {
         return Err("wecom: no outbound route".into());
     };
-    let instance_id = secrets.get("_instance_id").map(String::as_str).unwrap_or("");
+    let instance_id = secrets
+        .get("_instance_id")
+        .map(String::as_str)
+        .unwrap_or("");
     enqueue_wecom_ws_reply(instance_id, req_id, text)
 }
 
@@ -967,6 +1070,75 @@ mod tests {
         assert_eq!(msg.chat_id, "user-1");
         assert_eq!(msg.chat_type, "p2p");
         assert_eq!(msg.content, "hello");
+        assert!(msg.media_refs.is_empty());
+    }
+
+    #[test]
+    fn parse_ws_msg_keeps_file_without_text() {
+        let v = json!({
+            "cmd": "aibot_msg_callback",
+            "headers": { "req_id": "req-file" },
+            "body": {
+                "msgid": "m-file",
+                "chattype": "single",
+                "msgtype": "file",
+                "from": { "userid": "user-1" },
+                "file": {
+                    "url": "https://wwcdn.weixin.qq.com/file?token=secret",
+                    "aeskey": "0123456789abcdef0123456789abcdef",
+                    "filename": "aa.doc"
+                }
+            }
+        });
+        let msg = parse_ws_msg(&sample_inst(), &v).expect("file");
+        assert!(msg.content.is_empty());
+        assert_eq!(msg.media_refs.len(), 1);
+        assert_eq!(msg.media_refs[0].kind, "file");
+        assert_eq!(msg.media_refs[0].filename.as_deref(), Some("aa.doc"));
+        let shown = format!("{msg:?}");
+        assert!(!shown.contains("0123456789abcdef"));
+        assert!(!shown.contains("token=secret"));
+        assert!(shown.contains("[redacted]"));
+    }
+
+    #[test]
+    fn parse_ws_msg_mixed_and_voice() {
+        let mixed = json!({
+            "cmd": "aibot_msg_callback",
+            "headers": { "req_id": "req-mix" },
+            "body": {
+                "chattype": "single",
+                "msgtype": "mixed",
+                "from": { "userid": "user-1" },
+                "mixed": {
+                    "msg_item": [
+                        { "msgtype": "text", "text": { "content": "看图" } },
+                        { "msgtype": "image", "image": {
+                            "url": "https://wwcdn.weixin.qq.com/i",
+                            "aeskey": "0123456789abcdef0123456789abcdef"
+                        } }
+                    ]
+                }
+            }
+        });
+        let msg = parse_ws_msg(&sample_inst(), &mixed).expect("mixed");
+        assert_eq!(msg.content, "看图");
+        assert_eq!(msg.media_refs.len(), 1);
+        assert_eq!(msg.media_refs[0].kind, "image");
+
+        let voice = json!({
+            "cmd": "aibot_msg_callback",
+            "headers": { "req_id": "req-voice" },
+            "body": {
+                "chattype": "single",
+                "msgtype": "voice",
+                "from": { "userid": "user-1" },
+                "voice": { "content": " 你好 " }
+            }
+        });
+        let msg = parse_ws_msg(&sample_inst(), &voice).expect("voice");
+        assert_eq!(msg.content, "你好");
+        assert!(msg.media_refs.is_empty());
     }
 
     #[test]

@@ -477,10 +477,7 @@ fn auth_json_candidate_paths() -> Vec<PathBuf> {
     };
     push(&mut out, auth_json_path());
     push(&mut out, cli_default_auth_json_path());
-    push(
-        &mut out,
-        crate::paths::shared_cli_home().join("auth.json"),
-    );
+    push(&mut out, crate::paths::shared_cli_home().join("auth.json"));
     push(&mut out, legacy_grok_auth_json_path());
     push(&mut out, agent_home_auth_json_path());
     out
@@ -694,7 +691,10 @@ fn account_display_name(entry: &Value, email: Option<&str>) -> Option<String> {
     if !name.is_empty() {
         return Some(name);
     }
-    email.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
+    email
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
 }
 
 /// Pick the auth.json credential entry that actually holds a usable token
@@ -1921,9 +1921,7 @@ pub async fn account_login(
                 let t = line.trim();
                 if private_device {
                     capture_device_user_code(app_for_stdout.as_ref(), t).await;
-                } else if !url_opened
-                    && (t.starts_with("http://") || t.starts_with("https://"))
-                {
+                } else if !url_opened && (t.starts_with("http://") || t.starts_with("https://")) {
                     // Browser OAuth still opens the URL. Private device login
                     // stays in the account form (email + machine code).
                     url_opened = true;
@@ -2054,9 +2052,10 @@ If the browser showed a code to paste into Atlas, start sign-in again and paste 
     if exit_success || before_auth.iter().any(|m| m.is_some()) || device_url.is_some() {
         for _ in 0..60 {
             tokio::time::sleep(Duration::from_millis(500)).await;
-            let changed = auth_watch.iter().enumerate().any(|(i, path)| {
-                auth_file_mtime(path) != before_auth.get(i).copied().flatten()
-            });
+            let changed = auth_watch
+                .iter()
+                .enumerate()
+                .any(|(i, path)| auth_file_mtime(path) != before_auth.get(i).copied().flatten());
             if changed || read_auth_profile().signed_in {
                 break;
             }
