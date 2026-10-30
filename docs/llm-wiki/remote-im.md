@@ -484,7 +484,9 @@ Bridge **启动**与 **测试连接成功** 时自动调用 `setMyCommands`，�
 | 公网 URL 提示 | — | Callout + 复制建议 cloudflared 命令（**辅助**，非主路径强制终端） | |
 | 启用 Markdown | `enable_markdown` | Tg | | true |
 
-长连接可以接收单聊图片、文件、视频和图文混排。文件写到当前工作目录的 `.remote/{msgid}/` 下。同一条消息里的文字会立刻交给 Agent；只有文件时先收下，下一条文字再带上这些路径。下载地址只接受 `https` 的 `weixin.qq.com`，以及企业微信自己的 COS 桶 `ww-aibot-*.cos.<区域>.myqcloud.com`。纯文本主模型（GLM、MiniMax、Kimi 等）不会收到像素；Host 先按 CLI 实际使用的 `config.toml` 识图，再把文字描述交给 Agent。Webhook 与向外发送文件仍不支持。
+群聊里 @ 机器人后发 `/p`、序号或 `/status`。正文开头的 `@机器人` 会去掉，后面的命令与私聊相同。形如 `@E:\文件` 的路径会保留。
+
+长连接可以接收单聊图片、文件、视频和图文混排。文件写到当前工作目录的 `.remote/{msgid}/` 下。同一条消息里的文字会立刻交给 Agent；只有文件时先收下，下一条文字再带上这些路径。下载地址只接受 `https` 的 `weixin.qq.com`，以及企业微信自己的 COS 桶 `ww-aibot-*.cos.<区域>.myqcloud.com`。纯文本主模型（GLM、MiniMax、Kimi 等）不会收到像素；Host 先按 CLI 实际使用的 `config.toml` 识图，再把文字描述交给 Agent。Agent 回复里的本地 PNG、JPEG、GIF 会上传后作为图片发回当前这条会话。相对路径和 Markdown 图片按当前工作目录解析。单张不超过 10MB。Webhook 与主动推送图片仍不支持。
 
 ---
 

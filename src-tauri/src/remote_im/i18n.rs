@@ -13,6 +13,7 @@ pub enum MessageKey {
     /// `已收到 {name}。`
     AttachmentReceived,
     AttachmentFailed,
+    ImageSendFailed,
 }
 
 /// Canonical catalog id: `en` | `de` | … | `zh-TW`.
@@ -122,7 +123,9 @@ pub fn t(lang: &str, key: MessageKey) -> &'static str {
         (_, MessageKey::NoAvailableProject) => {
             "This instance has no available project. Send /p or contact an admin."
         }
-        (_, key) => attachment_copy(locale, key).unwrap_or(""),
+        (_, key) => attachment_copy(locale, key)
+            .or_else(|| image_send_copy(locale, key))
+            .unwrap_or(""),
     }
 }
 
@@ -165,6 +168,30 @@ fn attachment_copy(locale: Locale, key: MessageKey) -> Option<&'static str> {
         Locale::ZhTw => "附件下載失敗。",
         _ if received => "Received {name}.",
         _ => "Couldn't download that attachment.",
+    })
+}
+
+fn image_send_copy(locale: Locale, key: MessageKey) -> Option<&'static str> {
+    if !matches!(key, MessageKey::ImageSendFailed) {
+        return None;
+    }
+    Some(match locale {
+        Locale::De => "Das Bild konnte nicht gesendet werden.",
+        Locale::Es => "No se pudo enviar la imagen.",
+        Locale::Fil => "Hindi maipadala ang larawan.",
+        Locale::Fr => "Impossible d'envoyer l'image.",
+        Locale::Id => "Gambar tidak dapat dikirim.",
+        Locale::It => "Impossibile inviare l'immagine.",
+        Locale::Ja => "画像を送信できませんでした。",
+        Locale::Ko => "이미지를 보내지 못했습니다.",
+        Locale::PtBr => "Não foi possível enviar a imagem.",
+        Locale::Ru => "Не удалось отправить изображение.",
+        Locale::Ta => "படத்தை அனுப்ப முடியவில்லை.",
+        Locale::Tr => "Görsel gönderilemedi.",
+        Locale::Uk => "Не вдалося надіслати зображення.",
+        Locale::Zh => "图片发送失败。",
+        Locale::ZhTw => "圖片傳送失敗。",
+        _ => "Couldn't send that image.",
     })
 }
 
@@ -231,6 +258,7 @@ mod tests {
                 MessageKey::NoAvailableProject,
                 MessageKey::AttachmentReceived,
                 MessageKey::AttachmentFailed,
+                MessageKey::ImageSendFailed,
             ] {
                 assert!(!t(tag, key).trim().is_empty(), "{tag} has empty copy");
             }

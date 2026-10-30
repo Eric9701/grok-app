@@ -26,6 +26,7 @@ mod session;
 mod slash;
 mod types;
 mod validate;
+mod wecom_image;
 mod wecom_media;
 #[cfg(test)]
 mod weixin_flow_tests;

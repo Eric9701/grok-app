@@ -4,12 +4,12 @@ use super::super::outbound::{http_client, secret_or_opt};
 use super::super::types::{ChannelInstance, IncomingMessage};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 /// Official long-connection endpoint. Credentials go in `aibot_subscribe`, not the query string.
@@ -17,14 +17,21 @@ const WECOM_WS_URL: &str = "wss://openws.work.weixin.qq.com";
 const WECOM_SUPERSEDED: &str = "wecom ws: superseded";
 const WECOM_HEARTBEAT: Duration = Duration::from_secs(30);
 
-struct WecomWsReply {
-    req_id: String,
-    text: String,
+enum WecomOutbound {
+    Text {
+        req_id: String,
+        text: String,
+    },
+    Image {
+        callback_req_id: String,
+        plan: super::super::wecom_image::ImageUploadPlan,
+        done: oneshot::Sender<Result<(), String>>,
+    },
 }
 
 struct WecomSinkSlot {
     generation: u64,
-    tx: mpsc::Sender<WecomWsReply>,
+    tx: mpsc::Sender<WecomOutbound>,
 }
 
 static WECOM_SINK_GEN: AtomicU64 = AtomicU64::new(1);
@@ -50,7 +57,7 @@ impl Drop for WecomSinkGuard {
     }
 }
 
-fn register_wecom_sink(instance_id: &str, tx: mpsc::Sender<WecomWsReply>) -> WecomSinkGuard {
+fn register_wecom_sink(instance_id: &str, tx: mpsc::Sender<WecomOutbound>) -> WecomSinkGuard {
     let generation = WECOM_SINK_GEN.fetch_add(1, Ordering::Relaxed);
     if let Ok(mut map) = WECOM_WS_SINKS.lock() {
         map.insert(instance_id.to_string(), WecomSinkSlot { generation, tx });
@@ -68,11 +75,37 @@ fn enqueue_wecom_ws_reply(instance_id: &str, req_id: &str, text: &str) -> Result
         .get(instance_id)
         .map(|slot| slot.tx.clone())
         .ok_or_else(|| "wecom ws: long connection is not authenticated".to_string())?;
-    tx.try_send(WecomWsReply {
+    tx.try_send(WecomOutbound::Text {
         req_id: req_id.to_string(),
         text: text.to_string(),
     })
     .map_err(|_| "wecom ws: reply queue unavailable".to_string())
+}
+
+pub async fn send_image(instance_id: &str, callback_req_id: &str, path: &std::path::Path) -> Result<(), String> {
+    let callback_req_id = callback_req_id.trim();
+    if callback_req_id.is_empty() {
+        return Err("wecom image: no reply target".into());
+    }
+    let plan = super::super::wecom_image::plan_image_file(path)?;
+    let (done, rx) = oneshot::channel();
+    let tx = WECOM_WS_SINKS
+        .lock()
+        .map_err(|_| "wecom ws: reply queue locked".to_string())?
+        .get(instance_id)
+        .map(|slot| slot.tx.clone())
+        .ok_or_else(|| "wecom ws: long connection is not authenticated".to_string())?;
+    tx.try_send(WecomOutbound::Image {
+        callback_req_id: callback_req_id.to_string(),
+        plan,
+        done,
+    })
+    .map_err(|_| "wecom ws: reply queue unavailable".to_string())?;
+    match tokio::time::timeout(Duration::from_secs(60), rx).await {
+        Ok(Ok(result)) => result,
+        Ok(Err(_)) => Err("wecom image: connection closed".into()),
+        Err(_) => Err("wecom image: timeout".into()),
+    }
 }
 
 fn wecom_subscribe_frame(bot_id: &str, secret: &str, req_id: &str) -> Value {
@@ -178,6 +211,44 @@ async fn run_websocket(
     }
 }
 
+struct QueuedImage {
+    callback_req_id: String,
+    plan: super::super::wecom_image::ImageUploadPlan,
+    done: oneshot::Sender<Result<(), String>>,
+}
+
+struct ImageJob {
+    machine: super::super::wecom_image::UploadMachine,
+    done: oneshot::Sender<Result<(), String>>,
+}
+
+async fn begin_image_job<S>(
+    write: &mut S,
+    image_job: &mut Option<ImageJob>,
+    image_deadline: &mut Option<tokio::time::Instant>,
+    callback_req_id: String,
+    plan: super::super::wecom_image::ImageUploadPlan,
+    done: oneshot::Sender<Result<(), String>>,
+) -> Result<(), String>
+where
+    S: futures_util::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
+{
+    let req_id = format!("img_init_{}", uuid::Uuid::new_v4().simple());
+    let (machine, frame) = super::super::wecom_image::begin_upload(&callback_req_id, plan, &req_id);
+    tracing::info!(req_id = %req_id, "wecom image: upload init");
+    if let Err(error) = write
+        .send(Message::Text(frame.to_string().into()))
+        .await
+    {
+        let message = format!("wecom ws: image send failed: {error}");
+        let _ = done.send(Err(message.clone()));
+        return Err(message);
+    }
+    *image_job = Some(ImageJob { machine, done });
+    *image_deadline = Some(tokio::time::Instant::now() + Duration::from_secs(20));
+    Ok(())
+}
+
 async fn run_ws_once(
     inst: &ChannelInstance,
     bot_id: &str,
@@ -191,8 +262,11 @@ async fn run_ws_once(
     let (mut write, mut read) = ws.split();
     tracing::info!(instance = %inst.id, "wecom ws: connected");
 
-    let (reply_tx, mut reply_rx) = mpsc::channel::<WecomWsReply>(32);
+    let (reply_tx, mut reply_rx) = mpsc::channel::<WecomOutbound>(8);
     let _sink = register_wecom_sink(&inst.id, reply_tx);
+    let mut image_job: Option<ImageJob> = None;
+    let mut image_queue: VecDeque<QueuedImage> = VecDeque::new();
+    let mut image_deadline: Option<tokio::time::Instant> = None;
 
     let subscribe_req = format!("aibot_subscribe_{}", now_millis());
     let subscribe = wecom_subscribe_frame(bot_id, bot_secret, &subscribe_req);
@@ -218,18 +292,54 @@ async fn run_ws_once(
             }
             reply = reply_rx.recv() => {
                 let Some(reply) = reply else { continue };
-                let stream_id = format!("stream_{}", uuid::Uuid::new_v4().simple());
-                let frame = wecom_reply_frame(&reply.req_id, &stream_id, &reply.text);
-                tracing::info!(
-                    instance = %inst.id,
-                    req_id = %reply.req_id,
-                    text_len = reply.text.len(),
-                    "wecom ws: reply frame"
-                );
-                write
-                    .send(Message::Text(frame.to_string().into()))
-                    .await
-                    .map_err(|e| format!("wecom ws: reply send failed: {e}"))?;
+                match reply {
+                    WecomOutbound::Text { req_id, text } => {
+                        let stream_id = format!("stream_{}", uuid::Uuid::new_v4().simple());
+                        let frame = wecom_reply_frame(&req_id, &stream_id, &text);
+                        tracing::info!(
+                            instance = %inst.id,
+                            req_id = %req_id,
+                            text_len = text.len(),
+                            "wecom ws: reply frame"
+                        );
+                        write
+                            .send(Message::Text(frame.to_string().into()))
+                            .await
+                            .map_err(|e| format!("wecom ws: reply send failed: {e}"))?;
+                    }
+                    WecomOutbound::Image { callback_req_id, plan, done } => {
+                        if image_job.is_some() {
+                            image_queue.push_back(QueuedImage { callback_req_id, plan, done });
+                        } else if let Err(error) = begin_image_job(
+                            &mut write,
+                            &mut image_job,
+                            &mut image_deadline,
+                            callback_req_id,
+                            plan,
+                            done,
+                        ).await {
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+            _ = tokio::time::sleep_until(image_deadline.unwrap_or_else(tokio::time::Instant::now)), if image_deadline.is_some() => {
+                if let Some(job) = image_job.take() {
+                    let _ = job.done.send(Err("wecom image: timeout".into()));
+                }
+                image_deadline = None;
+                if let Some(queued) = image_queue.pop_front() {
+                    if let Err(error) = begin_image_job(
+                        &mut write,
+                        &mut image_job,
+                        &mut image_deadline,
+                        queued.callback_req_id,
+                        queued.plan,
+                        queued.done,
+                    ).await {
+                        return Err(error);
+                    }
+                }
             }
             _ = ping.tick(), if authed => {
                 if missed_pongs >= 2 {
@@ -277,6 +387,95 @@ async fn run_ws_once(
                         }
                         if is_disconnected_event(&v) {
                             return Err(WECOM_SUPERSEDED.into());
+                        }
+                        if image_job.is_some() {
+                            let next_req = format!("img_{}", uuid::Uuid::new_v4().simple());
+                            let step = image_job
+                                .as_mut()
+                                .expect("image job")
+                                .machine
+                                .on_frame(&v, &next_req);
+                            match step {
+                                Ok(super::super::wecom_image::UploadStep::Ignore) => {}
+                                Ok(super::super::wecom_image::UploadStep::Send(frame)) => {
+                                    let delivered = frame
+                                        .get("cmd")
+                                        .and_then(|v| v.as_str())
+                                        == Some("aibot_respond_msg");
+                                    write
+                                        .send(Message::Text(frame.to_string().into()))
+                                        .await
+                                        .map_err(|e| format!("wecom ws: image send failed: {e}"))?;
+                                    if delivered {
+                                        if let Some(job) = image_job.take() {
+                                            let _ = job.done.send(Ok(()));
+                                        }
+                                        image_deadline = None;
+                                        if let Some(queued) = image_queue.pop_front() {
+                                            if let Err(error) = begin_image_job(
+                                                &mut write,
+                                                &mut image_job,
+                                                &mut image_deadline,
+                                                queued.callback_req_id,
+                                                queued.plan,
+                                                queued.done,
+                                            )
+                                            .await
+                                            {
+                                                return Err(error);
+                                            }
+                                        }
+                                    } else {
+                                        image_deadline = Some(
+                                            tokio::time::Instant::now() + Duration::from_secs(20),
+                                        );
+                                    }
+                                    continue;
+                                }
+                                Ok(super::super::wecom_image::UploadStep::Finished) => {
+                                    if let Some(job) = image_job.take() {
+                                        let _ = job.done.send(Ok(()));
+                                    }
+                                    image_deadline = None;
+                                    if let Some(queued) = image_queue.pop_front() {
+                                        if let Err(error) = begin_image_job(
+                                            &mut write,
+                                            &mut image_job,
+                                            &mut image_deadline,
+                                            queued.callback_req_id,
+                                            queued.plan,
+                                            queued.done,
+                                        )
+                                        .await
+                                        {
+                                            return Err(error);
+                                        }
+                                    }
+                                    continue;
+                                }
+                                Err(error) => {
+                                    tracing::warn!(instance = %inst.id, "wecom image: {error}");
+                                    if let Some(job) = image_job.take() {
+                                        let _ = job.done.send(Err(error));
+                                    }
+                                    image_deadline = None;
+                                    if let Some(queued) = image_queue.pop_front() {
+                                        if let Err(error) = begin_image_job(
+                                            &mut write,
+                                            &mut image_job,
+                                            &mut image_deadline,
+                                            queued.callback_req_id,
+                                            queued.plan,
+                                            queued.done,
+                                        )
+                                        .await
+                                        {
+                                            return Err(error);
+                                        }
+                                    }
+                                    continue;
+                                }
+                            }
                         }
                         let summary = wecom_ws_frame_summary(&v);
                         let parsed = parse_ws_msg(inst, &v);
@@ -404,9 +603,6 @@ fn parse_ws_msg(inst: &ChannelInstance, v: &Value) -> Option<IncomingMessage> {
     let payload = body.unwrap_or(v);
     let text = wecom_text(payload, v);
     let media_refs = wecom_media_refs(payload);
-    if text.is_empty() && media_refs.is_empty() {
-        return None;
-    }
     let sender = body
         .and_then(|b| b.get("from"))
         .or_else(|| v.get("from"))
@@ -436,6 +632,16 @@ fn parse_ws_msg(inst: &ChannelInstance, v: &Value) -> Option<IncomingMessage> {
         }
         None => "p2p",
     };
+    // Group text keeps the @bot prefix (`@Eric-test /p`). Drop it so /p and
+    // number picks match the same commands as a direct chat.
+    let text = if chat_type == "group" {
+        strip_leading_mentions(&text)
+    } else {
+        text
+    };
+    if text.is_empty() && media_refs.is_empty() {
+        return None;
+    }
     let req_id = ws_req_id(v);
     let message_id = if req_id.is_empty() {
         body.and_then(|b| b.get("msgid"))
@@ -458,6 +664,37 @@ fn parse_ws_msg(inst: &ChannelInstance, v: &Value) -> Option<IncomingMessage> {
         thread_id: None,
         media_refs,
     })
+}
+
+/// Drop leading `@name` tokens. A token containing `:`, `/`, or `\` is a path
+/// (`@E:\a.png`) and stays in the text.
+fn strip_leading_mentions(text: &str) -> String {
+    let mut rest = text.trim();
+    while let Some(next) = strip_one_leading_mention(rest) {
+        rest = next.trim_start();
+    }
+    rest.to_string()
+}
+
+fn strip_one_leading_mention(text: &str) -> Option<&str> {
+    let rest = text.trim_start();
+    let mut chars = rest.chars();
+    let first = chars.next()?;
+    if first != '@' && first != '＠' {
+        return None;
+    }
+    let after = chars.as_str();
+    let end = after
+        .find(|c: char| c.is_whitespace())
+        .unwrap_or(after.len());
+    if end == 0 {
+        return None;
+    }
+    let token = &after[..end];
+    if token.contains([':', '/', '\\']) {
+        return None;
+    }
+    Some(&after[end..])
 }
 
 fn wecom_text(payload: &Value, root: &Value) -> String {
@@ -1164,6 +1401,43 @@ mod tests {
         assert_eq!(msg.chat_id, "wr-group");
         assert_eq!(msg.chat_type, "group");
         assert_eq!(msg.message_id, "req-g");
+        assert_eq!(msg.content, "hi");
+    }
+
+    #[test]
+    fn parse_ws_msg_strips_group_mention_before_commands() {
+        let frame = |content: &str, chattype: &str| {
+            json!({
+                "cmd": "aibot_msg_callback",
+                "headers": { "req_id": "req-cmd" },
+                "body": {
+                    "chatid": "wr-group",
+                    "chattype": chattype,
+                    "msgtype": "text",
+                    "from": { "userid": "user-2" },
+                    "text": { "content": content }
+                }
+            })
+        };
+        let project = parse_ws_msg(&sample_inst(), &frame("@Eric-test /p ", "group")).unwrap();
+        assert_eq!(project.content, "/p");
+        let pick = parse_ws_msg(&sample_inst(), &frame("@Eric-test 2", "group")).unwrap();
+        assert_eq!(pick.content, "2");
+        let status = parse_ws_msg(
+            &sample_inst(),
+            &frame("@Eric-test @同事 /status", "group"),
+        )
+        .unwrap();
+        assert_eq!(status.content, "/status");
+        let path = parse_ws_msg(
+            &sample_inst(),
+            &frame(r"@Eric-test @E:\work\a.png", "group"),
+        )
+        .unwrap();
+        assert_eq!(path.content, r"@E:\work\a.png");
+        let direct = parse_ws_msg(&sample_inst(), &frame("@Eric-test /p", "single")).unwrap();
+        assert_eq!(direct.content, "@Eric-test /p");
+        assert!(parse_ws_msg(&sample_inst(), &frame("@Eric-test", "group")).is_none());
     }
 
     #[test]

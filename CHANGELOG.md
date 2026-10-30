@@ -15,9 +15,19 @@ See `docs/llm-wiki/release.md`.
 
 ### Added
 - WeCom can receive a file or image in chat and hand it to the agent with the next message.
+- WeCom can send a PNG, JPEG, or GIF from the agent reply back to that chat.
+
+### Fixed
+- WeCom sends images named with a relative path in the agent reply.
+- WeCom group chats can switch projects with /p after mentioning the bot.
 
 **中文 · 新增**
 - 企业微信可以接收文件或图片，并在下一条消息里交给 Agent。
+- 企业微信可以把 Agent 回复里的 PNG、JPEG 或 GIF 发回当前会话。
+
+**中文 · 修复**
+- 企业微信会把回复里用相对路径标出的图片一并发出去。
+- 企业微信群里 @ 机器人后，可以用 /p 切换项目。
 
 ## [0.2.43] - 2026-10-26
 

@@ -1701,10 +1701,56 @@ impl Engine {
         if let Some(compact) = compact.as_ref() {
             app_sessions::sync_compact_to_app(&next, compact);
         }
+        let work_dir = next.work_dir.clone();
         self.store.set(scope, next);
 
         for chunk in chunk_text(&text, 3500) {
             let _ = self.reply_msg(msg, &chunk).await;
+        }
+        if msg.channel == "wecom" {
+            self.send_wecom_images(msg, &text, &stored_attachments, &work_dir)
+                .await;
+        }
+    }
+
+    async fn send_wecom_images(
+        &self,
+        msg: &IncomingMessage,
+        text: &str,
+        attachments: &[crate::store::MessageAttachmentStored],
+        work_dir: &str,
+    ) {
+        let exclude: Vec<String> = attachments.iter().map(|file| file.path.clone()).collect();
+        let paths = super::wecom_image::image_paths_in_reply(
+            text,
+            &exclude,
+            Some(std::path::Path::new(work_dir)),
+        );
+        for path in paths {
+            if !std::path::Path::new(&path).is_file() {
+                continue;
+            }
+            match super::channels::wecom::send_image(
+                &msg.instance_id,
+                &msg.message_id,
+                std::path::Path::new(&path),
+            )
+            .await
+            {
+                Ok(()) => {
+                    tracing::info!(instance = %msg.instance_id, "remote_im: wecom image sent");
+                }
+                Err(error) => {
+                    if error.contains("not authenticated") || error.contains("no reply target") {
+                        tracing::info!(instance = %msg.instance_id, "remote_im: wecom image skipped");
+                        break;
+                    }
+                    tracing::warn!(instance = %msg.instance_id, "remote_im: wecom image: {error}");
+                    let _ = self
+                        .reply_msg(msg, i18n::t(&self.lang(), MessageKey::ImageSendFailed))
+                        .await;
+                }
+            }
         }
     }
 
