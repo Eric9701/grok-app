@@ -28,6 +28,7 @@ import {
   isSessionLiveStreaming,
   snapshotOutgoingMessages,
 } from "@/lib/session";
+import { clearDraftRuntimeOverride } from "@/lib/draftRuntime";
 import { sessionLiveMapStore } from "@/lib/sessionLiveMapStore";
 import {
   projectHostIntoLiveMap,
@@ -518,6 +519,7 @@ export function useSessionNavigation(opts: {
       const proj =
         project === undefined ? host.catalog.getActiveProject() : project;
       if (host.catalog.rejectUnusable(proj)) return;
+      clearDraftRuntimeOverride();
       host.draft.startWelcomeIntro();
 
       const leavingId = viewingSessionIdRef.current;

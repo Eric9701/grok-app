@@ -1,6 +1,8 @@
 /**
  * Composer chip: which CLI this desktop chat runs.
  * Hidden until at least one runtime profile exists.
+ * A new chat has no session id yet; the chip still shows, starting from the
+ * desktop default, and the pick is applied when that chat is created.
  */
 import { useEffect, useState } from "react";
 import { GlassModal } from "@/components/GlassModal";
@@ -10,6 +12,12 @@ import {
   AGENT_RUNTIMES_EVENT,
   type AgentRuntimesFile,
 } from "@/lib/api/agentRuntimes";
+import {
+  draftRuntimeOverride,
+  resolveDraftProfileId,
+  setDraftRuntimeOverride,
+  subscribeDraftRuntime,
+} from "@/lib/draftRuntime";
 import type { createT } from "@/i18n";
 
 type TFn = ReturnType<typeof createT>;
@@ -34,6 +42,12 @@ export function useAgentRuntimesFile(): AgentRuntimesFile | null {
   return file;
 }
 
+export function useDraftRuntimeOverride(): string | undefined {
+  const [picked, setPicked] = useState(draftRuntimeOverride);
+  useEffect(() => subscribeDraftRuntime(() => setPicked(draftRuntimeOverride())), []);
+  return picked;
+}
+
 export function AgentRuntimeChip({
   sessionId,
   busy,
@@ -44,13 +58,15 @@ export function AgentRuntimeChip({
   tr: TFn;
 }) {
   const file = useAgentRuntimesFile();
+  const draftPick = useDraftRuntimeOverride();
   const [pending, setPending] = useState<string | null>(null);
 
-  if (!file || file.profiles.length === 0 || !sessionId) return null;
+  if (!file || file.profiles.length === 0) return null;
 
-  const current =
-    file.sessionBindings.find((row) => row.sessionId === sessionId)?.profileId ??
-    "";
+  const current = sessionId
+    ? file.sessionBindings.find((row) => row.sessionId === sessionId)?.profileId ??
+      ""
+    : resolveDraftProfileId(draftPick, file.desktopDefaultProfileId);
   const currentProfile = file.profiles.find((profile) => profile.id === current);
   const foreign = !!currentProfile && currentProfile.kind !== "atlas";
   const options: SelectOption[] = [
@@ -64,6 +80,7 @@ export function AgentRuntimeChip({
   ];
 
   const commit = (profileId: string) => {
+    if (!sessionId) return;
     void api.agentRuntimesSetSessionBinding(sessionId, profileId).then(() =>
       api.sessionConnect({ sessionId }),
     );
@@ -80,6 +97,10 @@ export function AgentRuntimeChip({
         title={busy ? tr("composer.runtimeBusy") : tr("composer.runtime")}
         onChange={(next) => {
           if (next === current) return;
+          if (!sessionId) {
+            setDraftRuntimeOverride(next);
+            return;
+          }
           setPending(next);
         }}
       />
@@ -125,10 +146,14 @@ export function AgentRuntimeChip({
 export function sessionUsesForeignRuntime(
   file: AgentRuntimesFile | null,
   sessionId: string | null,
+  draftPick?: string,
 ): boolean {
-  if (!file || !sessionId) return false;
-  const binding = file.sessionBindings.find((row) => row.sessionId === sessionId);
-  if (!binding) return false;
-  const profile = file.profiles.find((row) => row.id === binding.profileId);
+  if (!file) return false;
+  const profileId = sessionId
+    ? file.sessionBindings.find((row) => row.sessionId === sessionId)?.profileId ??
+      ""
+    : resolveDraftProfileId(draftPick, file.desktopDefaultProfileId);
+  if (!profileId) return false;
+  const profile = file.profiles.find((row) => row.id === profileId);
   return !!profile && profile.kind !== "atlas";
 }

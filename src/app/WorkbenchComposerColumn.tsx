@@ -65,6 +65,7 @@ import {
   AgentRuntimeChip,
   sessionUsesForeignRuntime,
   useAgentRuntimesFile,
+  useDraftRuntimeOverride,
 } from "@/components/composer/AgentRuntimeChip";
 import { WorkbenchComposerShell } from "@/app/WorkbenchComposerShell";
 import { MultiRootWorkspaceModal } from "@/components/MultiRootWorkspaceModal";
@@ -370,9 +371,11 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
   } = p;
   const multiRoot = useMultiRootWorkspace();
   const runtimeFile = useAgentRuntimesFile();
+  const draftRuntime = useDraftRuntimeOverride();
   const foreignRuntime = sessionUsesForeignRuntime(
     runtimeFile,
     session.sessionId ?? null,
+    draftRuntime,
   );
   const [permBusy, setPermBusy] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
