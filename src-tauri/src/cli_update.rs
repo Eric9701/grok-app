@@ -378,9 +378,10 @@ pub fn run_plain_atlas_update(
     manual_path: Option<&str>,
 ) -> Result<crate::cli_install::CliInstallResult, String> {
     let probe = cli_probe::probe_cli(manual_path);
-    let path = probe.path.filter(|_| probe.found).ok_or_else(|| {
-        "Atlas CLI not found — install or set the path under Runtime".to_string()
-    })?;
+    let path = probe
+        .path
+        .filter(|_| probe.found)
+        .ok_or_else(|| "Atlas CLI not found — install or set the path under Runtime".to_string())?;
     let stdout = run_cli_with_timeout(Path::new(&path), &["update"], UPDATE_TIMEOUT)?;
     let after = cli_probe::probe_cli(manual_path);
     let version = after

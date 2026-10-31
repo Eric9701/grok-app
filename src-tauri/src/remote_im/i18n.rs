@@ -10,6 +10,10 @@ pub enum MessageKey {
     StopSignalSent,
     NoInFlightTurn,
     NoAvailableProject,
+    /// `已收到 {name}。`
+    AttachmentReceived,
+    AttachmentFailed,
+    ImageSendFailed,
 }
 
 /// Canonical catalog id: `en` | `de` | … | `zh-TW`.
@@ -119,16 +123,89 @@ pub fn t(lang: &str, key: MessageKey) -> &'static str {
         (_, MessageKey::NoAvailableProject) => {
             "This instance has no available project. Send /p or contact an admin."
         }
+        (_, key) => attachment_copy(locale, key)
+            .or_else(|| image_send_copy(locale, key))
+            .unwrap_or(""),
     }
+}
+
+fn attachment_copy(locale: Locale, key: MessageKey) -> Option<&'static str> {
+    let received = matches!(key, MessageKey::AttachmentReceived);
+    let failed = matches!(key, MessageKey::AttachmentFailed);
+    if !received && !failed {
+        return None;
+    }
+    Some(match locale {
+        Locale::De if received => "{name} empfangen.",
+        Locale::De => "Der Anhang konnte nicht heruntergeladen werden.",
+        Locale::Es if received => "Se recibió {name}.",
+        Locale::Es => "No se pudo descargar el archivo adjunto.",
+        Locale::Fil if received => "Natanggap ang {name}.",
+        Locale::Fil => "Hindi ma-download ang attachment.",
+        Locale::Fr if received => "{name} reçu.",
+        Locale::Fr => "Impossible de télécharger la pièce jointe.",
+        Locale::Id if received => "{name} diterima.",
+        Locale::Id => "Lampiran tidak dapat diunduh.",
+        Locale::It if received => "Ricevuto {name}.",
+        Locale::It => "Impossibile scaricare l'allegato.",
+        Locale::Ja if received => "{name} を受け取りました。",
+        Locale::Ja => "添付ファイルをダウンロードできませんでした。",
+        Locale::Ko if received => "{name}을(를) 받았습니다.",
+        Locale::Ko => "첨부 파일을 받지 못했습니다.",
+        Locale::PtBr if received => "{name} recebido.",
+        Locale::PtBr => "Não foi possível baixar o anexo.",
+        Locale::Ru if received => "Получен файл {name}.",
+        Locale::Ru => "Не удалось скачать вложение.",
+        Locale::Ta if received => "{name} பெறப்பட்டது.",
+        Locale::Ta => "இணைப்பைப் பதிவிறக்க முடியவில்லை.",
+        Locale::Tr if received => "{name} alındı.",
+        Locale::Tr => "Ek indirilemedi.",
+        Locale::Uk if received => "Отримано {name}.",
+        Locale::Uk => "Не вдалося завантажити вкладення.",
+        Locale::Zh if received => "已收到 {name}。",
+        Locale::Zh => "附件下载失败。",
+        Locale::ZhTw if received => "已收到 {name}。",
+        Locale::ZhTw => "附件下載失敗。",
+        _ if received => "Received {name}.",
+        _ => "Couldn't download that attachment.",
+    })
+}
+
+fn image_send_copy(locale: Locale, key: MessageKey) -> Option<&'static str> {
+    if !matches!(key, MessageKey::ImageSendFailed) {
+        return None;
+    }
+    Some(match locale {
+        Locale::De => "Das Bild konnte nicht gesendet werden.",
+        Locale::Es => "No se pudo enviar la imagen.",
+        Locale::Fil => "Hindi maipadala ang larawan.",
+        Locale::Fr => "Impossible d'envoyer l'image.",
+        Locale::Id => "Gambar tidak dapat dikirim.",
+        Locale::It => "Impossibile inviare l'immagine.",
+        Locale::Ja => "画像を送信できませんでした。",
+        Locale::Ko => "이미지를 보내지 못했습니다.",
+        Locale::PtBr => "Não foi possível enviar a imagem.",
+        Locale::Ru => "Не удалось отправить изображение.",
+        Locale::Ta => "படத்தை அனுப்ப முடியவில்லை.",
+        Locale::Tr => "Görsel gönderilemedi.",
+        Locale::Uk => "Не вдалося надіслати зображення.",
+        Locale::Zh => "图片发送失败。",
+        Locale::ZhTw => "圖片傳送失敗。",
+        _ => "Couldn't send that image.",
+    })
+}
+
+pub fn format_received(lang: &str, name: &str) -> String {
+    t(lang, MessageKey::AttachmentReceived).replace("{name}", name)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const ALL_TAGS: [&str; 15] = [
-        "en", "de", "es", "fil", "fr", "id", "it", "ja", "ko", "pt-BR", "ru", "ta", "uk", "zh",
-        "zh-TW",
+    const ALL_TAGS: [&str; 16] = [
+        "en", "de", "es", "fil", "fr", "id", "it", "ja", "ko", "pt-BR", "ru", "ta", "tr", "uk",
+        "zh", "zh-TW",
     ];
 
     #[test]
@@ -179,9 +256,16 @@ mod tests {
                 MessageKey::StopSignalSent,
                 MessageKey::NoInFlightTurn,
                 MessageKey::NoAvailableProject,
+                MessageKey::AttachmentReceived,
+                MessageKey::AttachmentFailed,
+                MessageKey::ImageSendFailed,
             ] {
                 assert!(!t(tag, key).trim().is_empty(), "{tag} has empty copy");
             }
+            assert!(
+                t(tag, MessageKey::AttachmentReceived).contains("{name}"),
+                "{tag} dropped the file name"
+            );
             // The recovery instruction is useless without the command itself.
             assert!(
                 t(tag, MessageKey::NoAvailableProject).contains("/p"),

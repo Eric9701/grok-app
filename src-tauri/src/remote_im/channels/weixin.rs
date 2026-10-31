@@ -263,6 +263,7 @@ fn parse_msg(inst: &ChannelInstance, m: &Value) -> Option<IncomingMessage> {
         content: text,
         mentioned_bot: true,
         thread_id: None,
+        media_refs: Vec::new(),
     })
 }
 

@@ -24,7 +24,9 @@ pub struct Pending {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BootOutcome {
     Nothing,
-    Succeeded { to: String },
+    Succeeded {
+        to: String,
+    },
     /// Install did not take; `notify` is false after the first report.
     Failed {
         version: String,
@@ -59,7 +61,12 @@ pub fn clear() {
 }
 
 /// Next marker before handing off an install of `to` from `current`.
-pub fn next_attempt(prev: Option<&Pending>, current: &str, to: &str, now: DateTime<Utc>) -> Pending {
+pub fn next_attempt(
+    prev: Option<&Pending>,
+    current: &str,
+    to: &str,
+    now: DateTime<Utc>,
+) -> Pending {
     let attempts = match prev {
         Some(p) if p.to == to => p.attempts.saturating_add(1),
         _ => 1,
@@ -94,7 +101,13 @@ pub fn evaluate(
         attempts: p.attempts,
         notify,
     };
-    (outcome, Some(Pending { reported: true, ..p }))
+    (
+        outcome,
+        Some(Pending {
+            reported: true,
+            ..p
+        }),
+    )
 }
 
 #[cfg(test)]
@@ -127,7 +140,11 @@ mod tests {
         let (o, keep) = evaluate(Some(p.clone()), "1.0.0", at(1));
         assert_eq!(
             o,
-            BootOutcome::Failed { version: "1.1.0".into(), attempts: 1, notify: true }
+            BootOutcome::Failed {
+                version: "1.1.0".into(),
+                attempts: 1,
+                notify: true
+            }
         );
         let keep = keep.unwrap();
         assert!(keep.reported);
@@ -135,7 +152,11 @@ mod tests {
         let (o, _) = evaluate(Some(keep), "1.0.0", at(2));
         assert_eq!(
             o,
-            BootOutcome::Failed { version: "1.1.0".into(), attempts: 1, notify: false }
+            BootOutcome::Failed {
+                version: "1.1.0".into(),
+                attempts: 1,
+                notify: false
+            }
         );
 
         let (o, keep) = evaluate(Some(p), "1.0.0", at(24 * 8));

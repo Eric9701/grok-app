@@ -210,7 +210,9 @@ fn plain_cmd_path(path: &Path) -> Result<String, String> {
         .to_str()
         .ok_or("install path is not valid Unicode")?
         .to_string();
-    if s.chars().any(|c| matches!(c, '"' | '\n' | '\r' | '%' | '!')) {
+    if s.chars()
+        .any(|c| matches!(c, '"' | '\n' | '\r' | '%' | '!'))
+    {
         return Err("install path cannot be updated automatically".into());
     }
     Ok(s)
@@ -218,7 +220,12 @@ fn plain_cmd_path(path: &Path) -> Result<String, String> {
 
 /// cmd script: wait until `pid` exits, copy `src` onto `dest`, start `exe`.
 #[cfg_attr(not(windows), allow(dead_code))]
-pub fn portable_apply_script(pid: u32, src: &Path, dest: &Path, exe: &Path) -> Result<String, String> {
+pub fn portable_apply_script(
+    pid: u32,
+    src: &Path,
+    dest: &Path,
+    exe: &Path,
+) -> Result<String, String> {
     let src = plain_cmd_path(src)?;
     let dest = plain_cmd_path(dest)?;
     let exe = plain_cmd_path(exe)?;
@@ -259,8 +266,8 @@ pub fn stage_portable_swap(archive: &Path, work_dir: &Path, exe: &Path) -> Resul
         .file_name()
         .and_then(|s| s.to_str())
         .ok_or("not_installed_copy")?;
-    let root = portable_payload_root(&extract, exe_name)
-        .ok_or("update archive has no application")?;
+    let root =
+        portable_payload_root(&extract, exe_name).ok_or("update archive has no application")?;
     let dest = exe.parent().ok_or("not_installed_copy")?;
     let body = portable_apply_script(std::process::id(), &root, dest, exe)?;
     let script = work_dir.join("apply-portable.cmd");
@@ -345,8 +352,7 @@ pub fn swap_app_bundle(archive: &Path, work_dir: &Path) -> Result<(), String> {
             .is_ok_and(|s| s.success());
     if !placed {
         let _ = fs::remove_dir_all(&bundle);
-        fs::rename(&backup, &bundle)
-            .map_err(|e| format!("restore previous app failed: {e}"))?;
+        fs::rename(&backup, &bundle).map_err(|e| format!("restore previous app failed: {e}"))?;
         return Err("place new app failed; previous version restored".into());
     }
     let _ = fs::remove_dir_all(&backup);
@@ -375,10 +381,8 @@ mod tests {
 
     #[test]
     fn portable_dir_is_the_green_folder_not_a_loose_exe() {
-        let root = std::env::temp_dir().join(format!(
-            "atlasbuddy-portable-test-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("atlasbuddy-portable-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let exe = root.join("AtlasBuddy.exe");
@@ -403,10 +407,7 @@ mod tests {
 
     #[test]
     fn portable_zip_root_is_the_folder_that_holds_the_exe() {
-        let root = std::env::temp_dir().join(format!(
-            "atlasbuddy-zip-root-{}",
-            std::process::id()
-        ));
+        let root = std::env::temp_dir().join(format!("atlasbuddy-zip-root-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let inner = root.join("AtlasBuddy_0.2.43_x64-portable");
         std::fs::create_dir_all(&inner).unwrap();

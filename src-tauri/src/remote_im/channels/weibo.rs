@@ -89,7 +89,8 @@ async fn run_once(
                             sender_id: sender,
                             content: text.into(),
                             mentioned_bot: true,
-                            thread_id: None,                        }).await;
+                            thread_id: None,
+            media_refs: Vec::new(),                        }).await;
                     }
                     Some(Ok(Message::Close(_))) | None => return Ok(()),
                     Some(Ok(Message::Ping(p))) => { let _ = write.send(Message::Pong(p)).await; }

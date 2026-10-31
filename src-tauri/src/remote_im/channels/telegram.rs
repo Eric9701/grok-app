@@ -149,6 +149,7 @@ pub async fn run(
                     content: text,
                     mentioned_bot,
                     thread_id,
+                    media_refs: Vec::new(),
                 })
                 .await;
         }
@@ -251,6 +252,7 @@ fn callback_query_to_incoming(
             content: format!("__card_action__:{data}"),
             mentioned_bot: true,
             thread_id: telegram_thread_id(message),
+            media_refs: Vec::new(),
         },
         message_id,
     ))

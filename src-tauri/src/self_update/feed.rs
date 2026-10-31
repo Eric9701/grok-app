@@ -124,14 +124,18 @@ mod tests {
             feed_url_from_mirror("https://atlas.example.test/cli").as_deref(),
             Some("https://atlas.example.test/desktop/stable/update.json")
         );
-        assert_eq!(feed_url_from_mirror("http://cli.example.test/atlas/bin"), None);
+        assert_eq!(
+            feed_url_from_mirror("http://cli.example.test/atlas/bin"),
+            None
+        );
         assert_eq!(feed_url_from_mirror("ftp://cli.example.test/cli"), None);
         assert_eq!(feed_url_from_mirror(""), None);
     }
 
     #[test]
     fn payload_url_must_share_origin_and_dir() {
-        let ok = "http://cli.example.test:22255/atlas/desktop/stable/AtlasBuddy_1.0.0_x64-setup.exe";
+        let ok =
+            "http://cli.example.test:22255/atlas/desktop/stable/AtlasBuddy_1.0.0_x64-setup.exe";
         assert!(is_allowed_payload_url(FEED, ok));
         for bad in [
             "http://evil.example.test:22255/atlas/desktop/stable/a.exe",
@@ -154,7 +158,8 @@ mod tests {
     #[test]
     fn file_name_and_hash_checks() {
         assert_eq!(
-            payload_file_name("http://h/desktop/stable/AtlasBuddy_1.0.0_aarch64.app.tar.gz").as_deref(),
+            payload_file_name("http://h/desktop/stable/AtlasBuddy_1.0.0_aarch64.app.tar.gz")
+                .as_deref(),
             Some("AtlasBuddy_1.0.0_aarch64.app.tar.gz")
         );
         assert!(!is_safe_file_name("a..b"));

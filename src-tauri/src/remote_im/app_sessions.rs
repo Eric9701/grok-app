@@ -157,6 +157,7 @@ pub fn sync_turn_to_app(
     assistant_text: &str,
     is_error: bool,
     channel: &str,
+    attachments: &[crate::store::MessageAttachmentStored],
 ) -> ScopeBinding {
     let agent_id = binding
         .agent_session_id
@@ -223,14 +224,22 @@ pub fn sync_turn_to_app(
 
     // Journal: user + assistant rows (App UI reads messages.json)
     let now = Utc::now();
+    let mut user_content = format!("[Remote IM · {channel}]\n{user_prompt}");
+    let user_attachments = if attachments.is_empty() {
+        None
+    } else {
+        user_content =
+            crate::session_manager::append_journal_attachment_refs(user_content, attachments);
+        Some(attachments.to_vec())
+    };
     let user_msg = ChatMessageStored {
         id: uuid::Uuid::new_v4().to_string(),
         role: "user".into(),
-        content: format!("[Remote IM · {channel}]\n{user_prompt}"),
+        content: user_content,
         thought: None,
         created_at: now,
         is_error: false,
-        attachments: None,
+        attachments: user_attachments,
         marker: None,
     };
     let asst_msg = ChatMessageStored {

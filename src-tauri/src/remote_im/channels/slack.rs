@@ -188,6 +188,7 @@ fn parse_event(inst: &ChannelInstance, payload: &Value) -> Option<IncomingMessag
         sender_id,
         mentioned_bot: chat_type == "p2p" || text.contains("<@"),
         thread_id: None,
+        media_refs: Vec::new(),
         content: text,
     })
 }

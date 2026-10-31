@@ -32,6 +32,8 @@ mod turn;
 mod types;
 mod watchdog;
 
+pub(crate) use types::append_journal_attachment_refs;
+
 // Multi-session event routing (P0 shared-process load-replay safety).
 pub(crate) use stream::StreamEmitPayload;
 pub(crate) use stream::{

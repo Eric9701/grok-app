@@ -87,6 +87,7 @@ pub async fn run(
                                     content: body.into(),
                                     mentioned_bot: true,
                                     thread_id: None,
+                                    media_refs: Vec::new(),
                                 })
                                 .await;
                         }

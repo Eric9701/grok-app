@@ -22,10 +22,7 @@ pub fn device_event_name() -> &'static str {
 /// `http://host:22255/atlas/cli` → `http://host:22255/atlas`.
 pub fn atlas_auth_base_from_mirror(mirror: &str) -> String {
     let trimmed = mirror.trim().trim_end_matches('/');
-    trimmed
-        .strip_suffix("/cli")
-        .unwrap_or(trimmed)
-        .to_string()
+    trimmed.strip_suffix("/cli").unwrap_or(trimmed).to_string()
 }
 
 pub fn atlas_auth_base() -> String {
@@ -250,9 +247,13 @@ mod tests {
 
     #[test]
     fn approval_html() {
-        assert!(device_approval_result("<p class=\"ok\">Approved. You can return to the Atlas CLI.</p>").is_ok());
-        let err = device_approval_result("<p class=\"err\">machine code does not match your account</p>")
-            .unwrap_err();
+        assert!(device_approval_result(
+            "<p class=\"ok\">Approved. You can return to the Atlas CLI.</p>"
+        )
+        .is_ok());
+        let err =
+            device_approval_result("<p class=\"err\">machine code does not match your account</p>")
+                .unwrap_err();
         assert!(err.contains("does not match"));
     }
 }

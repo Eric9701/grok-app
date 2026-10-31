@@ -1826,7 +1826,7 @@ pub(super) fn grant_journal_attachment_paths(atts: &[MessageAttachmentStored]) {
 /// Preserves **internal** blank lines in the user body. Only a trailing run of
 /// blank lines at the end of the body (before the `@path` block) is normalized
 /// to a single separator empty line — mirrors FE `parseAttachmentsFromContent`.
-pub(super) fn append_journal_attachment_refs(
+pub(crate) fn append_journal_attachment_refs(
     content: String,
     atts: &[MessageAttachmentStored],
 ) -> String {

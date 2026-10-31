@@ -262,6 +262,7 @@ pub async fn run(
                         // A direct chat has no mention syntax.
                         mentioned_bot,
                         thread_id: None,
+                        media_refs: Vec::new(),
                     };
                     if tx.send(incoming).await.is_err() {
                         return Ok(());
