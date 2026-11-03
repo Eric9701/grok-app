@@ -1005,6 +1005,7 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
               >
                 <AgentRuntimeChip
                   sessionId={session.sessionId ?? null}
+                  projectPath={activeProject?.path ?? null}
                   busy={
                     session.state === "streaming" ||
                     session.state === "awaiting_permission"

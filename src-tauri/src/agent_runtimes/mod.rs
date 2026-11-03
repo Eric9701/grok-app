@@ -2,6 +2,7 @@
 //! Atlas and Cursor Agent are byte pipes. Claude Code is translated from
 //! stream-json. Config lives in `agent-runtimes.json`.
 
+mod claude_settings;
 mod translate;
 
 use std::cell::RefCell;
@@ -446,12 +447,16 @@ pub async fn spawn_acp_pipe(
     cwd: &Path,
     app_session_id: Option<&str>,
 ) -> Result<AcpPipe, String> {
-    let binary = resolve_binary(profile)?;
+    let mut profile = profile.clone();
+    if profile.kind == "claude" && profile.model.trim().is_empty() {
+        apply_claude_settings_model(&mut profile, cwd);
+    }
+    let binary = resolve_binary(&profile)?;
     let resume = app_session_id.and_then(cli_session_for);
     let args = match profile.kind.as_str() {
         "atlas" => atlas_stdio_args(&profile.model),
         "cursor" => cursor_acp_args(),
-        _ => stream_json_args(profile, resume.as_deref()),
+        _ => stream_json_args(&profile, resume.as_deref()),
     };
     let mut cmd = Command::new(&binary);
     cmd.args(&args);
@@ -651,6 +656,21 @@ async fn apply_effects(
     Ok(())
 }
 
+fn apply_claude_settings_model(profile: &mut RuntimeProfile, cwd: &Path) {
+    let dir = if profile.home.trim().is_empty() {
+        let Some(dir) = claude_settings::default_config_dir() else {
+            return;
+        };
+        dir
+    } else {
+        PathBuf::from(profile.home.trim())
+    };
+    let project = if cwd.is_dir() { Some(cwd) } else { None };
+    if let Some(model) = claude_settings::effective_model(&dir, project) {
+        profile.model = model;
+    }
+}
+
 #[tauri::command]
 pub fn agent_runtimes_get() -> AgentRuntimesFile {
     normalize(load())
@@ -666,6 +686,26 @@ pub fn agent_runtimes_save(file: AgentRuntimesFile) -> Result<AgentRuntimesFile,
 #[tauri::command]
 pub fn agent_runtimes_probe(kind: String) -> Vec<String> {
     probe_kind(&kind)
+}
+
+/// Model Claude Code would use when this profile's model box is empty.
+/// `home` is the profile home (`CLAUDE_CONFIG_DIR`); empty means `~/.claude`.
+#[tauri::command]
+pub fn agent_runtimes_claude_model(home: String, cwd: Option<String>) -> Option<String> {
+    let dir = {
+        let home = home.trim();
+        if home.is_empty() {
+            claude_settings::default_config_dir()?
+        } else {
+            PathBuf::from(home)
+        }
+    };
+    let project = cwd
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(Path::new);
+    claude_settings::effective_model(&dir, project)
 }
 
 #[tauri::command]

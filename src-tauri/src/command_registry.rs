@@ -63,6 +63,7 @@ pub fn app_invoke_handler(
         agent_runtimes::agent_runtimes_get,
         agent_runtimes::agent_runtimes_save,
         agent_runtimes::agent_runtimes_probe,
+        agent_runtimes::agent_runtimes_claude_model,
         agent_runtimes::agent_runtimes_set_session_binding,
         atlas_relay_agent::agent_runtimes_set_relay_binding,
         atlas_relay_agent::atlas_relay_agent_status,

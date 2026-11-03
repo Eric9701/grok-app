@@ -17,7 +17,7 @@
 - 桌面连接查 `sessionBindings`。有绑定就拉起该 profile 的 ACP 管道，现有会话管理器继续处理流式、权限、取消和本地记录。
 - 没有绑定的会话仍走原来的 Atlas 拉起（含手动 CLI 路径、数据模式、SSH / WSL）。
 - Claude 的续聊 id 记在绑定上，不写入会话元数据里的 Atlas 会话 id。Cursor 的 ACP 会话 id 写在这条聊天上，下一次发送和重连都用它。这条进程只服务一个会话，带 sessionId 的流式更新仍进入本会话。
-- 非 Atlas 的会话菜单里不提供 rewind 和 fork。模型芯片只显示该 profile 的模型，不打开官方模型目录。工作目录用当前聊天的文件夹；家目录只作为 CLI 配置目录。
+- 非 Atlas 的会话菜单里不提供 rewind 和 fork。模型芯片只显示该 profile 的模型，不打开官方模型目录。Claude 的模型文本框留空时，从 `CLAUDE_CONFIG_DIR/settings.json`（家目录空则是 `~/.claude/settings.json`）读取：`env.ANTHROPIC_MODEL` 优先，否则用 `model`。`opus` / `sonnet` / `haiku` 会按同文件里的 `ANTHROPIC_DEFAULT_*_MODEL` 展开。工作目录下的 `.claude/settings.json` 和 `settings.local.json` 覆盖用户配置。读到的 id 会在拉起时作为 `--model` 传给 Claude，芯片上显示同一个名字。文本框里写了模型则仍以文本框为准。Cursor 仍只看文本框。工作目录用当前聊天的文件夹；家目录只作为 CLI 配置目录。
 - SSH 文件夹上的已绑定会话会连接失败，并说明这条 CLI 只在本机运行。
 
 云端未绑定的中继仍直接拉起 `atlas agent --always-approve stdio`，并使用这条 Relay 上的模型。绑定到 Atlas profile 时同样用这条 Relay 的模型。绑定到其他 CLI 时用该 profile 自己的模型。看板仍按 `session/update` 折叠。

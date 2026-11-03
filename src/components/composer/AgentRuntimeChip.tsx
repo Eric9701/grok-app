@@ -50,25 +50,54 @@ export function useDraftRuntimeOverride(): string | undefined {
 
 export function AgentRuntimeChip({
   sessionId,
+  projectPath,
   busy,
   tr,
 }: {
   sessionId: string | null;
+  projectPath?: string | null;
   busy: boolean;
   tr: TFn;
 }) {
   const file = useAgentRuntimesFile();
   const draftPick = useDraftRuntimeOverride();
   const [pending, setPending] = useState<string | null>(null);
+  const [claudeModel, setClaudeModel] = useState("");
+
+  const current = !file
+    ? ""
+    : sessionId
+      ? file.sessionBindings.find((row) => row.sessionId === sessionId)?.profileId ??
+        ""
+      : resolveDraftProfileId(draftPick, file.desktopDefaultProfileId);
+  const currentProfile = file?.profiles.find((profile) => profile.id === current);
+  const claudeFollowsSettings =
+    currentProfile?.kind === "claude" && !currentProfile.model.trim();
+  const claudeHome = claudeFollowsSettings ? (currentProfile?.home ?? "") : null;
+
+  useEffect(() => {
+    if (claudeHome === null || !api.isDesktopHost()) {
+      setClaudeModel("");
+      return;
+    }
+    let stop = false;
+    void api
+      .agentRuntimesClaudeModel(claudeHome, projectPath)
+      .then((model) => {
+        if (!stop) setClaudeModel(model ?? "");
+      })
+      .catch(() => {
+        if (!stop) setClaudeModel("");
+      });
+    return () => {
+      stop = true;
+    };
+  }, [claudeHome, projectPath]);
 
   if (!file || file.profiles.length === 0) return null;
 
-  const current = sessionId
-    ? file.sessionBindings.find((row) => row.sessionId === sessionId)?.profileId ??
-      ""
-    : resolveDraftProfileId(draftPick, file.desktopDefaultProfileId);
-  const currentProfile = file.profiles.find((profile) => profile.id === current);
   const foreign = !!currentProfile && currentProfile.kind !== "atlas";
+  const shownModel = currentProfile?.model.trim() || claudeModel;
   const options: SelectOption[] = [
     { value: "", label: tr("composer.runtimeLegacy") },
     ...file.profiles
@@ -104,9 +133,9 @@ export function AgentRuntimeChip({
           setPending(next);
         }}
       />
-      {foreign && currentProfile?.model ? (
+      {foreign && shownModel ? (
         <span className="composer__context-label" title={tr("composer.runtimeModel")}>
-          {currentProfile.model}
+          {shownModel}
         </span>
       ) : null}
       <GlassModal

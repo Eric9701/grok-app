@@ -70,6 +70,20 @@ export async function agentRuntimesProbe(kind: string): Promise<string[]> {
   return invoke<string[]>("agent_runtimes_probe", { kind });
 }
 
+/** Model Claude would use when the profile model box is empty. */
+export async function agentRuntimesClaudeModel(
+  home: string,
+  cwd?: string | null,
+): Promise<string | null> {
+  if (!isDesktopHost()) return null;
+  const model = await invoke<string | null>("agent_runtimes_claude_model", {
+    home,
+    cwd: cwd ?? null,
+  });
+  const trimmed = model?.trim() ?? "";
+  return trimmed || null;
+}
+
 export async function agentRuntimesSetSessionBinding(
   sessionId: string,
   profileId: string,
