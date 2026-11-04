@@ -61,6 +61,8 @@ mod cc_switch_import;
 
 mod cli_install;
 
+mod cli_install_config;
+
 mod cli_probe;
 
 mod cli_sessions;

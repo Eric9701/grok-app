@@ -1330,7 +1330,11 @@ pub async fn prepare_agent_prompt_for_main_detailed(
         let paths = batch.clone();
         let question = {
             let q = stripped.trim();
-            if q.is_empty() { None } else { Some(q) }
+            if q.is_empty() {
+                None
+            } else {
+                Some(q)
+            }
         };
         match crate::official_aux::vision_describe_async(&paths, question, progress).await {
             Ok(text) => {

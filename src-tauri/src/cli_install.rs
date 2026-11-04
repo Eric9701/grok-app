@@ -869,6 +869,12 @@ pub async fn install_cli_latest(
 
     let linked = link_install(&tmp_path, &version)?;
     let _ = fs::remove_file(tmp_path.with_extension("sha256"));
+    if let Err(e) = crate::cli_install_config::persist_installer_configs(&mirror_used) {
+        return Err(format!(
+            "Atlas CLI binary is installed at {}, but config.toml was not updated: {e}",
+            linked.display()
+        ));
+    }
     let probe = cli_probe::probe_cli(Some(linked.to_string_lossy().as_ref()));
     let path = probe.path.or_else(|| Some(linked.display().to_string()));
     let version_out = probe.version.or(Some(ver_line));

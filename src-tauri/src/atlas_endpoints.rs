@@ -1,8 +1,9 @@
 //! Read-only view of `[endpoints]` in the shared Atlas CLI home.
 //!
-//! Settings shows this block from `~/.atlas/config.toml`. The host never
-//! rewrites that file. Only this table is returned — model keys and other
-//! sections stay on disk.
+//! Settings shows this block from `~/.atlas/config.toml` and does not edit it.
+//! The only host write of this file is the App-managed CLI install, which
+//! upserts `[cli] installer` and the three install-script endpoint URLs
+//! (`cli_install_config`). This reader still returns only `[endpoints]`.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};

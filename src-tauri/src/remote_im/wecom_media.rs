@@ -62,9 +62,7 @@ fn wecom_cos_host(host: &str) -> bool {
 }
 
 fn dns_label(value: &str) -> bool {
-    value
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '-')
+    value.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
         && !value.starts_with('-')
         && !value.ends_with('-')
 }
@@ -409,7 +407,9 @@ mod tests {
         assert!(!media_url_allowed(
             "https://other-bucket.cos.ap-guangzhou.myqcloud.com/file"
         ));
-        assert!(!media_url_allowed("https://ww-aibot-img.evil.myqcloud.com/file"));
+        assert!(!media_url_allowed(
+            "https://ww-aibot-img.evil.myqcloud.com/file"
+        ));
         assert_eq!(
             media_host("https://wwcdn.weixin.qq.com/a?q=1"),
             "wwcdn.weixin.qq.com"

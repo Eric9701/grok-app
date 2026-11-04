@@ -34,7 +34,9 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 自定义中转仍写 App `agent-home/config.toml`，spawn 时 `GROK_HOME` 指过去（#557 行为不变）。
 
-例外：设置里的 **从 CC Switch 导入** 会把自定义 `[model.<id>]` 合并进共享 `~/.atlas/config.toml`，供终端 `atlas` 按段 id 选用。不改 `[models].default`，不覆盖 `api_key = "ENC(...)"` 或 `hidden = true` 的企业段，也不导入 Grok Official。其它写入仍禁止改 shared CLI home。
+例外：设置里的 **从 CC Switch 导入** 会把自定义 `[model.<id>]` 合并进共享 `~/.atlas/config.toml`，供终端 `atlas` 按段 id 选用。不改 `[models].default`，不覆盖 `api_key = "ENC(...)"` 或 `hidden = true` 的企业段，也不导入 Grok Official。
+
+例外：应用代装 CLI 成功后，按安装脚本把 `[cli] installer = "internal"` 和 `[endpoints]` 的 `login_base_url`、`cli_chat_proxy_base_url`、`cli_update_base_url` upsert 进共享 `~/.atlas/config.toml`，并同步到 App `agent-home/config.toml`。只替换这几项；stable 安装会去掉已有的 `[cli] channel`。不整文件重写，不动 `[model.*]` 和其它密钥。其它写入仍禁止改 shared CLI home。
 
 ## 远程更新
 
@@ -85,7 +87,7 @@ Release 门禁认 `src-tauri/tauri.conf.json` 的 `productName`，也就是 **At
 
 新设置必须登记 `settingsCatalog`：`runtime.atlasCliMirror`（Runtime → CLI）。
 
-设置 → CLI / 运行时 → CLI 只读展示共享 `~/.atlas/config.toml` 的 `[endpoints]`（`cli_chat_proxy_base_url`、`cli_update_base_url`，以及同表里其它纯文本项）。不改写该文件，不下发其它表里的密钥。登记：`runtime.atlasEndpoints`。
+设置 → CLI / 运行时 → CLI 只读展示共享 `~/.atlas/config.toml` 的 `[endpoints]`（`cli_chat_proxy_base_url`、`cli_update_base_url`，以及同表里其它纯文本项）。设置页不改写该文件，不下发其它表里的密钥。这三项 URL 只在应用代装 CLI 时写入（见上面的家目录例外），并同时写入 `agent-home/config.toml`。登记：`runtime.atlasEndpoints`。
 
 ## 模型列表
 

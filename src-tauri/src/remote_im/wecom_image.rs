@@ -44,7 +44,11 @@ enum Phase {
     Reply,
 }
 
-pub fn image_paths_in_reply(text: &str, exclude: &[String], work_dir: Option<&Path>) -> Vec<String> {
+pub fn image_paths_in_reply(
+    text: &str,
+    exclude: &[String],
+    work_dir: Option<&Path>,
+) -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
     let lower = text.to_ascii_lowercase();
     let bytes = text.as_bytes();
@@ -59,10 +63,7 @@ pub fn image_paths_in_reply(text: &str, exclude: &[String], work_dir: Option<&Pa
             break;
         };
         let end = i + rel.0 + rel.1;
-        let boundary = text[end..]
-            .chars()
-            .next()
-            .is_none_or(|c| !is_path_char(c));
+        let boundary = text[end..].chars().next().is_none_or(|c| !is_path_char(c));
         if boundary {
             if let Some(start) = path_start(text, end) {
                 let raw = text[start..end].trim();
@@ -116,7 +117,11 @@ pub fn plan_image_file(path: &Path) -> Result<ImageUploadPlan, String> {
     plan_image_bytes(name, &bytes)
 }
 
-pub fn begin_upload(callback_req_id: &str, plan: ImageUploadPlan, req_id: &str) -> (UploadMachine, Value) {
+pub fn begin_upload(
+    callback_req_id: &str,
+    plan: ImageUploadPlan,
+    req_id: &str,
+) -> (UploadMachine, Value) {
     let frame = json!({
         "cmd": "aibot_upload_media_init",
         "headers": { "req_id": req_id },
@@ -222,7 +227,25 @@ impl UploadMachine {
 }
 
 fn is_path_char(c: char) -> bool {
-    !c.is_whitespace() && !matches!(c, '`' | '"' | '\'' | '<' | '>' | '|' | '*' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';')
+    !c.is_whitespace()
+        && !matches!(
+            c,
+            '`' | '"'
+                | '\''
+                | '<'
+                | '>'
+                | '|'
+                | '*'
+                | '?'
+                | '('
+                | ')'
+                | '['
+                | ']'
+                | '{'
+                | '}'
+                | ','
+                | ';'
+        )
 }
 
 fn path_start(text: &str, end: usize) -> Option<usize> {
@@ -303,20 +326,22 @@ mod tests {
         let found = image_paths_in_reply(text, &["E:/work/in.gif".into()], None);
         assert_eq!(
             found,
-            vec![
-                "E:\\work\\out.png".to_string(),
-                "/tmp/pic.jpeg".to_string()
-            ]
+            vec!["E:\\work\\out.png".to_string(), "/tmp/pic.jpeg".to_string()]
         );
     }
 
     #[test]
     fn markdown_relative_images_resolve_under_the_work_dir() {
-        let text = "![近7天](model-usage-7d.png)\n![入口](model-usage-entry.png)\n`model-usage-30d.png`";
+        let text =
+            "![近7天](model-usage-7d.png)\n![入口](model-usage-entry.png)\n`model-usage-30d.png`";
         let found = image_paths_in_reply(text, &[], Some(Path::new("E:/work/atlas-work")));
         assert_eq!(found.len(), 3);
-        assert!(found[0].replace('\\', "/").ends_with("E:/work/atlas-work/model-usage-7d.png"));
-        assert!(found[1].replace('\\', "/").ends_with("model-usage-entry.png"));
+        assert!(found[0]
+            .replace('\\', "/")
+            .ends_with("E:/work/atlas-work/model-usage-7d.png"));
+        assert!(found[1]
+            .replace('\\', "/")
+            .ends_with("model-usage-entry.png"));
         assert!(found[2].replace('\\', "/").ends_with("model-usage-30d.png"));
         assert!(image_paths_in_reply(text, &[], None).is_empty());
     }

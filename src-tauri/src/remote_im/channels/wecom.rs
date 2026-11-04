@@ -82,7 +82,11 @@ fn enqueue_wecom_ws_reply(instance_id: &str, req_id: &str, text: &str) -> Result
     .map_err(|_| "wecom ws: reply queue unavailable".to_string())
 }
 
-pub async fn send_image(instance_id: &str, callback_req_id: &str, path: &std::path::Path) -> Result<(), String> {
+pub async fn send_image(
+    instance_id: &str,
+    callback_req_id: &str,
+    path: &std::path::Path,
+) -> Result<(), String> {
     let callback_req_id = callback_req_id.trim();
     if callback_req_id.is_empty() {
         return Err("wecom image: no reply target".into());
@@ -236,10 +240,7 @@ where
     let req_id = format!("img_init_{}", uuid::Uuid::new_v4().simple());
     let (machine, frame) = super::super::wecom_image::begin_upload(&callback_req_id, plan, &req_id);
     tracing::info!(req_id = %req_id, "wecom image: upload init");
-    if let Err(error) = write
-        .send(Message::Text(frame.to_string().into()))
-        .await
-    {
+    if let Err(error) = write.send(Message::Text(frame.to_string().into())).await {
         let message = format!("wecom ws: image send failed: {error}");
         let _ = done.send(Err(message.clone()));
         return Err(message);
@@ -1423,11 +1424,8 @@ mod tests {
         assert_eq!(project.content, "/p");
         let pick = parse_ws_msg(&sample_inst(), &frame("@Eric-test 2", "group")).unwrap();
         assert_eq!(pick.content, "2");
-        let status = parse_ws_msg(
-            &sample_inst(),
-            &frame("@Eric-test @同事 /status", "group"),
-        )
-        .unwrap();
+        let status =
+            parse_ws_msg(&sample_inst(), &frame("@Eric-test @同事 /status", "group")).unwrap();
         assert_eq!(status.content, "/status");
         let path = parse_ws_msg(
             &sample_inst(),
