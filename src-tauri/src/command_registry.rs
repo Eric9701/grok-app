@@ -4,10 +4,10 @@
 //! new `// ── Domain ──` section rather than appending at a random spot.
 
 use crate::{
-    atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub, launch_chrome, leader,
-    mirror, os_theme, pet_quick, pet_window, pr_monitor, remote_im, self_update, serve,
-    session_api, ssh_remote, system_fonts, theme_editor_window, tray, updater, voice_host,
-    wallpaper_grok_album, wallpaper_remote_commands, window_min,
+    atlas_endpoints, atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub,
+    launch_chrome, leader, mirror, os_theme, pet_quick, pet_window, pr_monitor, remote_im,
+    self_update, serve, session_api, ssh_remote, system_fonts, theme_editor_window, tray, updater,
+    voice_host, wallpaper_grok_album, wallpaper_remote_commands, window_min,
 };
 
 /// Single invoke handler consumed by `Builder::invoke_handler` in `run()`.
@@ -159,6 +159,7 @@ pub fn app_invoke_handler(
         commands::memory_list,
         commands::memory_delete_file,
         commands::agent_config_toml_read,
+        atlas_endpoints::atlas_endpoints_read,
         commands::memory_search,
         commands::memory_embed_config_get,
         commands::memory_embed_config_set,

@@ -72,7 +72,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 |----|------|------|
 | 管理 Skills/MCP/Plugins/Hooks/Agents + 插件页内目录 | **扩展** | 可写开关、安装、移除；无独立市场 Tab |
 | 只读 project inspect 摘要 | **运行时 · 诊断** | 保留；文案链到扩展 |
-| CLI 路径 / **Atlas CLI 安装基址** (`runtime.atlasCliMirror`) / ACP / 进程池 / Doctor / Managed setup / Privacy center | **运行时** | 不进扩展 |
+| CLI 路径 / **Atlas CLI 安装基址** (`runtime.atlasCliMirror`) / **CLI 端点** (`runtime.atlasEndpoints`，只读 `~/.atlas/config.toml` 的 `[endpoints]`) / ACP / 进程池 / Doctor / Managed setup / Privacy center | **运行时** | 不进扩展 |
 | Atlas Relay 执行端 + 云端站点 URL | **Atlas** | `atlas.relayAgent` / `atlas.relayAgentHealth` / `atlas.cloudSite`；CLI 安装基址仍在运行时 |
 | 本机会话列表 + 按 id 续跑（#626 第一刀） | **运行时 · 连接** | `runtime.sessionApi`；见 [session-api.md](./session-api.md) |
 

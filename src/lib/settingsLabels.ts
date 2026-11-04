@@ -48,6 +48,8 @@ export const SETTINGS_LABEL_KEYS = [
   "settings.atlasCliMirror",
   "settings.atlasCliMirrorDesc",
   "settings.atlasCliMirrorPlaceholder",
+  "settings.atlasEndpoints",
+  "settings.atlasEndpointsDesc",
   "settings.cliNotFound",
   "settings.permissionDeep",
   "settings.permissionDeepDesc",

@@ -36,6 +36,7 @@ import { AcpServerField } from "./AcpServerField";
 import { WslBackendField } from "./WslBackendField";
 import { SshHostsPanel } from "./SshHostsPanel";
 import { AtlasCliMirrorField } from "./AtlasCliMirrorField";
+import { AtlasEndpointsCard } from "./AtlasEndpointsCard";
 import { detectAppPlatform } from "@/lib/appPlatform";
 import { resolveLocale, type MessageKey } from "@/i18n";
 import {
@@ -244,6 +245,7 @@ export function RuntimeSection() {
                   />
                 ) : null}
                 <AtlasCliMirrorField t={t} rowHighlight={rowHighlight} />
+                <AtlasEndpointsCard t={t} rowHighlight={rowHighlight} />
                 {detectAppPlatform() === "win" ? (
                   <div
                     className={

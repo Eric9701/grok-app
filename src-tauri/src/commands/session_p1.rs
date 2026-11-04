@@ -10,7 +10,11 @@ fn windows_grok_go_config_candidates() -> Option<Vec<String>> {
             out.push(format!(r"{local}\com.grokgo.desktop\config.json"));
             out.push(format!(r"{local}\GrokGo\config.json"));
         }
-        if out.is_empty() { None } else { Some(out) }
+        if out.is_empty() {
+            None
+        } else {
+            Some(out)
+        }
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -403,16 +407,22 @@ pub async fn acp_server_probe(
 /// `allowUnverifiedCliInstall`. Missing published checksums are allowed by
 /// default; this flag (or env) only overrides `GROK_CLI_REQUIRE_CHECKSUM`.
 /// Checksum **mismatch** always aborts.
+/// `mirror`: optional install base. When set, this download uses only that URL.
 #[tauri::command]
 pub async fn cli_install_latest(
     app: tauri::AppHandle,
     allow_unverified: Option<bool>,
+    mirror: Option<String>,
 ) -> Result<crate::cli_install::CliInstallResult, String> {
     let allow = match allow_unverified {
         Some(v) => v,
-        None => store::load_settings_async().await.allow_unverified_cli_install,
+        None => {
+            store::load_settings_async()
+                .await
+                .allow_unverified_cli_install
+        }
     };
-    let result = crate::cli_install::install_cli_latest(app, allow).await?;
+    let result = crate::cli_install::install_cli_latest(app, allow, mirror).await?;
     // Remember last install verification for Doctor.
     let mut s = store::load_settings_async().await;
     s.last_cli_checksum_verified = result.checksum_verified;
@@ -422,8 +432,8 @@ pub async fn cli_install_latest(
 
 /// Platform install command + docs URL for manual fallback.
 #[tauri::command]
-pub async fn cli_install_commands() -> Result<serde_json::Value, String> {
-    Ok(crate::cli_install::install_commands())
+pub async fn cli_install_commands(mirror: Option<String>) -> Result<serde_json::Value, String> {
+    crate::cli_install::install_commands(mirror.as_deref())
 }
 
 /// Native file picker for a Grok Build binary (manual path).
@@ -541,11 +551,7 @@ pub async fn project_add(path: String, trust: bool) -> Result<Project, String> {
 }
 
 #[tauri::command]
-pub async fn project_add_ssh(
-    alias: String,
-    path: String,
-    trust: bool,
-) -> Result<Project, String> {
+pub async fn project_add_ssh(alias: String, path: String, trust: bool) -> Result<Project, String> {
     store::add_ssh_project(&alias, path, trust)
 }
 
@@ -1169,12 +1175,8 @@ pub async fn session_set_system_prompt_override(
     system_prompt_override: Option<String>,
 ) -> Result<SessionMeta, String> {
     let meta = store::set_session_system_prompt_override(&id, system_prompt_override)?;
-    mgr.invalidate_spawn_flags_for_session(
-        &app,
-        &meta.id,
-        "session_system_prompt_override",
-    )
-    .await;
+    mgr.invalidate_spawn_flags_for_session(&app, &meta.id, "session_system_prompt_override")
+        .await;
     Ok(meta)
 }
 

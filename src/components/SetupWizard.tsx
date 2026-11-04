@@ -6,7 +6,7 @@
  * Errors are classified via pure `setupGatePro` helpers — never invent success.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GrokLogo } from "@/components/GrokLogo";
 import { MachineCodeLoginForm } from "@/components/MachineCodeLoginForm";
 import { Select } from "@/components/Select";
@@ -18,6 +18,13 @@ import {
 import * as api from "@/lib/api";
 import type { createT } from "@/i18n";
 import type { MessageKey } from "@/i18n";
+import {
+  classifyAtlasCliMirror,
+  formatAtlasCliInstallCommand,
+  isAtlasCliMirrorChoice,
+  resolveAtlasCliMirror,
+  type AtlasCliMirrorChoice,
+} from "@/lib/atlasCliMirror";
 import {
   buildAuthDeferredFlags,
   buildReadyChecklist,
@@ -82,6 +89,11 @@ export function SetupWizard({
   const [installCmds, setInstallCmds] = useState<api.CliInstallCommands | null>(
     null,
   );
+  const [mirrorChoice, setMirrorChoice] =
+    useState<AtlasCliMirrorChoice>("intranet");
+  const [customMirror, setCustomMirror] = useState("");
+  const [mirrorReady, setMirrorReady] = useState(false);
+  const mirrorTouched = useRef(false);
   const [copied, setCopied] = useState(false);
   const [accountPanel, setAccountPanel] = useState<AccountPanel>("menu");
   const [accountBusy, setAccountBusy] = useState(false);
@@ -125,7 +137,34 @@ export function SetupWizard({
   );
 
   useEffect(() => {
-    void api.cliInstallCommands().then(setInstallCmds).catch(() => null);
+    let cancelled = false;
+    void (async () => {
+      let saved = "";
+      try {
+        if (api.isTauri()) {
+          const s = await api.settingsGet();
+          saved = s.atlasCliMirror?.trim() || "";
+        }
+      } catch {
+        /* settings may be unread on a fresh profile */
+      }
+      try {
+        const cmds = await api.cliInstallCommands();
+        if (!cancelled) setInstallCmds(cmds);
+        if (!saved) saved = cmds.docsUrl?.trim() || "";
+      } catch {
+        /* copy command falls back to the in-memory choice */
+      }
+      if (!cancelled && !mirrorTouched.current) {
+        const next = classifyAtlasCliMirror(saved);
+        setMirrorChoice(next.choice);
+        setCustomMirror(next.custom);
+      }
+      if (!cancelled) setMirrorReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Live install progress from Host
@@ -184,9 +223,38 @@ export function SetupWizard({
     void recheck();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const selectedMirror = useMemo(
+    () => resolveAtlasCliMirror(mirrorChoice, customMirror),
+    [mirrorChoice, customMirror],
+  );
+  const installCmdPreview = selectedMirror
+    ? formatAtlasCliInstallCommand(selectedMirror, platform)
+    : null;
+  const mirrorOptions = useMemo(
+    () => [
+      { value: "intranet", label: tr("setup.cliMirror.intranet") },
+      { value: "public", label: tr("setup.cliMirror.public") },
+      { value: "custom", label: tr("setup.cliMirror.custom") },
+    ],
+    [tr],
+  );
+
+  const persistSelectedMirror = useCallback(async (base: string) => {
+    if (!api.isTauri()) return;
+    const s = await api.settingsGet();
+    const current = (s.atlasCliMirror ?? "").trim().replace(/\/+$/, "");
+    if (current === base) return;
+    await api.settingsSet({ ...s, atlasCliMirror: base });
+  }, []);
+
   const runInstall = useCallback(
     async (opts?: { allowUnverified?: boolean }) => {
-      if (installing) return;
+      if (installing || !mirrorReady) return;
+      const base = resolveAtlasCliMirror(mirrorChoice, customMirror);
+      if (!base) {
+        reportError(tr("setup.cliMirror.invalid"));
+        return;
+      }
       setInstalling(true);
       clearError();
       setProgress({
@@ -195,9 +263,11 @@ export function SetupWizard({
         percent: 0,
       });
       try {
-        const res = await api.cliInstallLatest(
-          opts?.allowUnverified ? { allowUnverified: true } : undefined,
-        );
+        await persistSelectedMirror(base);
+        const res = await api.cliInstallLatest({
+          ...(opts?.allowUnverified ? { allowUnverified: true } : {}),
+          mirror: base,
+        });
         if (!res.ok) {
           reportError(res.message || tr("setup.error"));
           return;
@@ -230,7 +300,7 @@ export function SetupWizard({
         setInstalling(false);
       }
     },
-    [clearError, installing, recheck, reportError, tr],
+    [clearError, customMirror, installing, mirrorChoice, mirrorReady, persistSelectedMirror, recheck, reportError, tr],
   );
 
   const checksumMissing = !!errorView?.offerUnverifiedInstall;
@@ -264,21 +334,27 @@ export function SetupWizard({
   }, [clearError, recheck, reportError, tr]);
 
   const copyCmd = useCallback(async () => {
-    const cmd = installCmds?.primary;
-    if (!cmd) return;
+    const base = resolveAtlasCliMirror(mirrorChoice, customMirror);
+    if (!base || !mirrorReady) return;
+    const cmd = formatAtlasCliInstallCommand(base, platform);
     try {
+      await persistSelectedMirror(base);
       await navigator.clipboard.writeText(cmd);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      reportError(tr("setup.error"));
+    } catch (e) {
+      reportError(e);
     }
-  }, [installCmds, reportError, tr]);
+  }, [customMirror, mirrorChoice, mirrorReady, persistSelectedMirror, platform, reportError]);
 
   const openDocs = useCallback(() => {
-    const url = installCmds?.docsUrl || "https://docs.x.ai/build/overview";
+    if (!mirrorReady) return;
+    const url =
+      resolveAtlasCliMirror(mirrorChoice, customMirror) ||
+      installCmds?.docsUrl ||
+      "https://docs.x.ai/build/overview";
     void api.openExternalUrl(url).catch((e) => reportError(e));
-  }, [installCmds, reportError]);
+  }, [customMirror, installCmds, mirrorChoice, mirrorReady, reportError]);
 
   const finishWizard = useCallback(
     async (opts: { authDeferred: boolean; authOk: boolean }) => {
@@ -600,6 +676,46 @@ export function SetupWizard({
                 <p className="setup-hint">{tr("setup.manualHint")}</p>
               )}
 
+              {!cli.found && (
+                <div className="setup-mirror">
+                  <label className="setup-field">
+                    <span className="setup-field__label">
+                      {tr("setup.cliMirror")}
+                    </span>
+                    <Select
+                      value={mirrorChoice}
+                      options={mirrorOptions}
+                      onChange={(v) => {
+                        if (!isAtlasCliMirrorChoice(v)) return;
+                        mirrorTouched.current = true;
+                        setMirrorChoice(v);
+                      }}
+                      disabled={installing || probing || !mirrorReady}
+                      aria-label={tr("setup.cliMirror")}
+                    />
+                  </label>
+                  {mirrorChoice === "custom" && (
+                    <input
+                      className="setup-input"
+                      value={customMirror}
+                      placeholder={tr("setup.cliMirror.placeholder")}
+                      disabled={installing}
+                      spellCheck={false}
+                      aria-label={tr("setup.cliMirror.custom")}
+                      onChange={(e) => {
+                        mirrorTouched.current = true;
+                        setCustomMirror(e.target.value);
+                      }}
+                    />
+                  )}
+                  {mirrorReady && selectedMirror ? (
+                    <p className="setup-mono">{selectedMirror}</p>
+                  ) : mirrorReady ? (
+                    <p className="setup-hint">{tr("setup.cliMirror.invalid")}</p>
+                  ) : null}
+                </div>
+              )}
+
               <div className="setup-actions">
                 {cli.found ? (
                   <button
@@ -613,7 +729,7 @@ export function SetupWizard({
                   <button
                     type="button"
                     className="btn btn--primary setup-btn-primary"
-                    disabled={installing || probing}
+                    disabled={installing || probing || !mirrorReady || !selectedMirror}
                     onClick={() => void runInstall()}
                   >
                     {installing ? (
@@ -630,7 +746,7 @@ export function SetupWizard({
                   <button
                     type="button"
                     className="btn btn--primary setup-btn-primary"
-                    disabled={probing}
+                    disabled={probing || !mirrorReady || !selectedMirror}
                     onClick={() => void runInstall({ allowUnverified: true })}
                   >
                     {tr("setup.installUnverified")}
@@ -659,7 +775,7 @@ export function SetupWizard({
                   <button
                     type="button"
                     className="btn btn--ghost"
-                    disabled={!installCmds?.primary}
+                    disabled={!mirrorReady || !installCmdPreview}
                     onClick={() => void copyCmd()}
                   >
                     {copied ? tr("setup.copied") : tr("setup.copyCmd")}
@@ -667,13 +783,14 @@ export function SetupWizard({
                   <button
                     type="button"
                     className="btn btn--ghost"
+                    disabled={!mirrorReady}
                     onClick={openDocs}
                   >
                     {tr("setup.openDocs")}
                   </button>
                 </div>
-                {installCmds?.primary && (
-                  <code className="setup-cmd">{installCmds.primary}</code>
+                {mirrorReady && installCmdPreview && (
+                  <code className="setup-cmd">{installCmdPreview}</code>
                 )}
               </div>
             </>

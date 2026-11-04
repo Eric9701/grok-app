@@ -463,14 +463,19 @@ export interface CliInstallCommands {
  */
 export async function cliInstallLatest(opts?: {
   allowUnverified?: boolean | null;
+  /** Explicit install base. Omitted keeps env → settings → built-in default. */
+  mirror?: string | null;
 }) {
   return invoke<CliInstallResult>("cli_install_latest", {
     allowUnverified: opts?.allowUnverified ?? null,
+    mirror: opts?.mirror ?? null,
   });
 }
 
-export async function cliInstallCommands() {
-  return invoke<CliInstallCommands>("cli_install_commands");
+export async function cliInstallCommands(mirror?: string | null) {
+  return invoke<CliInstallCommands>("cli_install_commands", {
+    mirror: mirror ?? null,
+  });
 }
 
 export async function pickCliBinary() {

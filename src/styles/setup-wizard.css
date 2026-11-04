@@ -282,6 +282,21 @@
   color: var(--text-tertiary);
 }
 
+.setup-mirror {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-mirror .c-select,
+.setup-mirror .c-select__trigger {
+  width: 100%;
+}
+
+.setup-mirror .c-select__trigger {
+  justify-content: space-between;
+}
+
 .setup-actions {
   display: flex;
   flex-direction: column;

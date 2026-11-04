@@ -373,3 +373,22 @@ export async function sessionApiRevealCliLink(): Promise<string> {
   return invoke<string>("session_api_reveal_cli_link");
 }
 
+/** One scalar from `~/.atlas/config.toml` `[endpoints]`. */
+export type AtlasEndpointEntry = {
+  key: string;
+  value: string;
+};
+
+/** Read-only `[endpoints]` snapshot. Secrets in other tables are not returned. */
+export type AtlasEndpointsSnapshot = {
+  path: string;
+  exists: boolean;
+  entries: AtlasEndpointEntry[];
+  truncated: boolean;
+  error: string | null;
+};
+
+export async function atlasEndpointsRead(): Promise<AtlasEndpointsSnapshot> {
+  return invoke<AtlasEndpointsSnapshot>("atlas_endpoints_read");
+}
+

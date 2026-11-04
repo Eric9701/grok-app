@@ -1,9 +1,11 @@
 //! Install / update Atlas CLI from the enterprise `/atlas/cli` channel.
 //!
-//! Mirror resolution (first non-empty wins):
+//! Mirror resolution (first non-empty wins), when the caller does not pass one:
 //! 1. `ATLAS_CLI_MIRROR`
 //! 2. Settings `atlasCliMirror`
 //! 3. Built-in enterprise default
+//!
+//! An explicit mirror (setup wizard choice) replaces that chain for one install.
 //!
 //! Trust chain:
 //! - URL must be under the resolved mirror base (`http` allowed for intranet)
@@ -54,6 +56,30 @@ fn mirror_bases() -> Vec<String> {
     vec![resolve_cli_mirror()]
 }
 
+/// Trim, drop a trailing slash, require http(s), reject userinfo and `..`.
+pub fn normalize_cli_mirror(raw: &str) -> Result<String, String> {
+    let t = raw.trim().trim_end_matches('/').to_string();
+    if t.is_empty() {
+        return Err("empty Atlas CLI mirror".into());
+    }
+    if t.contains('@') || t.contains("..") || t.chars().any(char::is_whitespace) {
+        return Err("invalid Atlas CLI mirror".into());
+    }
+    if !(t.starts_with("https://") || t.starts_with("http://")) {
+        return Err("Atlas CLI mirror must be http or https".into());
+    }
+    Ok(t)
+}
+
+/// Bases for one install. A non-empty explicit mirror is the only base;
+/// otherwise env → settings → built-in default.
+pub fn install_bases(mirror: Option<&str>) -> Result<Vec<String>, String> {
+    match mirror.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(raw) => Ok(vec![normalize_cli_mirror(raw)?]),
+        None => Ok(mirror_bases()),
+    }
+}
+
 const CHANNEL: &str = "stable";
 const MIRROR_ATTEMPTS: u32 = 2;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
@@ -92,12 +118,8 @@ pub struct CliInstallResult {
     pub checksum_verified: Option<bool>,
 }
 
-/// True for URLs under a resolved Atlas CLI mirror base (`http` or `https`).
-pub fn is_allowed_download_url(url: &str) -> bool {
-    is_allowed_download_url_against(url, &mirror_bases())
-}
-
-/// Test helper: allowlist against an explicit base list (no settings/env).
+/// True when `url` is `http`/`https` and stays under one of `bases`.
+/// Rejects userinfo and `..`. Used for version, download, and checksum fetches.
 pub fn is_allowed_download_url_against(url: &str, bases: &[String]) -> bool {
     let url = url.trim();
     if url.contains('@') || url.contains("..") {
@@ -172,6 +194,7 @@ async fn fetch_published_checksum(
     version: &str,
     platform: &str,
     artifact_name: &str,
+    allowed: &[String],
 ) -> Option<String> {
     let base = mirror.trim_end_matches('/');
     // Common sidecar layouts; none are published today, but we fail closed on mismatch
@@ -185,7 +208,7 @@ async fn fetch_published_checksum(
         format!("{base}/{version}/SHA256SUMS"),
     ];
     for url in candidates {
-        if !is_allowed_download_url(&url) {
+        if !is_allowed_download_url_against(&url, allowed) {
             continue;
         }
         match client.get(&url).send().await {
@@ -265,9 +288,13 @@ fn mirror_host(base: &str) -> String {
         .to_string()
 }
 
-async fn fetch_version_text(client: &reqwest::Client, base: &str) -> Result<String, String> {
+async fn fetch_version_text(
+    client: &reqwest::Client,
+    base: &str,
+    allowed: &[String],
+) -> Result<String, String> {
     let url = format!("{}/{CHANNEL}", base.trim_end_matches('/'));
-    if !is_allowed_download_url(&url) {
+    if !is_allowed_download_url_against(&url, allowed) {
         return Err(format!("version URL not on allowlist: {url}"));
     }
     let resp = client
@@ -301,6 +328,7 @@ async fn fetch_version_text(client: &reqwest::Client, base: &str) -> Result<Stri
 async fn resolve_version(
     app: &AppHandle,
     client: &reqwest::Client,
+    allowed: &[String],
 ) -> Result<(String, String), String> {
     emit(
         app,
@@ -314,7 +342,7 @@ async fn resolve_version(
     );
 
     let mut errors = Vec::new();
-    for base in mirror_bases() {
+    for base in allowed {
         for attempt in 1..=MIRROR_ATTEMPTS {
             emit(
                 app,
@@ -329,10 +357,10 @@ async fn resolve_version(
                     None,
                 ),
             );
-            match fetch_version_text(client, &base).await {
+            match fetch_version_text(client, base, allowed).await {
                 Ok(v) => {
                     info!("cli_install: version {v} via {base}");
-                    return Ok((v, base));
+                    return Ok((v, base.clone()));
                 }
                 Err(e) => {
                     warn!("cli_install version fail base={base} attempt={attempt}: {e}");
@@ -357,9 +385,10 @@ async fn download_to_file(
     dest: &Path,
     version: &str,
     mirror: &str,
+    allowed: &[String],
 ) -> Result<(), String> {
-    // Fail-closed: never fetch from outside the official mirror list.
-    if !is_allowed_download_url(url) {
+    // Fail-closed: never fetch from outside this install's mirror list.
+    if !is_allowed_download_url_against(url, allowed) {
         return Err(format!("download URL not on allowlist: {url}"));
     }
     let resp = client
@@ -372,7 +401,7 @@ async fn download_to_file(
     }
     // After redirects, re-check final URL when available.
     let final_url = resp.url().to_string();
-    if !is_allowed_download_url(&final_url) {
+    if !is_allowed_download_url_against(&final_url, allowed) {
         return Err(format!("download redirected off allowlist: {final_url}"));
     }
     let total = resp.content_length();
@@ -580,15 +609,16 @@ async fn try_download_all_mirrors(
     client: &reqwest::Client,
     version: &str,
     preferred_mirror: &str,
+    allowed: &[String],
 ) -> Result<(PathBuf, String), String> {
     let (os, arch) = platform_triple()?;
     let platform = format!("{os}-{arch}");
     let mut bases: Vec<String> = Vec::new();
     // Preferred first, then others
     bases.push(preferred_mirror.to_string());
-    for b in mirror_bases() {
+    for b in allowed {
         if b != preferred_mirror {
-            bases.push(b);
+            bases.push(b.clone());
         }
     }
 
@@ -631,7 +661,7 @@ async fn try_download_all_mirrors(
 
         for attempt in 1..=MIRROR_ATTEMPTS {
             for url in &candidates {
-                if !is_allowed_download_url(url) {
+                if !is_allowed_download_url_against(url, allowed) {
                     errors.push(format!("skip non-allowlisted URL: {url}"));
                     continue;
                 }
@@ -649,7 +679,7 @@ async fn try_download_all_mirrors(
                     ),
                 );
                 let _ = fs::remove_file(&tmp_path);
-                match download_to_file(app, client, url, &tmp_path, version, &base).await {
+                match download_to_file(app, client, url, &tmp_path, version, &base, allowed).await {
                     Ok(()) => return Ok((tmp_path, base.to_string())),
                     Err(e) => {
                         warn!("cli_install download fail url={url}: {e}");
@@ -699,12 +729,16 @@ fn env_flag_truthy(name: &str) -> bool {
 ///
 /// `allow_unverified`: when true, continue if the mirror has no published
 /// checksum (still fail on mismatch). Default path should pass `false`.
+/// `mirror`: when set, this install uses only that base (wizard choice).
+/// Empty / omitted keeps env → settings → built-in default.
 pub async fn install_cli_latest(
     app: AppHandle,
     allow_unverified: bool,
+    mirror: Option<String>,
 ) -> Result<CliInstallResult, String> {
+    let bases = install_bases(mirror.as_deref())?;
     let client = http_client()?;
-    let (version, preferred) = resolve_version(&app, &client).await?;
+    let (version, preferred) = resolve_version(&app, &client, &bases).await?;
 
     emit(
         &app,
@@ -718,7 +752,7 @@ pub async fn install_cli_latest(
     );
 
     let (tmp_path, mirror_used) =
-        try_download_all_mirrors(&app, &client, &version, &preferred).await?;
+        try_download_all_mirrors(&app, &client, &version, &preferred, &bases).await?;
 
     let digest = sha256_file(&tmp_path).unwrap_or_else(|_| {
         // Fallback: side file written during download
@@ -754,8 +788,15 @@ pub async fn install_cli_latest(
         },
     );
 
-    let published =
-        fetch_published_checksum(&client, &mirror_used, &version, &platform, &artifact_name).await;
+    let published = fetch_published_checksum(
+        &client,
+        &mirror_used,
+        &version,
+        &platform,
+        &artifact_name,
+        &bases,
+    )
+    .await;
     let checksum_verified = match published {
         Some(expected) => {
             if expected != digest {
@@ -862,25 +903,30 @@ pub async fn install_cli_latest(
 }
 
 /// Install command strings for copy-paste fallback (platform-specific).
-pub fn install_commands() -> serde_json::Value {
-    let base = resolve_cli_mirror();
+/// `mirror` overrides env/settings for this command when non-empty.
+pub fn install_commands(mirror: Option<&str>) -> Result<serde_json::Value, String> {
+    let bases = install_bases(mirror)?;
+    let base = bases
+        .first()
+        .cloned()
+        .ok_or_else(|| "empty Atlas CLI mirror".to_string())?;
     #[cfg(target_os = "windows")]
     {
-        serde_json::json!({
+        Ok(serde_json::json!({
             "primary": format!("irm {base}/install.ps1 | iex"),
             "shell": "powershell",
             "docsUrl": base,
             "mirrors": [base],
-        })
+        }))
     }
     #[cfg(not(target_os = "windows"))]
     {
-        serde_json::json!({
+        Ok(serde_json::json!({
             "primary": format!("curl -fsSL {base}/install.sh | bash"),
             "shell": "bash",
             "docsUrl": base,
             "mirrors": [base],
-        })
+        }))
     }
 }
 
@@ -929,6 +975,34 @@ mod tests {
             "ftp://cli.example.test/atlas/cli/stable",
             &bases
         ));
+    }
+
+    #[test]
+    fn normalize_cli_mirror_rejects_unsafe_urls() {
+        assert!(normalize_cli_mirror("").is_err());
+        assert!(normalize_cli_mirror("   ").is_err());
+        assert!(normalize_cli_mirror("ftp://atlas.example/cli").is_err());
+        assert!(normalize_cli_mirror("http://user:pass@h/atlas/cli").is_err());
+        assert!(normalize_cli_mirror("http://h/atlas/../cli").is_err());
+        assert_eq!(
+            normalize_cli_mirror("https://atlas.myai.tech/atlas/cli/").unwrap(),
+            "https://atlas.myai.tech/atlas/cli"
+        );
+    }
+
+    #[test]
+    fn explicit_mirror_allowlist_is_only_that_base() {
+        let bases = install_bases(Some("https://atlas.myai.tech/atlas/cli/")).unwrap();
+        assert_eq!(bases, vec!["https://atlas.myai.tech/atlas/cli".to_string()]);
+        assert!(is_allowed_download_url_against(
+            "https://atlas.myai.tech/atlas/cli/stable",
+            &bases
+        ));
+        assert!(!is_allowed_download_url_against(
+            "http://10.218.220.237:22255/atlas/cli/stable",
+            &bases
+        ));
+        assert!(install_bases(Some("not a url")).is_err());
     }
 
     #[test]

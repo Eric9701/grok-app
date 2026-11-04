@@ -78,11 +78,14 @@ Release 门禁认 `src-tauri/tauri.conf.json` 的 `productName`，也就是 **At
 
 - **已装 CLI**：`atlas update` / `atlas update --check --json`。
 - **未装 / App 代下**：只放行企业基址（允许内网 `http`），**不把 x.ai / GCS 当自动安装源**。
-- 解析顺序：环境变量 `ATLAS_CLI_MIRROR` → 设置 `atlasCliMirror` → Host 内置默认（企业 `…/atlas/cli`）。
+- 解析顺序（向导未指定时）：环境变量 `ATLAS_CLI_MIRROR` → 设置 `atlasCliMirror` → Host 内置默认（企业 `…/atlas/cli`）。
+- 首次安装向导在下载前三选一：**MY内** `http://10.218.220.237:22255/atlas/cli`、**MY外** `https://atlas.myai.tech/atlas/cli`、**其他**（用户输入 http/https）。选定基址写入 `atlasCliMirror`，并只用于这一次下载与复制命令；环境变量仍优先于之后未带显式基址的安装。
 - 发布文件名仍可能是 `grok-{ver}-{os}-{arch}`；安装落点是 `~/.atlas/bin/atlas`（Windows：`atlas.exe`）+ `agent`。
-- 向导「复制安装命令」：Windows `install.ps1` / Unix `install.sh`，基址同上。
+- 向导「复制安装命令」：Windows `install.ps1` / Unix `install.sh`，基址与上面的选择相同。
 
 新设置必须登记 `settingsCatalog`：`runtime.atlasCliMirror`（Runtime → CLI）。
+
+设置 → CLI / 运行时 → CLI 只读展示共享 `~/.atlas/config.toml` 的 `[endpoints]`（`cli_chat_proxy_base_url`、`cli_update_base_url`，以及同表里其它纯文本项）。不改写该文件，不下发其它表里的密钥。登记：`runtime.atlasEndpoints`。
 
 ## 模型列表
 

@@ -584,7 +584,7 @@ pub async fn install_cli_update(
 
     info!("cli_update_install: using cli_install trust-chain");
     let allow = crate::store::load_settings().allow_unverified_cli_install;
-    let result = cli_install::install_cli_latest(app, allow).await?;
+    let result = cli_install::install_cli_latest(app, allow, None).await?;
     let mut s = crate::store::load_settings();
     s.last_cli_checksum_verified = result.checksum_verified;
     let _ = crate::store::save_settings(&s);

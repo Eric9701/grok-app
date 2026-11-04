@@ -608,6 +608,10 @@
   -webkit-appearance: none;
 }
 
+.settings-input[readonly] {
+  cursor: default;
+}
+
 .settings-input[type="number"] {
   appearance: textfield;
   -moz-appearance: textfield;

@@ -8,6 +8,8 @@ mod account_profiles;
 
 mod acp_client;
 
+mod atlas_endpoints;
+
 mod atlas_relay_agent;
 
 #[cfg(test)]
