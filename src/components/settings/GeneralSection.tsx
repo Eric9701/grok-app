@@ -4,7 +4,10 @@
 import { useEffect, useState } from "react";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
 
-import { AtlasModelAddDialog } from "@/components/settings/AtlasModelAddDialog";
+import {
+  AtlasModelAddDialog,
+  AtlasModelDeleteDialog,
+} from "@/components/settings/AtlasModelAddDialog";
 import { Select } from "@/components/Select";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { IconLanguage, IconRefresh, IconShield } from "@/components/icons";
@@ -257,6 +260,11 @@ export function GeneralSection() {
   const [sttCustomApiKeyDraft, setSttCustomApiKeyDraft] = useState("");
   const [modelsRefreshBusy, setModelsRefreshBusy] = useState(false);
   const [modelsAddOpen, setModelsAddOpen] = useState(false);
+  const [modelsEditId, setModelsEditId] = useState<string | null>(null);
+  const [modelsDelete, setModelsDelete] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
   const [modelsRefreshError, setModelsRefreshError] = useState<string | null>(
     null,
   );
@@ -404,6 +412,35 @@ export function GeneralSection() {
                           {m.label}
                         </span>
                         <span className="settings-models-list__id">{m.id}</span>
+                        {m.editable ? (
+                          <span className="settings-models-list__actions">
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              onClick={() => {
+                                setModelsAddOpen(false);
+                                setModelsEditId(m.id);
+                              }}
+                            >
+                              {t("settings.availableModelsEdit")}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              onClick={() =>
+                                setModelsDelete({ id: m.id, label: m.label })
+                              }
+                            >
+                              {t("settings.availableModelsDelete")}
+                            </button>
+                          </span>
+                        ) : (
+                          <span className="settings-models-list__actions">
+                            <span className="settings-models-list__badge">
+                              {t("settings.availableModelsRemoteManaged")}
+                            </span>
+                          </span>
+                        )}
                       </div>
                     ))
                   )}
@@ -2978,8 +3015,21 @@ export function GeneralSection() {
             )}
           </>
       <AtlasModelAddDialog
-        open={modelsAddOpen}
-        onClose={() => setModelsAddOpen(false)}
+        open={modelsAddOpen || modelsEditId != null}
+        mode={modelsEditId ? "edit" : "add"}
+        editId={modelsEditId ?? undefined}
+        onClose={() => {
+          setModelsAddOpen(false);
+          setModelsEditId(null);
+        }}
+        t={t}
+        showToast={(message) => showSettingsToast(message, 2400)}
+        onAvailableModels={onAvailableModels}
+      />
+      <AtlasModelDeleteDialog
+        open={modelsDelete != null}
+        model={modelsDelete}
+        onClose={() => setModelsDelete(null)}
         t={t}
         showToast={(message) => showSettingsToast(message, 2400)}
         onAvailableModels={onAvailableModels}

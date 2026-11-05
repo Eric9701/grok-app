@@ -28,6 +28,7 @@ describe("catalogFromAvailableModels", () => {
         reasoningEfforts: undefined,
         contextWindow: 128000,
         contextWindows: [128000],
+        editable: false,
       },
     ]);
   });

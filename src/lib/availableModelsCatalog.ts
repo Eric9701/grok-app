@@ -25,6 +25,7 @@ export function catalogFromAvailableModels(
       reasoningEfforts: efforts,
       contextWindow: m.contextWindow ?? null,
       contextWindows: positiveContextWindows(m.contextWindows),
+      editable: m.editable === true,
     };
   });
 }

@@ -2439,6 +2439,7 @@ export function AppWorkbench() {
                 isDefault: m.isDefault,
                 contextWindow: m.contextWindow ?? null,
                 contextWindows: positiveContextWindows(m.contextWindows),
+                editable: m.editable === true,
               }))
             : GROK_BUILD_MODELS;
         setAvailableModels(catalog);
@@ -2608,6 +2609,7 @@ export function AppWorkbench() {
                 reasoningEfforts: efforts,
                 contextWindow: m.contextWindow ?? null,
                 contextWindows: positiveContextWindows(m.contextWindows),
+                editable: m.editable === true,
               };
             })
           : GROK_BUILD_MODELS;
@@ -9193,6 +9195,7 @@ export function AppWorkbench() {
                 contextWindows:
                   positiveContextWindows(m.contextWindows) ??
                   prior?.contextWindows,
+                editable: m.editable === true,
               };
             });
           });

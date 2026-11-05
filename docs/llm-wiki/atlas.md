@@ -38,6 +38,8 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 例外：设置 → 常规 → 对话偏好 → **可用模型** 旁的 **新增模型**（Host `providers_atlas_model_add`）只往共享 `~/.atlas/config.toml` **追加**一段 `[model.<id>]`。段 id 已存在则拒绝（含大小写、企业 `ENC(...)` 与 `hidden` 段），不覆盖。不改 `[models].default`，不写 App `agent-home`，也不把这段变成自定义中转，不删除 `auth.json`。终端 `atlas` 和共享模式会读到这段；独立模式的对话进程仍读 `agent-home`。
 
+同一列表里，只有共享配置中**非托管**的明文段（没有 `managed = true`、`api_key = "ENC(...)"`、`hidden = true`）在行尾显示 **编辑** / **删除**（`providers_atlas_model_get` / `update` / `delete`）。编辑不改段 id；API Key 留空则保留原密钥。删除不改 `[models].default`，默认模型本身不能删。托管段和只存在于模型缓存或 `agent-home` 的条目没有这两个按钮。
+
 例外：应用代装 CLI 成功后，按安装脚本把 `[cli] installer = "internal"` 和 `[endpoints]` 的 `login_base_url`、`cli_chat_proxy_base_url`、`cli_update_base_url` upsert 进共享 `~/.atlas/config.toml`，并同步到 App `agent-home/config.toml`。只替换这几项；stable 安装会去掉已有的 `[cli] channel`。不整文件重写，不动 `[model.*]` 和其它密钥。其它写入仍禁止改 shared CLI home。
 
 ## 远程更新

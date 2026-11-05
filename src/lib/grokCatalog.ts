@@ -33,6 +33,8 @@ export interface ModelOption {
    * flyout list available. Order is the catalog order.
    */
   contextWindows?: number[] | null;
+  /** Shared CLI section the settings list can edit and delete. */
+  editable?: boolean;
 }
 
 export interface SessionModeOption {

@@ -769,7 +769,7 @@ impl Default for TableFields {
     }
 }
 
-fn atlas_config_path() -> PathBuf {
+pub(crate) fn atlas_config_path() -> PathBuf {
     if let Ok(raw) = std::env::var(ATLAS_HOME_ENV) {
         let trimmed = raw.trim();
         if !trimmed.is_empty() {
@@ -1004,6 +1004,9 @@ pub const ATLAS_MODEL_ADD_BACKEND: &str = "invalid_backend";
 pub const ATLAS_MODEL_ADD_CONTEXT: &str = "invalid_context_window";
 pub const ATLAS_MODEL_ADD_BASE_URL: &str = "invalid_base_url";
 pub const ATLAS_MODEL_ADD_DEFAULT: &str = "default_changed";
+pub const ATLAS_MODEL_ADD_NOT_FOUND: &str = "not_found";
+pub const ATLAS_MODEL_ADD_MANAGED: &str = "managed";
+pub const ATLAS_MODEL_ADD_IS_DEFAULT: &str = "is_default";
 
 /// One new enterprise-style catalog section. The key never leaves this process.
 #[derive(Debug, Clone, Deserialize)]
@@ -1080,6 +1083,225 @@ pub(crate) fn add_atlas_catalog_model_at(
     fs::write(path, &next).map_err(|e| e.to_string())?;
     tracing::info!(target: "atlas_model", %id, "added atlas catalog model section");
     Ok(())
+}
+
+/// Editable view of one plaintext catalog section. The API key stays on disk.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AtlasModelEditView {
+    pub id: String,
+    pub model: String,
+    pub name: String,
+    pub description: String,
+    pub base_url: String,
+    pub api_backend: String,
+    pub context_window: u64,
+    pub has_api_key: bool,
+}
+
+/// Fields written back onto an existing section. An empty `api_key` keeps the stored key.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AtlasModelUpdateRequest {
+    pub id: String,
+    pub model: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub base_url: String,
+    pub api_backend: String,
+    pub context_window: u64,
+    #[serde(default)]
+    pub api_key: String,
+}
+
+/// Section ids in `text` that the settings list may edit or delete.
+pub(crate) fn editable_section_ids(text: &str) -> HashSet<String> {
+    providers::parse_model_sections_for_proxy(text)
+        .into_iter()
+        .filter(|section| !is_locked_atlas_section(&section.fields))
+        .map(|section| section.id.to_ascii_lowercase())
+        .collect()
+}
+
+fn is_locked_atlas_section(fields: &HashMap<String, String>) -> bool {
+    if is_enterprise_managed(fields) {
+        return true;
+    }
+    fields
+        .get("managed")
+        .map(|value| {
+            let value = value.trim();
+            value.eq_ignore_ascii_case("true") || value == "1"
+        })
+        .unwrap_or(false)
+}
+
+pub fn get_atlas_catalog_model(id: &str) -> Result<AtlasModelEditView, String> {
+    let text = fs::read_to_string(atlas_config_path()).unwrap_or_default();
+    get_atlas_catalog_model_in(&text, id)
+}
+
+pub(crate) fn get_atlas_catalog_model_in(
+    text: &str,
+    id: &str,
+) -> Result<AtlasModelEditView, String> {
+    let section = find_atlas_section(text, id)?;
+    if is_locked_atlas_section(&section.fields) {
+        return Err(ATLAS_MODEL_ADD_MANAGED.into());
+    }
+    let context_window = section
+        .fields
+        .get("context_window")
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(200_000);
+    let api_key = section
+        .fields
+        .get("api_key")
+        .map(|value| value.trim())
+        .unwrap_or("");
+    Ok(AtlasModelEditView {
+        id: section.id,
+        model: section.fields.get("model").cloned().unwrap_or_default(),
+        name: section.fields.get("name").cloned().unwrap_or_default(),
+        description: section
+            .fields
+            .get("description")
+            .cloned()
+            .unwrap_or_default(),
+        base_url: section.fields.get("base_url").cloned().unwrap_or_default(),
+        api_backend: section
+            .fields
+            .get("api_backend")
+            .cloned()
+            .unwrap_or_else(|| "messages".into()),
+        context_window,
+        has_api_key: !api_key.is_empty(),
+    })
+}
+
+pub fn update_atlas_catalog_model(req: AtlasModelUpdateRequest) -> Result<(), String> {
+    crate::agent_home_config::with_config_write_lock(|| {
+        update_atlas_catalog_model_at(&atlas_config_path(), req)
+    })
+}
+
+pub(crate) fn update_atlas_catalog_model_at(
+    path: &Path,
+    req: AtlasModelUpdateRequest,
+) -> Result<(), String> {
+    let model = require_field(&req.model)?;
+    let name = require_field(&req.name)?;
+    let base_url = normalize_http_base(&req.base_url)?;
+    let api_backend = normalize_atlas_backend(&req.api_backend)?;
+    if req.context_window == 0 {
+        return Err(ATLAS_MODEL_ADD_CONTEXT.into());
+    }
+    let description = req
+        .description
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("");
+
+    let original = fs::read_to_string(path).unwrap_or_default();
+    let before_default = providers::get_models_default(&original);
+    let section = find_atlas_section(&original, &req.id)?;
+    if is_locked_atlas_section(&section.fields) {
+        return Err(ATLAS_MODEL_ADD_MANAGED.into());
+    }
+    let api_key = {
+        let incoming = req.api_key.trim();
+        if incoming.is_empty() {
+            section
+                .fields
+                .get("api_key")
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| ATLAS_MODEL_ADD_MISSING.to_string())?
+        } else {
+            incoming.to_string()
+        }
+    };
+
+    let owned = [
+        "model",
+        "name",
+        "description",
+        "base_url",
+        "api_backend",
+        "context_window",
+        "api_key",
+    ];
+    let mut fields = vec![
+        ("model".to_string(), model),
+        ("name".to_string(), name),
+        ("description".to_string(), description.to_string()),
+        ("base_url".to_string(), base_url),
+        ("api_backend".to_string(), api_backend),
+        ("context_window".to_string(), req.context_window.to_string()),
+        ("api_key".to_string(), api_key),
+    ];
+    let mut extra: Vec<_> = section
+        .fields
+        .iter()
+        .filter(|(key, value)| !owned.contains(&key.as_str()) && !value.trim().is_empty())
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect();
+    extra.sort_by(|a, b| a.0.cmp(&b.0));
+    fields.extend(extra);
+    fields.retain(|(_, value)| !value.trim().is_empty());
+
+    let removed = remove_model_section(&original, &section.id);
+    let next = append_model_section(&removed, &section.id, &fields);
+    if providers::get_models_default(&next) != before_default {
+        return Err(ATLAS_MODEL_ADD_DEFAULT.into());
+    }
+    fs::write(path, &next).map_err(|e| e.to_string())?;
+    tracing::info!(target: "atlas_model", id = %section.id, "updated atlas catalog model section");
+    Ok(())
+}
+
+pub fn delete_atlas_catalog_model(id: &str) -> Result<(), String> {
+    crate::agent_home_config::with_config_write_lock(|| {
+        delete_atlas_catalog_model_at(&atlas_config_path(), id)
+    })
+}
+
+pub(crate) fn delete_atlas_catalog_model_at(path: &Path, id: &str) -> Result<(), String> {
+    let original = fs::read_to_string(path).unwrap_or_default();
+    let before_default = providers::get_models_default(&original);
+    let section = find_atlas_section(&original, id)?;
+    if is_locked_atlas_section(&section.fields) {
+        return Err(ATLAS_MODEL_ADD_MANAGED.into());
+    }
+    if before_default
+        .as_deref()
+        .is_some_and(|default| default.eq_ignore_ascii_case(&section.id))
+    {
+        return Err(ATLAS_MODEL_ADD_IS_DEFAULT.into());
+    }
+    let next = remove_model_section(&original, &section.id);
+    if providers::get_models_default(&next) != before_default {
+        return Err(ATLAS_MODEL_ADD_DEFAULT.into());
+    }
+    fs::write(path, &next).map_err(|e| e.to_string())?;
+    tracing::info!(target: "atlas_model", id = %section.id, "deleted atlas catalog model section");
+    Ok(())
+}
+
+fn find_atlas_section(
+    text: &str,
+    id: &str,
+) -> Result<crate::providers::ModelSection, String> {
+    let needle = id.trim();
+    if needle.is_empty() {
+        return Err(ATLAS_MODEL_ADD_NOT_FOUND.into());
+    }
+    providers::parse_model_sections_for_proxy(text)
+        .into_iter()
+        .find(|section| section.id.eq_ignore_ascii_case(needle))
+        .ok_or_else(|| ATLAS_MODEL_ADD_NOT_FOUND.to_string())
 }
 
 fn require_field(raw: &str) -> Result<String, String> {
@@ -1542,5 +1764,100 @@ api_backend = \"responses\"
             ATLAS_MODEL_ADD_INVALID_ID
         );
         assert_eq!(fs::read_to_string(&path).unwrap(), "");
+    }
+
+    fn sample_update(id: &str, api_key: &str) -> AtlasModelUpdateRequest {
+        AtlasModelUpdateRequest {
+            id: id.into(),
+            model: "kimi-for-coding".into(),
+            name: "Kimi".into(),
+            description: Some("note".into()),
+            base_url: "https://api.kimi.com/coding/v1".into(),
+            api_backend: "messages".into(),
+            context_window: 200_000,
+            api_key: api_key.into(),
+        }
+    }
+
+    #[test]
+    fn update_rewrites_plaintext_section_and_keeps_key_and_default() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        fs::write(
+            &path,
+            "[models]\ndefault = \"arch-glm-5.2\"\n\n[model.keep]\napi_key = \"ENC(secret)\"\nmanaged = true\n\n[model.arch-kimi-new]\nmodel = \"old\"\nname = \"old\"\nbase_url = \"https://old.example/v1\"\napi_backend = \"responses\"\ncontext_window = 1000\napi_key = \"sk-old\"\nextra = \"kept\"\n",
+        )
+        .unwrap();
+        let view = get_atlas_catalog_model_in(&fs::read_to_string(&path).unwrap(), "ARCH-KIMI-NEW")
+            .unwrap();
+        assert_eq!(view.model, "old");
+        assert!(view.has_api_key);
+        let encoded = serde_json::to_string(&view).unwrap();
+        assert!(!encoded.contains("sk-old"));
+        update_atlas_catalog_model_at(&path, sample_update("arch-kimi-new", "")).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("default = \"arch-glm-5.2\""));
+        assert!(text.contains("name = \"Kimi\""));
+        assert!(text.contains("context_window = 200000\n"));
+        assert!(!text.contains("context_window = \"200000\""));
+        assert!(text.contains("api_key = \"sk-old\""));
+        assert!(text.contains("extra = \"kept\""));
+        assert!(text.contains("api_key = \"ENC(secret)\""));
+        assert_eq!(
+            providers::get_models_default(&text).as_deref(),
+            Some("arch-glm-5.2")
+        );
+    }
+
+    #[test]
+    fn update_rejects_managed_sections() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        let original = "[model.arch-kimi-code-eric]\nmodel = \"kimi\"\nname = \"eric\"\napi_key = \"ENC(secret)\"\nmanaged = true\n";
+        fs::write(&path, original).unwrap();
+        assert_eq!(
+            update_atlas_catalog_model_at(&path, sample_update("arch-kimi-code-eric", "sk-new"))
+                .unwrap_err(),
+            ATLAS_MODEL_ADD_MANAGED
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), original);
+        assert!(!editable_section_ids(original).contains("arch-kimi-code-eric"));
+    }
+
+    #[test]
+    fn delete_removes_plaintext_section_and_keeps_default() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        fs::write(
+            &path,
+            "[models]\ndefault = \"arch-glm-5.2\"\n\n[model.arch-glm-5.2]\nmodel = \"glm\"\nname = \"glm\"\napi_key = \"ENC(secret)\"\nmanaged = true\n\n[model.arch-kimi-new]\nmodel = \"kimi-for-coding\"\nname = \"Kimi\"\nbase_url = \"https://api.kimi.com/coding/v1\"\napi_key = \"sk-old\"\n",
+        )
+        .unwrap();
+        assert!(editable_section_ids(&fs::read_to_string(&path).unwrap()).contains("arch-kimi-new"));
+        delete_atlas_catalog_model_at(&path, "ARCH-KIMI-NEW").unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("arch-kimi-new"));
+        assert!(text.contains("api_key = \"ENC(secret)\""));
+        assert_eq!(
+            providers::get_models_default(&text).as_deref(),
+            Some("arch-glm-5.2")
+        );
+    }
+
+    #[test]
+    fn delete_rejects_default_and_managed_sections() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        let original = "[models]\ndefault = \"arch-kimi-new\"\n\n[model.arch-kimi-new]\nmodel = \"kimi\"\nname = \"Kimi\"\napi_key = \"sk-old\"\n\n[model.locked]\nmodel = \"locked\"\nname = \"locked\"\napi_key = \"plain\"\nmanaged = true\n";
+        fs::write(&path, original).unwrap();
+        assert_eq!(
+            delete_atlas_catalog_model_at(&path, "arch-kimi-new").unwrap_err(),
+            ATLAS_MODEL_ADD_IS_DEFAULT
+        );
+        assert_eq!(
+            delete_atlas_catalog_model_at(&path, "locked").unwrap_err(),
+            ATLAS_MODEL_ADD_MANAGED
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), original);
     }
 }

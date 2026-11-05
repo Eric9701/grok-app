@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GlassModal } from "@/components/GlassModal";
 import { Select } from "@/components/Select";
 import * as api from "@/lib/api";
@@ -19,6 +19,9 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   invalid_context_window: "settings.availableModelsAddErr.invalid_context_window",
   invalid_base_url: "settings.availableModelsAddErr.invalid_base_url",
   default_changed: "settings.availableModelsAddErr.default_changed",
+  not_found: "settings.availableModelsAddErr.not_found",
+  managed: "settings.availableModelsAddErr.managed",
+  is_default: "settings.availableModelsAddErr.is_default",
 };
 
 type FieldId = "id" | "model" | "name" | "baseUrl" | "context" | "apiKey";
@@ -33,25 +36,50 @@ function errorText(t: TFn, raw: string): string {
 
 function hostInvalid(raw: string): FieldId | null {
   const code = raw.trim();
-  if (code === "invalid_id" || code === "reserved_id" || code === "duplicate_id") return "id";
+  if (
+    code === "invalid_id" ||
+    code === "reserved_id" ||
+    code === "duplicate_id" ||
+    code === "not_found" ||
+    code === "managed"
+  ) {
+    return "id";
+  }
   if (code === "invalid_base_url") return "baseUrl";
   if (code === "invalid_context_window") return "context";
   return null;
 }
 
+async function reloadModels(
+  onAvailableModels?: (models: ModelOption[]) => void,
+) {
+  try {
+    const res = await api.modelsListAvailable();
+    const next = catalogFromAvailableModels(res);
+    if (next.length > 0) onAvailableModels?.(next);
+  } catch {
+    /* The file is already updated; the next refresh still reads it. */
+  }
+}
+
 export function AtlasModelAddDialog({
   open,
+  mode = "add",
+  editId,
   onClose,
   t,
   showToast,
   onAvailableModels,
 }: {
   open: boolean;
+  mode?: "add" | "edit";
+  editId?: string;
   onClose: () => void;
   t: TFn;
   showToast: (message: string) => void;
   onAvailableModels?: (models: ModelOption[]) => void;
 }) {
+  const editing = mode === "edit";
   const [id, setId] = useState("");
   const [model, setModel] = useState("");
   const [name, setName] = useState("");
@@ -62,8 +90,58 @@ export function AtlasModelAddDialog({
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [invalid, setInvalid] = useState<ReadonlySet<FieldId>>(new Set());
+  const tRef = useRef(t);
+  tRef.current = t;
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setInvalid(new Set());
+    setShowKey(false);
+    if (!editing) {
+      setId("");
+      setModel("");
+      setName("");
+      setDescription("");
+      setBaseUrl("");
+      setApiBackend("messages");
+      setContextWindow("200000");
+      setApiKey("");
+      setLoading(false);
+      return;
+    }
+    const target = editId?.trim() ?? "";
+    if (!target) return;
+    let cancel = false;
+    setLoading(true);
+    void api
+      .providersAtlasModelGet(target)
+      .then((view) => {
+        if (cancel) return;
+        setId(view.id);
+        setModel(view.model);
+        setName(view.name);
+        setDescription(view.description);
+        setBaseUrl(view.baseUrl);
+        setApiBackend(view.apiBackend || "messages");
+        setContextWindow(String(view.contextWindow || 200000));
+        setApiKey("");
+      })
+      .catch((err: unknown) => {
+        if (cancel) return;
+        const detail = err instanceof Error ? err.message : String(err ?? "");
+        setError(errorText(tRef.current, detail));
+      })
+      .finally(() => {
+        if (!cancel) setLoading(false);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [open, editing, editId]);
 
   const clearInvalid = (field: FieldId) => {
     setInvalid((prev) => {
@@ -81,28 +159,27 @@ export function AtlasModelAddDialog({
   };
 
   const submit = () => {
-    if (busy) return;
+    if (busy || loading) return;
     const windowTokens = Number(contextWindow.trim());
     const missing = new Set<FieldId>();
-    if (!id.trim()) missing.add("id");
+    if (!editing && !id.trim()) missing.add("id");
     if (!model.trim()) missing.add("model");
     if (!name.trim()) missing.add("name");
     if (!baseUrl.trim()) missing.add("baseUrl");
-    if (!apiKey.trim()) missing.add("apiKey");
+    if (!editing && !apiKey.trim()) missing.add("apiKey");
     const contextBad = !Number.isInteger(windowTokens) || windowTokens <= 0;
     if (contextBad) missing.add("context");
     const urlBad =
-      baseUrl.trim().length > 0 &&
-      !/^https?:\/\//i.test(baseUrl.trim());
+      baseUrl.trim().length > 0 && !/^https?:\/\//i.test(baseUrl.trim());
     if (urlBad) missing.add("baseUrl");
     if (missing.size > 0) {
       setInvalid(missing);
       if (
-        !id.trim() ||
+        (!editing && !id.trim()) ||
         !model.trim() ||
         !name.trim() ||
         !baseUrl.trim() ||
-        !apiKey.trim()
+        (!editing && !apiKey.trim())
       ) {
         setError(t("settings.availableModelsAddErr.missing_field"));
       } else if (contextBad) {
@@ -115,25 +192,22 @@ export function AtlasModelAddDialog({
     setBusy(true);
     setError(null);
     setInvalid(new Set());
-    void api
-      .providersAtlasModelAdd({
-        id: id.trim(),
-        model: model.trim(),
-        name: name.trim(),
-        description: description.trim(),
-        baseUrl: baseUrl.trim(),
-        apiBackend,
-        contextWindow: windowTokens,
-        apiKey: apiKey.trim(),
-      })
+    const payload = {
+      id: id.trim(),
+      model: model.trim(),
+      name: name.trim(),
+      description: description.trim(),
+      baseUrl: baseUrl.trim(),
+      apiBackend,
+      contextWindow: windowTokens,
+      apiKey: apiKey.trim(),
+    };
+    const request = editing
+      ? api.providersAtlasModelUpdate(payload)
+      : api.providersAtlasModelAdd(payload);
+    void request
       .then(async () => {
-        try {
-          const res = await api.modelsListAvailable();
-          const next = catalogFromAvailableModels(res);
-          if (next.length > 0) onAvailableModels?.(next);
-        } catch {
-          /* The section is on disk; the next refresh still reads it. */
-        }
+        await reloadModels(onAvailableModels);
         setId("");
         setModel("");
         setName("");
@@ -143,23 +217,47 @@ export function AtlasModelAddDialog({
         setContextWindow("200000");
         setApiKey("");
         setShowKey(false);
-        showToast(t("settings.availableModelsAddDone"));
+        showToast(
+          t(
+            editing
+              ? "settings.availableModelsEditDone"
+              : "settings.availableModelsAddDone",
+          ),
+        );
         onClose();
       })
       .catch((err: unknown) => {
         const detail = err instanceof Error ? err.message : String(err ?? "");
         const field = hostInvalid(detail);
         setInvalid(field ? new Set([field]) : new Set());
-        setError(errorText(t, detail));
+        setError(
+          errorText(
+            t,
+            detail,
+          ).replace(
+            t("settings.availableModelsAddFailed"),
+            t(
+              editing
+                ? "settings.availableModelsEditFailed"
+                : "settings.availableModelsAddFailed",
+            ),
+          ),
+        );
       })
       .finally(() => setBusy(false));
   };
+
+  const locked = busy || loading;
 
   return (
     <GlassModal
       open={open}
       onClose={close}
-      title={t("settings.availableModelsAddTitle")}
+      title={t(
+        editing
+          ? "settings.availableModelsEditTitle"
+          : "settings.availableModelsAddTitle",
+      )}
       size="lg"
       className="settings-atlas-model-modal"
       wrapBody
@@ -178,18 +276,30 @@ export function AtlasModelAddDialog({
           <button
             type="button"
             className="btn btn--solid"
-            disabled={busy}
+            disabled={locked}
             onClick={submit}
           >
             {busy
-              ? t("settings.availableModelsAdding")
-              : t("settings.availableModelsAddSubmit")}
+              ? t(
+                  editing
+                    ? "settings.availableModelsEditing"
+                    : "settings.availableModelsAdding",
+                )
+              : t(
+                  editing
+                    ? "settings.availableModelsEditSubmit"
+                    : "settings.availableModelsAddSubmit",
+                )}
           </button>
         </>
       }
     >
       <p className="settings-atlas-model-form__hint">
-        {t("settings.availableModelsAddHint")}
+        {t(
+          editing
+            ? "settings.availableModelsEditHint"
+            : "settings.availableModelsAddHint",
+        )}
       </p>
       <div className="settings-atlas-model-form">
         <section className="settings-atlas-model-group">
@@ -200,7 +310,7 @@ export function AtlasModelAddDialog({
             <Field
               label={t("settings.availableModelsAddId")}
               value={id}
-              disabled={busy}
+              disabled={locked || editing}
               mono
               invalid={invalid.has("id")}
               placeholder={t("settings.availableModelsAddPhId")}
@@ -213,7 +323,7 @@ export function AtlasModelAddDialog({
             <Field
               label={t("settings.availableModelsAddName")}
               value={name}
-              disabled={busy}
+              disabled={locked}
               invalid={invalid.has("name")}
               placeholder={t("settings.availableModelsAddPhName")}
               autoComplete="off"
@@ -226,7 +336,7 @@ export function AtlasModelAddDialog({
               wide
               label={t("settings.availableModelsAddModel")}
               value={model}
-              disabled={busy}
+              disabled={locked}
               mono
               invalid={invalid.has("model")}
               placeholder={t("settings.availableModelsAddPhModel")}
@@ -241,7 +351,7 @@ export function AtlasModelAddDialog({
               label={t("settings.availableModelsAddDescription")}
               optional={t("settings.availableModelsAddOptional")}
               value={description}
-              disabled={busy}
+              disabled={locked}
               placeholder={t("settings.availableModelsAddPhDescription")}
               autoComplete="off"
               onChange={setDescription}
@@ -257,7 +367,7 @@ export function AtlasModelAddDialog({
               wide
               label={t("settings.availableModelsAddBaseUrl")}
               value={baseUrl}
-              disabled={busy}
+              disabled={locked}
               mono
               invalid={invalid.has("baseUrl")}
               placeholder={t("settings.availableModelsAddPhBaseUrl")}
@@ -274,7 +384,7 @@ export function AtlasModelAddDialog({
               </span>
               <Select
                 value={apiBackend}
-                disabled={busy}
+                disabled={locked}
                 aria-label={t("settings.availableModelsAddBackend")}
                 onChange={setApiBackend}
                 options={BACKENDS.map((value) => ({
@@ -292,7 +402,7 @@ export function AtlasModelAddDialog({
             <Field
               label={t("settings.availableModelsAddContext")}
               value={contextWindow}
-              disabled={busy}
+              disabled={locked}
               mono
               invalid={invalid.has("context")}
               placeholder={t("settings.availableModelsAddPhContext")}
@@ -305,7 +415,12 @@ export function AtlasModelAddDialog({
             />
             <div className="settings-atlas-model-field settings-atlas-model-field--wide">
               <span className="settings-atlas-model-field__label">
-                {t("settings.availableModelsAddApiKey")}
+                <span>{t("settings.availableModelsAddApiKey")}</span>
+                {editing ? (
+                  <span className="settings-atlas-model-field__optional">
+                    {t("settings.availableModelsEditKeyHint")}
+                  </span>
+                ) : null}
               </span>
               <div className="prov-key-row">
                 <input
@@ -315,7 +430,7 @@ export function AtlasModelAddDialog({
                   }
                   type={showKey ? "text" : "password"}
                   value={apiKey}
-                  disabled={busy}
+                  disabled={locked}
                   placeholder={t("settings.availableModelsAddPhApiKey")}
                   autoComplete="off"
                   spellCheck={false}
@@ -328,7 +443,7 @@ export function AtlasModelAddDialog({
                 <button
                   type="button"
                   className="btn btn--ghost btn--sm"
-                  disabled={busy}
+                  disabled={locked}
                   onClick={() => setShowKey((v) => !v)}
                 >
                   {showKey ? t("prov.keyHide") : t("prov.keyShow")}
@@ -338,6 +453,99 @@ export function AtlasModelAddDialog({
           </div>
         </section>
       </div>
+      {error ? (
+        <p className="settings-atlas-model-alert" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </GlassModal>
+  );
+}
+
+export function AtlasModelDeleteDialog({
+  open,
+  model,
+  onClose,
+  t,
+  showToast,
+  onAvailableModels,
+}: {
+  open: boolean;
+  model: { id: string; label: string } | null;
+  onClose: () => void;
+  t: TFn;
+  showToast: (message: string) => void;
+  onAvailableModels?: (models: ModelOption[]) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const close = () => {
+    if (busy) return;
+    setError(null);
+    onClose();
+  };
+
+  const confirm = () => {
+    if (busy || !model) return;
+    setBusy(true);
+    setError(null);
+    void api
+      .providersAtlasModelDelete(model.id)
+      .then(async () => {
+        await reloadModels(onAvailableModels);
+        showToast(t("settings.availableModelsDeleteDone"));
+        onClose();
+      })
+      .catch((err: unknown) => {
+        const detail = err instanceof Error ? err.message : String(err ?? "");
+        const known = ERROR_KEYS[detail.trim()];
+        setError(
+          known
+            ? t(known)
+            : `${t("settings.availableModelsDeleteFailed")} ${detail}`.trim(),
+        );
+      })
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <GlassModal
+      open={open}
+      onClose={close}
+      title={t("settings.availableModelsDeleteTitle")}
+      size="sm"
+      closeLabel={t("common.close")}
+      closeOnOverlay={!busy}
+      footer={
+        <>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={busy}
+            onClick={close}
+          >
+            {t("common.cancel")}
+          </button>
+          <button
+            type="button"
+            className="btn btn--danger"
+            disabled={busy || !model}
+            onClick={confirm}
+          >
+            {busy
+              ? t("settings.availableModelsDeleting")
+              : t("settings.availableModelsDeleteConfirm")}
+          </button>
+        </>
+      }
+    >
+      <p className="settings-atlas-model-form__hint">
+        {t("settings.availableModelsDeleteBody", {
+          name: model?.label ?? "",
+          id: model?.id ?? "",
+        })}
+      </p>
       {error ? (
         <p className="settings-atlas-model-alert" role="alert">
           {error}

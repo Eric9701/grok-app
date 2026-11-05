@@ -66,6 +66,10 @@ pub struct AvailableModel {
     /// Order is the catalog order. Empty when the CLI did not advertise a list.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub context_windows: Vec<u64>,
+    /// Plaintext section in shared `~/.atlas/config.toml` that is not
+    /// enterprise-managed (`managed`, `ENC(...)`, or `hidden`).
+    #[serde(default)]
+    pub editable: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -198,6 +202,7 @@ fn insert_fallback_model(
             reasoning_efforts: efforts,
             context_window: Some(OFFICIAL_FALLBACK_CONTEXT_WINDOW),
             context_windows: OFFICIAL_FALLBACK_CONTEXT_WINDOWS.to_vec(),
+            editable: false,
         },
     );
 }
@@ -376,6 +381,17 @@ fn parse_config_catalog_models(text: &str) -> BTreeMap<String, ParsedCacheModel>
     map
 }
 
+fn apply_editable_flags(by_id: &mut BTreeMap<String, AvailableModel>) {
+    let path = crate::cc_switch_import::atlas_config_path();
+    let Ok(text) = fs::read_to_string(path) else {
+        return;
+    };
+    let ids = crate::cc_switch_import::editable_section_ids(&text);
+    for model in by_id.values_mut() {
+        model.editable = ids.contains(&model.id.to_ascii_lowercase());
+    }
+}
+
 fn insert_parsed_models(
     by_id: &mut BTreeMap<String, AvailableModel>,
     map: BTreeMap<String, ParsedCacheModel>,
@@ -389,6 +405,7 @@ fn insert_parsed_models(
             reasoning_efforts: parsed.reasoning_efforts,
             context_window: parsed.context_window,
             context_windows: parsed.context_windows,
+            editable: false,
         });
     }
 }
@@ -564,6 +581,8 @@ pub fn list_available_models() -> AvailableModelsResult {
         }
         insert_parsed_models(&mut by_id, parse_config_catalog_models(&text));
     }
+
+    apply_editable_flags(&mut by_id);
 
     // Hard fallback — known official ids when cache + Atlas catalog empty.
     // Live CLI cache replaces this list, including Fast when the CLI ships it.
@@ -931,6 +950,7 @@ name = "ENC(not-a-label)"
                 reasoning_efforts: vec![],
                 context_window: None,
                 context_windows: Vec::new(),
+                editable: false,
             },
         );
         let pick =
@@ -983,6 +1003,7 @@ name = "ENC(not-a-label)"
             reasoning_efforts: Vec::new(),
             context_window: grok.context_window,
             context_windows: grok.context_windows.clone(),
+            editable: false,
         };
         assert!(model_supports_context_window(&supported, 256000));
         assert!(model_supports_context_window(&supported, 500000));
@@ -997,6 +1018,7 @@ name = "ENC(not-a-label)"
             reasoning_efforts: Vec::new(),
             context_window: Some(256_000),
             context_windows: vec![128_000, 256_000],
+            editable: false,
         };
         assert_eq!(app_default_context_window(&camel_only), None);
         assert_eq!(
@@ -1038,6 +1060,7 @@ name = "ENC(not-a-label)"
             reasoning_efforts: Vec::new(),
             context_window: Some(500_000),
             context_windows: Vec::new(),
+            editable: false,
         }
     }
 

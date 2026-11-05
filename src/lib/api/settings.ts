@@ -312,6 +312,8 @@ export interface AvailableModel {
   contextWindow?: number | null;
   /** Selectable windows from CLI `info.context_windows` (catalog order). */
   contextWindows?: number[] | null;
+  /** Plaintext, non-managed section in shared `~/.atlas/config.toml`. */
+  editable?: boolean;
 }
 
 export interface AvailableModelsResult {
@@ -357,6 +359,38 @@ export async function providersAtlasModelAdd(body: {
   apiKey: string;
 }) {
   return invoke<void>("providers_atlas_model_add", { body });
+}
+
+export interface AtlasModelEditView {
+  id: string;
+  model: string;
+  name: string;
+  description: string;
+  baseUrl: string;
+  apiBackend: string;
+  contextWindow: number;
+  hasApiKey: boolean;
+}
+
+export async function providersAtlasModelGet(id: string) {
+  return invoke<AtlasModelEditView>("providers_atlas_model_get", { id });
+}
+
+export async function providersAtlasModelUpdate(body: {
+  id: string;
+  model: string;
+  name: string;
+  description?: string;
+  baseUrl: string;
+  apiBackend: string;
+  contextWindow: number;
+  apiKey?: string;
+}) {
+  return invoke<void>("providers_atlas_model_update", { body });
+}
+
+export async function providersAtlasModelDelete(id: string) {
+  return invoke<void>("providers_atlas_model_delete", { id });
 }
 
 /** Run `atlas models refresh`, then return the catalog the composer reads. */

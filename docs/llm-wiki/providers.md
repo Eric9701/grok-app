@@ -190,6 +190,9 @@ Host must rebind both sides on every switch and before each ACP spawn (`prepare_
 | `providers_cc_switch_scan` | Read-only scan of local **CC Switch** Grok Build providers |
 | `providers_cc_switch_import` | Import selected CC Switch rows into shared `~/.atlas/config.toml` |
 | `providers_atlas_model_add` | Append one `[model.<id>]` to shared `~/.atlas/config.toml`; reject a duplicate section id |
+| `providers_atlas_model_get` | Read one non-managed section for editing; does not return the API key |
+| `providers_atlas_model_update` | Rewrite one non-managed section in place; blank API key keeps the stored key |
+| `providers_atlas_model_delete` | Remove one non-managed section; refuse when it is `[models].default` |
 | `editors_list` | Detected local IDEs |
 | `open_in_editor` | Open path in chosen editor |
 
@@ -257,7 +260,7 @@ Store file locations:
 
 Official CC Switch rows (Grok Official) are not listed and are not written. Proxy-takeover placeholders (`PROXY_MANAGED`, `127.0.0.1:…`) are rejected. The written `base_url` stays the upstream URL from CC Switch; this path does not rewrite it to the App loopback sanitizer.
 
-Two Host paths may write custom `[model.*]` tables into shared `~/.atlas/config.toml`. This import may overwrite a non-enterprise section with the same id. Settings → General → Composer → Available models → **Add model** (`providers_atlas_model_add`) only appends a new section and rejects any duplicate section id, including enterprise `ENC(...)` and `hidden` sections. Neither path changes `[models].default` or writes App agent-home. Other shared-home writes stay refused.
+Two Host paths may write custom `[model.*]` tables into shared `~/.atlas/config.toml`. This import may overwrite a non-enterprise section with the same id. Settings → General → Composer → Available models → **Add model** (`providers_atlas_model_add`) only appends a new section and rejects any duplicate section id, including enterprise `ENC(...)` and `hidden` sections. **Edit** and **Delete** on that list apply only to non-managed plaintext sections already in `~/.atlas/config.toml` (`managed` is not true, and the key is not `ENC(...)`). Edit keeps the section id and keeps the stored key when the field is blank. Delete refuses the current `[models].default`. Neither path changes `[models].default` or writes App agent-home. Other shared-home writes stay refused.
 
 ## Security
 

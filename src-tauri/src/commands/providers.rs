@@ -41,6 +41,37 @@ pub async fn providers_atlas_model_add(
 }
 
 #[tauri::command]
+pub async fn providers_atlas_model_get(
+    id: String,
+) -> Result<crate::cc_switch_import::AtlasModelEditView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::cc_switch_import::get_atlas_catalog_model(&id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn providers_atlas_model_update(
+    body: crate::cc_switch_import::AtlasModelUpdateRequest,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::cc_switch_import::update_atlas_catalog_model(body)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn providers_atlas_model_delete(id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::cc_switch_import::delete_atlas_catalog_model(&id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub async fn providers_list() -> Result<crate::providers::ProvidersListResult, String> {
     // Blocking file I/O off the async runtime (migrations / repairs / list).
     tauri::async_runtime::spawn_blocking(|| {
