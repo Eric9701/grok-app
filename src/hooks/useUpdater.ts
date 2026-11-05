@@ -410,6 +410,21 @@ export function useUpdater() {
       const shouldShow = () => !background || manualResultRequestedRef.current;
       let r: SelfUpdateCheck;
       try {
+        if (shouldShow()) {
+          try {
+            const s = await selfUpdateStatus();
+            if (stale()) return;
+            setSelfStatus(s);
+            setChannelInfo({
+              channel: s.blocker ? "unsupported" : "silent",
+              pluginEnabled: s.enabled,
+              platformSupported: !s.blocker,
+              endpoint: s.feedUrl,
+            });
+          } catch {
+            /* host label is best-effort; the check below still runs */
+          }
+        }
         r = await selfUpdateCheck();
       } catch (err) {
         if (stale()) return;

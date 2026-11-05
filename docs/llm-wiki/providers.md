@@ -188,7 +188,8 @@ Host must rebind both sides on every switch and before each ACP spawn (`prepare_
 | `providers_test_model` | Per-model probe: one tiny non-streaming inference request to `{base}/chat/completions` (\| `/responses` \| `/v1/messages` by `api_backend`); success = HTTP 2xx |
 | `providers_balance` | Account balance / plan probe (Phase 1: **DeepSeek only**) |
 | `providers_cc_switch_scan` | Read-only scan of local **CC Switch** Grok Build providers |
-| `providers_cc_switch_import` | Import selected CC Switch rows into custom providers |
+| `providers_cc_switch_import` | Import selected CC Switch rows into shared `~/.atlas/config.toml` |
+| `providers_atlas_model_add` | Append one `[model.<id>]` to shared `~/.atlas/config.toml`; reject a duplicate section id |
 | `editors_list` | Detected local IDEs |
 | `open_in_editor` | Open path in chosen editor |
 
@@ -256,7 +257,7 @@ Store file locations:
 
 Official CC Switch rows (Grok Official) are not listed and are not written. Proxy-takeover placeholders (`PROXY_MANAGED`, `127.0.0.1:…`) are rejected. The written `base_url` stays the upstream URL from CC Switch; this path does not rewrite it to the App loopback sanitizer.
 
-This import is the only Host path allowed to merge custom `[model.*]` tables into shared `~/.atlas/config.toml`. It does not change `[models].default` and does not overwrite enterprise `ENC(...)` or `hidden` sections. Other shared-home writes stay refused.
+Two Host paths may write custom `[model.*]` tables into shared `~/.atlas/config.toml`. This import may overwrite a non-enterprise section with the same id. Settings → General → Composer → Available models → **Add model** (`providers_atlas_model_add`) only appends a new section and rejects any duplicate section id, including enterprise `ENC(...)` and `hidden` sections. Neither path changes `[models].default` or writes App agent-home. Other shared-home writes stay refused.
 
 ## Security
 

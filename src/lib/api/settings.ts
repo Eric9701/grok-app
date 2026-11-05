@@ -345,6 +345,20 @@ export async function modelsListAvailable() {
   return invoke<AvailableModelsResult>("models_list_available");
 }
 
+/** Append one `[model.<id>]` section to shared `~/.atlas/config.toml`. */
+export async function providersAtlasModelAdd(body: {
+  id: string;
+  model: string;
+  name: string;
+  description?: string;
+  baseUrl: string;
+  apiBackend: string;
+  contextWindow: number;
+  apiKey: string;
+}) {
+  return invoke<void>("providers_atlas_model_add", { body });
+}
+
 /** Run `atlas models refresh`, then return the catalog the composer reads. */
 export async function modelsRefreshCatalog() {
   return invoke<AvailableModelsResult>("models_refresh_catalog");

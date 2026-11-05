@@ -387,6 +387,7 @@ pub fn app_invoke_handler(
         commands::providers_balance,
         commands::providers_cc_switch_scan,
         commands::providers_cc_switch_import,
+        commands::providers_atlas_model_add,
         commands::models_aux_get,
         commands::models_aux_set,
         commands::models_aux_apply_save_grok,

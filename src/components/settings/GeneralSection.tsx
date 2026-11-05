@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
 
+import { AtlasModelAddDialog } from "@/components/settings/AtlasModelAddDialog";
 import { Select } from "@/components/Select";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { IconLanguage, IconRefresh, IconShield } from "@/components/icons";
@@ -255,6 +256,7 @@ export function GeneralSection() {
   // webview, mirroring the big-model key fields).
   const [sttCustomApiKeyDraft, setSttCustomApiKeyDraft] = useState("");
   const [modelsRefreshBusy, setModelsRefreshBusy] = useState(false);
+  const [modelsAddOpen, setModelsAddOpen] = useState(false);
   const [modelsRefreshError, setModelsRefreshError] = useState<string | null>(
     null,
   );
@@ -329,7 +331,16 @@ export function GeneralSection() {
                 <div className="settings-row__text">
                   <div className="settings-row__label">
                     <span>{t("settings.availableModels")}</span>
-                    <button
+                    <span className="settings-models-actions">
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={modelsRefreshBusy}
+                        onClick={() => setModelsAddOpen(true)}
+                      >
+                        {t("settings.availableModelsAdd")}
+                      </button>
+                      <button
                       type="button"
                       className="btn btn--ghost btn--sm settings-models-refresh"
                       disabled={modelsRefreshBusy}
@@ -366,6 +377,7 @@ export function GeneralSection() {
                         ? t("settings.availableModelsRefreshing")
                         : t("settings.availableModelsRefresh")}
                     </button>
+                    </span>
                   </div>
                   <div className="settings-row__desc">
                     {t("settings.availableModelsDesc")}
@@ -2965,6 +2977,13 @@ export function GeneralSection() {
             </>
             )}
           </>
+      <AtlasModelAddDialog
+        open={modelsAddOpen}
+        onClose={() => setModelsAddOpen(false)}
+        t={t}
+        showToast={(message) => showSettingsToast(message, 2400)}
+        onAvailableModels={onAvailableModels}
+      />
     </>
   );
 }

@@ -40,6 +40,23 @@ pub fn read_atlas_endpoints() -> AtlasEndpointsSnapshot {
     read_atlas_endpoints_at(&shared_config_path())
 }
 
+/// `cli_update_base_url` from `~/.atlas/config.toml` when the user has one.
+///
+/// Desktop Check for updates uses this before the compile-time intranet default,
+/// so an empty Settings mirror still follows the CLI endpoint already configured.
+pub fn configured_cli_update_base() -> Option<String> {
+    endpoint_value(&read_atlas_endpoints().entries, "cli_update_base_url")
+}
+
+pub fn endpoint_value(entries: &[AtlasEndpointEntry], key: &str) -> Option<String> {
+    let value = entries.iter().find(|e| e.key == key)?.value.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
 fn shared_config_path() -> PathBuf {
     crate::paths::shared_cli_home().join("config.toml")
 }
@@ -299,6 +316,11 @@ cli_update_base_url = "https://cli.example.test/cli" # note
         let rows = parse_endpoints_table(text);
         assert_eq!(rows[0].value, "https://cli.example.test/v1#frag");
         assert_eq!(rows[1].value, "https://cli.example.test/cli");
+        assert_eq!(
+            endpoint_value(&rows, "cli_update_base_url").as_deref(),
+            Some("https://cli.example.test/cli")
+        );
+        assert_eq!(endpoint_value(&rows, "missing"), None);
     }
 
     #[test]

@@ -34,6 +34,13 @@ use crate::process_util;
 /// Built-in enterprise Atlas CLI channel (overridable).
 const DEFAULT_ATLAS_CLI_MIRROR: &str = "http://10.218.220.237:22255/atlas/cli";
 
+/// Compile-time enterprise CLI channel. Desktop Check for updates uses this
+/// only after env, settings, and `config.toml` are empty; CLI install does not
+/// consult `config.toml`.
+pub fn builtin_cli_mirror() -> &'static str {
+    DEFAULT_ATLAS_CLI_MIRROR
+}
+
 /// Resolve the install/update base URL (no trailing slash).
 pub fn resolve_cli_mirror() -> String {
     if let Ok(v) = std::env::var("ATLAS_CLI_MIRROR") {

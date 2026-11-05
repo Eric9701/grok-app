@@ -25,6 +25,21 @@ pub async fn providers_cc_switch_import(
     Ok(result)
 }
 
+/// Append one `[model.<id>]` section to shared `~/.atlas/config.toml`.
+///
+/// Duplicate section ids are rejected. Does not recycle agents and does not
+/// write App agent-home.
+#[tauri::command]
+pub async fn providers_atlas_model_add(
+    body: crate::cc_switch_import::AtlasModelAddRequest,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::cc_switch_import::add_atlas_catalog_model(body)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn providers_list() -> Result<crate::providers::ProvidersListResult, String> {
     // Blocking file I/O off the async runtime (migrations / repairs / list).

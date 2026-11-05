@@ -38,7 +38,10 @@ pub fn feed_url_from_mirror(mirror: &str) -> Option<String> {
     Some(format!("{root}/desktop/{CHANNEL}/update.json"))
 }
 
-/// Env override first, then the resolved CLI mirror.
+/// Full feed URL in `ATLAS_DESKTOP_UPDATE_URL` wins. Otherwise the mirror chain
+/// is `ATLAS_CLI_MIRROR`, Settings `atlasCliMirror`, `config.toml`
+/// `cli_update_base_url`, then the compile-time default.
+/// CLI install keeps [`crate::cli_install::resolve_cli_mirror`] and does not read config.toml.
 pub fn resolve_feed_url() -> Option<String> {
     if let Ok(v) = std::env::var(FEED_URL_ENV) {
         let t = v.trim();
@@ -46,7 +49,37 @@ pub fn resolve_feed_url() -> Option<String> {
             return Some(t.to_string());
         }
     }
-    feed_url_from_mirror(&crate::cli_install::resolve_cli_mirror())
+    feed_url_from_mirror(&resolve_desktop_update_mirror())
+}
+
+pub fn resolve_desktop_update_mirror() -> String {
+    let env_mirror = std::env::var("ATLAS_CLI_MIRROR").ok();
+    let settings_mirror = crate::store::load_settings().atlas_cli_mirror;
+    let config_mirror = crate::atlas_endpoints::configured_cli_update_base();
+    pick_desktop_update_mirror(
+        env_mirror.as_deref(),
+        settings_mirror.as_deref(),
+        config_mirror.as_deref(),
+        crate::cli_install::builtin_cli_mirror(),
+    )
+}
+
+/// First non-empty, normalizable mirror. `default_mirror` is always last.
+pub fn pick_desktop_update_mirror(
+    env_mirror: Option<&str>,
+    settings_mirror: Option<&str>,
+    config_mirror: Option<&str>,
+    default_mirror: &str,
+) -> String {
+    for candidate in [env_mirror, settings_mirror, config_mirror] {
+        if let Some(raw) = candidate {
+            if let Ok(url) = crate::cli_install::normalize_cli_mirror(raw) {
+                return url;
+            }
+        }
+    }
+    crate::cli_install::normalize_cli_mirror(default_mirror)
+        .unwrap_or_else(|_| default_mirror.trim().trim_end_matches('/').to_string())
 }
 
 /// `update.json` key for this binary, with the payload kind it must carry.
@@ -113,6 +146,43 @@ mod tests {
     use super::*;
 
     const FEED: &str = "http://cli.example.test:22255/atlas/desktop/stable/update.json";
+
+    #[test]
+    fn desktop_mirror_prefers_config_over_builtin() {
+        let builtin = "http://10.218.220.237:22255/atlas/cli";
+        let config = "https://atlas.example.test/atlas/cli";
+        assert_eq!(
+            pick_desktop_update_mirror(None, None, Some(config), builtin),
+            config
+        );
+        assert_eq!(
+            pick_desktop_update_mirror(None, Some("  "), Some(config), builtin),
+            config
+        );
+        assert_eq!(
+            pick_desktop_update_mirror(
+                Some("http://env.example.test/atlas/cli"),
+                Some("https://settings.example.test/atlas/cli"),
+                Some(config),
+                builtin
+            ),
+            "http://env.example.test/atlas/cli"
+        );
+        assert_eq!(
+            pick_desktop_update_mirror(None, Some("not a url"), Some("ftp://x/cli"), builtin),
+            builtin.trim_end_matches('/')
+        );
+        assert_eq!(
+            feed_url_from_mirror(&pick_desktop_update_mirror(
+                None,
+                None,
+                Some(config),
+                builtin
+            ))
+            .as_deref(),
+            Some("https://atlas.example.test/atlas/desktop/stable/update.json")
+        );
+    }
 
     #[test]
     fn derives_feed_from_cli_mirror() {

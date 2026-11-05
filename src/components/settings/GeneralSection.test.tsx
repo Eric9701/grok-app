@@ -110,6 +110,7 @@ describe("GeneralSection voice — custom STT", () => {
       }),
     );
     expect(html).toContain("settings.availableModelsRefresh");
+    expect(html).toContain("settings.availableModelsAdd");
     expect(html).toContain("glm-5");
   });
 

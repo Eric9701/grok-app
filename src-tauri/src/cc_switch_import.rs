@@ -993,6 +993,144 @@ fn slugify_id(name: &str, profile: &str) -> String {
     }
 }
 
+/// Stable error when `[model.<id>]` already exists in `~/.atlas/config.toml`.
+pub const ATLAS_MODEL_ADD_DUPLICATE: &str = "duplicate_id";
+/// Section id failed the charset check.
+pub const ATLAS_MODEL_ADD_INVALID_ID: &str = "invalid_id";
+/// `grok` and `official` stay reserved for the official route.
+pub const ATLAS_MODEL_ADD_RESERVED_ID: &str = "reserved_id";
+pub const ATLAS_MODEL_ADD_MISSING: &str = "missing_field";
+pub const ATLAS_MODEL_ADD_BACKEND: &str = "invalid_backend";
+pub const ATLAS_MODEL_ADD_CONTEXT: &str = "invalid_context_window";
+pub const ATLAS_MODEL_ADD_BASE_URL: &str = "invalid_base_url";
+pub const ATLAS_MODEL_ADD_DEFAULT: &str = "default_changed";
+
+/// One new enterprise-style catalog section. The key never leaves this process.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AtlasModelAddRequest {
+    pub id: String,
+    pub model: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub base_url: String,
+    pub api_backend: String,
+    pub context_window: u64,
+    pub api_key: String,
+}
+
+/// Append `[model.<id>]` to the shared Atlas CLI config.
+///
+/// Does not change `[models].default`, does not write App agent-home, and
+/// refuses an id that already exists (including enterprise `ENC` / hidden
+/// sections). The upstream `model` value may repeat across sections.
+pub fn add_atlas_catalog_model(req: AtlasModelAddRequest) -> Result<(), String> {
+    crate::agent_home_config::with_config_write_lock(|| {
+        add_atlas_catalog_model_at(&atlas_config_path(), req)
+    })
+}
+
+pub(crate) fn add_atlas_catalog_model_at(
+    path: &Path,
+    req: AtlasModelAddRequest,
+) -> Result<(), String> {
+    let id = normalize_atlas_section_id(&req.id)?;
+    let model = require_field(&req.model)?;
+    let name = require_field(&req.name)?;
+    let base_url = normalize_http_base(&req.base_url)?;
+    let api_key = require_field(&req.api_key)?;
+    let api_backend = normalize_atlas_backend(&req.api_backend)?;
+    if req.context_window == 0 {
+        return Err(ATLAS_MODEL_ADD_CONTEXT.into());
+    }
+    let description = req
+        .description
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("");
+
+    let original = fs::read_to_string(path).unwrap_or_default();
+    let before_default = providers::get_models_default(&original);
+    if providers::parse_model_sections_for_proxy(&original)
+        .iter()
+        .any(|section| section.id.eq_ignore_ascii_case(&id))
+    {
+        return Err(ATLAS_MODEL_ADD_DUPLICATE.into());
+    }
+
+    let mut fields = vec![
+        ("model".to_string(), model),
+        ("name".to_string(), name),
+        ("description".to_string(), description.to_string()),
+        ("base_url".to_string(), base_url),
+        ("api_backend".to_string(), api_backend),
+        ("context_window".to_string(), req.context_window.to_string()),
+        ("api_key".to_string(), api_key),
+    ];
+    fields.retain(|(_, value)| !value.trim().is_empty());
+    let next = append_model_section(&original, &id, &fields);
+    let after_default = providers::get_models_default(&next);
+    if before_default != after_default {
+        return Err(ATLAS_MODEL_ADD_DEFAULT.into());
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(path, &next).map_err(|e| e.to_string())?;
+    tracing::info!(target: "atlas_model", %id, "added atlas catalog model section");
+    Ok(())
+}
+
+fn require_field(raw: &str) -> Result<String, String> {
+    let value = raw.trim();
+    if value.is_empty() {
+        Err(ATLAS_MODEL_ADD_MISSING.into())
+    } else {
+        Ok(value.to_string())
+    }
+}
+
+fn normalize_atlas_section_id(raw: &str) -> Result<String, String> {
+    let id = raw.trim().to_ascii_lowercase();
+    let ok = !id.is_empty()
+        && id
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphanumeric())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-');
+    if !ok {
+        return Err(ATLAS_MODEL_ADD_INVALID_ID.into());
+    }
+    if providers::is_reserved_custom_provider_id(&id) {
+        return Err(ATLAS_MODEL_ADD_RESERVED_ID.into());
+    }
+    Ok(id)
+}
+
+fn normalize_atlas_backend(raw: &str) -> Result<String, String> {
+    match raw.trim() {
+        "messages" => Ok("messages".into()),
+        "chat_completions" => Ok("chat_completions".into()),
+        "responses" => Ok("responses".into()),
+        _ => Err(ATLAS_MODEL_ADD_BACKEND.into()),
+    }
+}
+
+fn normalize_http_base(raw: &str) -> Result<String, String> {
+    let value = raw.trim();
+    let lower = value.to_ascii_lowercase();
+    if value.is_empty() || value.chars().any(char::is_whitespace) {
+        return Err(ATLAS_MODEL_ADD_BASE_URL.into());
+    }
+    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+        return Err(ATLAS_MODEL_ADD_BASE_URL.into());
+    }
+    Ok(value.to_string())
+}
+
 fn unique_id(base: &str, existing: &std::collections::HashSet<String>) -> String {
     if !existing.contains(base) {
         return base.to_string();
@@ -1323,5 +1461,86 @@ api_backend = \"responses\"
     fn write_file(path: &Path, body: &str) {
         let mut f = fs::File::create(path).unwrap();
         f.write_all(body.as_bytes()).unwrap();
+    }
+
+    fn sample_add(id: &str) -> AtlasModelAddRequest {
+        AtlasModelAddRequest {
+            id: id.into(),
+            model: "kimi-for-coding".into(),
+            name: id.into(),
+            description: Some(String::new()),
+            base_url: "https://api.kimi.com/coding/v1".into(),
+            api_backend: "messages".into(),
+            context_window: 200_000,
+            api_key: "sk-test-key".into(),
+        }
+    }
+
+    #[test]
+    fn add_appends_section_and_keeps_default() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        fs::write(
+            &path,
+            "[models]\ndefault = \"arch-glm-5.2\"\n\n[model.keep]\nmodel = \"keep\"\nname = \"keep\"\nbase_url = \"https://keep.example/v1\"\napi_key = \"ENC(secret)\"\n",
+        )
+        .unwrap();
+        add_atlas_catalog_model_at(&path, sample_add("Arch-Kimi-New")).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("default = \"arch-glm-5.2\""));
+        assert!(text.contains("[model.\"arch-kimi-new\"]"));
+        assert!(text.contains("context_window = 200000\n"));
+        assert!(!text.contains("context_window = \"200000\""));
+        assert!(text.contains("api_backend = \"messages\""));
+        assert!(!text.contains("description ="));
+        assert!(text.contains("api_key = \"ENC(secret)\""));
+        assert_eq!(
+            providers::get_models_default(&text).as_deref(),
+            Some("arch-glm-5.2")
+        );
+    }
+
+    #[test]
+    fn add_rejects_duplicate_id_without_rewriting() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        let original = "[models]\ndefault = \"grok\"\n\n[model.arch-kimi-code-eric1]\nmodel = \"kimi-for-coding\"\nname = \"eric\"\nbase_url = \"https://api.kimi.com/coding/v1\"\napi_key = \"sk-old\"\n";
+        fs::write(&path, original).unwrap();
+        let err = add_atlas_catalog_model_at(&path, sample_add("ARCH-KIMI-CODE-ERIC1"))
+            .expect_err("duplicate");
+        assert_eq!(err, ATLAS_MODEL_ADD_DUPLICATE);
+        assert_eq!(fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn add_rejects_enterprise_section_of_the_same_id() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        let original = "[model.arch-kimi-code-eric]\nmodel = \"ENC(abc)\"\nname = \"eric\"\napi_key = \"ENC(secret)\"\nhidden = true\n";
+        fs::write(&path, original).unwrap();
+        let err = add_atlas_catalog_model_at(&path, sample_add("arch-kimi-code-eric"))
+            .expect_err("enterprise duplicate");
+        assert_eq!(err, ATLAS_MODEL_ADD_DUPLICATE);
+        assert_eq!(fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn add_rejects_reserved_and_blank_ids() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        fs::write(&path, "").unwrap();
+        assert_eq!(
+            add_atlas_catalog_model_at(&path, sample_add("grok")).unwrap_err(),
+            ATLAS_MODEL_ADD_RESERVED_ID
+        );
+        assert_eq!(
+            add_atlas_catalog_model_at(&path, sample_add("official")).unwrap_err(),
+            ATLAS_MODEL_ADD_RESERVED_ID
+        );
+        assert_eq!(
+            add_atlas_catalog_model_at(&path, sample_add("bad id")).unwrap_err(),
+            ATLAS_MODEL_ADD_INVALID_ID
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), "");
     }
 }
