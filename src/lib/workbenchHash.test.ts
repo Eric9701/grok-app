@@ -48,6 +48,14 @@ describe("resolveWorkbenchHash", () => {
     );
     expect(atlasCloudTaskIdFromHash("#/atlas-cloud")).toBeNull();
     expect(atlasCloudTaskIdFromHash("#/atlas-cloud/tasks")).toBeNull();
+    expect(resolveWorkbenchHash("#/fleet")).toEqual({
+      kind: "pane",
+      pane: "fleet",
+    });
+    expect(resolveWorkbenchHash("#/fleet/tasks")).toEqual({
+      kind: "pane",
+      pane: "fleet",
+    });
   });
 
   it("bare settings hash restores last route", () => {

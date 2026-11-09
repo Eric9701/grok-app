@@ -475,13 +475,15 @@ describe("agent kanban surface is not a todo list", () => {
     expect(palette).toContain('id: "open-kanban"');
     expect(palette).toContain('id: "open-task-board"');
     const workbench = readFileSync(join(root, "app/AppWorkbench.tsx"), "utf8");
+    const mainPane = readFileSync(join(root, "app/WorkbenchMainPane.tsx"), "utf8");
     const sessionModals = readFileSync(
       join(root, "app/WorkbenchSessionModals.tsx"),
       "utf8",
     );
     const chrome = workbench + sessionModals;
     const sidebar = readFileSync(join(root, "app/WorkbenchSidebar.tsx"), "utf8");
-    expect(workbench).toContain("KanbanBoardPage");
+    expect(mainPane).toContain("KanbanBoardPage");
+    expect(workbench).toContain("WorkbenchMainPane");
     expect(workbench).toContain("navigateKanban");
     expect(chrome).toContain('hash = "#/kanban"');
     expect(sidebar).toContain('tr("sidebar.kanban")');

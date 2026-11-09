@@ -11,6 +11,7 @@ mod acp_client;
 mod atlas_endpoints;
 
 mod atlas_relay_agent;
+mod fleet;
 
 #[cfg(test)]
 mod acp_golden_test;
@@ -994,6 +995,7 @@ pub fn run() {
                 tauri::async_runtime::spawn(async {
                     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
                     crate::atlas_relay_agent::autostart_from_settings().await;
+                    crate::fleet::restore_and_listen().await;
                 });
 
                 // Crash / exit recovery while bridge stays enabled.

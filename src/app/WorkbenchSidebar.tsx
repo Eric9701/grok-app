@@ -24,6 +24,7 @@ import {
 import {
   IconDeviceMobile,
   IconFolderPlus,
+  IconDeviceDesktop,
   IconList,
   IconNewChat,
   IconScheduled,
@@ -123,6 +124,7 @@ export type WorkbenchSidebarProps = {
   onNewChat: () => void;
   onNavigateAutomations: () => void;
   onNavigateKanban: () => void;
+  onNavigateFleet: () => void;
   onNavigateRemoteIm: () => void;
   showUserMenu: boolean;
   setShowUserMenu: Dispatch<SetStateAction<boolean>>;
@@ -185,6 +187,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
     onNewChat,
     onNavigateAutomations,
     onNavigateKanban,
+    onNavigateFleet,
     onNavigateRemoteIm,
     showUserMenu,
     setShowUserMenu,
@@ -411,6 +414,18 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
               <IconList size={16} />
             </span>
             {tr("sidebar.kanban")}
+          </button>
+          <button
+            type="button"
+            className={
+              "nav-item" + (mainPane === "fleet" ? " nav-item--active" : "")
+            }
+            onClick={onNavigateFleet}
+          >
+            <span className="nav-item__icon">
+              <IconDeviceDesktop size={16} />
+            </span>
+            {tr("fleet.nav")}
           </button>
           {isDesktopHost() && remoteChromeVisible ? (
             <button

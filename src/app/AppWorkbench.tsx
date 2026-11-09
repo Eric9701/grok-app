@@ -537,7 +537,6 @@ import { PhoneAccountSheet } from "@/components/PhoneAccountSheet";
 import { PhoneComposerToolsSheet } from "@/components/PhoneComposerToolsSheet";
 import { type ContextMenuItem } from "@/components/ContextMenu";
 import {
-  aiCreateSeedPrompt,
   computeNextRunAt,
   type Automation,
 } from "@/lib/automations";
@@ -573,6 +572,7 @@ import {
 import { resolveSidePathDeepLink } from "@/lib/sidePathDeepLink";
 
 import { WorkbenchAppDialogStage } from "@/app/WorkbenchAppDialogStage";
+import { WorkbenchMainPane } from "@/app/WorkbenchMainPane";
 import { WorkbenchComposerModals } from "@/app/WorkbenchComposerModals";
 import {
   mergeSessionChange,
@@ -581,14 +581,6 @@ import {
 } from "@/lib/sessionChanges";
 
 
-const AutomationsPage = lazy(async () => {
-  const m = await import("@/components/AutomationsPage");
-  return { default: m.AutomationsPage };
-});
-const KanbanBoardPage = lazy(async () => {
-  const m = await import("@/components/KanbanBoardPage");
-  return { default: m.KanbanBoardPage };
-});
 const SetupWizard = lazy(async () => {
   const m = await import("@/components/SetupWizard");
   return { default: m.SetupWizard };
@@ -3169,6 +3161,15 @@ export function AppWorkbench() {
     setShowUserMenu(false);
     if (typeof window !== "undefined") {
       window.location.hash = "#/kanban";
+    }
+  }, [closeSettings]);
+
+  const navigateFleet = useCallback(() => {
+    closeSettings();
+    setMainPane("fleet");
+    setShowUserMenu(false);
+    if (typeof window !== "undefined") {
+      window.location.hash = "#/fleet";
     }
   }, [closeSettings]);
 
@@ -12512,6 +12513,7 @@ export function AppWorkbench() {
           onNewChat={() => void newChat()}
           onNavigateAutomations={navigateAutomations}
           onNavigateKanban={navigateKanban}
+          onNavigateFleet={navigateFleet}
           onNavigateRemoteIm={() => navigateSettings("remote_im", "im")}
           showUserMenu={showUserMenu}
           setShowUserMenu={setShowUserMenu}
@@ -12646,88 +12648,28 @@ export function AppWorkbench() {
           openAsidePane={openAsidePane}
           showToast={showToast}
         >
-          {mainPane === "kanban" ? (
-            <Suspense fallback={null}>
-              <KanbanBoardPage
-                locale={locale}
-                sessions={sessions}
-                projects={projects.map((p) => ({
-                  id: p.id,
-                  name: p.name,
-                  path: p.path,
-                }))}
-                liveMap={liveMap}
-                currentSessionId={session.sessionId}
-                untitledLabel={tr("session.untitled")}
-                generalWorkspacePath={generalWorkspacePath}
-                unboundProjectLabel={tr("sidebar.otherSessions")}
-                onSelectSession={openSessionByIdHandler}
-              />
-            </Suspense>
-          ) : mainPane === "automations" ? (
-                        <Suspense fallback={null}>
-              <AutomationsPage
-              t={(k, vars) =>
-              tr(k as Parameters<typeof tr>[0], vars as Record<string, string | number>)
-              }
-              projects={projects.map((p) => ({ id: p.id, name: p.name }))}
-              defaultModelId={modelId}
-              defaultEffort={effort}
-              models={availableModels}
-              openAtLogin={launchAtLogin}
-              onOpenLaunchAtLogin={() => {
-              navigateSettings("general", "app");
-              // Scroll/highlight Launch at login after Settings mounts.
-              window.setTimeout(() => {
-              const el = document.getElementById(
-              "settings-anchor-launchAtLogin",
-              );
-              if (el) {
-              el.scrollIntoView({ block: "center", behavior: "smooth" });
-              el.classList.add("is-search-hit");
-              window.setTimeout(
-              () => el.classList.remove("is-search-hit"),
-              1600,
-              );
-              }
-              }, 120);
-              }}
-              closeToTray={closeToTray}
-              keepTrayForSchedules={keepTrayForSchedules}
-              onKeepTrayForSchedules={(v) => {
-              setKeepTrayForSchedules(v);
-              void api.settingsGet().then((s) =>
-              api.settingsSet({ ...s, keepTrayForSchedules: v }),
-              );
-              }}
-              onOpenKeepTraySetting={() => {
-              navigateSettings("general", "app");
-              window.setTimeout(() => {
-              const el = document.getElementById(
-              "settings-anchor-keepTrayForSchedules",
-              );
-              if (el) {
-              el.scrollIntoView({ block: "center", behavior: "smooth" });
-              el.classList.add("is-search-hit");
-              window.setTimeout(
-              () => el.classList.remove("is-search-hit"),
-              1600,
-              );
-              }
-              }, 120);
-              }}
-              onAiCreate={() => {
-              void newChat(null, {
-              seedDraft: aiCreateSeedPrompt("Atlas"),
-              switchToChat: true,
-              automationSetup: true,
-              });
-              setToast(tr("automations.aiComposerHint"));
-              window.setTimeout(() => setToast(null), 4200);
-              }}
-              onRunNow={(auto) => void runAutomation(auto)}
-              />            </Suspense>
-          ) : (
+          <WorkbenchMainPane
+            mainPane={mainPane}
+            locale={locale}
+            sessions={sessions}
+            projects={projects}
+            liveMap={liveMap}
+            currentSessionId={session.sessionId}
+            generalWorkspacePath={generalWorkspacePath}
+            onSelectSession={openSessionByIdHandler}
+            tr={tr}
+            modelId={modelId}
+            effort={effort}
+            models={availableModels}
+            launchAtLogin={launchAtLogin}
+            closeToTray={closeToTray}
+            keepTrayForSchedules={keepTrayForSchedules}
+            onKeepTrayForSchedules={setKeepTrayForSchedules}
+            onNavigateSettings={navigateSettings}
+            onNewChat={newChat}
+            onToast={setToast}
+            onRunNow={(auto) => void runAutomation(auto)}
+          >
           <>
           {activeProject && isProjectFolderMissing(activeProject) && (
             <div className="conn-bar">
@@ -13078,7 +13020,7 @@ export function AppWorkbench() {
           />
           </WorkbenchChatStage>
           </>
-          )}
+          </WorkbenchMainPane>
           {bottomTerminalMounted ? (
             <Suspense fallback={null}>
               <BottomTerminal
