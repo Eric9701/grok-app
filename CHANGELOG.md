@@ -29,6 +29,28 @@ See `docs/llm-wiki/release.md`.
 - 企业微信会把回复里用相对路径标出的图片一并发出去。
 - 企业微信群里 @ 机器人后，可以用 /p 切换项目。
 
+## [0.2.45] - 2026-11-09
+
+> **Highlight:** Available models can be added, edited, and deleted.
+>
+> **中文 · 亮点：** 可用模型可以新增、编辑和删除。
+
+### Added
+- You can add a model to the shared Atlas CLI config. A duplicate section id is refused.
+- Non-managed models in that list can be edited or deleted. A blank API key keeps the current key, and the default model cannot be deleted.
+
+**中文 · 新增**
+- 可用模型可以追加到共享的 Atlas CLI 配置。段名已存在时会拒绝。
+- 列表里非托管的模型可以编辑或删除。API Key 留空会保留原密钥，默认模型不能删除。
+
+### Changed
+- CC Switch import writes selected models into the shared Atlas CLI config. A matching non-enterprise section can be replaced.
+- Update checks follow the CLI mirror, then settings, then the shared config. A manual check rereads that source without a restart.
+
+**中文 · 变更**
+- 从 CC Switch 导入会把选中的模型写入共享的 Atlas CLI 配置。同名的非企业段可以被替换。
+- 检查更新会依次采用 CLI 镜像、设置和共享配置。手动检查会重新读取来源，不必重启。
+
 ## [0.2.43] - 2026-10-26
 
 > **Highlight:** The desktop pet can dictate, send, and stop a chat.
