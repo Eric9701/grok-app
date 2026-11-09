@@ -19,6 +19,13 @@ import {
 } from "@/lib/sessionFinishedTurns";
 import { useAtlasRelayStatus } from "@/hooks/useAtlasRelayStatus";
 import { RelayTaskTracePanel } from "@/components/RelayTaskTracePanel";
+import { formatWikiNotice } from "@/wiki/errors";
+import {
+  getWikiCompileTasks,
+  subscribeWikiCompileTasks,
+  type WikiCompileStage,
+} from "@/wiki/compileTasks";
+import { WikiCompileTracePanel } from "@/wiki/WikiCompileTracePanel";
 import {
   buildAgentKanban,
   countAgentKanbanCards,
@@ -27,6 +34,7 @@ import {
   loadAgentKanbanPrefs,
   mergeKanbanLiveMaps,
   mergeRelayTasksIntoKanban,
+  mergeWikiTasksIntoKanban,
   saveAgentKanbanPrefs,
   visibleAgentKanbanColumns,
   type AgentKanbanCard,
@@ -36,6 +44,13 @@ import {
 } from "@/lib/kanbanBoard";
 
 type TFn = (key: MessageKey, vars?: Record<string, string | number>) => string;
+
+const WIKI_STAGE_KEY: Record<WikiCompileStage, MessageKey> = {
+  read: "kanban.wikiStage.read",
+  analyze: "kanban.wikiStage.analyze",
+  generate: "kanban.wikiStage.generate",
+  write: "kanban.wikiStage.write",
+};
 
 const COLUMN_LABEL_KEY: Record<AgentKanbanColumnId, MessageKey> = {
   needs_you: "kanban.column.needsYou",
@@ -70,7 +85,13 @@ function AgentKanbanCardView({
   selected?: boolean;
   onSelect?: (card: AgentKanbanCard) => void;
 }) {
-  const isRelay = card.source === "relay";
+  const isTrace = card.source === "relay" || card.source === "wiki";
+  const sourceBadge =
+    card.source === "relay"
+      ? t("kanban.relayBadge")
+      : card.source === "wiki"
+        ? t("kanban.wikiBadge")
+        : "";
   const metaParts: string[] = [];
   if (card.projectName) metaParts.push(card.projectName);
   else if (card.projectPath) metaParts.push(card.projectPath);
@@ -93,13 +114,13 @@ function AgentKanbanCardView({
         type="button"
         className="agent-kanban__card-btn"
         onClick={() => onSelect?.(card)}
-        title={isRelay ? t("kanban.openTrace") : t("dashboard.openSession")}
+        title={isTrace ? t("kanban.openTrace") : t("dashboard.openSession")}
       >
         <span className="agent-kanban__card-title" title={card.title}>
           {card.title}
         </span>
-        {isRelay ? (
-          <span className="agent-kanban__card-source">{t("kanban.relayBadge")}</span>
+        {sourceBadge ? (
+          <span className="agent-kanban__card-source">{sourceBadge}</span>
         ) : null}
         {card.isCurrent ? (
           <span className="agent-kanban__card-current">
@@ -181,28 +202,57 @@ export function KanbanBoardPage({
 
   const relayStatus = useAtlasRelayStatus();
   const relayTasks = relayStatus?.tasks ?? [];
+  const wikiTasks = useSyncExternalStore(
+    subscribeWikiCompileTasks,
+    getWikiCompileTasks,
+    getWikiCompileTasks,
+  );
   const [relayTrace, setRelayTrace] = useState<{
     agentId: string;
     taskId: string;
     title: string;
   } | null>(null);
+  const [wikiTraceId, setWikiTraceId] = useState<string | null>(null);
   const board = useMemo(
     () =>
-      mergeRelayTasksIntoKanban(
-        buildAgentKanban({
-          sessions,
-          projects,
-          liveMap,
-          currentSessionId,
-          untitledLabel,
-          generalWorkspacePath,
-          unboundProjectLabel,
-          recentDoneAt,
+      mergeWikiTasksIntoKanban(
+        mergeRelayTasksIntoKanban(
+          buildAgentKanban({
+            sessions,
+            projects,
+            liveMap,
+            currentSessionId,
+            untitledLabel,
+            generalWorkspacePath,
+            unboundProjectLabel,
+            recentDoneAt,
+          }),
+          relayTasks,
+          {
+            projectName: tr("kanban.relayBadge"),
+            untitled: tr("kanban.relayUntitled"),
+          },
+        ),
+        wikiTasks.map((task) => {
+          const step = task.steps.find((item) => item.status === "in_progress");
+          return {
+            id: task.id,
+            title: task.sourcePath,
+            status: task.status,
+            progress:
+              task.status === "failed"
+                ? formatWikiNotice(tr, task.error, task.sourcePath)
+                : task.status === "running" && step
+                  ? tr(WIKI_STAGE_KEY[step.id])
+                  : null,
+            atMs: task.atMs,
+            projectName: task.projectName,
+            projectPath: task.projectPath,
+          };
         }),
-        relayTasks,
         {
-          projectName: tr("kanban.relayBadge"),
-          untitled: tr("kanban.relayUntitled"),
+          badge: tr("kanban.wikiBadge"),
+          untitled: tr("kanban.wikiUntitled"),
         },
       ),
     [
@@ -215,6 +265,7 @@ export function KanbanBoardPage({
       unboundProjectLabel,
       recentDoneAt,
       relayTasks,
+      wikiTasks,
       tr,
     ],
   );
@@ -236,7 +287,13 @@ export function KanbanBoardPage({
   );
 
   const onOpenCard = (card: AgentKanbanCard) => {
+    if (card.source === "wiki" && card.wikiTaskId) {
+      setRelayTrace(null);
+      setWikiTraceId(card.wikiTaskId);
+      return;
+    }
     if (card.source === "relay" && card.relayTaskId) {
+      setWikiTraceId(null);
       setRelayTrace({
         agentId: card.relayAgentId ?? "",
         taskId: card.relayTaskId,
@@ -250,9 +307,10 @@ export function KanbanBoardPage({
     ? `${relayTrace.agentId}:${relayTrace.taskId}`
     : "";
   const cardSelected = (card: AgentKanbanCard) =>
-    card.source === "relay" &&
-    !!card.relayTaskId &&
-    `${card.relayAgentId ?? ""}:${card.relayTaskId}` === relayTraceKey;
+    (card.source === "wiki" && card.wikiTaskId === wikiTraceId) ||
+    (card.source === "relay" &&
+      !!card.relayTaskId &&
+      `${card.relayAgentId ?? ""}:${card.relayTaskId}` === relayTraceKey);
 
   return (
     <div className="auto-page agent-kanban-page">
@@ -390,9 +448,9 @@ export function KanbanBoardPage({
                     {group.cards.map((card) => (
                       <AgentKanbanCardView
                         key={
-                          card.source === "relay"
-                            ? `${card.sessionId}:${card.lastActivityAt}`
-                            : card.sessionId
+                          card.source === "session"
+                            ? card.sessionId
+                            : `${card.sessionId}:${card.lastActivityAt}`
                         }
                         card={card}
                         t={tFn}
@@ -435,9 +493,9 @@ export function KanbanBoardPage({
                       {cards.map((card) => (
                         <AgentKanbanCardView
                           key={
-                          card.source === "relay"
-                            ? `${card.sessionId}:${card.lastActivityAt}`
-                            : card.sessionId
+                          card.source === "session"
+                            ? card.sessionId
+                            : `${card.sessionId}:${card.lastActivityAt}`
                         }
                           card={card}
                           t={tFn}
@@ -454,7 +512,14 @@ export function KanbanBoardPage({
           </div>
         )}
       </div>
-      {relayTrace ? (
+      {wikiTraceId ? (
+        <WikiCompileTracePanel
+          locale={locale}
+          tr={tr}
+          taskId={wikiTraceId}
+          onClose={() => setWikiTraceId(null)}
+        />
+      ) : relayTrace ? (
         <RelayTaskTracePanel
           locale={locale}
           tr={tr}

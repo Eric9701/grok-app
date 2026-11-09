@@ -16,7 +16,8 @@ export type WorkbenchHashPane =
   | "kanban"
   | "octo"
   | "atlasCloud"
-  | "fleet";
+  | "fleet"
+  | "wiki";
 
 export type WorkbenchHashRoute =
   | {
@@ -29,7 +30,7 @@ export type WorkbenchHashRoute =
   | { kind: "pane"; pane: WorkbenchHashPane };
 
 /**
- * Parse `#/settings…` / `#/automations` / `#/kanban` / `#/octo` / `#/atlas-cloud` / `#/fleet` / empty workbench hashes.
+ * Parse `#/settings…` / `#/automations` / `#/kanban` / `#/octo` / `#/atlas-cloud` / `#/fleet` / `#/wiki` / empty workbench hashes.
  */
 export function resolveWorkbenchHash(
   fullHash: string | null | undefined,
@@ -64,6 +65,9 @@ export function resolveWorkbenchHash(
   }
   if (raw === "fleet" || raw.startsWith("fleet")) {
     return { kind: "pane", pane: "fleet" };
+  }
+  if (raw === "wiki" || raw.startsWith("wiki")) {
+    return { kind: "pane", pane: "wiki" };
   }
   return { kind: "pane", pane: "chat" };
 }

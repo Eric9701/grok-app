@@ -3,6 +3,7 @@
  */
 import { useEffect, useState } from "react";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
+import { WikiLibrariesField } from "@/components/settings/WikiLibrariesField";
 
 import {
   AtlasModelAddDialog,
@@ -944,6 +945,7 @@ export function GeneralSection() {
 
             {activeTab === "agent" && (
             <>
+            <WikiLibrariesField t={t} rowHighlight={rowHighlight} />
             <div className="settings-card" id="settings-agent-card">
               {onMaxAgentTurns ? (
                 <div

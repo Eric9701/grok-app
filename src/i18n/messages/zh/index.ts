@@ -17,6 +17,7 @@ import { zhAutomations } from "./automations";
 import { zhFeatures } from "./features";
 import { zhKanban } from "./kanban";
 import { zhFleet } from "./fleet";
+import { zhWiki } from "./wiki";
 import { zhSettings } from "./settings";
 import { zhSettingsUi } from "./settings-ui";
 import { zhSettingsAgent } from "./settings-agent";
@@ -46,6 +47,7 @@ export const zh: Record<MessageKey, string> = {
   ...zhFeatures,
   ...zhKanban,
   ...zhFleet,
+  ...zhWiki,
   ...zhSettings,
   ...zhSettingsUi,
   ...zhSettingsAgent,
@@ -73,6 +75,7 @@ export { zhAutomations } from "./automations";
 export { zhFeatures } from "./features";
 export { zhKanban } from "./kanban";
 export { zhFleet } from "./fleet";
+export { zhWiki } from "./wiki";
 export { zhSettings } from "./settings";
 export { zhSettingsUi } from "./settings-ui";
 export { zhSettingsAgent } from "./settings-agent";

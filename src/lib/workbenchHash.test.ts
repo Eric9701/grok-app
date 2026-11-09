@@ -52,6 +52,10 @@ describe("resolveWorkbenchHash", () => {
       kind: "pane",
       pane: "fleet",
     });
+    expect(resolveWorkbenchHash("#/wiki")).toEqual({
+      kind: "pane",
+      pane: "wiki",
+    });
     expect(resolveWorkbenchHash("#/fleet/tasks")).toEqual({
       kind: "pane",
       pane: "fleet",

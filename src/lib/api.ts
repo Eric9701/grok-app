@@ -27,6 +27,7 @@ export * from "./api/memory";
 export * from "./api/voice";
 export * from "./api/runtime";
 export * from "./api/fleet";
+export * from "./api/wiki";
 export * from "./api/ssh";
 export * from "./api/wallpaper";
 export * from "./api/pet";

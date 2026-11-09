@@ -17,6 +17,7 @@ import { koAutomations } from "./automations";
 import { koFeatures } from "./features";
 import { koKanban } from "./kanban";
 import { koFleet } from "./fleet";
+import { koWiki } from "./wiki";
 import { koSettings } from "./settings";
 import { koSettingsUi } from "./settings-ui";
 import { koSettingsAgent } from "./settings-agent";
@@ -46,6 +47,7 @@ export const ko: Record<MessageKey, string> = {
   ...koFeatures,
   ...koKanban,
   ...koFleet,
+  ...koWiki,
   ...koSettings,
   ...koSettingsUi,
   ...koSettingsAgent,

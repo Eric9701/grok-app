@@ -38,5 +38,14 @@ export const trKanban = {
   "kanban.traceTool.failed": "Failed",
   "kanban.traceTool.cancelled": "Cancelled",
   "kanban.relayUntitled": "Cloud task",
+  "kanban.wikiBadge": "Knowledge base",
+  "kanban.wikiUntitled": "Knowledge compile",
+  "kanban.wikiStage.read": "Read the source",
+  "kanban.wikiStage.analyze": "Analyze the source",
+  "kanban.wikiStage.generate": "Write wiki pages",
+  "kanban.wikiStage.write": "Save wiki pages",
+  "kanban.wikiOpen": "Open the knowledge base",
+  "kanban.wikiSkipped": "This source is already compiled.",
+  "kanban.wikiWrote": "Saved {count} pages",
 
 };

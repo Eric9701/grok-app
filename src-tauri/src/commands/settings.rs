@@ -35,6 +35,8 @@ pub async fn settings_set(
     // Normalize / validate optional agents JSON (reject invalid non-empty).
     settings.agents_json =
         crate::agents_catalog::normalize_agents_json(&settings.agents_json)?;
+    settings.wiki_libraries =
+        crate::wiki_libraries::normalize_libraries(std::mem::take(&mut settings.wiki_libraries));
     // Headless background-wait policy (CLI 0.2.117+); clamp timeout 1–3600.
     settings.background_wait_policy =
         crate::acp_client::normalize_background_wait_policy(&settings.background_wait_policy)

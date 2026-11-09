@@ -16,6 +16,7 @@ import {
   IconAttach,
   IconClock,
   IconDeviceDesktop,
+  IconFileText,
   IconList,
   IconMenu,
   IconMore,
@@ -293,6 +294,17 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
               ) : null}
               <h1 className="main__title" data-tauri-drag-region={dragRegion}>
                 {tr("fleet.title")}
+              </h1>
+            </>
+          ) : mainPane === "wiki" ? (
+            <>
+              {!phoneLayout ? (
+                <span className="main__title-icon">
+                  <IconFileText size={16} />
+                </span>
+              ) : null}
+              <h1 className="main__title" data-tauri-drag-region={dragRegion}>
+                {tr("wiki.title")}
               </h1>
             </>
           ) : (

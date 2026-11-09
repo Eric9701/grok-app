@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { FleetPage } from "@/fleet/FleetPage";
+import { WikiPage } from "@/wiki/WikiPage";
 import type { AutomationsPageProps } from "@/components/AutomationsPage";
 import type { KanbanBoardPageProps } from "@/components/KanbanBoardPage";
 import { aiCreateSeedPrompt, type Automation } from "@/lib/automations";
@@ -73,6 +74,23 @@ export function WorkbenchMainPane({
 }) {
   if (mainPane === "fleet") {
     return <FleetPage locale={locale} />;
+  }
+  if (mainPane === "wiki") {
+    return (
+      <WikiPage
+        locale={locale}
+        onOpenSettings={() => {
+          onNavigateSettings("general", "agent");
+          window.setTimeout(() => {
+            const el = document.getElementById("settings-anchor-wikiLibraries");
+            if (!el) return;
+            el.scrollIntoView({ block: "center", behavior: "smooth" });
+            el.classList.add("is-search-hit");
+            window.setTimeout(() => el.classList.remove("is-search-hit"), 1600);
+          }, 120);
+        }}
+      />
+    );
   }
   if (mainPane === "kanban") {
     return (

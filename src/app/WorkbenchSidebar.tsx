@@ -25,6 +25,7 @@ import {
   IconDeviceMobile,
   IconFolderPlus,
   IconDeviceDesktop,
+  IconFileText,
   IconList,
   IconNewChat,
   IconScheduled,
@@ -426,6 +427,21 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
               <IconDeviceDesktop size={16} />
             </span>
             {tr("fleet.nav")}
+          </button>
+          <button
+            type="button"
+            className={
+              "nav-item" + (mainPane === "wiki" ? " nav-item--active" : "")
+            }
+            onClick={() => {
+              setShowUserMenu(false);
+              window.location.hash = "#/wiki";
+            }}
+          >
+            <span className="nav-item__icon">
+              <IconFileText size={16} />
+            </span>
+            {tr("wiki.nav")}
           </button>
           {isDesktopHost() && remoteChromeVisible ? (
             <button

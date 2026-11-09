@@ -17,6 +17,7 @@ import { ruAutomations } from "./automations";
 import { ruFeatures } from "./features";
 import { ruKanban } from "./kanban";
 import { ruFleet } from "./fleet";
+import { ruWiki } from "./wiki";
 import { ruSettings } from "./settings";
 import { ruSettingsUi } from "./settings-ui";
 import { ruSettingsAgent } from "./settings-agent";
@@ -46,6 +47,7 @@ export const ru: Record<MessageKey, string> = {
   ...ruFeatures,
   ...ruKanban,
   ...ruFleet,
+  ...ruWiki,
   ...ruSettings,
   ...ruSettingsUi,
   ...ruSettingsAgent,

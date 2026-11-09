@@ -671,6 +671,10 @@ pub struct AppSettings {
     /// scan remote Grok sessions. Empty = none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ssh_watch_aliases: Vec<String>,
+    /// Personal knowledge-base directories. One row may be the agent default.
+    /// App settings only — never written into `~/.atlas` or `config.toml`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wiki_libraries: Vec<crate::wiki_libraries::WikiLibraryRecord>,
     /// xAI realtime voice id (e.g. `eve`).
     #[serde(default = "default_voice_id")]
     pub voice_id: String,
@@ -1013,6 +1017,7 @@ impl Default for AppSettings {
             agents_json: String::new(),
             use_leader: false,
             ssh_watch_aliases: Vec::new(),
+            wiki_libraries: Vec::new(),
             voice_id: default_voice_id(),
             voice_dictation_auto_send: false,
             voice_keep_agents_on_end: true,

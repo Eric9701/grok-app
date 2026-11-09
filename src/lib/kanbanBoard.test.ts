@@ -22,7 +22,9 @@ import {
   mapTaskColumnToAgentKanban,
   markAgentKanbanSeen,
   mergeKanbanLiveMaps,
+  filterAgentKanban,
   mergeRelayTasksIntoKanban,
+  mergeWikiTasksIntoKanban,
   relayTaskKanbanColumn,
   relayTaskToKanbanCard,
   saveAgentKanbanPrefs,
@@ -421,6 +423,36 @@ describe("relay tasks on the agent kanban", () => {
     const groups = groupAgentKanbanByProject(board);
     expect(groups.map((g) => g.name)).toEqual(["grok-app"]);
     expect(groups[0]!.path).toBe("E:/GitHub/grok-app");
+  });
+});
+
+describe("knowledge compiles on the agent kanban", () => {
+  it("puts a running compile in Working and keeps the wiki source after search", () => {
+    const merged = mergeWikiTasksIntoKanban(
+      createEmptyAgentKanbanBoard(),
+      [
+        {
+          id: "c1",
+          title: "raw/sources/note.md",
+          status: "running",
+          progress: "Analyze the source",
+          atMs: 20,
+          projectName: "笔记",
+          projectPath: "E:/knowledge1",
+        },
+      ],
+      { badge: "Knowledge base", untitled: "Knowledge compile" },
+    );
+    expect(merged.working[0]).toMatchObject({
+      source: "wiki",
+      wikiTaskId: "c1",
+      sessionId: "wiki:c1",
+      liveToolTitle: "Analyze the source",
+      projectPath: "E:/knowledge1",
+    });
+    expect(filterAgentKanban(merged, { query: "note" }).working[0]?.source).toBe(
+      "wiki",
+    );
   });
 });
 

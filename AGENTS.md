@@ -23,6 +23,7 @@
    - [appearance-skins.md](docs/llm-wiki/appearance-skins.md) — **appearance packs**: `.grokskin` layout, K19 allowlist, `grok://` + `grok-app:`, never auto-apply
    - [atlas.md](docs/llm-wiki/atlas.md) — **feat-atlas 白标**：探测 `atlas`、shared `~/.atlas`、企业安装基址、与官方 Grok App 并排
    - [fleet.md](docs/llm-wiki/fleet.md) — **Atlas Fleet**：本机 leader 监听 `/ws`，向远程或本机 Atlas 派发任务；与 Relay、`agent serve`、SSH 分开
+   - [wiki-engine.md](docs/llm-wiki/wiki-engine.md) — **知识库引擎**：项目内 `wiki/*.md`；headless 补全不进桌面会话、不写 `config.toml`
    - [pr-monitor.md](docs/llm-wiki/pr-monitor.md) — **PR monitor**: session-owned watches over the repo's open PRs (one row per PR, inline bell, chip count), host poll + fingerprint dedup, the host delivers the localized follow-up into the chat; **the agent gets its own MCP tools** (`pr_watch` / `pr_unwatch` / `pr_watches` over loopback `/v1/pr-monitor/watches`) so it watches the PR it just opened and stops when the PR is done; process-lifetime, watches not persisted (ADR 0005)
 
 1b. **Release (AI handoff)** — **[docs/llm-wiki/release.md](docs/llm-wiki/release.md)** is the single source for ship steps. Platforms / local build: [docs/BUILD.md](docs/BUILD.md). Window chrome: `tauri.macos.conf.json` (Overlay) vs `tauri.windows.conf.json` (frameless).  

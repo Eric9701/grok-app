@@ -17,6 +17,7 @@ import { zhTWAutomations } from "./automations";
 import { zhTWFeatures } from "./features";
 import { zhTWKanban } from "./kanban";
 import { zhTWFleet } from "./fleet";
+import { zhTWWiki } from "./wiki";
 import { zhTWSettings } from "./settings";
 import { zhTWSettingsUi } from "./settings-ui";
 import { zhTWSettingsAgent } from "./settings-agent";
@@ -46,6 +47,7 @@ export const zhTW: Record<MessageKey, string> = {
   ...zhTWFeatures,
   ...zhTWKanban,
   ...zhTWFleet,
+  ...zhTWWiki,
   ...zhTWSettings,
   ...zhTWSettingsUi,
   ...zhTWSettingsAgent,
@@ -73,6 +75,7 @@ export { zhTWAutomations } from "./automations";
 export { zhTWFeatures } from "./features";
 export { zhTWKanban } from "./kanban";
 export { zhTWFleet } from "./fleet";
+export { zhTWWiki } from "./wiki";
 export { zhTWSettings } from "./settings";
 export { zhTWSettingsUi } from "./settings-ui";
 export { zhTWSettingsAgent } from "./settings-agent";

@@ -12,6 +12,8 @@ mod atlas_endpoints;
 
 mod atlas_relay_agent;
 mod fleet;
+mod wiki;
+mod wiki_libraries;
 
 #[cfg(test)]
 mod acp_golden_test;

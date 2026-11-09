@@ -17,6 +17,7 @@ import { enAutomations } from "./automations";
 import { enFeatures } from "./features";
 import { enKanban } from "./kanban";
 import { enFleet } from "./fleet";
+import { enWiki } from "./wiki";
 import { enSettings } from "./settings";
 import { enSettingsUi } from "./settings-ui";
 import { enSettingsAgent } from "./settings-agent";
@@ -44,6 +45,7 @@ export const en = {
   ...enFeatures,
   ...enKanban,
   ...enFleet,
+  ...enWiki,
   ...enSettings,
   ...enSettingsUi,
   ...enSettingsAgent,
@@ -73,6 +75,7 @@ export { enAutomations } from "./automations";
 export { enFeatures } from "./features";
 export { enKanban } from "./kanban";
 export { enFleet } from "./fleet";
+export { enWiki } from "./wiki";
 export { enSettings } from "./settings";
 export { enSettingsUi } from "./settings-ui";
 export { enSettingsAgent } from "./settings-agent";

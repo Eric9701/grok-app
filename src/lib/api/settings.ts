@@ -17,6 +17,13 @@ export interface AtlasRelayAgentRecord {
   enabled?: boolean;
 }
 
+export interface WikiLibraryRecord {
+  id: string;
+  name: string;
+  path: string;
+  agentDefault?: boolean;
+}
+
 export interface AppSettings {
   wallpaperXSearchMode?: string;
   theme: string;
@@ -80,6 +87,8 @@ export interface AppSettings {
   fleetToken?: string | null;
   /** OpenSSH Host aliases with watch enabled. */
   sshWatchAliases?: string[] | null;
+  /** Personal knowledge-base directories. One may be the agent default. */
+  wikiLibraries?: WikiLibraryRecord[] | null;
   /** Max warm/live agent processes (default 3). */
   maxConcurrentAgents?: number;
   /** Recycle idle agent processes after N minutes (default 30). */

@@ -17,6 +17,7 @@ import { itAutomations } from "./automations";
 import { itFeatures } from "./features";
 import { itKanban } from "./kanban";
 import { itFleet } from "./fleet";
+import { itWiki } from "./wiki";
 import { itSettings } from "./settings";
 import { itSettingsUi } from "./settings-ui";
 import { itSettingsAgent } from "./settings-agent";
@@ -46,6 +47,7 @@ export const it: Record<MessageKey, string> = {
   ...itFeatures,
   ...itKanban,
   ...itFleet,
+  ...itWiki,
   ...itSettings,
   ...itSettingsUi,
   ...itSettingsAgent,
