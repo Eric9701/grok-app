@@ -16,6 +16,7 @@ import { ptBRExtensions } from "./extensions";
 import { ptBRAutomations } from "./automations";
 import { ptBRFeatures } from "./features";
 import { ptBRKanban } from "./kanban";
+import { ptBRFleet } from "./fleet";
 import { ptBRSettings } from "./settings";
 import { ptBRSettingsUi } from "./settings-ui";
 import { ptBRSettingsAgent } from "./settings-agent";
@@ -44,6 +45,7 @@ export const ptBR: Record<MessageKey, string> = {
   ...ptBRAutomations,
   ...ptBRFeatures,
   ...ptBRKanban,
+  ...ptBRFleet,
   ...ptBRSettings,
   ...ptBRSettingsUi,
   ...ptBRSettingsAgent,

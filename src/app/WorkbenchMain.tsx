@@ -15,6 +15,7 @@ import { PaneToggleButton } from "@/components/PaneToggleButton";
 import {
   IconAttach,
   IconClock,
+  IconDeviceDesktop,
   IconList,
   IconMenu,
   IconMore,
@@ -281,6 +282,17 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
               ) : null}
               <h1 className="main__title" data-tauri-drag-region={dragRegion}>
                 {tr("kanban.title")}
+              </h1>
+            </>
+          ) : mainPane === "fleet" ? (
+            <>
+              {!phoneLayout ? (
+                <span className="main__title-icon">
+                  <IconDeviceDesktop size={16} />
+                </span>
+              ) : null}
+              <h1 className="main__title" data-tauri-drag-region={dragRegion}>
+                {tr("fleet.title")}
               </h1>
             </>
           ) : (

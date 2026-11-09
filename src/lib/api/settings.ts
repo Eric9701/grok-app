@@ -72,6 +72,12 @@ export interface AppSettings {
   atlasRelayAgentHealthSecs?: number;
   /** Sidebar Atlas Cloud webview. Empty until set in Settings → Atlas. */
   atlasCloudSiteUrl?: string | null;
+  /** Fleet leader accepts remote `atlas agent --grok-ws-url` workers. */
+  fleetListenEnabled?: boolean;
+  /** `host:port` for the fleet WebSocket. */
+  fleetBind?: string | null;
+  /** Shared `/ws` secret. Status shows only the last four characters. */
+  fleetToken?: string | null;
   /** OpenSSH Host aliases with watch enabled. */
   sshWatchAliases?: string[] | null;
   /** Max warm/live agent processes (default 3). */

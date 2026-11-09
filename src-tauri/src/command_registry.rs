@@ -4,7 +4,7 @@
 //! new `// ── Domain ──` section rather than appending at a random spot.
 
 use crate::{
-    atlas_endpoints, atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub,
+    atlas_endpoints, atlas_relay_agent, cli_worktrees, commands, desktop_notify, fleet, git_pr_hub,
     launch_chrome, leader, mirror, os_theme, pet_quick, pet_window, pr_monitor, remote_im,
     self_update, serve, session_api, ssh_remote, system_fonts, theme_editor_window, tray, updater,
     voice_host, wallpaper_grok_album, wallpaper_remote_commands, window_min,
@@ -65,6 +65,13 @@ pub fn app_invoke_handler(
         atlas_relay_agent::atlas_relay_agent_connect,
         atlas_relay_agent::atlas_relay_agent_disconnect,
         atlas_relay_agent::atlas_relay_agent_set_model,
+        // ── Fleet ──
+        fleet::fleet_status,
+        fleet::fleet_tasks,
+        fleet::fleet_task_trace,
+        fleet::fleet_dispatch,
+        fleet::fleet_cancel,
+        fleet::fleet_listen_apply,
         commands::cli_install_latest,
         commands::cli_install_commands,
         commands::cli_update_check,

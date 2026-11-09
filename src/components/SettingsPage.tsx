@@ -219,6 +219,7 @@ import { ExtensionsSection } from "@/components/settings/ExtensionsSection";
 import { RemoteImSection } from "@/components/settings/RemoteImSection";
 import { RuntimeSection } from "@/components/settings/RuntimeSection";
 import { AtlasSection } from "@/components/settings/AtlasSection";
+import { FleetListenCard } from "@/fleet/FleetListenCard";
 import { ShortcutsSection } from "@/components/settings/ShortcutsSection";
 import { AboutSection } from "@/components/settings/AboutSection";
 import { PetSection } from "@/components/settings/PetSection";
@@ -1991,7 +1992,12 @@ export function SettingsPage({
         {section === "extensions" && <ExtensionsSection />}
         {section === "remote_im" && remoteChromeVisible && <RemoteImSection />}
         {section === "runtime" && <RuntimeSection />}
-        {section === "atlas" && <AtlasSection />}
+        {section === "atlas" && (
+          <>
+            <AtlasSection />
+            <FleetListenCard />
+          </>
+        )}
         {section === "shortcuts" && <ShortcutsSection />}
         {section === "about" && <AboutSection />}
       </main>

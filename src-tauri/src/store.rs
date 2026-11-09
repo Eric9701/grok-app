@@ -426,6 +426,15 @@ pub struct AppSettings {
     /// Empty or missing becomes [`DEFAULT_ATLAS_CLOUD_SITE_URL`].
     #[serde(default = "default_atlas_cloud_site_url")]
     pub atlas_cloud_site_url: String,
+    /// Fleet leader listens for remote `atlas agent --grok-ws-url` workers.
+    #[serde(default)]
+    pub fleet_listen_enabled: bool,
+    /// `host:port` for the fleet WebSocket. Empty becomes 127.0.0.1:24720.
+    #[serde(default = "default_fleet_bind")]
+    pub fleet_bind: String,
+    /// Shared secret for `/ws`. Status responses only expose the last four characters.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub fleet_token: String,
     /// Max warm/live agent processes (I02). Default 3.
     #[serde(default = "default_max_concurrent_agents")]
     pub max_concurrent_agents: u32,
@@ -946,6 +955,9 @@ impl Default for AppSettings {
             atlas_relay_agents: Vec::new(),
             atlas_relay_agent_health_secs: default_atlas_relay_health_secs(),
             atlas_cloud_site_url: default_atlas_cloud_site_url(),
+            fleet_listen_enabled: false,
+            fleet_bind: default_fleet_bind(),
+            fleet_token: String::new(),
             max_concurrent_agents: default_max_concurrent_agents(),
             agent_idle_minutes: default_agent_idle_minutes(),
             // Fresh installs already start on the current default.
@@ -1148,6 +1160,10 @@ pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), Str
 }
 
 pub const DEFAULT_ATLAS_CLOUD_SITE_URL: &str = "https://atlas.myai.tech";
+
+fn default_fleet_bind() -> String {
+    "127.0.0.1:24720".into()
+}
 
 fn default_atlas_cloud_site_url() -> String {
     DEFAULT_ATLAS_CLOUD_SITE_URL.to_string()

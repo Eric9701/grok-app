@@ -16,6 +16,7 @@ import { frExtensions } from "./extensions";
 import { frAutomations } from "./automations";
 import { frFeatures } from "./features";
 import { frKanban } from "./kanban";
+import { frFleet } from "./fleet";
 import { frSettings } from "./settings";
 import { frSettingsUi } from "./settings-ui";
 import { frSettingsAgent } from "./settings-agent";
@@ -44,6 +45,7 @@ export const fr: Record<MessageKey, string> = {
   ...frAutomations,
   ...frFeatures,
   ...frKanban,
+  ...frFleet,
   ...frSettings,
   ...frSettingsUi,
   ...frSettingsAgent,
