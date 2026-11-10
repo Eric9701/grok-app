@@ -34,6 +34,15 @@ export function isValidTab(
   return !!nav?.tabs.some((t) => t.id === tab);
 }
 
+/**
+ * Account → custom providers and extras stay in the catalog, but the
+ * settings UI does not offer them. Deep links and the last route land
+ * on the official account.
+ */
+export function isHiddenAccountTab(tab: string | null | undefined): boolean {
+  return tab === "providers" || tab === "extras";
+}
+
 /** Resolve tab for a section: valid tab, else default, else null. */
 export function resolveTab(
   section: SettingsSectionId,
@@ -42,6 +51,9 @@ export function resolveTab(
   // Legacy deep-link: market tab merged into plugins (no top-level Market tab).
   if (section === "extensions" && tab === "market") {
     return "plugins";
+  }
+  if (section === "account" && isHiddenAccountTab(tab)) {
+    return "official";
   }
   if (isValidTab(section, tab)) return tab;
   return defaultTabFor(section);

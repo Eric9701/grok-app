@@ -37,6 +37,7 @@ export {
   catalogInvariants,
   defaultTabFor,
   getNavDef,
+  isHiddenAccountTab,
   isValidTab,
   keywordKeysForSection,
   parseSettingsHash,

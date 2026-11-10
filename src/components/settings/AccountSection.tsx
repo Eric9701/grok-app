@@ -4,10 +4,6 @@
 import { useSettingsModel } from "@/providers/SettingsModelContext";
 
 import { AccountPanel } from "@/components/AccountPanel";
-import { OfficialAuxPanel } from "@/components/OfficialAuxPanel";
-import { ProvidersPanel } from "@/components/ProvidersPanel";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { resolveLocale } from "@/i18n";
 
 
 export function AccountSection() {
@@ -19,7 +15,6 @@ export function AccountSection() {
     accountLoading,
     accountProbeError,
     activeAccountId,
-    activeTab,
     locale,
     loginHint,
     onAccountLoginDevice,
@@ -34,86 +29,23 @@ export function AccountSection() {
     onImportChat,
     onCliSessionsImported,
     onOpenCliSession,
-    onProviderActivated,
-    onProvidersChanged,
-    onProviderBalanceLoaded,
     onRemoveAccount,
     onSaveAccount,
     onSwitchAccount,
     savedAccounts,
-    setSectionTab,
     t,
   } = s;
 
   return (
     <>
-<>
-            <div
-              className="settings-account-tabs"
-              id={
-                activeTab === "providers"
-                  ? "settings-anchor-account-providers"
-                  : activeTab === "extras"
-                    ? "settings-anchor-account-extras"
-                    : "settings-anchor-account-official"
-              }
-            >
-              <SegmentedControl
-                value={activeTab ?? "official"}
-                role="tablist"
-                large
-                options={[
-                  { value: "official", label: t("settings.tabOfficial") },
-                  { value: "providers", label: t("settings.tabProviders") },
-                  { value: "extras", label: t("settings.tabExtras") },
-                ]}
-                onChange={(tab, event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setSectionTab(tab);
-                }}
-              />
-              {activeTab === "providers" ? (
-                <p className="settings-account-tabs__hint">
-                  {t("settings.tabProvidersHint")}
-                </p>
-              ) : activeTab === "extras" ? (
-                <p className="settings-account-tabs__hint">
-                  {t("settings.tabExtrasHint")}
-                </p>
-              ) : (
-                <p className="settings-account-tabs__hint">
-                  {t("settings.tabOfficialHint")}
-                </p>
-              )}
-            </div>
-            {activeTab === "providers" ? (
-              <ProvidersPanel
-                locale={resolveLocale(locale)}
-                officialAvailable={
-                  !!(
-                    account?.profile?.signedIn ||
-                    account?.cliAuthPresent ||
-                    account?.hasOfficialKey
-                  )
-                }
-                onProvidersChanged={onProvidersChanged}
-                onProviderActivated={onProviderActivated}
-                onBalanceLoaded={onProviderBalanceLoaded}
-              />
-            ) : activeTab === "extras" ? (
-              <OfficialAuxPanel
-                locale={resolveLocale(locale)}
-                officialAvailable={
-                  !!(
-                    account?.profile?.signedIn ||
-                    account?.cliAuthPresent ||
-                    account?.hasOfficialKey
-                  )
-                }
-                onProviderActivated={onProviderActivated}
-              />
-            ) : (
+          <div
+            className="settings-account-tabs"
+            id="settings-anchor-account-official"
+          >
+            <p className="settings-account-tabs__hint">
+              {t("settings.tabOfficialHint")}
+            </p>
+          </div>
           <AccountPanel
             status={account}
             loading={accountLoading}
@@ -238,8 +170,6 @@ export function AccountSection() {
             onImported={onCliSessionsImported}
             onOpenSession={onOpenCliSession}
           />
-            )}
-          </>
     </>
   );
 }

@@ -51,7 +51,7 @@ describe("useSettingsNavigation", () => {
       result.current.navigateSettings();
     });
     expect(result.current.settingsSection).toBe("account");
-    expect(result.current.settingsTab).toBe("extras");
+    expect(result.current.settingsTab).toBe("official");
   });
 
   it("closeSettings drops the overlay without a host pane callback", () => {

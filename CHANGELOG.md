@@ -23,6 +23,12 @@ See `docs/llm-wiki/release.md`.
 - 企业微信可以接收文件或图片，并在下一条消息里交给 Agent。
 - 企业微信可以把 Agent 回复里的 PNG、JPEG 或 GIF 发回当前会话。
 
+### Changed
+- Account settings shows only the official account. Custom providers and extras are hidden.
+
+**中文 · 变更**
+- 账户设置只显示官方账户。自定义提供商和拓展已隐藏。
+
 ### Fixed
 - WeCom sends images named with a relative path in the agent reply.
 - WeCom group chats can switch projects with /p after mentioning the bot.
