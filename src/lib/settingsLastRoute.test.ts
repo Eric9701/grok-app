@@ -90,7 +90,7 @@ describe("settingsLastRoute", () => {
         tab: "providers",
         last,
       }),
-    ).toEqual({ section: "account", tab: "providers" });
+    ).toEqual({ section: "account", tab: "official" });
     expect(
       resolveOpenSettingsLocation({ section: "about", last }),
     ).toEqual({ section: "about", tab: null });

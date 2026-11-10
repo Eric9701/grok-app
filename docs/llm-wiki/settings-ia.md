@@ -25,7 +25,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 |---------|------|
 | general | `composer` · `permissions` · `agent`（含 experimental memory、memory browser、**memory embedding 0.2.117**） · `app` |
 | appearance | `theme`（主题：浅深色 / 皮肤 / 背景 / 文字色与阴影）· `interface`（界面：聊天展示，含默认浏览器 / 打开链接前确认） |
-| account | `official` · `providers` · `extras`（「拓展」：官方工具注入开关） |
+| account | `official`（界面只显示官方账户。`providers` / `extras` 仍在目录里，深链和上次路由都落到 `official`） |
 | extensions | `plugins`（含 Discover **+** 本地路径安装 `settings-anchor-ext-plugins-install`）· `mcp` · `skills`（含 **探测 Claude/Cursor 技能** 开关，`#/settings/extensions/skills` → `settings-anchor-ext-skills-discover`）· `rules`（Cursor 式规则编辑，写 CLI 真实文件）· `commands`（斜杠命令 markdown）· `agents` · `hooks`（**无** `market` / `apps`；`#/settings/extensions/market` → `plugins` 可安装目录锚点） |
 | runtime | `cli` · `connection` · `ssh` · `network` · `pool` · `tools` · `privacy` |
 | atlas | 无 tab（Relay 执行端 + 云端站点） |
@@ -45,8 +45,8 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 #/settings/runtime/tools?pr=42      → 诊断 · PR hub（可选高亮 PR #42；ship 成功「在 PR 中心打开」）
 #/settings/runtime/privacy          → CLI · 隐私中心
 #/settings/atlas                     → Atlas（Relay + 云端站点）
-#/settings/account/providers        → 自定义提供商
-#/settings/account/extras           → 拓展（官方工具注入 / 扩展 MCP）
+#/settings/account/providers        → 官方账户（自定义提供商已从界面隐藏）
+#/settings/account/extras           → 官方账户（拓展已从界面隐藏）
 #/settings/remote_im                → 远程控制 · IM 通信
 #/settings/remote_im/mirror         → 远程控制 · 手机镜像
 #/settings/appearance               → appearance/theme

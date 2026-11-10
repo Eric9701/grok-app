@@ -75,6 +75,8 @@ export type WorkbenchResourcesAsideProps = {
   skillsLoading: boolean;
   skillsLoadError: string | null;
   onSelectSkill: (skill: SkillsPickerSkill) => void;
+  /** Local file-tree drop onto the composer. */
+  onAttachPaths?: (paths: string[]) => void;
 };
 
 export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
@@ -122,6 +124,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
     skillsLoading,
     skillsLoadError,
     onSelectSkill,
+    onAttachPaths,
   } = props;
 
   const asideMin = layout.asideWidth || DEFAULT_LAYOUT.asideWidth;
@@ -265,6 +268,7 @@ export function WorkbenchResourcesAside(props: WorkbenchResourcesAsideProps) {
             skillsLoading={skillsLoading}
             skillsLoadError={skillsLoadError}
             onSelectSkill={onSelectSkill}
+            onAttachPaths={onAttachPaths}
           />
           </UiErrorBoundary>
         </Suspense>

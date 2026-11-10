@@ -78,6 +78,8 @@ export type SideWorkbenchProps = {
   skillsLoading?: boolean;
   skillsLoadError?: string | null;
   onSelectSkill?: (skill: SkillsPickerSkill) => void;
+  /** Local file-tree drop onto the composer. */
+  onAttachPaths?: (paths: string[]) => void;
 };
 
 export function SideWorkbench({
@@ -114,6 +116,7 @@ export function SideWorkbench({
   skillsLoading = false,
   skillsLoadError = null,
   onSelectSkill,
+  onAttachPaths,
 }: SideWorkbenchProps) {
   const [internal, setInternal] = useState(emptySideWorkbenchState);
   const state = controlled ?? internal;
@@ -420,6 +423,7 @@ export function SideWorkbench({
                   onClosePathResult={onClosePathResult}
                   paneActive={paneActive && active.kind === "file"}
                   sessionChanges={sessionChanges}
+                  onAttachPaths={onAttachPaths}
                 />
               </div>
             ) : null}

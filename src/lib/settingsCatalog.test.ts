@@ -10,6 +10,7 @@ import {
   buildSettingsHash,
   catalogInvariants,
   defaultTabFor,
+  isHiddenAccountTab,
   isSettingsSectionId,
   keywordKeysForSection,
   parseSettingsHash,
@@ -66,10 +67,18 @@ describe("settingsCatalog", () => {
       visit(sourceFile);
     }
     const missing = SETTINGS_ENTRIES.filter(
-      ({ anchorId }) => !mountedAnchors.has(anchorId),
+      (entry) =>
+        !(entry.section === "account" && isHiddenAccountTab(entry.tab)) &&
+        !mountedAnchors.has(entry.anchorId),
     ).map(({ id, anchorId }) => `${id}: ${anchorId}`);
 
     expect(missing).toEqual([]);
+    const hidden = SETTINGS_ENTRIES.filter(
+      (entry) => entry.section === "account" && isHiddenAccountTab(entry.tab),
+    ).map(({ id }) => id);
+    expect(hidden).toEqual(
+      expect.arrayContaining(["account.providers", "account.extras"]),
+    );
   });
 
   it("registers three distinct static skin-share anchors", () => {
@@ -375,17 +384,17 @@ describe("settingsCatalog", () => {
     );
   });
 
-  it("account has official · providers · extras tabs", () => {
+  it("account opens the official tab; providers and extras stay hidden", () => {
     expect(defaultTabFor("account")).toBe("official");
-    expect(resolveTab("account", "providers")).toBe("providers");
-    expect(resolveTab("account", "extras")).toBe("extras");
+    expect(resolveTab("account", "providers")).toBe("official");
+    expect(resolveTab("account", "extras")).toBe("official");
     expect(resolveTab("account", "nope")).toBe("official");
     expect(parseSettingsHash("settings/account/extras")).toEqual({
       section: "account",
-      tab: "extras",
+      tab: "official",
     });
     expect(buildSettingsHash({ section: "account", tab: "extras" })).toBe(
-      "#/settings/account/extras",
+      "#/settings/account/official",
     );
     const aux = SETTINGS_ENTRIES.find((e) => e.id === "account.officialAuxInject");
     expect(aux?.tab).toBe("extras");

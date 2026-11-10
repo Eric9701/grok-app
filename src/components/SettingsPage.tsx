@@ -195,6 +195,7 @@ import {
   defaultTabFor,
   getNavDef,
   resolveTab,
+  isHiddenAccountTab,
   searchSettingsEntries,
   type SettingsSectionId,
   type SettingsTabId,
@@ -1153,8 +1154,13 @@ export function SettingsPage({
           (k) => tEn(k),
         )
       : [];
-    if (remoteChromeVisible) return hits;
-    return hits.filter((hit) => hit.entry.section !== "remote_im");
+    return hits.filter((hit) => {
+      if (!remoteChromeVisible && hit.entry.section === "remote_im") return false;
+      if (hit.entry.section === "account" && isHiddenAccountTab(hit.entry.tab)) {
+        return false;
+      }
+      return true;
+    });
   }, [trimmedQuery, t, tEn, remoteChromeVisible]);
 
   const hitSections = useMemo(() => {

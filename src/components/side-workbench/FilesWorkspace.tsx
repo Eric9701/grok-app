@@ -65,6 +65,7 @@ import {
 } from "@/lib/sessionChanges";
 import { sshChatRelative, sshRemoteDirToList } from "@/lib/sshChatPath";
 import { sshListDirShouldSetPaneError } from "@/lib/sshListDirHonesty";
+import { useFileTreeAttachDrag } from "@/hooks/useFileTreeAttachDrag";
 
 export type FilesWorkspaceProps = {
   locale: Locale | string;
@@ -95,6 +96,11 @@ export type FilesWorkspaceProps = {
   onClosePathResult?: (path: string, closed: boolean) => void;
   paneActive?: boolean;
   sessionChanges: SessionFileChange[];
+  /**
+   * Drop a tree row on the composer. Local projects only — the hook stays
+   * off for SSH listings, whose paths are not local files.
+   */
+  onAttachPaths?: (paths: string[]) => void;
 };
 
 const NOOP = () => {};
@@ -116,8 +122,14 @@ export function FilesWorkspace({
   onClosePathResult,
   paneActive = true,
   sessionChanges,
+  onAttachPaths,
 }: FilesWorkspaceProps) {
   const tr = useMemo(() => createT(locale as Locale), [locale]);
+  useFileTreeAttachDrag({
+    enabled: !sshAlias && !!projectPath && !!onAttachPaths,
+    projectPath,
+    onAttach: onAttachPaths,
+  });
   const [root, setRoot] = useState<TreeNode[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     loadTreeExpanded(projectPath || ""),
@@ -805,6 +817,7 @@ export function FilesWorkspace({
                 maxWidth: treeWidth,
               }}
               data-testid="files-tree"
+              data-file-tree-drag=""
             >
               <div className="rp-tree-search">
                 <IconSearch size={14} />
@@ -843,9 +856,12 @@ export function FilesWorkspace({
                       return (
                         <button
                           type="button"
+                          draggable={false}
                           className={
                             "rp-tree__row" + (selected ? " is-selected" : "")
                           }
+                          data-tree-path={n.relativePath}
+                          data-tree-name={n.name}
                           style={{ paddingLeft: 8 + row.depth * 12 }}
                           onClick={() => {
                             if (n.isDir) void toggleDir(n);
