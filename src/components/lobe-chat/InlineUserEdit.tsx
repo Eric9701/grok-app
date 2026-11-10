@@ -122,7 +122,11 @@ export function InlineUserEdit({
     .map((x) => x.path);
 
   return (
-    <div className="lobe-inline-edit" data-testid="inline-user-edit">
+    <div
+      className="lobe-inline-edit"
+      data-testid="inline-user-edit"
+      data-composer-attach=""
+    >
       {attachments.length > 0 ? (
         <div className="lobe-inline-edit__atts" aria-label="attachments">
           {attachments.map((a) => (

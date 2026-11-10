@@ -11,12 +11,13 @@ import { FilesWorkspace } from "./FilesWorkspace";
 
 const apiMocks = vi.hoisted(() => ({
   fsListDir: vi.fn(),
+  sshListDir: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
   isTauri: () => true,
   fsListDir: apiMocks.fsListDir,
-  sshListDir: vi.fn(),
+  sshListDir: apiMocks.sshListDir,
   settingsGet: vi.fn(),
   settingsSet: vi.fn(),
 }));
@@ -84,6 +85,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   apiMocks.fsListDir.mockReset();
+  apiMocks.sshListDir.mockReset();
 });
 
 describe("FilesWorkspace session-change refresh", () => {
@@ -257,5 +259,124 @@ describe("FilesWorkspace session-change refresh", () => {
       expect(screen.getByText("latest.ts")).toBeInTheDocument();
       expect(screen.queryByText("stale.ts")).not.toBeInTheDocument();
     });
+  });
+});
+
+function stubElementsFromPoint(stack: Element[]) {
+  Object.defineProperty(document, "elementsFromPoint", {
+    configurable: true,
+    value: () => stack,
+  });
+}
+
+function dispatchPointer(
+  type: string,
+  target: EventTarget,
+  init: PointerEventInit & { timeStamp?: number },
+) {
+  const ev = new PointerEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    pointerId: 1,
+    button: 0,
+    buttons: type === "pointerup" ? 0 : 1,
+    ...init,
+  });
+  if (typeof init.timeStamp === "number") {
+    Object.defineProperty(ev, "timeStamp", { value: init.timeStamp });
+  }
+  target.dispatchEvent(ev);
+}
+
+describe("FilesWorkspace file-tree drag", () => {
+  it("attaches a local file dropped on the composer and still opens on click", async () => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    apiMocks.fsListDir.mockResolvedValue([file("notes.md")]);
+    const onAttachPaths = vi.fn();
+    const onFileOpen = vi.fn();
+    render(
+      <FilesWorkspace
+        locale="en"
+        projectPath="/repo"
+        projectName="repo"
+        treeVisible
+        onTreeVisibleChange={vi.fn()}
+        paneActive
+        sessionChanges={[]}
+        onAttachPaths={onAttachPaths}
+        onFileOpen={onFileOpen}
+      />,
+    );
+    const row = (await screen.findByText("notes.md")).closest("button");
+    expect(row).toHaveAttribute("data-tree-path", "notes.md");
+    if (!row) throw new Error("row missing");
+
+    dispatchPointer("pointerdown", row, { clientX: 20, clientY: 20, timeStamp: 0 });
+    dispatchPointer("pointerup", window, { clientX: 22, clientY: 21, timeStamp: 30 });
+    row.click();
+    await waitFor(() =>
+      expect(onFileOpen).toHaveBeenCalledWith("notes.md", "notes.md"),
+    );
+    expect(onAttachPaths).not.toHaveBeenCalled();
+
+    const composer = document.createElement("div");
+    composer.setAttribute("data-composer-attach", "");
+    document.body.appendChild(composer);
+    stubElementsFromPoint([composer]);
+    dispatchPointer("pointerdown", row, { clientX: 300, clientY: 40, timeStamp: 0 });
+    dispatchPointer("pointermove", window, {
+      clientX: 260,
+      clientY: 40,
+      timeStamp: 10,
+    });
+    dispatchPointer("pointermove", window, {
+      clientX: 80,
+      clientY: 120,
+      timeStamp: 50,
+    });
+    dispatchPointer("pointerup", window, {
+      clientX: 80,
+      clientY: 120,
+      timeStamp: 70,
+    });
+    expect(onAttachPaths).toHaveBeenCalledWith(["/repo/notes.md"]);
+    composer.remove();
+  });
+
+  it("does not drag files from an SSH tree", async () => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    apiMocks.sshListDir.mockResolvedValue({
+      ok: true,
+      entries: [{ name: "remote.md", isDir: false }],
+    });
+    const onAttachPaths = vi.fn();
+    render(
+      <FilesWorkspace
+        locale="en"
+        projectPath="/home/proj"
+        sshAlias="box"
+        projectName="proj"
+        treeVisible
+        onTreeVisibleChange={vi.fn()}
+        paneActive
+        sessionChanges={[]}
+        onAttachPaths={onAttachPaths}
+      />,
+    );
+    const row = (await screen.findByText("remote.md")).closest("button");
+    if (!row) throw new Error("row missing");
+    const composer = document.createElement("div");
+    composer.setAttribute("data-composer-attach", "");
+    document.body.appendChild(composer);
+    stubElementsFromPoint([composer]);
+    dispatchPointer("pointerdown", row, { clientX: 20, clientY: 20, timeStamp: 0 });
+    dispatchPointer("pointermove", window, {
+      clientX: 80,
+      clientY: 80,
+      timeStamp: 200,
+    });
+    dispatchPointer("pointerup", window, { clientX: 80, clientY: 80, timeStamp: 220 });
+    expect(onAttachPaths).not.toHaveBeenCalled();
+    composer.remove();
   });
 });

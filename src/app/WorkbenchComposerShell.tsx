@@ -196,6 +196,7 @@ export function WorkbenchComposerShell(p: WorkbenchComposerShellProps) {
                 (dragZone === "main" ? " composer--drop-ready" : "")
               }
               data-session-attach=""
+              data-composer-attach=""
             >
               {sendQueueStrip.visible && (
                 <div

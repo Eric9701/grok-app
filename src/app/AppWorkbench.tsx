@@ -13154,6 +13154,9 @@ export function AppWorkbench() {
             });
             window.setTimeout(() => requestComposerFocus(), 40);
           }}
+          onAttachPaths={(paths) => {
+            void addAttachmentsFromPaths(paths);
+          }}
         />
       </div>
       </>
