@@ -1053,6 +1053,7 @@ export function SettingsPage({
   const featureMask = useFeatureMask();
   const remoteChromeVisible = featureMask.remote;
   const wikiChromeVisible = featureMask.wiki;
+  const agentCliVisible = featureMask.agentCli;
 
   const navigateTo = useCallback(
     (
@@ -1095,7 +1096,8 @@ export function SettingsPage({
   useEffect(() => {
     if (section === "remote_im" && !remoteChromeVisible) navigateTo("general");
     if (section === "wiki" && !wikiChromeVisible) navigateTo("general");
-  }, [remoteChromeVisible, wikiChromeVisible, section, navigateTo]);
+    if (section === "agent_cli" && !agentCliVisible) navigateTo("general");
+  }, [remoteChromeVisible, wikiChromeVisible, agentCliVisible, section, navigateTo]);
 
   const openSection = useCallback(
     (id: SettingsSectionId) => {
@@ -1164,9 +1166,10 @@ export function SettingsPage({
         return false;
       }
       if (!wikiChromeVisible && hit.entry.section === "wiki") return false;
+      if (!agentCliVisible && hit.entry.section === "agent_cli") return false;
       return true;
     });
-  }, [trimmedQuery, t, tEn, remoteChromeVisible, wikiChromeVisible]);
+  }, [trimmedQuery, t, tEn, remoteChromeVisible, wikiChromeVisible, agentCliVisible]);
 
   const hitSections = useMemo(() => {
     if (!trimmedQuery) return null;
@@ -1177,11 +1180,12 @@ export function SettingsPage({
     const base = SETTINGS_NAV.filter((n) => {
       if (!remoteChromeVisible && n.id === "remote_im") return false;
       if (!wikiChromeVisible && n.id === "wiki") return false;
+      if (!agentCliVisible && n.id === "agent_cli") return false;
       return true;
     });
     if (!hitSections) return [...base];
     return base.filter((n) => hitSections.has(n.id));
-  }, [hitSections, remoteChromeVisible, wikiChromeVisible]);
+  }, [hitSections, remoteChromeVisible, wikiChromeVisible, agentCliVisible]);
 
   const personalNav = useMemo(
     () => nav.filter((n) => n.group === "personal"),
@@ -2011,7 +2015,7 @@ export function SettingsPage({
           </>
         )}
         {section === "wiki" && wikiChromeVisible && <WikiSection />}
-        {section === "agent_cli" && <AgentCliSection />}
+        {section === "agent_cli" && agentCliVisible && <AgentCliSection />}
         {section === "shortcuts" && <ShortcutsSection />}
         {section === "about" && <AboutSection />}
       </main>

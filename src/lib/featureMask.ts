@@ -1,13 +1,12 @@
 /**
  * Desktop feature mask from atlas-server.
- * Bit 0 (1) fleet, bit 1 (2) wiki, bit 2 (4) remote. Anything else is hidden.
+ * Bit 0 (1) fleet, bit 1 (2) wiki, bit 2 (4) remote, bit 3 (8) agent CLI.
+ * Fetched once at startup, again after a successful login or account switch.
  * The host returns 0 when the request fails. This module does the same.
  */
 
 import { useEffect, useState } from "react";
 import { invoke, isDesktopHost } from "./api/host";
-
-const POLL_MS = 5 * 60 * 1000;
 
 export function featureBit(mask: number, bit: number): boolean {
   if (!Number.isInteger(mask) || mask < 0 || mask > 65535) return false;
@@ -19,7 +18,7 @@ type Snap = { mask: number; ready: boolean };
 
 let snap: Snap = { mask: 0, ready: false };
 const listeners = new Set<() => void>();
-let timer: number | null = null;
+let started = false;
 let inflight: Promise<void> | null = null;
 
 function emit(): void {
@@ -54,15 +53,10 @@ export async function refreshFeatureMask(): Promise<void> {
   return inflight;
 }
 
-function ensureLoop(): void {
-  if (timer != null || typeof window === "undefined") return;
+function ensureStarted(): void {
+  if (started || typeof window === "undefined") return;
+  started = true;
   void refreshFeatureMask();
-  timer = window.setInterval(() => {
-    void refreshFeatureMask();
-  }, POLL_MS);
-  window.addEventListener("focus", () => {
-    void refreshFeatureMask();
-  });
 }
 
 export function useFeatureMask(): {
@@ -71,12 +65,13 @@ export function useFeatureMask(): {
   fleet: boolean;
   wiki: boolean;
   remote: boolean;
+  agentCli: boolean;
 } {
   const [local, setLocal] = useState(snap);
   useEffect(() => {
     const pull = () => setLocal(snap);
     listeners.add(pull);
-    ensureLoop();
+    ensureStarted();
     pull();
     return () => {
       listeners.delete(pull);
@@ -89,5 +84,6 @@ export function useFeatureMask(): {
     fleet: featureBit(mask, 0),
     wiki: featureBit(mask, 1),
     remote: featureBit(mask, 2),
+    agentCli: featureBit(mask, 3),
   };
 }

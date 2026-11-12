@@ -5,7 +5,7 @@
 
 use serde_json::Value;
 
-/// Bits from the right: 1 fleet, 2 wiki, 4 remote.
+/// Bits from the right: 1 fleet, 2 wiki, 4 remote, 8 agent CLI.
 #[tauri::command]
 pub async fn feature_mask_get() -> i64 {
     fetch_feature_mask().await

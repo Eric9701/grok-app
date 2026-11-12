@@ -7,6 +7,8 @@ describe("featureBit", () => {
     expect(featureBit(3, 1)).toBe(true);
     expect(featureBit(3, 2)).toBe(false);
     expect(featureBit(4, 2)).toBe(true);
+    expect(featureBit(8, 3)).toBe(true);
+    expect(featureBit(8, 2)).toBe(false);
     expect(featureBit(0, 0)).toBe(false);
   });
 

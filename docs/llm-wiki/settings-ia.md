@@ -15,7 +15,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 个人：`general` · `appearance` · `account` · `archived` · `pet`（展示名「宠物」）  
 系统：`extensions` · `runtime` · `atlas` · `wiki`（展示名「知识库配置」）· `agent_cli`（展示名「智能体 CLI」）· `remote_im`（展示名「远程控制」）· `shortcuts` · `about`
 
-机群、个人知识库、远程控制是否出现，由 atlas-server `GET /atlas/v1/feature-mask` 的十进制控制码决定。从右往左：位 0（1）机群，位 1（2）个人知识库，位 2（4）远程控制。为 1 才显示侧栏入口、对应页面和设置节；搜索命中同样滤掉。直接打开被关掉的 `#/fleet`、`#/wiki` 或 `#/settings/remote_im`、`#/settings/wiki` 时回到工作台或常规设置。接口失败、未登录或结果还没回来都按 0。不写入设置。目录注册表仍保留这些节。`--show-remote` 不再决定远程控制是否可见。
+机群、个人知识库、远程控制、智能体 CLI 是否出现，由 atlas-server `GET /atlas/v1/feature-mask` 的十进制控制码决定。从右往左：位 0（1）机群，位 1（2）个人知识库，位 2（4）远程控制，位 3（8）智能体 CLI。为 1 才显示侧栏入口、对应页面和设置节；搜索命中同样滤掉。直接打开被关掉的 `#/fleet`、`#/wiki` 或 `#/settings/remote_im`、`#/settings/wiki`、`#/settings/agent_cli` 时回到工作台或常规设置。接口失败、未登录或结果还没回来都按 0。不写入设置。目录注册表仍保留这些节。`--show-remote` 不再决定远程控制是否可见。
 
 **不要**再往 `SETTINGS_NAV` 塞重复 `runtime`。
 

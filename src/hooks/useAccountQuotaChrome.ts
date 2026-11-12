@@ -201,7 +201,7 @@ export function useAccountQuotaChrome(opts: {
         }
         await refreshAccount({ refreshBilling: true });
         await refreshSavedAccounts();
-        if (res.ok && method !== "device") void refreshFeatureMask();
+        if (res.ok) void refreshFeatureMask();
         if (res.ok) h.resetFocusedSession();
         return !!res.ok;
       } catch (e) {
@@ -285,6 +285,7 @@ export function useAccountQuotaChrome(opts: {
       setAccountBusy(true);
       try {
         await api.accountSwitch(id);
+        void refreshFeatureMask();
         await refreshAccount({ refreshBilling: true });
         await refreshSavedAccounts();
         h.resetFocusedSession();

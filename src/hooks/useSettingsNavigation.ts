@@ -132,6 +132,7 @@ export function useSettingsNavigation(opts: {
       if (
         route.kind === "settings-explicit" &&
         ((route.section === "wiki" && !featureMask.wiki) ||
+          (route.section === "agent_cli" && !featureMask.agentCli) ||
           (route.section === "remote_im" && !featureMask.remote))
       ) {
         window.location.hash = "#/settings/general";
@@ -180,6 +181,7 @@ export function useSettingsNavigation(opts: {
     featureMask.fleet,
     featureMask.wiki,
     featureMask.remote,
+    featureMask.agentCli,
   ]);
 
   useEffect(() => {
