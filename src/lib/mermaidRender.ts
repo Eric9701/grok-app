@@ -45,16 +45,33 @@ async function loadMermaid(theme: MermaidThemeMode): Promise<MermaidApi> {
       securityLevel: "strict",
       theme: theme === "light" ? "default" : "dark",
       fontFamily: "inherit",
+      // Mermaid otherwise draws its own error diagram before throwing, and the
+      // parse-error path skips its temp-element cleanup, leaving a giant SVG
+      // stranded in document.body.
+      suppressErrorRendering: true,
     });
     initTheme = theme;
   }
   return api;
 }
 
+/** Remove the temp element mermaid renders into, in case it leaked on failure. */
+function cleanupTempElement(id: string): void {
+  if (typeof document === "undefined") return;
+  document.getElementById(`d${id}`)?.remove();
+}
+
 function normalizeSvg(result: { svg: string } | string): string {
   const svg = typeof result === "string" ? result : result.svg;
   if (!svg || !/<svg[\s>]/i.test(svg)) {
     throw new Error("Mermaid did not return SVG");
+  }
+  // Mermaid's built-in error diagram is a valid <svg>, so it must be rejected
+  // explicitly or it would be injected as if it were the diagram. Only its
+  // text content is a reliable marker: every diagram stylesheet defines an
+  // `.error-text` CSS class.
+  if (/syntax error in text/i.test(svg) || /mermaid version\s*[\d.]+/i.test(svg)) {
+    throw new Error("Mermaid returned an error diagram");
   }
   return svg;
 }
@@ -71,8 +88,13 @@ export async function renderMermaidSvg(
     const api = await loadMermaid(theme);
     renderSeq += 1;
     const id = `grok-mermaid-${renderSeq}`;
-    const result = await api.render(id, text);
-    return normalizeSvg(result);
+    try {
+      const result = await api.render(id, text);
+      return normalizeSvg(result);
+    } catch (err) {
+      cleanupTempElement(id);
+      throw err;
+    }
   };
 
   const next = renderChain.then(run, run);

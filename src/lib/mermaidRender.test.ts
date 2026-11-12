@@ -60,4 +60,44 @@ describe("mermaidRender", () => {
     await expect(renderMermaidSvg("   ", "dark")).rejects.toThrow(/empty/i);
     expect(renderMock).not.toHaveBeenCalled();
   });
+
+  it("initializes mermaid with error rendering suppressed", async () => {
+    const { renderMermaidSvg } = await import("./mermaidRender");
+    await renderMermaidSvg("flowchart LR\n  A-->B", "dark");
+    const config = initializeMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(config.suppressErrorRendering).toBe(true);
+  });
+
+  it("rejects mermaid's built-in error diagram svg", async () => {
+    renderMock.mockImplementationOnce(async () => ({
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.error-text{fill:red}</style><text class="error-text">Syntax error in text</text><text>mermaid version 11.17.2</text></svg>',
+    }));
+    const { renderMermaidSvg } = await import("./mermaidRender");
+    await expect(renderMermaidSvg("not a diagram", "dark")).rejects.toThrow(
+      /error diagram/i,
+    );
+  });
+
+  it("accepts a diagram whose stylesheet defines an error-text class", async () => {
+    renderMock.mockImplementationOnce(async () => ({
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.error-text{fill:red}</style><text>A</text></svg>',
+    }));
+    const { renderMermaidSvg } = await import("./mermaidRender");
+    const svg = await renderMermaidSvg("flowchart LR\n  A-->B", "dark");
+    expect(svg).toMatch(/<svg[\s>]/i);
+  });
+
+  it("removes the leaked temp element when a render fails", async () => {
+    renderMock.mockImplementationOnce(async () => {
+      const leaked = document.createElement("div");
+      leaked.id = "dgrok-mermaid-1";
+      document.body.appendChild(leaked);
+      throw new Error("Parse error on line 2");
+    });
+    const { renderMermaidSvg } = await import("./mermaidRender");
+    await expect(renderMermaidSvg("flowchart LR\n  ???", "dark")).rejects.toThrow(
+      /parse error/i,
+    );
+    expect(document.getElementById("dgrok-mermaid-1")).toBeNull();
+  });
 });
