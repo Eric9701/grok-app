@@ -381,7 +381,7 @@ export const taExtensions = {
   "ext.skills.newDescriptionHint": "SKILL.md பிரண்ட்மேட்டரில் எழுதப்பட்டது. உருவாக்கிய பிறகு முழு உடலையும் திருத்தலாம்.",
   "ext.skills.newScope": "இடம்",
   "ext.skills.newScopeUser": "பயனர் (பாதை நோக்கம் கொண்ட GROK_HOME /திறன்கள்)",
-  "ext.skills.newScopeProject": "திட்டம் (செயலில் உள்ள திட்டத்தில்.grok/skills)",
+  "ext.skills.newScopeProject": "திட்டம் (செயலில் உள்ள திட்டத்தில்.atlas/skills)",
   "ext.skills.newScopeProjectDisabled": "திட்டம் (ஒரு திட்டத்தை முதலில் திற)",
   "ext.skills.newScopeProjectNeed": "திட்டத் திறனை உருவாக்க ஒரு திட்டத்தைத் திறக்கவும்.",
   "ext.skills.newScopeHint": "பயனர் திறன்கள் செயலில் உள்ள முகவரைப் பின்தொடர்கின்றன (சுயாதீனமான GROK_HOME அல்லது ~/.atlas). திட்டத் திறன்கள் ரெப்போவுடன் அனுப்பப்படுகின்றன.",

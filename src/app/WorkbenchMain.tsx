@@ -15,6 +15,8 @@ import { PaneToggleButton } from "@/components/PaneToggleButton";
 import {
   IconAttach,
   IconClock,
+  IconDeviceDesktop,
+  IconFileText,
   IconList,
   IconMenu,
   IconMore,
@@ -23,6 +25,7 @@ import {
   IconUser,
   IconWorld,
 } from "@/components/icons";
+import { useFeatureMask } from "@/lib/featureMask";
 import { createT, type Locale, type MessageKey } from "@/i18n";
 import {
   projectDisplayName,
@@ -106,6 +109,7 @@ export type WorkbenchMainProps = {
 };
 
 export function WorkbenchMain(props: WorkbenchMainProps) {
+  const featureMask = useFeatureMask();
   const {
     tr,
     locale,
@@ -281,6 +285,28 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
               ) : null}
               <h1 className="main__title" data-tauri-drag-region={dragRegion}>
                 {tr("kanban.title")}
+              </h1>
+            </>
+          ) : mainPane === "fleet" && featureMask.fleet ? (
+            <>
+              {!phoneLayout ? (
+                <span className="main__title-icon">
+                  <IconDeviceDesktop size={16} />
+                </span>
+              ) : null}
+              <h1 className="main__title" data-tauri-drag-region={dragRegion}>
+                {tr("fleet.title")}
+              </h1>
+            </>
+          ) : mainPane === "wiki" && featureMask.wiki ? (
+            <>
+              {!phoneLayout ? (
+                <span className="main__title-icon">
+                  <IconFileText size={16} />
+                </span>
+              ) : null}
+              <h1 className="main__title" data-tauri-drag-region={dragRegion}>
+                {tr("wiki.title")}
               </h1>
             </>
           ) : (

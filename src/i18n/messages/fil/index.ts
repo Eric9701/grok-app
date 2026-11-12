@@ -16,6 +16,8 @@ import { filExtensions } from "./extensions";
 import { filAutomations } from "./automations";
 import { filFeatures } from "./features";
 import { filKanban } from "./kanban";
+import { filFleet } from "./fleet";
+import { filWiki } from "./wiki";
 import { filSettings } from "./settings";
 import { filSettingsUi } from "./settings-ui";
 import { filSettingsAgent } from "./settings-agent";
@@ -44,6 +46,8 @@ export const fil: Record<MessageKey, string> = {
   ...filAutomations,
   ...filFeatures,
   ...filKanban,
+  ...filFleet,
+  ...filWiki,
   ...filSettings,
   ...filSettingsUi,
   ...filSettingsAgent,

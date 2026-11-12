@@ -2,6 +2,8 @@
 export const trErrors = {
   "error.details": "Ayrıntılar",
   "error.hideDetails": "Ayrıntıları gizle",
+  "error.viewOriginal": "Özgün hata",
+  "error.hideOriginal": "Özgün hatayı gizle",
   "error.action.reconnect": "Yeniden bağlan",
   "error.action.retry": "Tekrar dene",
   "error.action.openDoctor": "Tanılamayı aç",

@@ -2,6 +2,8 @@
 export const ptBRErrors = {
   "error.details": "Detalhes",
   "error.hideDetails": "Ocultar detalhes",
+  "error.viewOriginal": "Erro original",
+  "error.hideOriginal": "Ocultar erro original",
   "error.action.reconnect": "Reconectar",
   "error.action.retry": "Tentar de novo",
   "error.action.openDoctor": "Abrir Doctor",

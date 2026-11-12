@@ -263,6 +263,17 @@ describe("settingsCatalog", () => {
     expect(zhHits.some((h) => h.entry.id === "runtime.sshHosts")).toBe(true);
   });
 
+  it("opens knowledge-base settings beside Atlas", () => {
+    expect(SETTINGS_NAV.some((n) => n.id === "wiki" && n.group === "system")).toBe(true);
+    expect(buildSettingsHash({ section: "wiki" })).toBe("#/settings/wiki");
+    expect(parseSettingsHash("#/settings/wiki")).toEqual({
+      section: "wiki",
+      tab: null,
+    });
+    expect(SETTINGS_ENTRIES.some((e) => e.id === "wiki.compileTurns")).toBe(true);
+    expect(SETTINGS_ENTRIES.some((e) => e.id === "general.wikiLibraries")).toBe(false);
+  });
+
   it("isSettingsSectionId", () => {
     expect(isSettingsSectionId("runtime")).toBe(true);
     expect(isSettingsSectionId("pet")).toBe(true);

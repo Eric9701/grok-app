@@ -77,6 +77,7 @@ export const taSettingsUi = {
   "settings.nav.extensions": "நீட்டிப்புகள்",
   "settings.nav.runtime": "CLI / இயக்க நேரம்",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "விசைப்பலகை",
   "settings.nav.about": "பற்றி",
   "settings.tab.composer": "எழுதி",

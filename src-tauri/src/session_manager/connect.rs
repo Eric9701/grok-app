@@ -1323,11 +1323,12 @@ impl SessionManager {
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
             } else {
-                crate::official_aux::merge_extra_rules(
+                crate::official_aux::merge_extra_rules_with_wiki(
                     meta.extra_rules
                         .as_ref()
                         .map(|s| s.trim())
                         .filter(|s| !s.is_empty()),
+                    crate::wiki_libraries::agent_rules(&store::load_settings().wiki_libraries),
                 )
             },
             max_agent_turns: meta.max_agent_turns,
@@ -1934,7 +1935,10 @@ impl SessionManager {
             permission_policy: Some(prefs.permission_policy.clone()),
             product_mode: Some(prefs.mode.clone()),
             sandbox_profile: Some(effective_sandbox.clone()),
-            extra_rules: crate::official_aux::merge_extra_rules(None),
+            extra_rules: crate::official_aux::merge_extra_rules_with_wiki(
+                None,
+                crate::wiki_libraries::agent_rules(&settings.wiki_libraries),
+            ),
             ..Default::default()
         };
         let scanned_at = chrono::Utc::now();

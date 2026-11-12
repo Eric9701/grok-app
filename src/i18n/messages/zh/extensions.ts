@@ -381,7 +381,7 @@ export const zhExtensions = {
   "ext.skills.newDescriptionHint": "写入 SKILL.md 前置元数据。创建后可继续编辑正文。",
   "ext.skills.newScope": "位置",
   "ext.skills.newScopeUser": "用户（路径作用域 GROK_HOME /skills）",
-  "ext.skills.newScopeProject": "项目（当前项目 .grok/skills）",
+  "ext.skills.newScopeProject": "项目（当前项目 .atlas/skills）",
   "ext.skills.newScopeProjectDisabled": "项目（请先打开项目）",
   "ext.skills.newScopeProjectNeed": "请先打开项目以创建项目技能。",
   "ext.skills.newScopeHint": "用户技能跟随当前 agent home（独立 GROK_HOME 或 ~/.atlas）。项目技能随仓库共享。",

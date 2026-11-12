@@ -3,7 +3,6 @@
  */
 import { useEffect, useState } from "react";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
-
 import {
   AtlasModelAddDialog,
   AtlasModelDeleteDialog,

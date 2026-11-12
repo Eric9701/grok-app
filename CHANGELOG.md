@@ -15,11 +15,13 @@ See `docs/llm-wiki/release.md`.
 
 ### Added
 - Drag a file or folder from the file tree onto the message box to attach it. A remote SSH tree stays click-to-open.
+- Chat errors can be expanded to show the original exception.
 - WeCom can receive a file or image in chat and hand it to the agent with the next message.
 - WeCom can send a PNG, JPEG, or GIF from the agent reply back to that chat.
 
 **中文 · 新增**
 - 可以把文件树里的文件或文件夹拖到输入框，附到下一条消息。通过 SSH 打开的远程目录仍是点击打开。
+- 对话里的错误可以展开，查看服务返回的原始异常。
 - 企业微信可以接收文件或图片，并在下一条消息里交给 Agent。
 - 企业微信可以把 Agent 回复里的 PNG、JPEG 或 GIF 发回当前会话。
 

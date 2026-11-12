@@ -24,6 +24,8 @@ import {
 import {
   IconDeviceMobile,
   IconFolderPlus,
+  IconDeviceDesktop,
+  IconFileText,
   IconList,
   IconNewChat,
   IconScheduled,
@@ -33,7 +35,7 @@ import {
   IconWorld,
 } from "@/components/icons";
 import { createT } from "@/i18n";
-import { useRemoteChromeVisible } from "@/lib/api/launchChrome";
+import { useFeatureMask } from "@/lib/featureMask";
 import {
   isDesktopHost,
   type AccountStatus,
@@ -123,6 +125,7 @@ export type WorkbenchSidebarProps = {
   onNewChat: () => void;
   onNavigateAutomations: () => void;
   onNavigateKanban: () => void;
+  onNavigateFleet: () => void;
   onNavigateRemoteIm: () => void;
   showUserMenu: boolean;
   setShowUserMenu: Dispatch<SetStateAction<boolean>>;
@@ -185,6 +188,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
     onNewChat,
     onNavigateAutomations,
     onNavigateKanban,
+    onNavigateFleet,
     onNavigateRemoteIm,
     showUserMenu,
     setShowUserMenu,
@@ -209,7 +213,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
     onSwitchAccount,
     onUserMenuOpened,
   } = props;
-  const remoteChromeVisible = useRemoteChromeVisible().visible;
+  const featureMask = useFeatureMask();
 
   const providerSupportsBalance =
     !!activeCustomProvider &&
@@ -412,7 +416,38 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
             </span>
             {tr("sidebar.kanban")}
           </button>
-          {isDesktopHost() && remoteChromeVisible ? (
+          {featureMask.fleet ? (
+          <button
+            type="button"
+            className={
+              "nav-item" + (mainPane === "fleet" ? " nav-item--active" : "")
+            }
+            onClick={onNavigateFleet}
+          >
+            <span className="nav-item__icon">
+              <IconDeviceDesktop size={16} />
+            </span>
+            {tr("fleet.nav")}
+          </button>
+          ) : null}
+          {featureMask.wiki ? (
+          <button
+            type="button"
+            className={
+              "nav-item" + (mainPane === "wiki" ? " nav-item--active" : "")
+            }
+            onClick={() => {
+              setShowUserMenu(false);
+              window.location.hash = "#/wiki";
+            }}
+          >
+            <span className="nav-item__icon">
+              <IconFileText size={16} />
+            </span>
+            {tr("wiki.nav")}
+          </button>
+          ) : null}
+          {isDesktopHost() && featureMask.remote ? (
             <button
               type="button"
               className="nav-item"

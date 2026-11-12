@@ -4,7 +4,7 @@
 //! new `// ── Domain ──` section rather than appending at a random spot.
 
 use crate::{
-    atlas_endpoints, atlas_relay_agent, cli_worktrees, commands, desktop_notify, git_pr_hub,
+    atlas_endpoints, atlas_relay_agent, cli_worktrees, commands, desktop_notify, feature_mask, fleet, git_pr_hub, wiki,
     launch_chrome, leader, mirror, os_theme, pet_quick, pet_window, pr_monitor, remote_im,
     self_update, serve, session_api, ssh_remote, system_fonts, theme_editor_window, tray, updater,
     voice_host, wallpaper_grok_album, wallpaper_remote_commands, window_min,
@@ -42,6 +42,7 @@ pub fn app_invoke_handler(
         commands::session_resolve_ask_user,
         // ── CLI & environment probe ──
         launch_chrome::launch_chrome_get,
+        feature_mask::feature_mask_get,
         commands::probe_cli,
         commands::wsl_status,
         // ── SSH remote hosts ──
@@ -65,6 +66,34 @@ pub fn app_invoke_handler(
         atlas_relay_agent::atlas_relay_agent_connect,
         atlas_relay_agent::atlas_relay_agent_disconnect,
         atlas_relay_agent::atlas_relay_agent_set_model,
+        // ── Fleet ──
+        fleet::fleet_status,
+        fleet::fleet_tasks,
+        fleet::fleet_task_trace,
+        fleet::fleet_dispatch,
+        fleet::fleet_cancel,
+        fleet::fleet_listen_apply,
+        // ── Wiki engine ──
+        wiki::wiki_open,
+        wiki::wiki_read,
+        wiki::wiki_write_pages,
+        wiki::wiki_remove_page,
+        wiki::wiki_list,
+        wiki::wiki_list_raw,
+        wiki::wiki_list_dirs,
+        wiki::wiki_scaffold,
+        wiki::wiki_init,
+        wiki::wiki_import_files,
+        wiki::wiki_import_url,
+        wiki::wiki_remove_raw,
+        wiki::wiki_lint,
+        wiki::wiki_search,
+        wiki::wiki_fingerprint,
+        wiki::wiki_cache_get,
+        wiki::wiki_cache_put,
+        wiki::wiki_complete,
+        wiki::wiki_usage_list,
+        wiki::wiki_usage_append,
         commands::cli_install_latest,
         commands::cli_install_commands,
         commands::cli_update_check,

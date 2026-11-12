@@ -1562,6 +1562,15 @@ pub fn path_citation_session_rules() -> &'static str {
 
 /// Merge user session extra_rules with always-on path rules + official-aux inject.
 pub fn merge_extra_rules(user: Option<&str>) -> Option<String> {
+    assemble_extra_rules(user, None)
+}
+
+/// Same merge, plus the personal knowledge base marked as the agent default.
+pub fn merge_extra_rules_with_wiki(user: Option<&str>, wiki: Option<String>) -> Option<String> {
+    assemble_extra_rules(user, wiki.filter(|text| !text.trim().is_empty()))
+}
+
+fn assemble_extra_rules(user: Option<&str>, wiki: Option<String>) -> Option<String> {
     let path = path_citation_session_rules().trim();
     let inject = inject_session_rules();
     let user = user
@@ -1570,9 +1579,12 @@ pub fn merge_extra_rules(user: Option<&str>) -> Option<String> {
         .map(|s| s.to_string());
     // Channel-level rules from the active custom provider (Settings → Providers).
     let channel = crate::providers::active_provider_append_prompt();
-    let mut parts: Vec<String> = Vec::with_capacity(4);
+    let mut parts: Vec<String> = Vec::with_capacity(5);
     if let Some(u) = user {
         parts.push(u);
+    }
+    if let Some(w) = wiki {
+        parts.push(w);
     }
     if let Some(c) = channel {
         parts.push(c);

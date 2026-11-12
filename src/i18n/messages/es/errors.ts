@@ -2,6 +2,8 @@
 export const esErrors = {
   "error.details": "Detalles",
   "error.hideDetails": "Ocultar detalles",
+  "error.viewOriginal": "Error original",
+  "error.hideOriginal": "Ocultar error original",
   "error.action.reconnect": "Reconectar",
   "error.action.retry": "Reintentar",
   "error.action.openDoctor": "Abrir Doctor",

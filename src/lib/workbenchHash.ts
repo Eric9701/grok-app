@@ -10,7 +10,14 @@ import {
 } from "@/lib/settingsCatalog";
 import { parsePrHubDeepLink } from "@/lib/prHubDeepLink";
 
-export type WorkbenchHashPane = "chat" | "automations" | "kanban" | "octo" | "atlasCloud";
+export type WorkbenchHashPane =
+  | "chat"
+  | "automations"
+  | "kanban"
+  | "octo"
+  | "atlasCloud"
+  | "fleet"
+  | "wiki";
 
 export type WorkbenchHashRoute =
   | {
@@ -23,7 +30,7 @@ export type WorkbenchHashRoute =
   | { kind: "pane"; pane: WorkbenchHashPane };
 
 /**
- * Parse `#/settings…` / `#/automations` / `#/kanban` / `#/octo` / `#/atlas-cloud` / empty workbench hashes.
+ * Parse `#/settings…` / `#/automations` / `#/kanban` / `#/octo` / `#/atlas-cloud` / `#/fleet` / `#/wiki` / empty workbench hashes.
  */
 export function resolveWorkbenchHash(
   fullHash: string | null | undefined,
@@ -55,6 +62,12 @@ export function resolveWorkbenchHash(
   }
   if (raw === "atlas-cloud" || raw.startsWith("atlas-cloud")) {
     return { kind: "pane", pane: "atlasCloud" };
+  }
+  if (raw === "fleet" || raw.startsWith("fleet")) {
+    return { kind: "pane", pane: "fleet" };
+  }
+  if (raw === "wiki" || raw.startsWith("wiki")) {
+    return { kind: "pane", pane: "wiki" };
   }
   return { kind: "pane", pane: "chat" };
 }

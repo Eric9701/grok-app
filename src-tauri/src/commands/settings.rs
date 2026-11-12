@@ -1,6 +1,9 @@
 #[tauri::command]
 pub async fn settings_get() -> Result<AppSettings, String> {
-    Ok(store::load_settings_async().await)
+    let mut settings = store::load_settings_async().await;
+    settings.wiki_libraries =
+        crate::wiki_libraries::normalize_libraries(std::mem::take(&mut settings.wiki_libraries));
+    Ok(settings)
 }
 
 /// One-shot notice after corrupt store files were quarantined on load.
@@ -35,6 +38,17 @@ pub async fn settings_set(
     // Normalize / validate optional agents JSON (reject invalid non-empty).
     settings.agents_json =
         crate::agents_catalog::normalize_agents_json(&settings.agents_json)?;
+    settings.wiki_libraries =
+        crate::wiki_libraries::normalize_libraries(std::mem::take(&mut settings.wiki_libraries));
+    settings.wiki_compile_max_turns =
+        crate::wiki::clamp_wiki_compile_turns(settings.wiki_compile_max_turns);
+    settings.wiki_compile_model_id = settings
+        .wiki_compile_model_id
+        .trim()
+        .chars()
+        .filter(|ch| !ch.is_control())
+        .take(120)
+        .collect();
     // Headless background-wait policy (CLI 0.2.117+); clamp timeout 1–3600.
     settings.background_wait_policy =
         crate::acp_client::normalize_background_wait_policy(&settings.background_wait_policy)

@@ -43,7 +43,7 @@ export const AGENT_KANBAN_DEFAULT_COLUMNS: readonly AgentKanbanColumnId[] = [
 
 export const AGENT_KANBAN_PREFS_KEY = "grok-app.agentKanbanPrefs";
 
-export type AgentKanbanCardSource = "session" | "relay";
+export type AgentKanbanCardSource = "session" | "relay" | "wiki";
 
 export type AgentKanbanCard = TaskBoardCard & {
   kanbanColumn: AgentKanbanColumnId;
@@ -53,6 +53,8 @@ export type AgentKanbanCard = TaskBoardCard & {
   relayTaskId?: string;
   /** Relay agent that recorded this prompt. */
   relayAgentId?: string;
+  /** Knowledge-base compile id when `source` is `wiki`. */
+  wikiTaskId?: string;
 };
 
 export type AgentKanbanBoard = Record<AgentKanbanColumnId, AgentKanbanCard[]>;
@@ -272,6 +274,80 @@ export function relayTaskToKanbanCard(
   };
 }
 
+export type WikiKanbanTask = {
+  id: string;
+  title: string;
+  status: "running" | "done" | "failed";
+  progress: string | null;
+  atMs: number;
+  projectName: string;
+  projectPath: string;
+};
+
+export function wikiTaskToKanbanCard(
+  task: WikiKanbanTask,
+  labels: { badge: string; untitled: string },
+): AgentKanbanCard | null {
+  const id = task.id.trim();
+  if (!id) return null;
+  const kanbanColumn: AgentKanbanColumnId =
+    task.status === "running" ? "working" : task.status === "failed" ? "needs_you" : "done";
+  const column: TaskBoardColumn =
+    kanbanColumn === "working" ? "running" : kanbanColumn === "needs_you" ? "error" : "done";
+  const title = task.title.trim() || labels.untitled;
+  return {
+    sessionId: `wiki:${id}`,
+    title,
+    projectName: task.projectName.trim() || labels.badge,
+    projectPath: task.projectPath.trim() || null,
+    status: kanbanColumn === "working" ? "busy" : kanbanColumn === "needs_you" ? "error" : "idle",
+    column,
+    liveToolTitle: task.progress?.trim() || null,
+    isCurrent: false,
+    lastActivityAt: Number.isFinite(task.atMs) ? task.atMs : 0,
+    archived: false,
+    kanbanColumn,
+    source: "wiki",
+    wikiTaskId: id,
+  };
+}
+
+/** Append knowledge-base compiles beside the other cards. */
+export function mergeWikiTasksIntoKanban(
+  board: AgentKanbanBoard,
+  tasks: readonly WikiKanbanTask[],
+  labels: { badge: string; untitled: string },
+): AgentKanbanBoard {
+  const out = createEmptyAgentKanbanBoard();
+  for (const col of AGENT_KANBAN_COLUMN_IDS) {
+    out[col] = board[col].slice();
+  }
+  const touched = new Set<AgentKanbanColumnId>();
+  for (const task of tasks) {
+    const card = wikiTaskToKanbanCard(task, labels);
+    if (!card) continue;
+    out[card.kanbanColumn].push(card);
+    touched.add(card.kanbanColumn);
+  }
+  for (const col of touched) {
+    out[col].sort(compareKanbanCards);
+  }
+  return out;
+}
+
+function compareKanbanCards(a: AgentKanbanCard, b: AgentKanbanCard): number {
+  const rank = kanbanCardRank(a) - kanbanCardRank(b);
+  if (rank !== 0) return rank;
+  return b.lastActivityAt - a.lastActivityAt;
+}
+
+/** A running knowledge compile stays above the current chat. */
+function kanbanCardRank(card: AgentKanbanCard): number {
+  if (card.source === "wiki" && card.status === "busy") return 0;
+  if (card.isCurrent) return 1;
+  return 2;
+}
+
 /** Append cloud prompts beside session cards. Does not write sessions. */
 export function mergeRelayTasksIntoKanban(
   board: AgentKanbanBoard,
@@ -315,7 +391,8 @@ export function filterAgentKanban(
     return {
       ...extra,
       kanbanColumn: column,
-      source: extra.source === "relay" ? "relay" : "session",
+      source:
+        extra.source === "relay" || extra.source === "wiki" ? extra.source : "session",
     };
   };
   return {

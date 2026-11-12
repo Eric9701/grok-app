@@ -2,6 +2,8 @@
 export const frErrors = {
   "error.details": "Détails",
   "error.hideDetails": "Masquer les détails",
+  "error.viewOriginal": "Erreur d'origine",
+  "error.hideOriginal": "Masquer l'erreur d'origine",
   "error.action.reconnect": "Reconnecter",
   "error.action.retry": "Réessayer",
   "error.action.openDoctor": "Ouvrir Doctor",

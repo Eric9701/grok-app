@@ -14,6 +14,7 @@ import {
 } from "react";
 import { createT } from "@/i18n";
 import * as api from "@/lib/api";
+import { refreshFeatureMask } from "@/lib/featureMask";
 import type { AppDialog } from "@/lib/app/appDialogTypes";
 import { mergeAccountStatusPreservingLocalUsage } from "@/lib/accountQuotaRefresh";
 import {
@@ -200,6 +201,7 @@ export function useAccountQuotaChrome(opts: {
         }
         await refreshAccount({ refreshBilling: true });
         await refreshSavedAccounts();
+        if (res.ok && method !== "device") void refreshFeatureMask();
         if (res.ok) h.resetFocusedSession();
         return !!res.ok;
       } catch (e) {
@@ -327,6 +329,7 @@ export function useAccountQuotaChrome(opts: {
     setAccountBusy(true);
     try {
       await api.accountLogout();
+      void refreshFeatureMask();
       await refreshAccount({ refreshBilling: false });
       await refreshSavedAccounts();
       h.resetFocusedSession();

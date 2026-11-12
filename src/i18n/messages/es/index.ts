@@ -16,6 +16,8 @@ import { esExtensions } from "./extensions";
 import { esAutomations } from "./automations";
 import { esFeatures } from "./features";
 import { esKanban } from "./kanban";
+import { esFleet } from "./fleet";
+import { esWiki } from "./wiki";
 import { esSettings } from "./settings";
 import { esSettingsUi } from "./settings-ui";
 import { esSettingsAgent } from "./settings-agent";
@@ -44,6 +46,8 @@ export const es: Record<MessageKey, string> = {
   ...esAutomations,
   ...esFeatures,
   ...esKanban,
+  ...esFleet,
+  ...esWiki,
   ...esSettings,
   ...esSettingsUi,
   ...esSettingsAgent,

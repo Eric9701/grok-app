@@ -381,7 +381,7 @@ export const koExtensions = {
   "ext.skills.newDescriptionHint": "SKILL.md 프론트매터에 기록됩니다. 만든 뒤 전체 본문을 편집할 수 있습니다.",
   "ext.skills.newScope": "위치",
   "ext.skills.newScopeUser": "사용자(경로 범위 GROK_HOME /skills)",
-  "ext.skills.newScopeProject": "프로젝트(활성 프로젝트의 .grok/skills)",
+  "ext.skills.newScopeProject": "프로젝트(활성 프로젝트의 .atlas/skills)",
   "ext.skills.newScopeProjectDisabled": "프로젝트(먼저 프로젝트를 여세요)",
   "ext.skills.newScopeProjectNeed": "프로젝트 스킬을 만들려면 프로젝트를 여세요.",
   "ext.skills.newScopeHint": "사용자 스킬은 활성 에이전트 홈(독립 GROK_HOME 또는 ~/.atlas)을 따릅니다. 프로젝트 스킬은 저장소와 함께 제공됩니다.",

@@ -381,7 +381,7 @@ export const idExtensions = {
   "ext.skills.newDescriptionHint": "Ditulis ke frontmatter SKILL.md. Anda dapat menyunting isi penuh setelah dibuat.",
   "ext.skills.newScope": "Lokasi",
   "ext.skills.newScopeUser": "Pengguna (GROK_HOME /skills cakupan jalur)",
-  "ext.skills.newScopeProject": "Proyek (.grok/skills di proyek aktif)",
+  "ext.skills.newScopeProject": "Proyek (.atlas/skills di proyek aktif)",
   "ext.skills.newScopeProjectDisabled": "Proyek (buka proyek terlebih dahulu)",
   "ext.skills.newScopeProjectNeed": "Buka proyek untuk membuat skill proyek.",
   "ext.skills.newScopeHint": "Skill pengguna mengikuti home agen aktif (GROK_HOME mandiri atau ~/.atlas). Skill proyek dikirim bersama repositori.",

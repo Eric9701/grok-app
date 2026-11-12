@@ -385,7 +385,7 @@ export const trExtensions = {
   "ext.skills.newDescriptionHint": "SKILL.md ön bilgisine yazılır. Oluşturduktan sonra tüm gövdeyi düzenleyebilirsiniz.",
   "ext.skills.newScope": "Konum",
   "ext.skills.newScopeUser": "Kullanıcı (yol kapsamlı GROK_HOME /skills)",
-  "ext.skills.newScopeProject": "Proje (etkin projede .grok/skills)",
+  "ext.skills.newScopeProject": "Proje (etkin projede .atlas/skills)",
   "ext.skills.newScopeProjectDisabled": "Proje (önce bir proje açın)",
   "ext.skills.newScopeProjectNeed": "Proje becerisi oluşturmak için bir proje açın.",
   "ext.skills.newScopeHint": "Kullanıcı becerileri etkin ajan dizinini izler (bağımsız GROK_HOME ya da ~/.grok). Proje becerileri depoyla birlikte gelir.",

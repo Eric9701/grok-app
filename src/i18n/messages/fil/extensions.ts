@@ -381,7 +381,7 @@ export const filExtensions = {
   "ext.skills.newDescriptionHint": "Isinusulat sa frontmatter ng SKILL.md. Puwede mong i-edit ang buong katawan pagkatapos gumawa.",
   "ext.skills.newScope": "Lokasyon",
   "ext.skills.newScopeUser": "User (GROK_HOME /skills na naka-scope sa path)",
-  "ext.skills.newScopeProject": "Proyekto (.grok/skills sa aktibong proyekto)",
+  "ext.skills.newScopeProject": "Proyekto (.atlas/skills sa aktibong proyekto)",
   "ext.skills.newScopeProjectDisabled": "Proyekto (magbukas muna ng proyekto)",
   "ext.skills.newScopeProjectNeed": "Magbukas ng proyekto para gumawa ng skill ng proyekto.",
   "ext.skills.newScopeHint": "Sumusunod ang mga skill ng user sa aktibong agent home (independent GROK_HOME o ~/.atlas). Kasama sa repo ang mga skill ng proyekto.",

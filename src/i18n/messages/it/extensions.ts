@@ -381,7 +381,7 @@ export const itExtensions = {
   "ext.skills.newDescriptionHint": "Scritta nel frontmatter di SKILL.md. Puoi modificare il corpo completo dopo la creazione.",
   "ext.skills.newScope": "Posizione",
   "ext.skills.newScopeUser": "Utente (GROK_HOME /skills con ambito percorso)",
-  "ext.skills.newScopeProject": "Progetto (.grok/skills nel progetto attivo)",
+  "ext.skills.newScopeProject": "Progetto (.atlas/skills nel progetto attivo)",
   "ext.skills.newScopeProjectDisabled": "Progetto (apri prima un progetto)",
   "ext.skills.newScopeProjectNeed": "Apri un progetto per creare una skill di progetto.",
   "ext.skills.newScopeHint": "Le skill utente seguono la home agente attiva (GROK_HOME indipendente o ~/.atlas). Le skill di progetto viaggiano con il repo.",

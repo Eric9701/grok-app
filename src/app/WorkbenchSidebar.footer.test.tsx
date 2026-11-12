@@ -118,6 +118,7 @@ function props(
     onNewChat: () => undefined,
     onNavigateAutomations: () => undefined,
     onNavigateKanban: () => undefined,
+    onNavigateFleet: () => undefined,
     onNavigateRemoteIm: () => undefined,
     showUserMenu: false,
     setShowUserMenu: () => undefined,

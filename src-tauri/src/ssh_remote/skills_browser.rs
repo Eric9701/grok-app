@@ -1,4 +1,4 @@
-// ── Remote skills (`grok inspect --json` + project `.grok/skills`) ─────────
+// ── Remote skills (`grok inspect --json` + `~/.atlas/skills` + project `.atlas/skills`) ─────────
 
 #[derive(Debug, Clone)]
 pub struct SshSkillRow {
@@ -13,6 +13,7 @@ pub struct SshSkillRow {
 pub struct SshSkillsFetch {
     pub inspect: Option<serde_json::Value>,
     pub error: Option<String>,
+    pub user_skills: Vec<SshSkillRow>,
     pub project_skills: Vec<SshSkillRow>,
 }
 
@@ -54,6 +55,7 @@ exit 0
 const REMOTE_SKILLS_PY: &str = r##"python3 -c '
 import json, os, sys
 root = os.environ.get("GROK_APP_SKILLS_ROOT", "")
+source = os.environ.get("GROK_APP_SKILLS_SOURCE", "project").strip() or "project"
 out = []
 def meta(text):
     name = None
@@ -105,7 +107,7 @@ if root and os.path.isdir(root):
         n, desc, inv = meta(text)
         if not n:
             n = name
-        out.append({"name": n, "description": desc, "source": "project", "path": md, "userInvocable": inv})
+        out.append({"name": n, "description": desc, "source": source, "path": md, "userInvocable": inv})
 sys.stdout.write("GROK_APP_SKILLS\n")
 sys.stdout.write(json.dumps(out, ensure_ascii=False))
 sys.stdout.write("\n")
@@ -113,11 +115,28 @@ sys.stdout.flush()
 '
 "##;
 
-fn remote_project_skills_script(project_path: &str) -> String {
-    let root = format!("{}/.grok/skills", project_path.trim().trim_end_matches('/'));
+fn remote_skills_scan_script(root_assignment: &str, source: &str) -> String {
     format!(
-        "export GROK_APP_SKILLS_ROOT={}\n{REMOTE_SKILLS_PY}",
-        posix_single_quote(&root),
+        "{root_assignment}\nexport GROK_APP_SKILLS_SOURCE={}\n{REMOTE_SKILLS_PY}",
+        posix_single_quote(source),
+    )
+}
+
+fn remote_project_skills_script(project_path: &str) -> String {
+    let root = format!(
+        "{}/.atlas/skills",
+        project_path.trim().trim_end_matches('/')
+    );
+    remote_skills_scan_script(
+        &format!("export GROK_APP_SKILLS_ROOT={}", posix_single_quote(&root)),
+        "project",
+    )
+}
+
+fn remote_user_atlas_skills_script() -> String {
+    remote_skills_scan_script(
+        "export GROK_APP_SKILLS_ROOT=\"$HOME/.atlas/skills\"",
+        "user",
     )
 }
 
@@ -135,10 +154,7 @@ fn parse_inspect_stdout(stdout: &str) -> (Option<serde_json::Value>, Option<Stri
     let rest = stdout[idx + "GROK_APP_INSPECT".len()..].trim_start();
     let status = rest.lines().next().unwrap_or("").trim();
     if status.eq_ignore_ascii_case("MISSING") {
-        return (
-            None,
-            Some("Atlas CLI not found on the remote host".into()),
-        );
+        return (None, Some("Atlas CLI not found on the remote host".into()));
     }
     let after = rest.get(status.len()..).unwrap_or("").trim_start();
     match parse_first_json_value(after) {
@@ -195,12 +211,13 @@ fn parse_remote_skills_stdout(stdout: &str) -> Vec<SshSkillRow> {
     out
 }
 
-/// Remote `grok inspect --json` plus `{project}/.grok/skills` scan.
+/// Remote `grok inspect --json` plus `$HOME/.atlas/skills` and `{project}/.atlas/skills`.
 pub async fn ssh_fetch_skills(alias: &str, project_path: Option<&str>) -> SshSkillsFetch {
     if !is_safe_ssh_alias(alias) {
         return SshSkillsFetch {
             inspect: None,
             error: Some("invalid alias".into()),
+            user_skills: Vec::new(),
             project_skills: Vec::new(),
         };
     }
@@ -209,6 +226,7 @@ pub async fn ssh_fetch_skills(alias: &str, project_path: Option<&str>) -> SshSki
         .map(str::trim)
         .filter(|s| !s.is_empty() && s.starts_with('/') && !s.contains('\0'))
         .map(remote_project_skills_script);
+    let user_script = remote_user_atlas_skills_script();
 
     let inspect_fut = run_ssh(alias, &inspect_script, true, SSH_INSPECT_TIMEOUT_SECS);
     let scan_fut = async {
@@ -221,7 +239,8 @@ pub async fn ssh_fetch_skills(alias: &str, project_path: Option<&str>) -> SshSki
             }),
         }
     };
-    let (inspect_run, scan_run) = tokio::join!(inspect_fut, scan_fut);
+    let user_fut = run_ssh(alias, &user_script, true, SSH_OVERALL_TIMEOUT_SECS);
+    let (inspect_run, scan_run, user_run) = tokio::join!(inspect_fut, scan_fut, user_fut);
 
     let (inspect, error) = match inspect_run {
         Err(e) => (None, Some(ssh_io_err(e))),
@@ -236,10 +255,15 @@ pub async fn ssh_fetch_skills(alias: &str, project_path: Option<&str>) -> SshSki
         Ok(run) => parse_remote_skills_stdout(&run.stdout),
         Err(_) => Vec::new(),
     };
+    let user_skills = match user_run {
+        Ok(run) => parse_remote_skills_stdout(&run.stdout),
+        Err(_) => Vec::new(),
+    };
 
     SshSkillsFetch {
         inspect,
         error,
+        user_skills,
         project_skills,
     }
 }

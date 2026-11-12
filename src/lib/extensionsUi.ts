@@ -107,7 +107,7 @@ export function normalizeSkillSource(source: string | null | undefined): string 
 }
 
 /**
- * True when a skill is project-local (`{project}/.grok/skills`).
+ * True when a skill is project-local (`{project}/.atlas/skills`).
  * Used for the compact `[项目]` / `[Project]` name tag (global sources stay untagged).
  */
 export function isProjectSkillSource(

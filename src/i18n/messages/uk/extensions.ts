@@ -381,7 +381,7 @@ export const ukExtensions = {
   "ext.skills.newDescriptionHint": "Записано в SKILL.md frontmatter. Ви можете редагувати весь текст після створення.",
   "ext.skills.newScope": "Розташування",
   "ext.skills.newScopeUser": "Користувач (GROK_HOME /skills)",
-  "ext.skills.newScopeProject": "Проєкт (.grok/skills в активному проєкті)",
+  "ext.skills.newScopeProject": "Проєкт (.atlas/skills в активному проєкті)",
   "ext.skills.newScopeProjectDisabled": "Проєкт (спершу відкрийте проєкт)",
   "ext.skills.newScopeProjectNeed": "Відкрити проєкт, щоб створити навик проєкту.",
   "ext.skills.newScopeHint": "Навички користувача слідують за активним agent-home (незалежний GROK_HOME або ~/.atlas). Проєктні навички постачаються разом із репо.",

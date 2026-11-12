@@ -16,6 +16,8 @@ import { jaExtensions } from "./extensions";
 import { jaAutomations } from "./automations";
 import { jaFeatures } from "./features";
 import { jaKanban } from "./kanban";
+import { jaFleet } from "./fleet";
+import { jaWiki } from "./wiki";
 import { jaSettings } from "./settings";
 import { jaSettingsUi } from "./settings-ui";
 import { jaSettingsAgent } from "./settings-agent";
@@ -44,6 +46,8 @@ export const ja: Record<MessageKey, string> = {
   ...jaAutomations,
   ...jaFeatures,
   ...jaKanban,
+  ...jaFleet,
+  ...jaWiki,
   ...jaSettings,
   ...jaSettingsUi,
   ...jaSettingsAgent,

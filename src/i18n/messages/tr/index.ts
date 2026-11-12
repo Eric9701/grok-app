@@ -9,6 +9,8 @@ import { trErrors } from "./errors";
 import { trExtensions } from "./extensions";
 import { trFeatures } from "./features";
 import { trKanban } from "./kanban";
+import { trFleet } from "./fleet";
+import { trWiki } from "./wiki";
 import { trProject } from "./project";
 import { trProviders } from "./providers";
 import { trSession } from "./session";
@@ -37,6 +39,8 @@ export const tr: Record<MessageKey, string> = {
   ...trExtensions,
   ...trFeatures,
   ...trKanban,
+  ...trFleet,
+  ...trWiki,
   ...trProject,
   ...trProviders,
   ...trSession,

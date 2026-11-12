@@ -77,6 +77,7 @@ export const frSettingsUi = {
   "settings.nav.extensions": "Extensions",
   "settings.nav.runtime": "CLI / Exécution",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "Clavier",
   "settings.nav.about": "À propos",
   "settings.tab.composer": "Saisie",

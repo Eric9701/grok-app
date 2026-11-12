@@ -22,7 +22,9 @@ import {
   mapTaskColumnToAgentKanban,
   markAgentKanbanSeen,
   mergeKanbanLiveMaps,
+  filterAgentKanban,
   mergeRelayTasksIntoKanban,
+  mergeWikiTasksIntoKanban,
   relayTaskKanbanColumn,
   relayTaskToKanbanCard,
   saveAgentKanbanPrefs,
@@ -424,6 +426,70 @@ describe("relay tasks on the agent kanban", () => {
   });
 });
 
+describe("knowledge compiles on the agent kanban", () => {
+  it("puts a running compile in Working and keeps the wiki source after search", () => {
+    const merged = mergeWikiTasksIntoKanban(
+      createEmptyAgentKanbanBoard(),
+      [
+        {
+          id: "c1",
+          title: "raw/sources/note.md",
+          status: "running",
+          progress: "Analyze the source",
+          atMs: 20,
+          projectName: "笔记",
+          projectPath: "E:/knowledge1",
+        },
+      ],
+      { badge: "Knowledge base", untitled: "Knowledge compile" },
+    );
+    expect(merged.working[0]).toMatchObject({
+      source: "wiki",
+      wikiTaskId: "c1",
+      sessionId: "wiki:c1",
+      liveToolTitle: "Analyze the source",
+      projectPath: "E:/knowledge1",
+    });
+    expect(filterAgentKanban(merged, { query: "note" }).working[0]?.source).toBe(
+      "wiki",
+    );
+  });
+
+  it("pins a running compile above the current session", () => {
+    const board = createEmptyAgentKanbanBoard();
+    board.working.push({
+      sessionId: "s1",
+      title: "chat",
+      projectName: "grok-app",
+      projectPath: "E:/GitHub/grok-app",
+      status: "busy",
+      column: "running",
+      liveToolTitle: null,
+      isCurrent: true,
+      lastActivityAt: 999,
+      archived: false,
+      kanbanColumn: "working",
+      source: "session",
+    });
+    const merged = mergeWikiTasksIntoKanban(
+      board,
+      [
+        {
+          id: "c1",
+          title: "note.md",
+          status: "running",
+          progress: "Compiling · Analyze · 0:12",
+          atMs: 20,
+          projectName: "笔记",
+          projectPath: "E:/knowledge1",
+        },
+      ],
+      { badge: "Knowledge base", untitled: "Knowledge compile" },
+    );
+    expect(merged.working.map((card) => card.sessionId)).toEqual(["wiki:c1", "s1"]);
+  });
+});
+
 describe("agent kanban surface is not a todo list", () => {
   const root = join(__dirname, "..");
 
@@ -475,13 +541,15 @@ describe("agent kanban surface is not a todo list", () => {
     expect(palette).toContain('id: "open-kanban"');
     expect(palette).toContain('id: "open-task-board"');
     const workbench = readFileSync(join(root, "app/AppWorkbench.tsx"), "utf8");
+    const mainPane = readFileSync(join(root, "app/WorkbenchMainPane.tsx"), "utf8");
     const sessionModals = readFileSync(
       join(root, "app/WorkbenchSessionModals.tsx"),
       "utf8",
     );
     const chrome = workbench + sessionModals;
     const sidebar = readFileSync(join(root, "app/WorkbenchSidebar.tsx"), "utf8");
-    expect(workbench).toContain("KanbanBoardPage");
+    expect(mainPane).toContain("KanbanBoardPage");
+    expect(workbench).toContain("WorkbenchMainPane");
     expect(workbench).toContain("navigateKanban");
     expect(chrome).toContain('hash = "#/kanban"');
     expect(sidebar).toContain('tr("sidebar.kanban")');

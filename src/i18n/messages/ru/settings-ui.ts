@@ -77,6 +77,7 @@ export const ruSettingsUi = {
   "settings.nav.extensions": "Расширения",
   "settings.nav.runtime": "CLI / Среда выполнения",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "Клавиатура",
   "settings.nav.about": "О приложении",
   "settings.tab.composer": "Ввод",

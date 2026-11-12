@@ -77,6 +77,7 @@ export const koSettingsUi = {
   "settings.nav.extensions": "확장",
   "settings.nav.runtime": "CLI / 런타임",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "키보드",
   "settings.nav.about": "정보",
   "settings.tab.composer": "작성기",

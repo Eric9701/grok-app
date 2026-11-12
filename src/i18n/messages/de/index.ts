@@ -16,6 +16,8 @@ import { deExtensions } from "./extensions";
 import { deAutomations } from "./automations";
 import { deFeatures } from "./features";
 import { deKanban } from "./kanban";
+import { deFleet } from "./fleet";
+import { deWiki } from "./wiki";
 import { deSettings } from "./settings";
 import { deSettingsUi } from "./settings-ui";
 import { deSettingsAgent } from "./settings-agent";
@@ -44,6 +46,8 @@ export const de: Record<MessageKey, string> = {
   ...deAutomations,
   ...deFeatures,
   ...deKanban,
+  ...deFleet,
+  ...deWiki,
   ...deSettings,
   ...deSettingsUi,
   ...deSettingsAgent,

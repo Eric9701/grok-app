@@ -77,6 +77,7 @@ export const idSettingsUi = {
   "settings.nav.extensions": "Ekstensi",
   "settings.nav.runtime": "CLI / Runtime",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "Papan ketik",
   "settings.nav.about": "Tentang",
   "settings.tab.composer": "Composer",

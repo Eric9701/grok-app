@@ -77,6 +77,7 @@ export const ptBRSettingsUi = {
   "settings.nav.extensions": "Extensões",
   "settings.nav.runtime": "CLI / Runtime",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "Teclado",
   "settings.nav.about": "Sobre",
   "settings.tab.composer": "Compositor",

@@ -52,9 +52,9 @@ export function isPathUnderSkillRoot(path: string, root: string): boolean {
 
 /**
  * Known writable skill roots:
- * - `{userHome}/.grok/skills` (shared / classic GROK_HOME)
+ * - `{userHome}/.atlas/skills` (shared CLI home)
  * - `{agentHome}/skills` (App independent agent-home)
- * - `{projectPath}/.grok/skills` (project-local skills)
+ * - `{projectPath}/.atlas/skills` (project-local skills)
  *
  * Vendor/bundled/plugin trees are intentionally omitted.
  */
@@ -76,7 +76,7 @@ export function buildSkillEditRoots(opts: {
 
   const userHome = (opts.userHome ?? "").trim();
   if (userHome) {
-    push(`${normalizeSkillFsPath(userHome)}/.grok/skills`);
+    push(`${normalizeSkillFsPath(userHome)}/.atlas/skills`);
   }
 
   const agentHome = (opts.agentHome ?? "").trim();
@@ -86,7 +86,7 @@ export function buildSkillEditRoots(opts: {
 
   const projectPath = (opts.projectPath ?? "").trim();
   if (projectPath) {
-    push(`${normalizeSkillFsPath(projectPath)}/.grok/skills`);
+    push(`${normalizeSkillFsPath(projectPath)}/.atlas/skills`);
   }
 
   return out;

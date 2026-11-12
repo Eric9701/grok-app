@@ -72,8 +72,7 @@ pub async fn export_bytes_save(
         };
 
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("create parent dir: {e}"))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("create parent dir: {e}"))?;
         }
         std::fs::write(&path, &bytes).map_err(|e| format!("write file: {e}"))?;
 
@@ -260,13 +259,19 @@ fn run_grok_inspect(project_path: Option<&str>) -> (Option<serde_json::Value>, O
             let stdout = String::from_utf8_lossy(&output.stdout);
             match serde_json::from_str::<serde_json::Value>(stdout.trim()) {
                 Ok(v) => (Some(v), None),
-                Err(e) => (None, Some(format!("Failed to parse grok inspect JSON: {e}"))),
+                Err(e) => (
+                    None,
+                    Some(format!("Failed to parse grok inspect JSON: {e}")),
+                ),
             }
         }
         Ok(Err(e)) => (None, Some(format!("Failed to run grok inspect: {e}"))),
-        Err(_) => (None, Some(format!(
-            "grok inspect timed out after {INSPECT_TIMEOUT_SECS}s"
-        ))),
+        Err(_) => (
+            None,
+            Some(format!(
+                "grok inspect timed out after {INSPECT_TIMEOUT_SECS}s"
+            )),
+        ),
     }
 }
 
@@ -370,7 +375,7 @@ const PROJECT_SKILLS_SCAN_MAX: usize = 500;
 /// Soft cap for reading a single SKILL.md when scanning project skills.
 const PROJECT_SKILL_MD_READ_MAX: usize = 64 * 1024;
 
-/// Pure: project skills root `{project}/.grok/skills` when path is non-empty.
+/// Pure: project skills root `{project}/.atlas/skills` when path is non-empty.
 fn project_skills_dir(project_path: Option<&str>) -> Option<std::path::PathBuf> {
     let raw = project_path.map(str::trim).filter(|s| !s.is_empty())?;
     if raw.contains('\0') {
@@ -378,10 +383,17 @@ fn project_skills_dir(project_path: Option<&str>) -> Option<std::path::PathBuf> 
     }
     let p = std::path::Path::new(raw);
     // Reject obvious traversal in the project path string itself.
-    if p.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+    if p.components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
         return None;
     }
-    Some(p.join(".grok").join("skills"))
+    Some(p.join(".atlas").join("skills"))
+}
+
+/// User-home skills root `~/.atlas/skills` (shared Atlas CLI home).
+fn user_atlas_skills_dir() -> std::path::PathBuf {
+    crate::paths::shared_cli_home().join("skills")
 }
 
 /// Pure: simple SKILL.md frontmatter (`---` … `---`) key:value lines.
@@ -441,13 +453,8 @@ fn parse_skill_md_frontmatter_meta(content: &str) -> (Option<String>, String, bo
     (name, description, user_invocable)
 }
 
-/// Scan `{project}/.grok/skills/*/SKILL.md` on disk (one level).
-/// Independent of `grok inspect` so project skills still appear when CLI
-/// inspect is slow, partial, or missing project entries.
-fn scan_project_skills(project_path: Option<&str>) -> Vec<SkillDto> {
-    let Some(root) = project_skills_dir(project_path) else {
-        return Vec::new();
-    };
+/// Scan `{root}/*/SKILL.md` on disk (one level). `source` is `"project"` or `"user"`.
+fn scan_skills_dir(root: &std::path::Path, source: &str) -> Vec<SkillDto> {
     if !root.is_dir() {
         return Vec::new();
     }
@@ -503,7 +510,7 @@ fn scan_project_skills(project_path: Option<&str>) -> Vec<SkillDto> {
         out.push(SkillDto {
             name,
             description,
-            source: "project".into(),
+            source: source.to_string(),
             path: Some(skill_md.to_string_lossy().to_string()),
             user_invocable,
             plugin_name: None,
@@ -517,21 +524,45 @@ fn scan_project_skills(project_path: Option<&str>) -> Vec<SkillDto> {
     out
 }
 
-/// Merge inspect skills with project-disk skills.
-/// Same name (case-insensitive): **project wins** over global/user/plugin/bundled.
-/// Project scan also fills gaps when inspect omitted project skills.
-fn merge_skills_prefer_project(
+/// Scan `{project}/.atlas/skills/*/SKILL.md` on disk (one level).
+/// Independent of `grok inspect` so project skills still appear when CLI
+/// inspect is slow, partial, or missing project entries.
+fn scan_project_skills(project_path: Option<&str>) -> Vec<SkillDto> {
+    let Some(root) = project_skills_dir(project_path) else {
+        return Vec::new();
+    };
+    scan_skills_dir(&root, "project")
+}
+
+/// Scan `~/.atlas/skills/*/SKILL.md`. Fills skills inspect did not return.
+fn scan_user_atlas_skills() -> Vec<SkillDto> {
+    scan_skills_dir(&user_atlas_skills_dir(), "user")
+}
+
+/// Merge inspect skills with user-home and project disk skills.
+/// Same name (case-insensitive): user-home disk fills gaps only;
+/// **project wins** over global/user/plugin/bundled and over `~/.atlas`.
+fn merge_discovered_skills(
     inspect: Vec<SkillDto>,
+    user_disk: Vec<SkillDto>,
     project: Vec<SkillDto>,
 ) -> Vec<SkillDto> {
     let mut map: std::collections::HashMap<String, SkillDto> =
-        std::collections::HashMap::with_capacity(inspect.len() + project.len());
+        std::collections::HashMap::with_capacity(inspect.len() + user_disk.len() + project.len());
     for s in inspect {
         let key = s.name.to_ascii_lowercase();
         if key.is_empty() {
             continue;
         }
         map.insert(key, s);
+    }
+    for s in user_disk {
+        let key = s.name.to_ascii_lowercase();
+        if key.is_empty() {
+            continue;
+        }
+        // ~/.atlas fills names inspect missed. Do not replace an inspect row.
+        map.entry(key).or_insert(s);
     }
     for s in project {
         let key = s.name.to_ascii_lowercase();
@@ -550,15 +581,28 @@ fn merge_skills_prefer_project(
     out
 }
 
+/// Merge inspect skills with project-disk skills.
+/// Same name (case-insensitive): **project wins** over global/user/plugin/bundled.
+fn merge_skills_prefer_project(inspect: Vec<SkillDto>, project: Vec<SkillDto>) -> Vec<SkillDto> {
+    merge_discovered_skills(inspect, Vec::new(), project)
+}
+
 #[cfg(test)]
 mod skill_project_scan_tests {
     use super::*;
     use std::io::Write;
 
     #[test]
-    fn project_skills_dir_joins_dot_grok_skills() {
+    fn project_skills_dir_joins_dot_atlas_skills() {
         let d = project_skills_dir(Some("/tmp/demo")).unwrap();
-        assert!(d.ends_with(std::path::Path::new(".grok/skills")) || d.ends_with(".grok\\skills"));
+        assert!(
+            d.ends_with(std::path::Path::new(".atlas/skills")) || d.ends_with(".atlas\\skills")
+        );
+        let home = user_atlas_skills_dir();
+        assert!(
+            home.ends_with(std::path::Path::new(".atlas/skills"))
+                || home.ends_with(".atlas\\skills")
+        );
         assert!(project_skills_dir(Some("")).is_none());
         assert!(project_skills_dir(None).is_none());
         assert!(project_skills_dir(Some("/tmp/../evil")).is_none());
@@ -650,13 +694,65 @@ mod skill_project_scan_tests {
     }
 
     #[test]
+    fn merge_adds_user_atlas_without_overriding_inspect_or_project() {
+        let inspect = vec![SkillDto {
+            name: "from-cli".into(),
+            description: "inspect copy".into(),
+            source: "user".into(),
+            path: Some("/u/.atlas/skills/from-cli/SKILL.md".into()),
+            user_invocable: true,
+            plugin_name: None,
+        }];
+        let user = vec![
+            SkillDto {
+                name: "from-cli".into(),
+                description: "disk copy".into(),
+                source: "user".into(),
+                path: Some("/u/.atlas/skills/from-cli/SKILL.md".into()),
+                user_invocable: true,
+                plugin_name: None,
+            },
+            SkillDto {
+                name: "atlas-only".into(),
+                description: "home".into(),
+                source: "user".into(),
+                path: Some("/u/.atlas/skills/atlas-only/SKILL.md".into()),
+                user_invocable: true,
+                plugin_name: None,
+            },
+            SkillDto {
+                name: "shared".into(),
+                description: "home copy".into(),
+                source: "user".into(),
+                path: Some("/u/.atlas/skills/shared/SKILL.md".into()),
+                user_invocable: true,
+                plugin_name: None,
+            },
+        ];
+        let project = vec![SkillDto {
+            name: "shared".into(),
+            description: "proj copy".into(),
+            source: "project".into(),
+            path: Some("/p/.atlas/skills/shared/SKILL.md".into()),
+            user_invocable: true,
+            plugin_name: None,
+        }];
+        let merged = merge_discovered_skills(inspect, user, project);
+        let cli = merged.iter().find(|s| s.name == "from-cli").unwrap();
+        assert_eq!(cli.description, "inspect copy");
+        let only = merged.iter().find(|s| s.name == "atlas-only").unwrap();
+        assert_eq!(only.source, "user");
+        let shared = merged.iter().find(|s| s.name == "shared").unwrap();
+        assert_eq!(shared.source, "project");
+        assert_eq!(shared.description, "proj copy");
+    }
+
+    #[test]
     fn scan_project_skills_reads_disk() {
-        let dir = std::env::temp_dir().join(format!(
-            "grok-project-skills-scan-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("grok-project-skills-scan-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let skill_dir = dir.join(".grok").join("skills").join("disk-skill");
+        let skill_dir = dir.join(".atlas").join("skills").join("disk-skill");
         std::fs::create_dir_all(&skill_dir).unwrap();
         let md = skill_dir.join("SKILL.md");
         let mut f = std::fs::File::create(&md).unwrap();
@@ -687,10 +783,8 @@ mod skill_project_scan_tests {
             Some("agent-plugin-codex")
         );
         assert_eq!(
-            plugin_name_from_skill_path(Some(
-                "/Users/me/.grok/plugins/foo/skills/bar/SKILL.md"
-            ))
-            .as_deref(),
+            plugin_name_from_skill_path(Some("/Users/me/.grok/plugins/foo/skills/bar/SKILL.md"))
+                .as_deref(),
             Some("foo")
         );
         assert_eq!(

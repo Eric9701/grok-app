@@ -338,8 +338,8 @@
 
 .lobe-chat-error__pill {
   display: inline-flex;
-  align-items: flex-start;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
   max-width: 100%;
   padding: 10px 14px;
   border-radius: 14px;
@@ -348,6 +348,83 @@
   color: var(--chat-text-2, var(--text-secondary, #a1a1aa));
   font-size: 13px;
   line-height: 1.45;
+}
+
+.lobe-chat-error__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lobe-chat-error__raw {
+  margin-top: 6px;
+  margin-inline-start: 24px;
+  min-width: 0;
+}
+
+.lobe-chat-error__raw[open] {
+  width: min(36rem, 100%);
+}
+
+.lobe-chat-error__raw summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  width: fit-content;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--chat-text-2, var(--text-secondary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lobe-chat-error__raw summary::-webkit-details-marker {
+  display: none;
+}
+
+.lobe-chat-error__raw summary::marker {
+  content: "";
+}
+
+.lobe-chat-error__raw summary .lobe-chat-error__raw-open {
+  display: none;
+}
+
+.lobe-chat-error__raw[open] summary .lobe-chat-error__raw-closed {
+  display: none;
+}
+
+.lobe-chat-error__raw[open] summary .lobe-chat-error__raw-open {
+  display: inline;
+}
+
+.lobe-chat-error__raw-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 6px;
+  min-width: 0;
+}
+
+.lobe-chat-error__raw-body pre {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 180px;
+  overflow: auto;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--chat-text, #fff) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chat-text, #fff) 12%, transparent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--chat-text-2, var(--text-secondary));
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .lobe-chat-error__icon {

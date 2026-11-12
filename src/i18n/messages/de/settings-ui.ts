@@ -78,6 +78,7 @@ export const deSettingsUi = {
   "settings.nav.extensions": "Erweiterungen",
   "settings.nav.runtime": "CLI / Laufzeit",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "Tastatur",
   "settings.nav.about": "Info",
   "settings.tab.composer": "Composer",

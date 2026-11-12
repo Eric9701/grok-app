@@ -2,6 +2,8 @@
 export const koErrors = {
   "error.details": "자세히",
   "error.hideDetails": "자세히 숨기기",
+  "error.viewOriginal": "원본 오류",
+  "error.hideOriginal": "원본 오류 숨기기",
   "error.action.reconnect": "다시 연결",
   "error.action.retry": "다시 시도",
   "error.action.openDoctor": "닥터 열기",

@@ -426,6 +426,15 @@ pub struct AppSettings {
     /// Empty or missing becomes [`DEFAULT_ATLAS_CLOUD_SITE_URL`].
     #[serde(default = "default_atlas_cloud_site_url")]
     pub atlas_cloud_site_url: String,
+    /// Fleet leader listens for remote `atlas agent --grok-ws-url` workers.
+    #[serde(default)]
+    pub fleet_listen_enabled: bool,
+    /// `host:port` for the fleet WebSocket. Empty becomes 127.0.0.1:24720.
+    #[serde(default = "default_fleet_bind")]
+    pub fleet_bind: String,
+    /// Shared secret for `/ws`. Status responses only expose the last four characters.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub fleet_token: String,
     /// Max warm/live agent processes (I02). Default 3.
     #[serde(default = "default_max_concurrent_agents")]
     pub max_concurrent_agents: u32,
@@ -662,6 +671,16 @@ pub struct AppSettings {
     /// scan remote Grok sessions. Empty = none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ssh_watch_aliases: Vec<String>,
+    /// Personal knowledge-base directories. One row may be the agent default.
+    /// App settings only — never written into `~/.atlas` or `config.toml`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wiki_libraries: Vec<crate::wiki_libraries::WikiLibraryRecord>,
+    /// Turns allowed for one knowledge-base compile step. 1–20; anything else is 6.
+    #[serde(default = "default_wiki_compile_max_turns")]
+    pub wiki_compile_max_turns: u32,
+    /// Model id used when compiling a knowledge base. Empty uses the app model.
+    #[serde(default)]
+    pub wiki_compile_model_id: String,
     /// xAI realtime voice id (e.g. `eve`).
     #[serde(default = "default_voice_id")]
     pub voice_id: String,
@@ -814,6 +833,10 @@ fn default_background_wait_timeout_sec() -> u32 {
     crate::acp_client::DEFAULT_BACKGROUND_WAIT_TIMEOUT_SEC
 }
 
+fn default_wiki_compile_max_turns() -> u32 {
+    6
+}
+
 fn default_voice_id() -> String {
     "eve".into()
 }
@@ -946,6 +969,9 @@ impl Default for AppSettings {
             atlas_relay_agents: Vec::new(),
             atlas_relay_agent_health_secs: default_atlas_relay_health_secs(),
             atlas_cloud_site_url: default_atlas_cloud_site_url(),
+            fleet_listen_enabled: false,
+            fleet_bind: default_fleet_bind(),
+            fleet_token: String::new(),
             max_concurrent_agents: default_max_concurrent_agents(),
             agent_idle_minutes: default_agent_idle_minutes(),
             // Fresh installs already start on the current default.
@@ -1001,6 +1027,9 @@ impl Default for AppSettings {
             agents_json: String::new(),
             use_leader: false,
             ssh_watch_aliases: Vec::new(),
+            wiki_libraries: Vec::new(),
+            wiki_compile_max_turns: default_wiki_compile_max_turns(),
+            wiki_compile_model_id: String::new(),
             voice_id: default_voice_id(),
             voice_dictation_auto_send: false,
             voice_keep_agents_on_end: true,
@@ -1148,6 +1177,10 @@ pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), Str
 }
 
 pub const DEFAULT_ATLAS_CLOUD_SITE_URL: &str = "https://atlas.myai.tech";
+
+fn default_fleet_bind() -> String {
+    "127.0.0.1:24720".into()
+}
 
 fn default_atlas_cloud_site_url() -> String {
     DEFAULT_ATLAS_CLOUD_SITE_URL.to_string()

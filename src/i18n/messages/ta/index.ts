@@ -16,6 +16,8 @@ import { taExtensions } from "./extensions";
 import { taAutomations } from "./automations";
 import { taFeatures } from "./features";
 import { taKanban } from "./kanban";
+import { taFleet } from "./fleet";
+import { taWiki } from "./wiki";
 import { taSettings } from "./settings";
 import { taSettingsUi } from "./settings-ui";
 import { taSettingsAgent } from "./settings-agent";
@@ -44,6 +46,8 @@ export const ta: Record<MessageKey, string> = {
   ...taAutomations,
   ...taFeatures,
   ...taKanban,
+  ...taFleet,
+  ...taWiki,
   ...taSettings,
   ...taSettingsUi,
   ...taSettingsAgent,

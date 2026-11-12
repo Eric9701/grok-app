@@ -2,6 +2,8 @@
 export const zhErrors = {
   "error.details": "详情",
   "error.hideDetails": "收起详情",
+  "error.viewOriginal": "原始异常",
+  "error.hideOriginal": "收起原始异常",
   "error.action.reconnect": "重新连接",
   "error.action.retry": "重试",
   "error.action.openDoctor": "打开 Doctor",

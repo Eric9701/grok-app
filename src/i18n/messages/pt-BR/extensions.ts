@@ -381,7 +381,7 @@ export const ptBRExtensions = {
   "ext.skills.newDescriptionHint": "Escrita no frontmatter do SKILL.md. Você pode editar o corpo completo depois de criar.",
   "ext.skills.newScope": "Local",
   "ext.skills.newScopeUser": "Usuário (GROK_HOME com escopo de caminho /skills)",
-  "ext.skills.newScopeProject": "Projeto (.grok/skills no projeto ativo)",
+  "ext.skills.newScopeProject": "Projeto (.atlas/skills no projeto ativo)",
   "ext.skills.newScopeProjectDisabled": "Projeto (abra um projeto primeiro)",
   "ext.skills.newScopeProjectNeed": "Abra um projeto para criar uma skill de projeto.",
   "ext.skills.newScopeHint": "Skills de usuário seguem o home ativo do agente (GROK_HOME independente ou ~/.atlas). Skills de projeto vão com o repositório.",

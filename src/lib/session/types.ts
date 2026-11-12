@@ -102,6 +102,12 @@ export interface ChatMessage {
   toolStatus?: string;
   /** Turn failed (retries exhausted / provider error) — show as chat error record. */
   isError?: boolean;
+  /**
+   * Provider exception behind the friendly error line.
+   * Journal reload leaves this empty: the raw text is still in `content`
+   * (`**CODE**` plus the detail), and the pill reads it from there.
+   */
+  errorRaw?: string;
   /** Local file/folder refs shown as cards (also embedded as @path for agent). */
   attachments?: MessageAttachment[];
   /** ISO timestamp when the message was created (for hover footer). */

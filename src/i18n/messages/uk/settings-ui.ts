@@ -77,6 +77,7 @@ export const ukSettingsUi = {
   "settings.nav.extensions": "Розширення",
   "settings.nav.runtime": "CLI / Середовище",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "Клавіатура",
   "settings.nav.about": "Про застосунок",
   "settings.tab.composer": "Композер",

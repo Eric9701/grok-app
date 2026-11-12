@@ -2,9 +2,9 @@
 //! Also scaffolds new skills (`skill_create`) under path-scoped GROK_HOME or project.
 //!
 //! Writable roots (mirrors `src/lib/skillEditPath.ts`):
-//! - `{user_home}/.grok/skills`
+//! - `{user_home}/.atlas/skills` (shared CLI home)
 //! - `{agent_home}/skills` (App independent GROK_HOME)
-//! - `{project}/.grok/skills` when a project path is provided
+//! - `{project}/.atlas/skills` when a project path is provided
 //!
 //! Vendor/bundled/plugin trees are not allowlisted. Path traversal is rejected.
 
@@ -201,7 +201,7 @@ description: {desc_line}\n\
 
 /// Resolve the skills root for create: path-scoped GROK_HOME (user) or project.
 ///
-/// - `scope` `"project"` → `{project}/.grok/skills` (requires non-empty project_path)
+/// - `scope` `"project"` → `{project}/.atlas/skills` (requires non-empty project_path)
 /// - otherwise `"user"` (default) → `{resolve_agent_grok_home}/skills`
 pub fn resolve_skill_create_root(
     project_path: Option<&str>,
@@ -217,7 +217,7 @@ pub fn resolve_skill_create_root(
             if path_has_traversal(Path::new(raw)) {
                 return Err("invalid project path".into());
             }
-            Ok(PathBuf::from(raw).join(".grok").join("skills"))
+            Ok(PathBuf::from(raw).join(".atlas").join("skills"))
         }
         "user" | "global" | "" => {
             let settings = crate::store::load_settings();
@@ -317,11 +317,11 @@ pub fn build_skill_edit_roots(project_path: Option<&str>) -> Vec<PathBuf> {
         out.push(p);
     };
 
-    push(user_home().join(".grok").join("skills"));
+    push(user_home().join(".atlas").join("skills"));
     push(agent_home_dir().join("skills"));
 
     if let Some(raw) = project_path.map(str::trim).filter(|s| !s.is_empty()) {
-        push(PathBuf::from(raw).join(".grok").join("skills"));
+        push(PathBuf::from(raw).join(".atlas").join("skills"));
     }
 
     out
@@ -681,6 +681,11 @@ mod tests {
         assert!(!r1.already_existed);
         assert_eq!(r1.name, "hello-world");
         assert!(Path::new(&r1.path).is_file());
+        let created = r1.path.replace('\\', "/");
+        assert!(
+            created.contains("/.atlas/skills/hello-world/SKILL.md"),
+            "{created}"
+        );
         let body = fs::read_to_string(&r1.path).unwrap();
         assert!(body.contains("name: hello-world"));
         assert!(body.contains("Says hello when asked."));
