@@ -10,7 +10,8 @@ use std::time::Duration;
 use serde_json::{json, Value};
 
 use crate::acp_client::{
-    decode_permission_request, decode_session_update, initialize_advertises_rewind,
+    decode_permission_request, decode_session_update, init_offers_auth_method,
+    initialize_advertises_rewind,
     parse_ask_user_question_params, rewind_execute_method_candidates, wire_ask_user_result,
     wire_exit_plan_mode_result, wire_initialize_params, wire_jsonrpc_result,
     wire_permission_result, wire_session_cancel_params, wire_session_interject_params,
@@ -107,6 +108,16 @@ fn rewind_execute_tries_underscore_fallback() {
         rewind_execute_method_candidates(),
         &["x.ai/rewind/execute", "_x.ai/rewind/execute"]
     );
+}
+
+#[test]
+fn cursor_login_is_detected_from_initialize_auth_methods() {
+    let cursor = json!({
+        "authMethods": [{ "id": "cursor_login", "name": "Cursor Login" }]
+    });
+    assert!(init_offers_auth_method(&cursor, "cursor_login"));
+    assert!(!init_offers_auth_method(&cursor, "cached_token"));
+    assert!(!init_offers_auth_method(&json!({}), "cursor_login"));
 }
 
 #[test]

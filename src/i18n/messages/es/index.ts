@@ -25,6 +25,7 @@ import { esSettingsMemory } from "./settings-memory";
 import { esSettingsCode } from "./settings-code";
 import { esSettingsRemoteIm } from "./settings-remoteIm";
 import { esSettingsPet } from "./settings-pet";
+import { esAgentCli } from "./agentCli";
 
 import type { MessageKey } from "../en";
 
@@ -55,4 +56,5 @@ export const es: Record<MessageKey, string> = {
   ...esSettingsCode,
   ...esSettingsRemoteIm,
   ...esSettingsPet,
+  ...esAgentCli,
 };

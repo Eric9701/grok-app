@@ -16,6 +16,7 @@ export type SettingsSectionId =
   | "runtime"
   | "atlas"
   | "wiki"
+  | "agent_cli"
   | "shortcuts"
   | "about";
 
@@ -29,6 +30,7 @@ export const SETTINGS_SECTION_IDS: readonly SettingsSectionId[] = [
   "runtime",
   "atlas",
   "wiki",
+  "agent_cli",
   "remote_im",
   "shortcuts",
   "about",
@@ -89,6 +91,7 @@ export type SettingsNavIcon =
   | "doctor"
   | "cloud"
   | "wiki"
+  | "agents"
   | "keyboard"
   | "info";
 

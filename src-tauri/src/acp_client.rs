@@ -267,6 +267,9 @@ fn session_load_no_replay() -> bool {
     )
 }
 const AUTH_TIMEOUT_SECS: u64 = 12;
+/// Cursor `authenticate { methodId: cursor_login }` may open a browser when the
+/// headless credential check fails. Keep this longer than the Atlas token probe.
+const CURSOR_LOGIN_TIMEOUT_SECS: u64 = 120;
 /// Max wait for a single stdin write (JSON-RPC line). A wedged agent with a full
 /// pipe used to block forever here — which froze interject ("引导"), cancel, and
 /// any other Host→agent RPC before the request-level timeout could start.
@@ -459,6 +462,10 @@ pub struct AcpClient {
     /// Private `GROK_HOME` sealed for this process (#1293). `None` for
     /// `~/.grok`, official-aux, SSH, and TCP. Discarded in `kill`.
     proc_home: std::sync::Mutex<Option<PathBuf>>,
+    /// Set when this process came from `agent_runtimes`. `None` is legacy Atlas.
+    runtime_profile_id: Option<String>,
+    /// Claude/Cursor resume ids stay in `agent-runtimes.json`.
+    hides_agent_session_meta: bool,
 }
 
 /// Options applied at agent process start (CLI flags).
@@ -1253,6 +1260,8 @@ impl AcpClient {
             ssh_alias: ssh_alias.clone(),
             wsl_active: wsl_launch.is_some(),
             proc_home: std::sync::Mutex::new(proc_home),
+            runtime_profile_id: None,
+            hides_agent_session_meta: false,
         });
 
         client.start_read_loop(Box::new(stdout));
@@ -1356,9 +1365,100 @@ impl AcpClient {
             ssh_alias: None,
             wsl_active: false,
             proc_home: std::sync::Mutex::new(None),
+            runtime_profile_id: None,
+            hides_agent_session_meta: false,
         });
         client.start_read_loop(Box::new(read_half));
         Ok((client, event_rx))
+    }
+
+    /// Attach an already-spawned ACP stdio pipe (`agent_runtimes`).
+    /// Skips Atlas `GROK_HOME`, config healing, and SSH/WSL flag assembly.
+    pub async fn from_acp_pipe(
+        pipe: crate::agent_runtimes::AcpPipe,
+        cwd: PathBuf,
+        app_session_id: Option<String>,
+    ) -> Result<
+        (
+            Arc<Self>,
+            mpsc::UnboundedReceiver<(Option<String>, AcpEvent)>,
+        ),
+        AgentError,
+    > {
+        let crate::agent_runtimes::AcpPipe {
+            child,
+            pid,
+            stdin,
+            stdout,
+            stderr,
+            cli_path,
+            profile_id,
+            profile_kind,
+        } = pipe;
+        let (event_tx, event_rx) = mpsc::unbounded_channel();
+        let foreign = profile_kind != "atlas";
+        // Cursor's ACP session id is a real prompt target. Claude's translator
+        // id stays off the chat row; its resume id lives on the runtime binding.
+        let hides_meta = foreign && profile_kind != "cursor";
+        let client = Arc::new(Self {
+            child: AsyncMutex::new(Some(child)),
+            child_pid: Some(pid).filter(|pid| *pid != 0),
+            owns_local_process_tree: true,
+            stdin: AsyncMutex::new(Some(stdin)),
+            next_id: AtomicU64::new(1),
+            pending: ParkingMutex::new(HashMap::new()),
+            event_tx: event_tx.clone(),
+            agent_session_id: ParkingMutex::new(None),
+            cli_path,
+            cwd,
+            stopped: AtomicBool::new(false),
+            reader_alive: AtomicBool::new(true),
+            reader_stop: Arc::new(Notify::new()),
+            stderr_tail: ParkingMutex::new(Vec::new()),
+            last_update_by_session: ParkingMutex::new(HashMap::new()),
+            last_update_unstamped: ParkingMutex::new(None),
+            empty_mcp_servers: foreign,
+            app_session_id,
+            sandbox_profile: ParkingMutex::new(None),
+            custom_route: false,
+            route_provider_id: crate::providers::SESSION_PROVIDER_OFFICIAL.to_string(),
+            rewind_supported: ParkingMutex::new(None),
+            ssh_alias: None,
+            wsl_active: false,
+            proc_home: std::sync::Mutex::new(None),
+            runtime_profile_id: Some(profile_id),
+            hides_agent_session_meta: hides_meta,
+        });
+        client.start_read_loop(stdout);
+        if let Some(stderr) = stderr {
+            let c = Arc::clone(&client);
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    match reader.read_line(&mut line).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {
+                            let t = line.trim_end().to_string();
+                            if !t.is_empty() {
+                                c.push_stderr(&t);
+                                let _ = c.event_tx.send((None, AcpEvent::Stderr { line: t }));
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        Ok((client, event_rx))
+    }
+
+    pub fn runtime_profile_id(&self) -> Option<&str> {
+        self.runtime_profile_id.as_deref()
+    }
+
+    pub fn hides_agent_session_meta(&self) -> bool {
+        self.hides_agent_session_meta
     }
 
     /// Whether this process was spawned for a custom relay route (api_key only).
@@ -2260,6 +2360,13 @@ impl AcpClient {
     /// killed healthy multi-image / multi-tool turns past 4 hours.
     async fn request_prompt(&self, params: Value) -> Result<Value, String> {
         let method = "session/prompt";
+        tracing::info!(
+            target: "session",
+            session = self.app_session_id.as_deref().unwrap_or("-"),
+            runtime = self.runtime_profile_id.as_deref().unwrap_or("legacy-atlas"),
+            binary = %self.cli_path.display(),
+            "session turn cli"
+        );
         if !self.reader_alive.load(Ordering::SeqCst) {
             return Err(format!(
                 "agent stdout closed before {method}; {}",
@@ -2424,6 +2531,21 @@ impl AcpClient {
             initialize_advertises_rewind(&init),
         );
         *self.rewind_supported.lock() = initialize_advertises_rewind(&init);
+
+        // Cursor Agent's ACP server rejects Atlas `cached_token`. It accepts
+        // `cursor_login` and, when the CLI is already signed in, returns
+        // immediately. A missing login opens the browser inside this call.
+        if init_offers_auth_method(&init, "cursor_login") {
+            self.request_timeout(
+                "authenticate",
+                json!({ "methodId": "cursor_login" }),
+                CURSOR_LOGIN_TIMEOUT_SECS,
+            )
+            .await
+            .map_err(|e| self.map_handshake_err("authenticate", e))?;
+            info!("acp authenticate cursor_login ok");
+            return Ok(init);
+        }
 
         // Live per-model context windows (ClaudeCode `_meta.modelState`).
         // Soft-fail silently when absent — Grok CLI does not expose this yet.
@@ -3387,6 +3509,16 @@ pub enum AskUserOutcome {
 // ── Wire builders / pure decoders (locked by tests/fixtures/acp/) ────────────
 
 /// Host → agent `initialize` params. Golden: `handshake_initialize.json`.
+pub fn init_offers_auth_method(init: &Value, method_id: &str) -> bool {
+    init.pointer("/authMethods")
+        .and_then(|v| v.as_array())
+        .is_some_and(|methods| {
+            methods
+                .iter()
+                .any(|method| method.get("id").and_then(|id| id.as_str()) == Some(method_id))
+        })
+}
+
 pub fn wire_initialize_params() -> Value {
     json!({
         "protocolVersion": 1,

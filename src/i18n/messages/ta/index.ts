@@ -25,6 +25,7 @@ import { taSettingsMemory } from "./settings-memory";
 import { taSettingsCode } from "./settings-code";
 import { taSettingsRemoteIm } from "./settings-remoteIm";
 import { taSettingsPet } from "./settings-pet";
+import { taAgentCli } from "./agentCli";
 
 import type { MessageKey } from "../en";
 
@@ -55,4 +56,5 @@ export const ta: Record<MessageKey, string> = {
   ...taSettingsCode,
   ...taSettingsRemoteIm,
   ...taSettingsPet,
+  ...taAgentCli,
 };

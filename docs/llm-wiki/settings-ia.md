@@ -10,10 +10,10 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | Shell | `src/components/SettingsPage.tsx` | 左栏 + 搜索命中列表 + 分 section 内容 |
 | 路由 | `App.tsx` hash | `#/settings/{section}[/{tab}]` |
 
-## 一级导航（12 项，禁止双登记）
+## 一级导航（13 项，禁止双登记）
 
 个人：`general` · `appearance` · `account` · `archived` · `pet`（展示名「宠物」）  
-系统：`extensions` · `runtime` · `atlas` · `wiki`（展示名「知识库配置」）· `remote_im`（展示名「远程控制」）· `shortcuts` · `about`
+系统：`extensions` · `runtime` · `atlas` · `wiki`（展示名「知识库配置」）· `agent_cli`（展示名「智能体 CLI」）· `remote_im`（展示名「远程控制」）· `shortcuts` · `about`
 
 机群、个人知识库、远程控制是否出现，由 atlas-server `GET /atlas/v1/feature-mask` 的十进制控制码决定。从右往左：位 0（1）机群，位 1（2）个人知识库，位 2（4）远程控制。为 1 才显示侧栏入口、对应页面和设置节；搜索命中同样滤掉。直接打开被关掉的 `#/fleet`、`#/wiki` 或 `#/settings/remote_im`、`#/settings/wiki` 时回到工作台或常规设置。接口失败、未登录或结果还没回来都按 0。不写入设置。目录注册表仍保留这些节。`--show-remote` 不再决定远程控制是否可见。
 
@@ -28,8 +28,9 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | account | `official`（界面只显示官方账户。`providers` / `extras` 仍在目录里，深链和上次路由都落到 `official`） |
 | extensions | `plugins`（含 Discover **+** 本地路径安装 `settings-anchor-ext-plugins-install`）· `mcp` · `skills`（含 **探测 Claude/Cursor 技能** 开关，`#/settings/extensions/skills` → `settings-anchor-ext-skills-discover`）· `rules`（Cursor 式规则编辑，写 CLI 真实文件）· `commands`（斜杠命令 markdown）· `agents` · `hooks`（**无** `market` / `apps`；`#/settings/extensions/market` → `plugins` 可安装目录锚点） |
 | runtime | `cli` · `connection` · `ssh` · `network` · `pool` · `tools` · `privacy` |
-| atlas | 无 tab（Relay 执行端 + 云端站点） |
+| atlas | 无 tab（每条 Relay 选 CLI 与模型、云端站点） |
 | wiki | 无 tab（知识库目录、Agent 默认、编译轮次） |
+| agent_cli | 无 tab（多 CLI 运行时、新建会话默认） |
 | remote_im（远程控制） | `im`（IM 通信）· `mirror`（手机镜像） |
 | pet | `look`（外观设置：顶栏开关+尺寸，左侧预览，右侧形体/表情/颜色/眼睛）· `bubbles`（气泡设置：提示框、进度条、自动关闭、形状/背景） |
 | 其余 | 无 tab（单页） |
@@ -47,6 +48,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 #/settings/runtime/privacy          → CLI · 隐私中心
 #/settings/atlas                     → Atlas（Relay + 云端站点）
 #/settings/wiki                      → 知识库配置（目录、Agent 默认、编译模型、编译轮次、编译记录）
+#/settings/agent_cli                 → 智能体 CLI（独立 `agent-runtimes.json`）
 #/settings/account/providers        → 官方账户（自定义提供商已从界面隐藏）
 #/settings/account/extras           → 官方账户（拓展已从界面隐藏）
 #/settings/remote_im                → 远程控制 · IM 通信
@@ -75,7 +77,8 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | 管理 Skills/MCP/Plugins/Hooks/Agents + 插件页内目录 | **扩展** | 可写开关、安装、移除；无独立市场 Tab |
 | 只读 project inspect 摘要 | **运行时 · 诊断** | 保留；文案链到扩展 |
 | CLI 路径 / **Atlas CLI 安装基址** (`runtime.atlasCliMirror`) / **CLI 端点** (`runtime.atlasEndpoints`，只读 `~/.atlas/config.toml` 的 `[endpoints]`) / ACP / 进程池 / Doctor / Managed setup / Privacy center | **运行时** | 不进扩展 |
-| Atlas Relay 执行端 + 云端站点 URL | **Atlas** | `atlas.relayAgent` / `atlas.relayAgentHealth` / `atlas.cloudSite`；CLI 安装基址仍在运行时 |
+| Atlas Relay（每条选 CLI 与模型）+ 云端站点 URL | **Atlas** | `atlas.relayAgent` / `atlas.relayAgentHealth` / `atlas.cloudSite`；CLI 安装基址仍在运行时 |
+| 多 CLI 运行时（二进制 / 家目录 / 新建会话默认） | **智能体 CLI** | `agent-runtimes.json`，不进 App 设置 |
 | 本机会话列表 + 按 id 续跑（#626 第一刀） | **运行时 · 连接** | `runtime.sessionApi`；见 [session-api.md](./session-api.md) |
 
 ## 新增设置 — 强制清单

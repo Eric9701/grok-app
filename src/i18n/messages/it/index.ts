@@ -25,6 +25,7 @@ import { itSettingsMemory } from "./settings-memory";
 import { itSettingsCode } from "./settings-code";
 import { itSettingsRemoteIm } from "./settings-remoteIm";
 import { itSettingsPet } from "./settings-pet";
+import { itAgentCli } from "./agentCli";
 
 import type { MessageKey } from "../en";
 
@@ -55,4 +56,5 @@ export const it: Record<MessageKey, string> = {
   ...itSettingsCode,
   ...itSettingsRemoteIm,
   ...itSettingsPet,
+  ...itAgentCli,
 };

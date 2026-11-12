@@ -25,6 +25,7 @@ import { zhTWSettingsMemory } from "./settings-memory";
 import { zhTWSettingsCode } from "./settings-code";
 import { zhTWSettingsRemoteIm } from "./settings-remoteIm";
 import { zhTWSettingsPet } from "./settings-pet";
+import { zhTWAgentCli } from "./agentCli";
 
 import type { MessageKey } from "../en";
 
@@ -55,6 +56,7 @@ export const zhTW: Record<MessageKey, string> = {
   ...zhTWSettingsCode,
   ...zhTWSettingsRemoteIm,
   ...zhTWSettingsPet,
+  ...zhTWAgentCli,
 };
 
 export { zhTWCore } from "./core";
@@ -83,3 +85,4 @@ export { zhTWSettingsMemory } from "./settings-memory";
 export { zhTWSettingsCode } from "./settings-code";
 export { zhTWSettingsRemoteIm } from "./settings-remoteIm";
 export { zhTWSettingsPet } from "./settings-pet";
+export { zhTWAgentCli } from "./agentCli";

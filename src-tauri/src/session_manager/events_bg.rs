@@ -33,10 +33,12 @@ impl SessionManager {
         let route_matches = self.background.lock().get(app_session_id).is_some_and(|s| {
             s.process_id == process_id
                 && agent_session_id.is_none_or(|sid| {
-                    // Stamped events must name this background session
-                    // exactly; an unset owner is not a safe wildcard while a
-                    // focus/park transition is moving the same process.
-                    s.meta.agent_session_id.as_deref() == Some(sid)
+                    // Foreign CLI pipes serve one chat. Shared Atlas processes
+                    // still require an exact agent id.
+                    s.acp
+                        .as_ref()
+                        .is_some_and(|acp| acp.hides_agent_session_meta())
+                        || s.meta.agent_session_id.as_deref() == Some(sid)
                 })
         });
         if !route_matches {

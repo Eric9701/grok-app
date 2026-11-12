@@ -25,6 +25,7 @@ import { ptBRSettingsMemory } from "./settings-memory";
 import { ptBRSettingsCode } from "./settings-code";
 import { ptBRSettingsRemoteIm } from "./settings-remoteIm";
 import { ptBRSettingsPet } from "./settings-pet";
+import { ptBRAgentCli } from "./agentCli";
 
 import type { MessageKey } from "../en";
 
@@ -55,4 +56,5 @@ export const ptBR: Record<MessageKey, string> = {
   ...ptBRSettingsCode,
   ...ptBRSettingsRemoteIm,
   ...ptBRSettingsPet,
+  ...ptBRAgentCli,
 };

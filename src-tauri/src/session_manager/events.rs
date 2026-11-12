@@ -76,6 +76,10 @@ impl SessionManager {
                 process_id: s.process_id.clone(),
                 agent_session_id: s.meta.agent_session_id.clone(),
                 prompt_in_flight: s.prompt_in_flight,
+                exclusive_process: s
+                    .acp
+                    .as_ref()
+                    .is_some_and(|acp| acp.hides_agent_session_meta()),
             });
             let bg_hints: Vec<SessionRouteHint> = self
                 .background
@@ -86,6 +90,10 @@ impl SessionManager {
                     process_id: s.process_id.clone(),
                     agent_session_id: s.meta.agent_session_id.clone(),
                     prompt_in_flight: s.prompt_in_flight,
+                    exclusive_process: s
+                        .acp
+                        .as_ref()
+                        .is_some_and(|acp| acp.hides_agent_session_meta()),
                 })
                 .collect();
             let parked_hints: Vec<SessionRouteHint> = self
@@ -97,6 +105,7 @@ impl SessionManager {
                     process_id: p.process_id.clone(),
                     agent_session_id: p.meta.agent_session_id.clone(),
                     prompt_in_flight: false,
+                    exclusive_process: p.acp.hides_agent_session_meta(),
                 })
                 .collect();
             match resolve_turn_event_route(
@@ -132,11 +141,13 @@ impl SessionManager {
         let live_route_matches = self.inner.lock().as_ref().is_some_and(|s| {
             s.process_id == process_id
                 && session_id.is_none_or(|sid| {
-                    // Once the wire event carries a session id, require an
-                    // exact owner match. Treating an unbound live hint as a
-                    // wildcard lets late events from a co-tenant land in the
-                    // newly focused session during connect/park races.
-                    s.meta.agent_session_id.as_deref() == Some(sid)
+                    // Foreign CLI pipes serve one chat and do not store an
+                    // Atlas agent id. Shared Atlas processes still require an
+                    // exact owner match so a co-tenant cannot land here.
+                    s.acp
+                        .as_ref()
+                        .is_some_and(|acp| acp.hides_agent_session_meta())
+                        || s.meta.agent_session_id.as_deref() == Some(sid)
                 })
         });
         if !live_route_matches {
@@ -1026,8 +1037,14 @@ impl SessionManager {
                     let mut guard = self.inner.lock();
                     if let Some(s) = guard.as_mut() {
                         s.backend = backend;
+                        let hide = s
+                            .acp
+                            .as_ref()
+                            .is_some_and(|acp| acp.hides_agent_session_meta());
                         if let Some(id) = agent_session_id {
-                            s.meta.agent_session_id = Some(id);
+                            if !hide {
+                                s.meta.agent_session_id = Some(id);
+                            }
                         }
                         if model_id.is_some() {
                             s.model_id = model_id;

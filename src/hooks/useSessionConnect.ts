@@ -38,6 +38,10 @@ import {
 import { reconcileSessionState } from "@/lib/sessionPhase";
 import { migrateDraftTurnClock } from "@/lib/turnClock";
 import { isSameView, shouldAdoptView, type ViewFocus } from "@/lib/viewFocus";
+import {
+  clearDraftRuntimeOverride,
+  draftRuntimeOverride,
+} from "@/lib/draftRuntime";
 import { useLiveMapWhen } from "@/hooks/useSessionLiveMap";
 import { SESSION_CONNECT_CLAIM_WAIT_MS } from "@/lib/sessionConnectTimeout";
 
@@ -275,11 +279,22 @@ export function useSessionConnect(opts: {
       try {
         let sessionId = preferredId ?? null;
         if (!sessionId && api.hasHost()) {
+          const pickedRuntime = draftRuntimeOverride();
           const meta = (await api.sessionCreate(
             connectProject?.id,
             h.tr("session.new"),
           )) as { id: string; title?: string };
           sessionId = meta.id;
+          if (pickedRuntime !== undefined) {
+            if (draftRuntimeOverride() === pickedRuntime) {
+              clearDraftRuntimeOverride();
+            }
+            try {
+              await api.agentRuntimesSetSessionBinding(meta.id, pickedRuntime);
+            } catch {
+              /* create already copied the desktop default */
+            }
+          }
           const pendingRoute = h.draftComposerRouteRef.current;
           if (pendingRoute && api.isTauri()) {
             h.draftComposerRouteRef.current = null;

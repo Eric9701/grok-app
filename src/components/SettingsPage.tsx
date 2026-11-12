@@ -219,6 +219,7 @@ import { ArchivedSection } from "@/components/settings/ArchivedSection";
 import { ExtensionsSection } from "@/components/settings/ExtensionsSection";
 import { RemoteImSection } from "@/components/settings/RemoteImSection";
 import { RuntimeSection } from "@/components/settings/RuntimeSection";
+import { AgentCliSection } from "@/components/settings/AgentCliSection";
 import { AtlasSection } from "@/components/settings/AtlasSection";
 import { WikiSection } from "@/components/settings/WikiSection";
 import { FleetListenCard } from "@/fleet/FleetListenCard";
@@ -2010,6 +2011,7 @@ export function SettingsPage({
           </>
         )}
         {section === "wiki" && wikiChromeVisible && <WikiSection />}
+        {section === "agent_cli" && <AgentCliSection />}
         {section === "shortcuts" && <ShortcutsSection />}
         {section === "about" && <AboutSection />}
       </main>

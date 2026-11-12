@@ -37,6 +37,8 @@ export type WorkbenchSessionContextMenuProps = {
   bulkMoveMenuItems: (ids: string[]) => ContextMenuItem[];
   busyIds: Set<string>;
   canRewindSession: boolean;
+  /** Sessions bound to Claude or Cursor. Atlas-only actions stay off those rows. */
+  nonAtlasSessionIds?: ReadonlySet<string>;
   /** Rewind stays available while this chat's turn is running. Fork does not. */
   canRewindNow: boolean;
   clearSessionPluginDirs: (s: SessionRow) => Promise<void>;
@@ -248,16 +250,21 @@ export function buildSessionContextMenuItems(
                 : []),
             ];
 
+            const hideAtlasOnly = p.nonAtlasSessionIds?.has(s.id) ?? false;
             const conversationChildren: ContextMenuItem[] = [
-              {
-                id: "rewind",
-                label: tr("session.rewind"),
-                icon: <IconRewind size={16} />,
-                disabled: !isOpen || !canRewindNow,
-                onClick: () => {
-                  void openRewindTimeline(s.id);
-                },
-              },
+              ...(hideAtlasOnly
+                ? []
+                : [
+                    {
+                      id: "rewind",
+                      label: tr("session.rewind"),
+                      icon: <IconRewind size={16} />,
+                      disabled: !isOpen || !canRewindNow,
+                      onClick: () => {
+                        void openRewindTimeline(s.id);
+                      },
+                    } satisfies ContextMenuItem,
+                  ]),
               {
                 id: "collapse-all-activity",
                 label: tr("session.collapseAllActivity"),
@@ -727,12 +734,16 @@ export function buildSessionContextMenuItems(
                 icon: <IconSettings size={16} />,
                 children: settingsChildren,
               },
-              {
-                id: "fork",
-                label: tr("session.fork"),
-                icon: <IconFork size={16} />,
-                onClick: () => confirmForkSession(s),
-              },
+              ...(hideAtlasOnly
+                ? []
+                : [
+                    {
+                      id: "fork",
+                      label: tr("session.fork"),
+                      icon: <IconFork size={16} />,
+                      onClick: () => confirmForkSession(s),
+                    } satisfies ContextMenuItem,
+                  ]),
               {
                 id: "duplicate",
                 label: tr("session.duplicate"),

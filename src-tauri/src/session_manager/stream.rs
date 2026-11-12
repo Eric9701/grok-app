@@ -51,6 +51,9 @@ pub(crate) struct SessionRouteHint {
     pub agent_session_id: Option<String>,
     /// Only meaningful for live/background. Parked is always idle Ready.
     pub prompt_in_flight: bool,
+    /// This process serves one chat (Claude / Cursor pipe). Stamped updates
+    /// belong to it even when `SessionMeta.agent_session_id` stays empty.
+    pub exclusive_process: bool,
 }
 
 /// Where an ACP event for `process_id` should be delivered.
@@ -82,19 +85,12 @@ pub(crate) fn resolve_turn_event_route(
     parked: &[SessionRouteHint],
 ) -> TurnEventRoute {
     if let Some(sid) = agent_session_id {
-        if live.is_some_and(|l| {
-            // A stamped event is authoritative: an unknown owner must not be
-            // treated as a wildcard. During connect/open the live hint can
-            // briefly lack an agent id; dropping that handshake-side event is
-            // safer than allowing a late foreign session update to mutate the
-            // current chat.
-            l.process_id == process_id && l.agent_session_id.as_deref() == Some(sid)
-        }) {
+        if live.is_some_and(|l| hint_owns_stamped(l, process_id, sid)) {
             return TurnEventRoute::Live;
         }
         if let Some(bg) = backgrounds
             .iter()
-            .find(|b| b.process_id == process_id && b.agent_session_id.as_deref() == Some(sid))
+            .find(|b| hint_owns_stamped(b, process_id, sid))
         {
             return TurnEventRoute::Background(bg.app_session_id.clone());
         }
@@ -128,6 +124,22 @@ pub(crate) fn resolve_turn_event_route(
         return TurnEventRoute::Live;
     }
     TurnEventRoute::Drop
+}
+
+/// A stamped event names this hint when the agent id matches, or when the
+/// process is an exclusive foreign CLI (one chat, no Atlas session id stored).
+fn hint_owns_stamped(hint: &SessionRouteHint, process_id: &str, sid: &str) -> bool {
+    if hint.process_id != process_id {
+        return false;
+    }
+    if hint.exclusive_process {
+        return true;
+    }
+    // A stamped event is authoritative: an unknown owner must not be treated
+    // as a wildcard. During connect/open the live hint can briefly lack an
+    // agent id; dropping that handshake-side event is safer than allowing a
+    // late foreign session update to mutate the current chat.
+    hint.agent_session_id.as_deref() == Some(sid)
 }
 
 /// Disk payload for one stream journal flush, prepared under the session
