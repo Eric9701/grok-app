@@ -2,6 +2,8 @@
 export const idErrors = {
   "error.details": "Detail",
   "error.hideDetails": "Sembunyikan detail",
+  "error.viewOriginal": "Kesalahan asli",
+  "error.hideOriginal": "Sembunyikan kesalahan asli",
   "error.action.reconnect": "Sambungkan ulang",
   "error.action.retry": "Coba lagi",
   "error.action.openDoctor": "Buka Doctor",

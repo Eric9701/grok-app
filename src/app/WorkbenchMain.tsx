@@ -25,6 +25,7 @@ import {
   IconUser,
   IconWorld,
 } from "@/components/icons";
+import { useFeatureMask } from "@/lib/featureMask";
 import { createT, type Locale, type MessageKey } from "@/i18n";
 import {
   projectDisplayName,
@@ -108,6 +109,7 @@ export type WorkbenchMainProps = {
 };
 
 export function WorkbenchMain(props: WorkbenchMainProps) {
+  const featureMask = useFeatureMask();
   const {
     tr,
     locale,
@@ -285,7 +287,7 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
                 {tr("kanban.title")}
               </h1>
             </>
-          ) : mainPane === "fleet" ? (
+          ) : mainPane === "fleet" && featureMask.fleet ? (
             <>
               {!phoneLayout ? (
                 <span className="main__title-icon">
@@ -296,7 +298,7 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
                 {tr("fleet.title")}
               </h1>
             </>
-          ) : mainPane === "wiki" ? (
+          ) : mainPane === "wiki" && featureMask.wiki ? (
             <>
               {!phoneLayout ? (
                 <span className="main__title-icon">

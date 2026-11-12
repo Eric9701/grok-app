@@ -4,7 +4,7 @@
 //! new `// ── Domain ──` section rather than appending at a random spot.
 
 use crate::{
-    atlas_endpoints, atlas_relay_agent, cli_worktrees, commands, desktop_notify, fleet, git_pr_hub, wiki,
+    atlas_endpoints, atlas_relay_agent, cli_worktrees, commands, desktop_notify, feature_mask, fleet, git_pr_hub, wiki,
     launch_chrome, leader, mirror, os_theme, pet_quick, pet_window, pr_monitor, remote_im,
     self_update, serve, session_api, ssh_remote, system_fonts, theme_editor_window, tray, updater,
     voice_host, wallpaper_grok_album, wallpaper_remote_commands, window_min,
@@ -42,6 +42,7 @@ pub fn app_invoke_handler(
         commands::session_resolve_ask_user,
         // ── CLI & environment probe ──
         launch_chrome::launch_chrome_get,
+        feature_mask::feature_mask_get,
         commands::probe_cli,
         commands::wsl_status,
         // ── SSH remote hosts ──
@@ -79,6 +80,12 @@ pub fn app_invoke_handler(
         wiki::wiki_remove_page,
         wiki::wiki_list,
         wiki::wiki_list_raw,
+        wiki::wiki_list_dirs,
+        wiki::wiki_scaffold,
+        wiki::wiki_init,
+        wiki::wiki_import_files,
+        wiki::wiki_import_url,
+        wiki::wiki_remove_raw,
         wiki::wiki_lint,
         wiki::wiki_search,
         wiki::wiki_fingerprint,

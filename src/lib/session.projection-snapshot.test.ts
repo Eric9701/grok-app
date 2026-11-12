@@ -7,6 +7,7 @@ import {
   errorCopy,
   formatTurnErrorBody,
   presentErrorBanner,
+  turnErrorOriginalDetail,
   snapshotOutgoingMessages,
   mergeSessionMessagesById,
   stripAnsi,
@@ -250,7 +251,8 @@ describe("session projection", () => {
     expect(fromAgent?.cause).toBeTruthy();
     expect(fromAgent?.summary).not.toMatch(/Connection refused/);
     expect(fromAgent?.summary).not.toMatch(/stderr/i);
-    expect(fromAgent?.detail).toBeNull();
+    expect(fromAgent?.detail).toMatch(/rpc timeout on session\/prompt/);
+    expect(fromAgent?.detail).not.toMatch(/Connection refused|stderr/i);
     expect(fromAgent?.primary?.id).toBeTruthy();
     expect(fromAgent?.reconnectHint).toBe(true);
 
@@ -263,7 +265,8 @@ describe("session projection", () => {
     // to TURN_TIMEOUT (same path as agent timeout opts).
     expect(fromLocal?.code).toBe("TURN_TIMEOUT");
     expect(fromLocal?.summary).toMatch(/timed?\s*out|timeout|network|model|provider/i);
-    expect(fromLocal?.detail).toBeNull();
+    expect(fromLocal?.detail).toMatch(/rpc timeout on session\/prompt/);
+    expect(fromLocal?.detail).not.toMatch(/Connection refused|stderr/i);
     expect(fromLocal?.primary?.label.length).toBeGreaterThan(0);
 
     const short = presentErrorBanner(null, "Select a project first", "en");
@@ -425,6 +428,19 @@ describe("session projection", () => {
     expect(err.streaming).toBe(false);
     expect(err.content).toMatch(/timed?\s*out|timeout/i);
     expect(err.content).not.toMatch(/Connection refused|stderr|rpc timeout/i);
+    expect(err.errorRaw).toMatch(/rpc timeout on session\/prompt/);
+    expect(err.errorRaw).not.toMatch(/Connection refused|stderr/i);
+  });
+
+  it("turnErrorOriginalDetail keeps the provider exception behind the deck line", () => {
+    const journal =
+      "**AUTH_FAILED**\n\nIncorrect API key provided. Obtain a key from console.x.ai";
+    const friendly = formatTurnErrorBody({ content: journal }, "zh");
+    expect(friendly).toMatch(/API Key 被拒绝/);
+    expect(friendly).not.toMatch(/console\.x\.ai/);
+    expect(turnErrorOriginalDetail(journal, friendly)).toMatch(/console\.x\.ai/);
+    expect(turnErrorOriginalDetail("turn_timeout", friendly)).toBeNull();
+    expect(turnErrorOriginalDetail(friendly, friendly)).toBeNull();
   });
 
   it("applyTurnError keeps a partially streamed answer instead of erasing it", () => {

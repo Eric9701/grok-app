@@ -2,6 +2,8 @@
 export const ukErrors = {
   "error.details": "Деталі",
   "error.hideDetails": "Сховати деталі",
+  "error.viewOriginal": "Початкова помилка",
+  "error.hideOriginal": "Сховати початкову помилку",
   "error.action.reconnect": "Підключитися знову",
   "error.action.retry": "Повторити",
   "error.action.openDoctor": "Відкрити діагностику",

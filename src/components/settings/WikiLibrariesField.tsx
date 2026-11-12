@@ -1,11 +1,14 @@
 /**
- * Settings → General → Agent: personal knowledge-base directories.
+ * Settings → 知识库配置: personal knowledge-base directories.
  * One row can be the agent default. The knowledge page lists these rows.
  */
 import { useCallback, useEffect, useState } from "react";
 import * as api from "@/lib/api";
 import type { Vars } from "@/i18n";
+import { WikiCreateDialog } from "@/wiki/WikiCreateDialog";
+import { WikiInitDialog } from "@/wiki/WikiInitDialog";
 import {
+  displayLibraryPath,
   isAbsoluteLibraryPath,
   libraryFolderName,
   wikiPathKey,
@@ -22,6 +25,9 @@ export function WikiLibrariesField({ t, rowHighlight }: Props) {
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [initTarget, setInitTarget] = useState<WikiLibrary | null>(null);
+  const [note, setNote] = useState("");
 
   const refresh = useCallback(async () => {
     if (!api.isTauri()) {
@@ -30,7 +36,23 @@ export function WikiLibrariesField({ t, rowHighlight }: Props) {
     }
     try {
       const settings = await api.settingsGet();
-      setRows(settings.wikiLibraries ?? []);
+      const loaded = (settings.wikiLibraries ?? []).map((row) => ({
+        ...row,
+        path: displayLibraryPath(row.path),
+      }));
+      setRows(loaded);
+      const dirty = (settings.wikiLibraries ?? []).some(
+        (row, index) => row.path !== loaded[index]?.path,
+      );
+      if (dirty) {
+        const saved = await api.settingsSet({ ...settings, wikiLibraries: loaded });
+        setRows(
+          (saved.wikiLibraries ?? loaded).map((row) => ({
+            ...row,
+            path: displayLibraryPath(row.path),
+          })),
+        );
+      }
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("wiki.pathInvalid"));
@@ -50,7 +72,12 @@ export function WikiLibrariesField({ t, rowHighlight }: Props) {
     try {
       const settings = await api.settingsGet();
       const saved = await api.settingsSet({ ...settings, wikiLibraries: next });
-      setRows(saved.wikiLibraries ?? []);
+      setRows(
+        (saved.wikiLibraries ?? []).map((row) => ({
+          ...row,
+          path: displayLibraryPath(row.path),
+        })),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : t("wiki.pathInvalid"));
     } finally {
@@ -60,7 +87,8 @@ export function WikiLibrariesField({ t, rowHighlight }: Props) {
 
   const add = async () => {
     if (!api.isTauri() || saving) return;
-    const picked = await api.pickDirectory();
+    const pickedRaw = await api.pickDirectory();
+    const picked = pickedRaw ? displayLibraryPath(pickedRaw) : "";
     if (!picked) return;
     if (!isAbsoluteLibraryPath(picked)) {
       setError(t("wiki.pathInvalid"));
@@ -92,14 +120,33 @@ export function WikiLibrariesField({ t, rowHighlight }: Props) {
           <div className="settings-row__label">{t("wiki.settingsTitle")}</div>
           <div className="settings-row__desc">{t("wiki.settingsDesc")}</div>
         </div>
-        <button
-          type="button"
-          className="btn btn--primary"
-          disabled={saving || !api.isTauri()}
-          onClick={() => void add()}
-        >
-          {t("wiki.addDirectory")}
-        </button>
+        <div className="wiki-lib__actions">
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={saving || !api.isTauri()}
+            onClick={() => setCreateOpen(true)}
+          >
+            {t("wiki.create")}
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={saving || !api.isTauri()}
+            onClick={() => void add()}
+          >
+            {t("wiki.addDirectory")}
+          </button>
+        </div>
+        <WikiCreateDialog
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          t={t}
+          onCreated={(libraries) => {
+            setRows(libraries);
+            setCreateOpen(false);
+          }}
+        />
         {ready && rows.length === 0 ? (
           <p className="wiki-settings-empty">{t("wiki.settingsEmpty")}</p>
         ) : (
@@ -133,6 +180,17 @@ export function WikiLibrariesField({ t, rowHighlight }: Props) {
                   />
                 </label>
                 <div className="wiki-lib__actions">
+                  <button
+                    type="button"
+                    className="btn btn--sm btn--ghost"
+                    disabled={saving}
+                    onClick={() => {
+                      setNote("");
+                      setInitTarget(row);
+                    }}
+                  >
+                    {t("wiki.init")}
+                  </button>
                   <button
                     type="button"
                     className={
@@ -169,13 +227,24 @@ export function WikiLibrariesField({ t, rowHighlight }: Props) {
                     {t("wiki.remove")}
                   </button>
                 </div>
-                <p className="wiki-lib__path" title={row.path}>
-                  {row.path}
+                <p className="wiki-lib__path" title={displayLibraryPath(row.path)}>
+                  {displayLibraryPath(row.path)}
                 </p>
               </li>
             ))}
           </ul>
         )}
+        <WikiInitDialog
+          library={initTarget}
+          onClose={() => setInitTarget(null)}
+          onDone={() => setNote(t("wiki.initDone"))}
+          t={t}
+        />
+        {note ? (
+          <p className="wiki-settings-empty" role="status">
+            {note}
+          </p>
+        ) : null}
         {error ? (
           <p className="wiki-error" role="alert">
             {error}

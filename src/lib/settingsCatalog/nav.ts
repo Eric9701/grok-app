@@ -99,6 +99,13 @@ export const SETTINGS_NAV: readonly SettingsNavDef[] = [
     tabs: [],
   },
   {
+    id: "wiki",
+    icon: "wiki",
+    labelKey: "settings.nav.wiki",
+    group: "system",
+    tabs: [],
+  },
+  {
     id: "remote_im",
     icon: "remote_im",
     labelKey: "settings.nav.remoteIm",

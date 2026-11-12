@@ -108,7 +108,8 @@ Full management surface: **Settings → Extensions** (`#/settings/extensions`).
 `skills_list` merges:
 
 1. **`grok inspect --json`** under the active session `GROK_HOME` (user / plugin / bundled / project when CLI reports them)
-2. **Host disk scan** of `{activeProject}/.grok/skills/*/SKILL.md`
+2. **Host disk scan** of `{activeProject}/.atlas/skills/*/SKILL.md`
+3. **Host disk scan** of `~/.atlas/skills/*/SKILL.md` (fills names inspect did not return)
 
 Then it **drops Claude/Cursor compat skills** when discovery is off:
 
@@ -117,7 +118,7 @@ Then it **drops Claude/Cursor compat skills** when discovery is off:
 
 Settings → Extensions → Skills has a **Discover Claude / Cursor skills** switch. Independent mode also writes those config.toml keys. Shared mode updates the App overlay only (never rewrites `~/.grok`). Hidden rows are omitted from this list and from slash / + (not greyed-out leftovers).
 
-**Name collision (case-insensitive): project wins.** Project rows show a compact **`[Project]` / `[项目]`** tag after the skill name in Extensions, `+` / slash skill rows, and the skills task picker; global/user/plugin rows stay untagged. Create-skill still supports user or project scope under Settings → Extensions → Skills.
+**Name collision (case-insensitive): project wins.** A `~/.atlas` row does not replace a skill inspect already returned. Project rows show a compact **`[Project]` / `[项目]`** tag after the skill name in Extensions, `+` / slash skill rows, and the skills task picker; global/user/plugin rows stay untagged. Create-skill writes user scope under the active agent home (`~/.atlas/skills` in shared mode) or project scope under `{project}/.atlas/skills`.
 
 ### Auto-refresh after conversation install
 

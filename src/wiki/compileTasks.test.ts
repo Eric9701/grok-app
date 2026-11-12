@@ -1,9 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./host", () => ({
+  ingestWithAtlas: () => new Promise(() => {}),
+}));
 import {
   createWikiCompileTask,
   failWikiCompileTask,
   finishWikiCompileTask,
+  formatWikiElapsed,
+  getWikiCompileTasks,
   markWikiCompileStage,
+  noteWikiCompilePulse,
+  resetWikiCompileTasksForTests,
+  startWikiCompile,
+  wikiCompileActivity,
 } from "./compileTasks";
 
 function task() {
@@ -45,5 +55,24 @@ describe("wiki compile tasks", () => {
       "cancelled",
       "cancelled",
     ]);
+  });
+
+  it("keeps a running compile on the shared list and marks a process pulse", () => {
+    resetWikiCompileTasksForTests();
+    void startWikiCompile({
+      projectPath: "E:/knowledge1",
+      projectName: "笔记",
+      sourcePath: "raw/sources/note.md",
+    });
+    const running = getWikiCompileTasks()[0];
+    expect(running?.status).toBe("running");
+    expect(running?.sourcePath).toBe("raw/sources/note.md");
+    noteWikiCompilePulse("E:/knowledge1", 2000);
+    const pulsed = getWikiCompileTasks()[0]!;
+    expect(pulsed.pulseAt).toBeTypeOf("number");
+    expect(wikiCompileActivity(pulsed, Date.now())).toBe("live");
+    expect(wikiCompileActivity(pulsed, Date.now() + 9000)).toBe("quiet");
+    expect(formatWikiElapsed(12_500)).toBe("0:12");
+    resetWikiCompileTasksForTests();
   });
 });

@@ -22,6 +22,7 @@ import { createT } from "@/i18n";
 import {
   formatTurnErrorBody,
   turnErrorContinuesOnRetry,
+  turnErrorOriginalDetail,
   isToolInlinedInAssistants,
   lastRegenerableAssistantId,
   messageSegments,
@@ -1167,6 +1168,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
       { content: m.content, code: undefined, message: undefined },
       locale,
     );
+    const original = turnErrorOriginalDetail(m.errorRaw || m.content, friendly);
     const isFindHit = !!findHitMessageIds?.has(m.id);
     const isFindCurrent = findActive?.messageId === m.id;
     const isNodeFocus = focusMessageId === m.id;
@@ -1187,10 +1189,11 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
         data-message-id={m.id}
       >
         <div className="lobe-chat-error__pill">
-          <span className="lobe-chat-error__icon" aria-hidden>
-            ℹ
-          </span>
-          <span className="lobe-chat-error__text">
+          <div className="lobe-chat-error__row">
+            <span className="lobe-chat-error__icon" aria-hidden>
+              ℹ
+            </span>
+            <span className="lobe-chat-error__text">
             {findQuery.trim() ? (
               <HighlightedText
                 text={friendly}
@@ -1233,6 +1236,27 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                 }}
               />
             </span>
+          ) : null}
+          </div>
+          {original ? (
+            <details className="lobe-chat-error__raw">
+              <summary>
+                <span className="lobe-chat-error__raw-closed">
+                  {tr("error.viewOriginal")}
+                </span>
+                <span className="lobe-chat-error__raw-open">
+                  {tr("error.hideOriginal")}
+                </span>
+              </summary>
+              <div className="lobe-chat-error__raw-body">
+                <pre>{original}</pre>
+                <MessageCopyButton
+                  text={original}
+                  copyLabel={tr("message.copy")}
+                  copiedLabel={tr("message.copied")}
+                />
+              </div>
+            </details>
           ) : null}
         </div>
       </div>,

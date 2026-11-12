@@ -2,6 +2,8 @@
 export const zhTWErrors = {
   "error.details": "詳情",
   "error.hideDetails": "收合詳情",
+  "error.viewOriginal": "原始錯誤",
+  "error.hideOriginal": "收合原始錯誤",
   "error.action.reconnect": "重新連線",
   "error.action.retry": "重試",
   "error.action.openDoctor": "開啟 Doctor",

@@ -4,7 +4,7 @@
  *
  * Grok Build reloads skills when files change on disk (CLI slash menu), but the
  * App workbench catalog is snapshot-based (`skills_list` via `grok inspect`).
- * After conversation installs (create-skill, copy into ~/.grok/skills, plugin
+ * After conversation installs (create-skill, copy into ~/.atlas/skills, plugin
  * install, …) we re-run that list so composer slash / + palette picks them up.
  */
 
@@ -27,6 +27,7 @@ const TERMINAL_OK = new Set(["completed", "complete", "success", "succeeded"]);
  * Deliberately broad (vendor compat dirs + plugin install roots).
  */
 const SKILL_PATH_MARKERS = [
+  "/.atlas/skills/",
   "/.grok/skills/",
   "/.agents/skills/",
   "/.claude/skills/",

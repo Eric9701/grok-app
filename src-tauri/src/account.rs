@@ -730,6 +730,10 @@ fn auth_profile_score(prof: &AccountProfile) -> (u8, u8, u8) {
     )
 }
 
+pub(crate) fn read_access_token_for_mask() -> Option<String> {
+    read_access_token()
+}
+
 fn read_access_token() -> Option<String> {
     // Match profile ranking across Host / ~/.grok / agent-home mirrors.
     let mut best_path: Option<PathBuf> = None;

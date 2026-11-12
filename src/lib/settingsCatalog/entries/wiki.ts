@@ -1,0 +1,75 @@
+import type { SettingsEntry } from "../types";
+
+/** Settings → 知识库配置. Directories, compile model, and compile turns. */
+export const WIKI_ENTRIES: readonly SettingsEntry[] = [
+  {
+    id: "wiki.libraries",
+    section: "wiki",
+    anchorId: "settings-anchor-wikiLibraries",
+    labelKey: "wiki.settingsTitle",
+    descKeys: [
+      "wiki.settingsDesc",
+      "wiki.addDirectory",
+      "wiki.agentDefault",
+      "wiki.makeDefault",
+    ],
+    keywords: [
+      "wiki",
+      "knowledge base",
+      "knowledge",
+      "agent default",
+      "个人知识库",
+      "個人知識庫",
+      "知识库配置",
+      "知識庫配置",
+      "知识库目录",
+      "知識庫目錄",
+    ],
+  },
+  {
+    id: "wiki.compileModel",
+    section: "wiki",
+    anchorId: "settings-anchor-wikiCompileModel",
+    labelKey: "wiki.model",
+    descKeys: ["wiki.modelHint"],
+    keywords: [
+      "model",
+      "compile model",
+      "模型",
+      "編譯模型",
+      "编译模型",
+    ],
+  },
+  {
+    id: "wiki.compileTurns",
+    section: "wiki",
+    anchorId: "settings-anchor-wikiCompileTurns",
+    labelKey: "wiki.compileTurns",
+    descKeys: ["wiki.compileTurnsDesc"],
+    keywords: [
+      "turns",
+      "max turns",
+      "compile",
+      "编译轮次",
+      "編譯輪次",
+      "轮次",
+      "輪次",
+    ],
+  },
+  {
+    id: "wiki.history",
+    section: "wiki",
+    anchorId: "settings-anchor-wikiHistory",
+    labelKey: "wiki.history",
+    descKeys: ["wiki.historyDesc", "wiki.historyEmpty"],
+    keywords: [
+      "history",
+      "usage",
+      "compile log",
+      "tokens",
+      "编译记录",
+      "編譯記錄",
+      "用量",
+    ],
+  },
+];

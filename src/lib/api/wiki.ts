@@ -86,6 +86,30 @@ export function wikiListRaw(project: string) {
   return invoke<string[]>("wiki_list_raw", { project });
 }
 
+export function wikiListDirs(project: string) {
+  return invoke<string[]>("wiki_list_dirs", { project });
+}
+
+export function wikiScaffold(parent: string, name: string, template: string) {
+  return invoke<string>("wiki_scaffold", { parent, name, template });
+}
+
+export function wikiInit(project: string, template: string) {
+  return invoke<string>("wiki_init", { project, template });
+}
+
+export function wikiImportFiles(project: string, paths: string[]) {
+  return invoke<string[]>("wiki_import_files", { project, paths });
+}
+
+export function wikiImportUrl(project: string, url: string) {
+  return invoke<string>("wiki_import_url", { project, url });
+}
+
+export function wikiRemoveRaw(project: string, path: string) {
+  return invoke<void>("wiki_remove_raw", { project, path });
+}
+
 export function wikiLint(project: string) {
   return invoke<WikiLint>("wiki_lint", { project });
 }

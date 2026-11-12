@@ -116,6 +116,7 @@ mod integration_test;
 
 mod journal_throttle;
 
+mod feature_mask;
 mod launch_chrome;
 
 mod leader;

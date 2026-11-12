@@ -675,6 +675,12 @@ pub struct AppSettings {
     /// App settings only — never written into `~/.atlas` or `config.toml`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub wiki_libraries: Vec<crate::wiki_libraries::WikiLibraryRecord>,
+    /// Turns allowed for one knowledge-base compile step. 1–20; anything else is 6.
+    #[serde(default = "default_wiki_compile_max_turns")]
+    pub wiki_compile_max_turns: u32,
+    /// Model id used when compiling a knowledge base. Empty uses the app model.
+    #[serde(default)]
+    pub wiki_compile_model_id: String,
     /// xAI realtime voice id (e.g. `eve`).
     #[serde(default = "default_voice_id")]
     pub voice_id: String,
@@ -825,6 +831,10 @@ fn default_background_wait_policy() -> String {
 
 fn default_background_wait_timeout_sec() -> u32 {
     crate::acp_client::DEFAULT_BACKGROUND_WAIT_TIMEOUT_SEC
+}
+
+fn default_wiki_compile_max_turns() -> u32 {
+    6
 }
 
 fn default_voice_id() -> String {
@@ -1018,6 +1028,8 @@ impl Default for AppSettings {
             use_leader: false,
             ssh_watch_aliases: Vec::new(),
             wiki_libraries: Vec::new(),
+            wiki_compile_max_turns: default_wiki_compile_max_turns(),
+            wiki_compile_model_id: String::new(),
             voice_id: default_voice_id(),
             voice_dictation_auto_send: false,
             voice_keep_agents_on_end: true,

@@ -77,6 +77,7 @@ export const zhTWSettingsUi = {
   "settings.nav.extensions": "擴充功能",
   "settings.nav.runtime": "CLI / 執行環境",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "知識庫配置",
   "settings.nav.shortcuts": "鍵盤",
   "settings.nav.about": "關於",
   "settings.tab.composer": "對話偏好",

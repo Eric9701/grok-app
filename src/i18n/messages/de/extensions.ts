@@ -381,7 +381,7 @@ export const deExtensions = {
   "ext.skills.newDescriptionHint": "Wird in SKILL.md-Frontmatter geschrieben. Den vollen Body kannst du nach dem Anlegen bearbeiten.",
   "ext.skills.newScope": "Ort",
   "ext.skills.newScopeUser": "User (pfad-scoped GROK_HOME /skills)",
-  "ext.skills.newScopeProject": "Projekt (.grok/skills im aktiven Projekt)",
+  "ext.skills.newScopeProject": "Projekt (.atlas/skills im aktiven Projekt)",
   "ext.skills.newScopeProjectDisabled": "Projekt (zuerst ein Projekt öffnen)",
   "ext.skills.newScopeProjectNeed": "Projekt öffnen, um einen Projekt-Skill anzulegen.",
   "ext.skills.newScopeHint": "User-Skills folgen dem aktiven Agent-Home (Independent GROK_HOME oder ~/.atlas). Projekt-Skills liegen im Repo.",

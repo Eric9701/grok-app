@@ -454,6 +454,40 @@ describe("knowledge compiles on the agent kanban", () => {
       "wiki",
     );
   });
+
+  it("pins a running compile above the current session", () => {
+    const board = createEmptyAgentKanbanBoard();
+    board.working.push({
+      sessionId: "s1",
+      title: "chat",
+      projectName: "grok-app",
+      projectPath: "E:/GitHub/grok-app",
+      status: "busy",
+      column: "running",
+      liveToolTitle: null,
+      isCurrent: true,
+      lastActivityAt: 999,
+      archived: false,
+      kanbanColumn: "working",
+      source: "session",
+    });
+    const merged = mergeWikiTasksIntoKanban(
+      board,
+      [
+        {
+          id: "c1",
+          title: "note.md",
+          status: "running",
+          progress: "Compiling · Analyze · 0:12",
+          atMs: 20,
+          projectName: "笔记",
+          projectPath: "E:/knowledge1",
+        },
+      ],
+      { badge: "Knowledge base", untitled: "Knowledge compile" },
+    );
+    expect(merged.working.map((card) => card.sessionId)).toEqual(["wiki:c1", "s1"]);
+  });
 });
 
 describe("agent kanban surface is not a todo list", () => {

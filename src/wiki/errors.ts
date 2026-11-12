@@ -43,8 +43,16 @@ export function formatWikiNotice(tr: Tr, err: unknown, source = ""): string {
     }
     case "wiki_complete_timeout":
       return tr("wiki.errTimeout");
+    case "wiki_turn_cap":
+      return tr("wiki.errTurns");
     case "wiki_overwrite":
       return tr("wiki.errOverwrite");
+    case "wiki_name":
+      return tr("wiki.errName");
+    case "wiki_import_empty":
+    case "wiki_import_url":
+    case "wiki_template":
+      return tr("wiki.errImport");
     default:
       return tr("wiki.errFailed", { detail: (text || "unknown").slice(0, 180) });
   }

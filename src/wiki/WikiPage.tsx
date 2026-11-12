@@ -1,41 +1,64 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { GlassModal } from "@/components/GlassModal";
+import { IconChevronRight, IconFileText, IconFolder } from "@/components/icons";
 import { MarkdownBody } from "@/components/MarkdownBody";
-import { Select } from "@/components/Select";
-import { createT, intlLocale, type Locale } from "@/i18n";
+import { createT, intlLocale, type Locale, type MessageKey } from "@/i18n";
 import * as api from "@/lib/api";
-import type { WikiUsageEntry } from "@/lib/api";
-import { startWikiCompile } from "./compileTasks";
+import {
+  ensureWikiCompileEvents,
+  formatWikiElapsed,
+  getWikiCompileTasks,
+  startWikiCompile,
+  subscribeWikiCompileTasks,
+  wikiCompileActivity,
+  type WikiCompileStage,
+} from "./compileTasks";
 import { formatWikiNotice } from "./errors";
+import { buildWikiTree, groupWikiPages } from "./groups";
 import type { WikiLibrary } from "./libraries";
+import { WikiCreateDialog } from "./WikiCreateDialog";
 
 function pageLabel(path: string) {
   return path.replace(/^wiki\//, "").replace(/\.md$/, "");
+}
+
+function pageTitle(path: string) {
+  const name = path.split("/").pop() || path;
+  return name.replace(/\.md$/, "");
 }
 
 function formatCount(locale: Locale, value: number) {
   return new Intl.NumberFormat(intlLocale(locale)).format(value);
 }
 
-function formatWhen(locale: Locale, at: string) {
-  const date = new Date(at);
-  if (Number.isNaN(date.getTime())) return at;
-  return new Intl.DateTimeFormat(intlLocale(locale), {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
+const WIKI_CLI_STARTED_EVENT = "wiki://cli-started";
+
+const STAGE_KEY: Record<WikiCompileStage, MessageKey> = {
+  read: "kanban.wikiStage.read",
+  analyze: "kanban.wikiStage.analyze",
+  generate: "kanban.wikiStage.generate",
+  write: "kanban.wikiStage.write",
+};
 
 export function WikiPage({
   locale,
   onOpenSettings,
+  onToast,
 }: {
   locale: Locale;
   onOpenSettings?: () => void;
+  onToast?: (message: string | null) => void;
 }) {
   const tr = useMemo(() => createT(locale), [locale]);
+  const compileTasks = useSyncExternalStore(
+    subscribeWikiCompileTasks,
+    getWikiCompileTasks,
+    getWikiCompileTasks,
+  );
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    ensureWikiCompileEvents();
+  }, []);
   const [libraries, setLibraries] = useState<WikiLibrary[]>([]);
   const [ready, setReady] = useState(false);
   const usable = useMemo(
@@ -43,6 +66,14 @@ export function WikiPage({
     [libraries],
   );
   const [projectPath, setProjectPath] = useState("");
+  const runningCompile = compileTasks.find(
+    (task) => task.status === "running" && task.projectPath === projectPath,
+  );
+  useEffect(() => {
+    if (!runningCompile) return;
+    const id = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [runningCompile?.id]);
   const [pages, setPages] = useState<string[]>([]);
   const [hits, setHits] = useState<string[] | null>(null);
   const [selected, setSelected] = useState("");
@@ -51,15 +82,41 @@ export function WikiPage({
   const [issues, setIssues] = useState<string[]>([]);
   const [source, setSource] = useState("");
   const [sources, setSources] = useState<string[]>([]);
+  const [dirs, setDirs] = useState<string[]>([]);
+  const [ingested, setIngested] = useState<Record<string, boolean>>({});
+  const [view, setView] = useState<"library" | "files" | "raw">("library");
+  const [openDirs, setOpenDirs] = useState<Record<string, boolean>>({ raw: true, wiki: true });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [createOpen, setCreateOpen] = useState(false);
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [urlDraft, setUrlDraft] = useState("");
+  const [deletePath, setDeletePath] = useState("");
+  const [sourceTick, setSourceTick] = useState(0);
   const [models, setModels] = useState<Array<{ id: string; label: string }>>([]);
   const [modelId, setModelId] = useState("");
   const [seedModel, setSeedModel] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState("");
+  const compileStatus = (() => {
+    if (!runningCompile) return "";
+    const step =
+      runningCompile.steps.find((item) => item.status === "in_progress") ??
+      runningCompile.steps[0];
+    if (!step) return "";
+    if (wikiCompileActivity(runningCompile, clock) === "quiet") {
+      return tr("wiki.compilingQuiet");
+    }
+    return tr("wiki.compilingLive", {
+      stage: tr(STAGE_KEY[step.id]),
+      time: formatWikiElapsed(clock - runningCompile.startedAt),
+    });
+  })();
+  const statusText = compileStatus || note;
   const [error, setError] = useState("");
   const [recompileOpen, setRecompileOpen] = useState(false);
-  const [usageRows, setUsageRows] = useState<WikiUsageEntry[]>([]);
+  const compileEpoch = useRef(0);
+  const startedEpoch = useRef(0);
 
   useEffect(() => {
     if (!api.isTauri()) {
@@ -72,7 +129,9 @@ export function WikiPage({
       .then((settings) => {
         if (stop) return;
         setLibraries(settings.wikiLibraries ?? []);
-        setSeedModel(settings.modelId?.trim() ?? "");
+        setSeedModel(
+          settings.wikiCompileModelId?.trim() || settings.modelId?.trim() || "",
+        );
       })
       .catch(() => {
         if (!stop) setLibraries([]);
@@ -128,27 +187,39 @@ export function WikiPage({
   useEffect(() => {
     if (!projectPath || !api.isTauri()) {
       setSources([]);
+      setDirs([]);
       setSource("");
       return;
     }
     let stop = false;
-    void api
-      .wikiListRaw(projectPath)
-      .then((rows) => {
+    void Promise.all([api.wikiListRaw(projectPath), api.wikiListDirs(projectPath)])
+      .then(async ([rows, folders]) => {
         if (stop) return;
         setSources(rows);
+        setDirs(folders);
         setSource((current) => (rows.includes(current) ? current : (rows[0] ?? "")));
+        const flags = await Promise.all(
+          rows.map(async (path) => {
+            const [fingerprint, cached] = await Promise.all([
+              api.wikiFingerprint(projectPath, path).catch(() => ""),
+              api.wikiCacheGet(projectPath, path).catch(() => null),
+            ]);
+            return [path, !!fingerprint && cached === fingerprint] as const;
+          }),
+        );
+        if (!stop) setIngested(Object.fromEntries(flags));
       })
       .catch(() => {
         if (!stop) {
           setSources([]);
+          setDirs([]);
           setSource("");
         }
       });
     return () => {
       stop = true;
     };
-  }, [projectPath]);
+  }, [projectPath, sourceTick]);
 
   useEffect(() => {
     if (!projectPath || !api.isTauri()) {
@@ -228,32 +299,36 @@ export function WikiPage({
   }, [projectPath, selected]);
 
   useEffect(() => {
-    if (!projectPath || !api.isTauri()) {
-      setUsageRows([]);
-      return;
-    }
+    if (!projectPath || !api.isTauri()) return;
     let stop = false;
+    let unlisten = () => {};
     void api
-      .wikiUsageList(projectPath)
-      .then((rows) => {
-        if (!stop) setUsageRows(rows);
+      .listen<string>(WIKI_CLI_STARTED_EVENT, (payload) => {
+        if (stop || payload !== projectPath) return;
+        const epoch = compileEpoch.current;
+        if (epoch === 0 || startedEpoch.current === epoch) return;
+        startedEpoch.current = epoch;
+        const message = tr("wiki.started");
+        setNote(message);
+        onToast?.(message);
+        window.setTimeout(() => onToast?.(null), 4200);
       })
-      .catch(() => {
-        if (!stop) setUsageRows([]);
-      });
+      .then((fn) => {
+        if (stop) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {});
     return () => {
       stop = true;
+      unlisten();
     };
-  }, [projectPath]);
+  }, [projectPath, tr, onToast]);
 
   const visible = hits ?? pages;
-  const usageTotal = usageRows.reduce(
-    (sum, row) => sum + (row.reported ? row.totalTokens : 0),
-    0,
-  );
-  const compile = async (force = false) => {
+  const compile = async (force = false, explicit?: string) => {
     if (!projectPath || busy) return;
-    const sourcePath = source.trim();
+    const sourcePath = (explicit ?? source).trim();
+    if (explicit) setSource(explicit);
     if (!sourcePath) {
       setNote("");
       setError(tr("wiki.errPath"));
@@ -266,6 +341,7 @@ export function WikiPage({
           api.wikiCacheGet(projectPath, sourcePath),
         ]);
         if (cached && cached === fingerprint) {
+          setSource(sourcePath);
           setRecompileOpen(true);
           return;
         }
@@ -274,16 +350,20 @@ export function WikiPage({
       }
     }
     setRecompileOpen(false);
+    compileEpoch.current += 1;
     setBusy(true);
     setError("");
     setNote("");
     try {
       const library = usable.find((item) => item.path === projectPath);
+      const latest = await api.settingsGet().catch(() => null);
+      const chosen =
+        latest?.wikiCompileModelId?.trim() || modelId.trim() || undefined;
       const result = await startWikiCompile({
         projectPath,
         projectName: library?.name || projectPath,
         sourcePath,
-        modelId: modelId.trim() || undefined,
+        modelId: chosen,
         force,
       });
       if (result.skipped) {
@@ -300,16 +380,83 @@ export function WikiPage({
         );
         const listed = await api.wikiList(projectPath);
         setPages(listed);
-        if (result.written[0]) setSelected(result.written[0]);
-        const rows = await api.wikiUsageList(projectPath).catch(() => []);
-        setUsageRows(rows);
+        setSourceTick((tick) => tick + 1);
+        if (result.written[0]) {
+          setView("library");
+          setSelected(result.written[0]);
+        }
       }
     } catch (err) {
+      setNote("");
       setError(formatWikiNotice(tr, err, sourcePath));
     } finally {
       setBusy(false);
     }
   };
+
+  const reloadSources = () => setSourceTick((tick) => tick + 1);
+
+  const importFiles = async () => {
+    if (!projectPath || !api.isTauri()) return;
+    const picked = await api.pickAttachFiles();
+    if (!picked.length) return;
+    try {
+      await api.wikiImportFiles(projectPath, picked);
+      reloadSources();
+      setError("");
+    } catch (err) {
+      setError(formatWikiNotice(tr, err));
+    }
+  };
+
+  const importFolder = async () => {
+    if (!projectPath || !api.isTauri()) return;
+    const picked = await api.pickDirectory();
+    if (!picked) return;
+    try {
+      await api.wikiImportFiles(projectPath, [picked]);
+      reloadSources();
+      setError("");
+    } catch (err) {
+      setError(formatWikiNotice(tr, err));
+    }
+  };
+
+  const importUrl = async () => {
+    if (!projectPath || !urlDraft.trim()) return;
+    try {
+      await api.wikiImportUrl(projectPath, urlDraft.trim());
+      setUrlDraft("");
+      setUrlOpen(false);
+      reloadSources();
+      setError("");
+    } catch (err) {
+      setError(formatWikiNotice(tr, err));
+    }
+  };
+
+  const removeRaw = async () => {
+    if (!projectPath || !deletePath) return;
+    try {
+      await api.wikiRemoveRaw(projectPath, deletePath);
+      if (selected === deletePath) setSelected("");
+      setDeletePath("");
+      reloadSources();
+    } catch (err) {
+      setError(formatWikiNotice(tr, err));
+      setDeletePath("");
+    }
+  };
+
+  const rawQuery = query.trim().toLowerCase();
+  const visibleSources = rawQuery
+    ? sources.filter((path) => path.toLowerCase().includes(rawQuery))
+    : sources;
+  const groups = groupWikiPages(visible);
+  const tree = buildWikiTree(
+    [...pages, ...sources],
+    dirs,
+  );
 
   if (!ready) {
     return (
@@ -326,15 +473,81 @@ export function WikiPage({
   if (usable.length === 0) {
     return (
       <div className="wiki-page wiki-page--empty">
-        <p>{tr("wiki.noLibraries")}</p>
-        {onOpenSettings ? (
-          <button type="button" className="btn btn--primary" onClick={onOpenSettings}>
-            {tr("wiki.openSettings")}
-          </button>
-        ) : null}
+        <div className="wiki-empty-panel">
+          <p>{tr("wiki.noLibraries")}</p>
+          <div className="wiki-empty-panel__actions">
+            <button type="button" className="btn btn--primary" onClick={() => setCreateOpen(true)}>
+              {tr("wiki.create")}
+            </button>
+            {onOpenSettings ? (
+              <button type="button" className="btn btn--ghost" onClick={onOpenSettings}>
+                {tr("wiki.openSettings")}
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <WikiCreateDialog
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          t={tr}
+          onCreated={(libraries) => {
+            setLibraries(libraries);
+            setCreateOpen(false);
+          }}
+        />
       </div>
     );
   }
+
+  const renderTree = (nodes: ReturnType<typeof buildWikiTree>, depth = 0): ReactNode => (
+    <ul className={depth > 0 ? "wiki-pages wiki-pages--nested" : "wiki-pages"}>
+      {nodes.map((node) => {
+        const opened = openDirs[node.path] !== false;
+        return (
+          <li key={node.path}>
+            {node.dir ? (
+              <>
+                <button
+                  type="button"
+                  className="wiki-tree__row"
+                  aria-expanded={opened}
+                  onClick={() =>
+                    setOpenDirs((current) => ({
+                      ...current,
+                      [node.path]: current[node.path] === false,
+                    }))
+                  }
+                >
+                  <IconChevronRight
+                    size={14}
+                    className={"wiki-twist" + (opened ? " is-open" : "")}
+                  />
+                  <span className="wiki-tree__mark">
+                    <IconFolder size={15} />
+                  </span>
+                  <span className="wiki-tree__name">{node.name}</span>
+                </button>
+                {opened ? renderTree(node.children, depth + 1) : null}
+              </>
+            ) : (
+              <button
+                type="button"
+                className={"wiki-tree__row" + (node.path === selected ? " is-selected" : "")}
+                aria-pressed={node.path === selected}
+                onClick={() => setSelected(node.path)}
+              >
+                <span className="wiki-tree__file">
+                  <IconFileText size={14} />
+                </span>
+                <span className="wiki-tree__name">{node.name}</span>
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+  const libraryName = usable.find((library) => library.path === projectPath)?.name ?? "";
 
   return (
     <div className="wiki-page">
@@ -369,33 +582,104 @@ export function WikiPage({
             spellCheck={false}
           />
         </label>
+        <div className="wiki-views" role="group" aria-label={tr("wiki.views")}>
+          <button
+            type="button"
+            className={"wiki-chip" + (view === "library" ? " is-selected" : "")}
+            aria-pressed={view === "library"}
+            onClick={() => setView("library")}
+          >
+            {tr("wiki.viewLibrary")}
+          </button>
+          <button
+            type="button"
+            className={"wiki-chip" + (view === "files" ? " is-selected" : "")}
+            aria-pressed={view === "files"}
+            onClick={() => setView("files")}
+          >
+            {tr("wiki.viewFiles")}
+          </button>
+          <button
+            type="button"
+            className={"wiki-chip" + (view === "raw" ? " is-selected" : "")}
+            aria-pressed={view === "raw"}
+            onClick={() => setView("raw")}
+          >
+            {tr("wiki.kind.raw")}
+          </button>
+        </div>
+        {libraryName ? <p className="wiki-library-name">{libraryName}</p> : null}
         <div className="wiki-pages-scroll">
-          {loading && visible.length === 0 ? (
+          {view === "files" ? (
+            tree.length === 0 ? (
+              <p className="wiki-empty">{tr("wiki.pagesEmpty")}</p>
+            ) : (
+              renderTree(tree)
+            )
+          ) : view === "raw" ? (
+            <p className="wiki-rail-note">{tr("wiki.rawPageHint")}</p>
+          ) : loading && visible.length === 0 ? (
             <div className="wiki-skeleton" aria-label={tr("wiki.loading")}>
               <span />
               <span />
               <span />
               <span />
             </div>
-          ) : visible.length === 0 ? (
-            <p className="wiki-empty">
-              {query.trim() ? tr("wiki.searchEmpty") : tr("wiki.pagesEmpty")}
-            </p>
           ) : (
-            <ul className="wiki-pages">
-              {visible.map((path) => (
-                <li key={path}>
-                  <button
-                    type="button"
-                    className={"wiki-page-link" + (path === selected ? " is-selected" : "")}
-                    aria-pressed={path === selected}
-                    onClick={() => setSelected(path)}
-                  >
-                    {pageLabel(path)}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              {groups.length === 0 ? (
+                <p className="wiki-empty">
+                  {query.trim() ? tr("wiki.searchEmpty") : tr("wiki.pagesEmpty")}
+                </p>
+              ) : (
+                groups.map((group) => {
+                  const opened = query.trim() ? true : openGroups[group.key] !== false;
+                  const label = group.labelKey ? tr(group.labelKey as MessageKey) : group.label;
+                  return (
+                    <section key={group.key} className="wiki-kind">
+                      <button
+                        type="button"
+                        className="wiki-kind__head"
+                        aria-expanded={opened}
+                        onClick={() =>
+                          setOpenGroups((current) => ({
+                            ...current,
+                            [group.key]: current[group.key] === false,
+                          }))
+                        }
+                      >
+                        <IconChevronRight
+                          size={14}
+                          className={"wiki-twist" + (opened ? " is-open" : "")}
+                        />
+                        <span className={"wiki-kind__mark wiki-kind__mark--" + group.key}>
+                          <IconFolder size={15} />
+                        </span>
+                        <span className="wiki-kind__label">{label}</span>
+                        <span className="wiki-kind__count">{group.pages.length}</span>
+                      </button>
+                      {opened ? (
+                        <ul className="wiki-pages wiki-kind__pages">
+                          {group.pages.map((path) => (
+                            <li key={path}>
+                              <button
+                                type="button"
+                                className={"wiki-page-link" + (path === selected ? " is-selected" : "")}
+                                aria-label={pageLabel(path)}
+                                aria-pressed={path === selected}
+                                onClick={() => setSelected(path)}
+                              >
+                                {pageTitle(path)}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </section>
+                  );
+                })
+              )}
+            </>
           )}
         </div>
         <div className="wiki-rail__foot">
@@ -408,86 +692,12 @@ export function WikiPage({
               ))}
             </ul>
           )}
-          <form
-            className="wiki-compile"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void compile();
-            }}
-          >
-            <label className="wiki-model">
-              <span className="wiki-kicker">{tr("wiki.model")}</span>
-              <Select
-                value={modelId}
-                options={models.map((model) => ({
-                  value: model.id,
-                  label: model.label,
-                }))}
-                onChange={setModelId}
-                disabled={busy || models.length === 0}
-                aria-label={tr("wiki.model")}
-              />
-              <span className="wiki-hint">
-                {models.length === 0 ? tr("wiki.modelsEmpty") : tr("wiki.modelHint")}
-              </span>
-            </label>
-            <label className="wiki-model">
-              <span className="wiki-kicker">{tr("wiki.source")}</span>
-              <Select
-                value={source}
-                options={sources.map((path) => ({
-                  value: path,
-                  label: path.replace(/^raw\//, ""),
-                }))}
-                onChange={setSource}
-                disabled={busy || sources.length === 0}
-                aria-label={tr("wiki.source")}
-              />
-              <span className="wiki-hint">
-                {sources.length === 0 ? tr("wiki.rawEmpty") : tr("wiki.sourceHint")}
-              </span>
-            </label>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={busy || sources.length === 0}
-            >
-              {busy ? tr("wiki.compiling") : tr("wiki.compile")}
-            </button>
-          </form>
-          {note ? <p className="wiki-note">{note}</p> : null}
-          <section className="wiki-usage" aria-label={tr("wiki.usage")}>
-            <p className="wiki-kicker">{tr("wiki.usage")}</p>
-            {usageRows.length === 0 ? (
-              <p className="wiki-empty">{tr("wiki.usageEmpty")}</p>
-            ) : (
-              <>
-                <p className="wiki-usage__total">
-                  {tr("wiki.usageTotal", { count: formatCount(locale, usageTotal) })}
-                </p>
-                <ul className="wiki-usage__list">
-                  {usageRows.slice(0, 6).map((row) => (
-                    <li key={`${row.at}-${row.source}`}>
-                      <span>{formatWhen(locale, row.at)}</span>
-                      <span className="wiki-usage__source">{pageLabel(row.source)}</span>
-                      {row.reported ? (
-                        <span>
-                          {tr("wiki.usageIn", { count: formatCount(locale, row.inputTokens) })}
-                          {" · "}
-                          {tr("wiki.usageOut", { count: formatCount(locale, row.outputTokens) })}
-                          {" · "}
-                          {tr("wiki.usageTotal", { count: formatCount(locale, row.totalTokens) })}
-                        </span>
-                      ) : (
-                        <span>{tr("wiki.usageUnreported")}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </section>
-          {error ? (
+          {view !== "raw" && statusText ? (
+            <p className="wiki-note" role="status">
+              {statusText}
+            </p>
+          ) : null}
+          {view !== "raw" && error ? (
             <p className="wiki-error" role="alert">
               {error}
             </p>
@@ -495,7 +705,82 @@ export function WikiPage({
         </div>
       </aside>
       <article className="wiki-article">
-        {selected && body ? (
+        {view === "raw" ? (
+          <div className="wiki-raw-page">
+            <header className="wiki-raw-page__head">
+              <p className="wiki-kicker">
+                {tr("wiki.kind.raw")}
+                <span className="wiki-kind__count">{visibleSources.length}</span>
+              </p>
+              <div className="wiki-raw-page__actions">
+                <button type="button" className="btn btn--sm btn--ghost" disabled={busy} onClick={() => void importFiles()}>
+                  {tr("wiki.importFiles")}
+                </button>
+                <button type="button" className="btn btn--sm btn--ghost" disabled={busy} onClick={() => void importFolder()}>
+                  {tr("wiki.importFolder")}
+                </button>
+                <button type="button" className="btn btn--sm btn--ghost" disabled={busy} onClick={() => setUrlOpen(true)}>
+                  {tr("wiki.importUrl")}
+                </button>
+              </div>
+            </header>
+            {statusText ? (
+              <p className="wiki-note" role="status">
+                {statusText}
+              </p>
+            ) : null}
+            {error ? (
+              <p className="wiki-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            {visibleSources.length === 0 ? (
+              <div className="wiki-empty-article">
+                <p>{tr("wiki.rawEmpty")}</p>
+              </div>
+            ) : (
+              <ul className="wiki-raw-page__list">
+                {visibleSources.map((path) => (
+                  <li key={path} className={"wiki-raw-row" + (path === selected ? " is-selected" : "")}>
+                    <button
+                      type="button"
+                      className={"wiki-page-link" + (path === selected ? " is-selected" : "")}
+                      aria-pressed={path === selected}
+                      onClick={() => setSelected(path)}
+                    >
+                      {path.replace(/^raw\//, "")}
+                    </button>
+                    <div className="wiki-raw-row__meta">
+                      {ingested[path] ? <span className="wiki-ingested">{tr("wiki.ingested")}</span> : null}
+                      <button
+                        type="button"
+                        className="btn btn--sm btn--primary"
+                        disabled={busy}
+                        onClick={() => void compile(false, path)}
+                      >
+                        {busy && source === path ? tr("wiki.compiling") : tr("wiki.extract")}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--sm btn--ghost"
+                        disabled={busy}
+                        aria-label={tr("wiki.rawDelete")}
+                        onClick={() => setDeletePath(path)}
+                      >
+                        {tr("wiki.rawDelete")}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {selected.startsWith("raw/") && body ? (
+              <div className="wiki-raw-preview">
+                <MarkdownBody locale={locale}>{body}</MarkdownBody>
+              </div>
+            ) : null}
+          </div>
+        ) : selected && body ? (
           <>
             <p className="wiki-kicker wiki-article__path">{pageLabel(selected)}</p>
             <MarkdownBody locale={locale}>{body}</MarkdownBody>
@@ -507,6 +792,51 @@ export function WikiPage({
           </div>
         )}
       </article>
+      <GlassModal
+        open={urlOpen}
+        onClose={() => setUrlOpen(false)}
+        title={tr("wiki.importUrlTitle")}
+        size="sm"
+        closeLabel={tr("common.close")}
+        footer={
+          <>
+            <button type="button" className="btn btn--ghost" onClick={() => setUrlOpen(false)}>
+              {tr("common.cancel")}
+            </button>
+            <button type="button" className="btn btn--primary" onClick={() => void importUrl()}>
+              {tr("wiki.importUrl")}
+            </button>
+          </>
+        }
+      >
+        <p>{tr("wiki.importUrlHint")}</p>
+        <input
+          className="settings-input"
+          value={urlDraft}
+          onChange={(event) => setUrlDraft(event.target.value)}
+          spellCheck={false}
+          aria-label={tr("wiki.importUrl")}
+        />
+      </GlassModal>
+      <GlassModal
+        open={!!deletePath}
+        onClose={() => setDeletePath("")}
+        title={tr("wiki.rawDeleteTitle")}
+        size="sm"
+        closeLabel={tr("common.close")}
+        footer={
+          <>
+            <button type="button" className="btn btn--ghost" onClick={() => setDeletePath("")}>
+              {tr("common.cancel")}
+            </button>
+            <button type="button" className="btn btn--primary" onClick={() => void removeRaw()}>
+              {tr("wiki.rawDelete")}
+            </button>
+          </>
+        }
+      >
+        <p>{tr("wiki.rawDeleteBody")}</p>
+      </GlassModal>
       <GlassModal
         open={recompileOpen}
         onClose={() => setRecompileOpen(false)}

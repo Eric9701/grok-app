@@ -381,7 +381,7 @@ export const ruExtensions = {
   "ext.skills.newDescriptionHint": "Записывается во frontmatter SKILL.md. Полное тело можно править после создания.",
   "ext.skills.newScope": "Расположение",
   "ext.skills.newScopeUser": "Пользователь (GROK_HOME /skills)",
-  "ext.skills.newScopeProject": "Проект (.grok/skills активного проекта)",
+  "ext.skills.newScopeProject": "Проект (.atlas/skills активного проекта)",
   "ext.skills.newScopeProjectDisabled": "Проект (сначала откройте проект)",
   "ext.skills.newScopeProjectNeed": "Откройте проект, чтобы создать проектный навык.",
   "ext.skills.newScopeHint": "Пользовательские навыки следуют активному agent home (независимый GROK_HOME или ~/.atlas). Проектные навыки живут в репозитории.",

@@ -76,6 +76,29 @@ pub fn read_text(project: &Path, rel: &str) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| format!("wiki_io:{e}"))
 }
 
+/// `canonicalize` on Windows returns `\\?\E:\...`. Settings and the page
+/// should show the path a person typed.
+pub fn user_path(path: &Path) -> String {
+    user_path_string(&path.display().to_string())
+}
+
+pub fn user_path_string(raw: &str) -> String {
+    let text = raw.trim();
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        if let Some(unc) = rest.strip_prefix(r"UNC\") {
+            return format!(r"\\{unc}");
+        }
+        return rest.to_string();
+    }
+    if let Some(rest) = text.strip_prefix("//?/") {
+        if let Some(unc) = rest.strip_prefix("UNC/") {
+            return format!("//{unc}");
+        }
+        return rest.to_string();
+    }
+    text.to_string()
+}
+
 fn is_windows_abs(text: &str) -> bool {
     let b = text.as_bytes();
     b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'/' || b[2] == b'\\')

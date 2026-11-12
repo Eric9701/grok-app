@@ -6,6 +6,7 @@ import type { KanbanBoardPageProps } from "@/components/KanbanBoardPage";
 import { aiCreateSeedPrompt, type Automation } from "@/lib/automations";
 import * as api from "@/lib/api";
 import type { ModelOption } from "@/lib/grokCatalog";
+import { useFeatureMask } from "@/lib/featureMask";
 import type { WorkbenchHashPane } from "@/lib/workbenchHash";
 import type { Locale, MessageKey } from "@/i18n";
 
@@ -59,7 +60,7 @@ export function WorkbenchMainPane({
   closeToTray: boolean;
   keepTrayForSchedules: boolean;
   onKeepTrayForSchedules: (value: boolean) => void;
-  onNavigateSettings: (section?: "general" | null, tab?: string | null) => void;
+  onNavigateSettings: (section?: "general" | "wiki" | null, tab?: string | null) => void;
   onNewChat: (
     project?: null,
     opts?: {
@@ -72,15 +73,19 @@ export function WorkbenchMainPane({
   onRunNow: (auto: Automation) => void;
   children: ReactNode;
 }) {
+  const featureMask = useFeatureMask();
   if (mainPane === "fleet") {
+    if (!featureMask.fleet) return null;
     return <FleetPage locale={locale} />;
   }
   if (mainPane === "wiki") {
+    if (!featureMask.wiki) return null;
     return (
       <WikiPage
         locale={locale}
+        onToast={onToast}
         onOpenSettings={() => {
-          onNavigateSettings("general", "agent");
+          onNavigateSettings("wiki");
           window.setTimeout(() => {
             const el = document.getElementById("settings-anchor-wikiLibraries");
             if (!el) return;

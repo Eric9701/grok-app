@@ -6,6 +6,7 @@ mod complete;
 mod gate;
 mod lint;
 mod path;
+mod scaffold;
 mod search;
 mod usage;
 
@@ -13,10 +14,12 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use serde::Serialize;
+use tauri::{AppHandle, Emitter};
 
-pub use complete::{headless_args, resolve_model_id, WikiUsage};
+pub use complete::{clamp_wiki_compile_turns, headless_args, resolve_model_id, WikiUsage};
 pub use gate::{WikiOpen, WikiPageInput, WikiText};
 pub use lint::WikiLint;
+pub use path::{user_path, user_path_string};
 pub use search::WikiHit;
 
 #[derive(Debug, Clone, Serialize)]
@@ -66,6 +69,42 @@ pub fn wiki_list_raw(project: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn wiki_list_dirs(project: String) -> Result<Vec<String>, String> {
+    lint::list_dirs(PathBuf::from(project).as_path())
+}
+
+#[tauri::command]
+pub fn wiki_scaffold(parent: String, name: String, template: String) -> Result<String, String> {
+    scaffold::scaffold(PathBuf::from(parent).as_path(), &name, &template)
+        .map(|path| path::user_path(&path))
+}
+
+#[tauri::command]
+pub fn wiki_init(project: String, template: String) -> Result<String, String> {
+    scaffold::init_existing(PathBuf::from(project).as_path(), &template)
+        .map(|path| path::user_path(&path))
+}
+
+#[tauri::command]
+pub fn wiki_import_files(project: String, paths: Vec<String>) -> Result<Vec<String>, String> {
+    scaffold::import_files(PathBuf::from(project).as_path(), &paths)
+}
+
+#[tauri::command]
+pub async fn wiki_import_url(project: String, url: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        scaffold::import_url(PathBuf::from(project).as_path(), &url)
+    })
+    .await
+    .map_err(|_| "wiki_import_url".to_string())?
+}
+
+#[tauri::command]
+pub fn wiki_remove_raw(project: String, path: String) -> Result<(), String> {
+    scaffold::remove_raw(PathBuf::from(project).as_path(), &path)
+}
+
+#[tauri::command]
 pub fn wiki_lint(project: String) -> Result<WikiLint, String> {
     lint::lint(PathBuf::from(project).as_path())
 }
@@ -102,16 +141,18 @@ pub fn wiki_cache_put(project: String, key: String, value: String) -> Result<(),
 /// rewrite the agent `config.toml`.
 #[tauri::command]
 pub async fn wiki_complete(
+    app: AppHandle,
     prompt: String,
     project: String,
     model_id: Option<String>,
 ) -> Result<WikiComplete, String> {
-    tauri::async_runtime::spawn_blocking(move || complete_prompt(prompt, project, model_id))
+    tauri::async_runtime::spawn_blocking(move || complete_prompt(app, prompt, project, model_id))
         .await
         .map_err(|_| "wiki_complete_join".to_string())?
 }
 
 fn complete_prompt(
+    app: AppHandle,
     prompt: String,
     project: String,
     model_id: Option<String>,
@@ -135,7 +176,20 @@ fn complete_prompt(
         &model,
         &prompt,
         &workdir,
-        Duration::from_secs(180),
+        Duration::from_secs(300),
+        clamp_wiki_compile_turns(settings.wiki_compile_max_turns),
+        || {
+            let _ = app.emit(complete::WIKI_CLI_STARTED_EVENT, &project);
+        },
+        |elapsed_ms| {
+            let _ = app.emit(
+                complete::WIKI_CLI_PULSE_EVENT,
+                complete::WikiCliPulse {
+                    project: project.clone(),
+                    elapsed_ms,
+                },
+            );
+        },
     )?;
     Ok(WikiComplete {
         text: parsed.text,
@@ -305,14 +359,19 @@ mod tests {
             resolve_model_id(None, "").unwrap_err(),
             "wiki_model_missing"
         );
-        let args = headless_args("atlas-main", "prompt.txt");
+        let args = headless_args("atlas-main", "prompt.txt", 6);
+        assert_eq!(clamp_wiki_compile_turns(0), 6);
+        assert_eq!(clamp_wiki_compile_turns(4), 4);
+        assert_eq!(clamp_wiki_compile_turns(99), 6);
         assert!(args
             .windows(2)
             .any(|pair| pair[0] == "--prompt-file" && pair[1] == "prompt.txt"));
         assert!(!args.iter().any(|arg| arg == "-p"));
         assert!(args.iter().any(|a| a == "atlas-main"));
         assert!(args.iter().any(|a| a == "json"));
-        assert!(args.windows(2).any(|pair| pair == ["--max-turns", "2"]));
+        assert!(args.windows(2).any(|pair| pair == ["--max-turns", "6"]));
+        assert!(args.iter().any(|arg| arg == "--no-plan"));
+        assert!(args.iter().any(|arg| arg.contains("read_file")));
         assert!(args.iter().any(|a| a == "--no-subagents"));
         assert!(!args.iter().any(|a| a == "--always-approve"));
         assert!(!args.iter().any(|a| a.contains("config.toml")));

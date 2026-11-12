@@ -400,9 +400,9 @@ export async function resetAppData(keepSecrets = true) {
 }
 
 /**
- * List skills via `grok inspect --json` + project-disk scan
- * (`{project}/.grok/skills`). Optional project cwd; project rows win on name
- * collision and carry `source: "project"`.
+ * List skills via `grok inspect --json` plus disk scans of
+ * `{project}/.atlas/skills` and `~/.atlas/skills`. Optional project cwd;
+ * project rows win on name collision and carry `source: "project"`.
  */
 export async function skillsList(
   projectPath?: string | null,

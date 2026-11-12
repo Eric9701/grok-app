@@ -53,7 +53,10 @@ pub fn normalize_libraries(raw: Vec<WikiLibraryRecord>) -> Vec<WikiLibraryRecord
 /// Short spawn rule for the library marked as the agent default.
 pub fn agent_rules(libs: &[WikiLibraryRecord]) -> Option<String> {
     let lib = libs.iter().find(|item| item.agent_default)?;
-    let path = lib.path.replace('`', "").trim().to_string();
+    let path = crate::wiki::user_path_string(&lib.path)
+        .replace('`', "")
+        .trim()
+        .to_string();
     if path.is_empty() {
         return None;
     }
@@ -64,7 +67,7 @@ pub fn agent_rules(libs: &[WikiLibraryRecord]) -> Option<String> {
 }
 
 fn clean_path(raw: &str) -> Option<String> {
-    let text = raw.trim().replace('\0', "");
+    let text = crate::wiki::user_path_string(raw).replace('\0', "");
     if text.is_empty() || text.contains('\n') || text.contains('\r') {
         return None;
     }
@@ -143,6 +146,13 @@ mod tests {
         assert!(rows[0].agent_default);
         assert!(!rows[1].agent_default);
         assert_eq!(rows[0].path, r"E:\notes");
+        let verbatim = normalize_libraries(vec![
+            lib(r"\\?\E:\knowledge1\test", true),
+            lib(r"E:\knowledge1\test", false),
+        ]);
+        assert_eq!(verbatim.len(), 1);
+        assert_eq!(verbatim[0].path, r"E:\knowledge1\test");
+        assert_eq!(verbatim[0].name, "test");
         assert_eq!(rows[0].name, "notes");
         assert!(!rows[0].id.is_empty());
     }

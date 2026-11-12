@@ -2,6 +2,8 @@
 export const ruErrors = {
   "error.details": "Подробности",
   "error.hideDetails": "Скрыть подробности",
+  "error.viewOriginal": "Исходная ошибка",
+  "error.hideOriginal": "Скрыть исходную ошибку",
   "error.action.reconnect": "Переподключиться",
   "error.action.retry": "Повторить",
   "error.action.openDoctor": "Открыть диагностику",

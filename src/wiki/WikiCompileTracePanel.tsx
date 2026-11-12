@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { Locale, MessageKey } from "@/i18n";
+import { useFeatureMask } from "@/lib/featureMask";
 import { formatWikiNotice } from "./errors";
 import {
   getWikiCompileTasks,
@@ -44,6 +45,7 @@ export function WikiCompileTracePanel({
   taskId: string;
   onClose: () => void;
 }) {
+  const wikiVisible = useFeatureMask().wiki;
   const tasks = useSyncExternalStore(
     subscribeWikiCompileTasks,
     getWikiCompileTasks,
@@ -97,6 +99,7 @@ export function WikiCompileTracePanel({
           </p>
         ) : null}
       </div>
+      {wikiVisible ? (
       <footer className="relay-trace__foot">
         <button
           type="button"
@@ -108,6 +111,7 @@ export function WikiCompileTracePanel({
           {tr("kanban.wikiOpen")}
         </button>
       </footer>
+      ) : null}
     </aside>
   );
 }

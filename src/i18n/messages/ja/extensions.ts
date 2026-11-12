@@ -381,7 +381,7 @@ export const jaExtensions = {
   "ext.skills.newDescriptionHint": "SKILL.md のフロントマターに書き込みます。作成後に本文を編集できます。",
   "ext.skills.newScope": "場所",
   "ext.skills.newScopeUser": "ユーザー（パス範囲の GROK_HOME /skills）",
-  "ext.skills.newScopeProject": "プロジェクト（アクティブプロジェクトの .grok/skills）",
+  "ext.skills.newScopeProject": "プロジェクト（アクティブプロジェクトの .atlas/skills）",
   "ext.skills.newScopeProjectDisabled": "プロジェクト（先にプロジェクトを開く）",
   "ext.skills.newScopeProjectNeed": "プロジェクトスキルを作るには、先にプロジェクトを開いてください。",
   "ext.skills.newScopeHint": "ユーザースキルは現在の agent home（独立 GROK_HOME または ~/.atlas）に従います。プロジェクトスキルはリポジトリと一緒に配布されます。",

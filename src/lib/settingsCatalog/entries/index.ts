@@ -1,6 +1,7 @@
 import type { SettingsEntry } from "../types";
 import { ABOUT_ENTRIES } from "./about";
 import { ATLAS_ENTRIES } from "./atlas";
+import { WIKI_ENTRIES } from "./wiki";
 import { FLEET_ENTRIES } from "./fleet";
 import { ACCOUNT_ENTRIES } from "./account";
 import { APPEARANCE_ENTRIES } from "./appearance";
@@ -28,6 +29,7 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   ...RUNTIME_ENTRIES,
   ...RUNTIME_TOOLS_ENTRIES,
   ...ATLAS_ENTRIES,
+  ...WIKI_ENTRIES,
   ...FLEET_ENTRIES,
   ...REMOTE_IM_ENTRIES,
   ...SHORTCUTS_ENTRIES,

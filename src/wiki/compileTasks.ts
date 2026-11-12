@@ -26,32 +26,74 @@ export type WikiCompileTask = {
   written: string[];
   skipped: boolean;
   totalTokens: number | null;
+  /** When this compile was created. The kanban clock uses this. */
+  startedAt: number;
+  /** Last time the CLI process reported it was still running. */
+  pulseAt: number | null;
   atMs: number;
 };
 
 const MAX_TASKS = 40;
+const STORE_KEY = "__atlasWikiCompileTasks";
+const BOUND_KEY = "__atlasWikiCompileEventsBound";
 
-let tasks: WikiCompileTask[] = [];
-const listeners = new Set<() => void>();
+type Bucket = {
+  tasks: WikiCompileTask[];
+  listeners: Set<() => void>;
+};
+
+function bucket(): Bucket {
+  const g = globalThis as typeof globalThis & { [STORE_KEY]?: Bucket };
+  if (!g[STORE_KEY]) g[STORE_KEY] = { tasks: [], listeners: new Set() };
+  return g[STORE_KEY];
+}
 
 function emit(next: WikiCompileTask[]) {
-  tasks = next;
-  for (const listener of listeners) listener();
+  const box = bucket();
+  box.tasks = next;
+  for (const listener of box.listeners) listener();
 }
 
 function replace(id: string, next: WikiCompileTask) {
-  emit(tasks.map((task) => (task.id === id ? next : task)));
+  emit(bucket().tasks.map((task) => (task.id === id ? next : task)));
 }
 
 export function getWikiCompileTasks(): readonly WikiCompileTask[] {
-  return tasks;
+  return bucket().tasks;
 }
 
 export function subscribeWikiCompileTasks(listener: () => void): () => void {
-  listeners.add(listener);
+  const box = bucket();
+  box.listeners.add(listener);
   return () => {
-    listeners.delete(listener);
+    box.listeners.delete(listener);
   };
+}
+
+export function formatWikiElapsed(ms: number): string {
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(sec / 60);
+  const seconds = sec % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+/** Quiet only after the process has reported once and then gone silent. */
+export function wikiCompileActivity(task: WikiCompileTask, now: number): "live" | "quiet" {
+  if (task.status !== "running" || task.pulseAt == null) return "live";
+  return now - task.pulseAt > 8000 ? "quiet" : "live";
+}
+
+export function noteWikiCompilePulse(project: string, _elapsedMs: number) {
+  const key = project.trim();
+  if (!key) return;
+  const now = Date.now();
+  let changed = false;
+  const next = bucket().tasks.map((task) => {
+    if (task.status !== "running" || task.projectPath !== key) return task;
+    changed = true;
+    return { ...task, pulseAt: now, atMs: now };
+  });
+  if (changed) emit(next);
 }
 
 export function resetWikiCompileTasksForTests() {
@@ -78,6 +120,8 @@ export function createWikiCompileTask(input: {
     written: [],
     skipped: false,
     totalTokens: null,
+    startedAt: input.atMs ?? Date.now(),
+    pulseAt: null,
     atMs: input.atMs ?? Date.now(),
   };
 }
@@ -132,6 +176,22 @@ export function failWikiCompileTask(task: WikiCompileTask, err: unknown): WikiCo
   };
 }
 
+const WIKI_CLI_PULSE_EVENT = "wiki://cli-pulse";
+
+/** Listen once, on the shared store, so the kanban and the wiki page see the same pulses. */
+export function ensureWikiCompileEvents() {
+  const g = globalThis as typeof globalThis & { [BOUND_KEY]?: boolean };
+  if (g[BOUND_KEY]) return;
+  g[BOUND_KEY] = true;
+  void import("@/lib/api").then((api) => {
+    if (!api.isTauri()) return;
+    void api.listen<{ project?: string; elapsedMs?: number }>(WIKI_CLI_PULSE_EVENT, (payload) => {
+      if (!payload?.project) return;
+      noteWikiCompilePulse(payload.project, payload.elapsedMs ?? 0);
+    });
+  });
+}
+
 function trim(list: WikiCompileTask[]): WikiCompileTask[] {
   if (list.length <= MAX_TASKS) return list;
   const running = list.filter((task) => task.status === "running");
@@ -157,13 +217,15 @@ export function startWikiCompile(input: {
     }),
     "read",
   );
-  emit(trim([task, ...tasks]));
+  ensureWikiCompileEvents();
+  emit(trim([task, ...bucket().tasks]));
   return ingestWithAtlas(
     input.projectPath,
     input.sourcePath,
     input.modelId,
     (stage) => {
-      task = markWikiCompileStage(task, stage);
+      const current = getWikiCompileTasks().find((item) => item.id === id) ?? task;
+      task = markWikiCompileStage(current, stage);
       replace(id, task);
     },
     input.force,

@@ -10,12 +10,12 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | Shell | `src/components/SettingsPage.tsx` | 左栏 + 搜索命中列表 + 分 section 内容 |
 | 路由 | `App.tsx` hash | `#/settings/{section}[/{tab}]` |
 
-## 一级导航（11 项，禁止双登记）
+## 一级导航（12 项，禁止双登记）
 
 个人：`general` · `appearance` · `account` · `archived` · `pet`（展示名「宠物」）  
-系统：`extensions` · `runtime` · `atlas` · `remote_im`（展示名「远程控制」）· `shortcuts` · `about`
+系统：`extensions` · `runtime` · `atlas` · `wiki`（展示名「知识库配置」）· `remote_im`（展示名「远程控制」）· `shortcuts` · `about`
 
-本次进程带 `--show-remote` 时，侧栏「连接设备」和设置「远程控制」一起显示。不带这个参数时两处都隐藏：左栏、搜索命中没有这一节，直接打开 `#/settings/remote_im` 回到常规设置。目录注册表仍保留 `remote_im`，只按本次启动结果过滤，不写入设置。
+机群、个人知识库、远程控制是否出现，由 atlas-server `GET /atlas/v1/feature-mask` 的十进制控制码决定。从右往左：位 0（1）机群，位 1（2）个人知识库，位 2（4）远程控制。为 1 才显示侧栏入口、对应页面和设置节；搜索命中同样滤掉。直接打开被关掉的 `#/fleet`、`#/wiki` 或 `#/settings/remote_im`、`#/settings/wiki` 时回到工作台或常规设置。接口失败、未登录或结果还没回来都按 0。不写入设置。目录注册表仍保留这些节。`--show-remote` 不再决定远程控制是否可见。
 
 **不要**再往 `SETTINGS_NAV` 塞重复 `runtime`。
 
@@ -23,12 +23,13 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 
 | Section | Tabs |
 |---------|------|
-| general | `composer` · `permissions` · `agent`（含 experimental memory、memory browser、**memory embedding 0.2.117**、**个人知识库目录**） · `app` |
+| general | `composer` · `permissions` · `agent`（含 experimental memory、memory browser、**memory embedding 0.2.117**） · `app` |
 | appearance | `theme`（主题：浅深色 / 皮肤 / 背景 / 文字色与阴影）· `interface`（界面：聊天展示，含默认浏览器 / 打开链接前确认） |
 | account | `official` · `providers` · `extras`（「拓展」：官方工具注入开关） |
 | extensions | `plugins`（含 Discover **+** 本地路径安装 `settings-anchor-ext-plugins-install`）· `mcp` · `skills`（含 **探测 Claude/Cursor 技能** 开关，`#/settings/extensions/skills` → `settings-anchor-ext-skills-discover`）· `rules`（Cursor 式规则编辑，写 CLI 真实文件）· `commands`（斜杠命令 markdown）· `agents` · `hooks`（**无** `market` / `apps`；`#/settings/extensions/market` → `plugins` 可安装目录锚点） |
 | runtime | `cli` · `connection` · `ssh` · `network` · `pool` · `tools` · `privacy` |
 | atlas | 无 tab（Relay 执行端 + 云端站点） |
+| wiki | 无 tab（知识库目录、Agent 默认、编译轮次） |
 | remote_im（远程控制） | `im`（IM 通信）· `mirror`（手机镜像） |
 | pet | `look`（外观设置：顶栏开关+尺寸，左侧预览，右侧形体/表情/颜色/眼睛）· `bubbles`（气泡设置：提示框、进度条、自动关闭、形状/背景） |
 | 其余 | 无 tab（单页） |
@@ -45,6 +46,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 #/settings/runtime/tools?pr=42      → 诊断 · PR hub（可选高亮 PR #42；ship 成功「在 PR 中心打开」）
 #/settings/runtime/privacy          → CLI · 隐私中心
 #/settings/atlas                     → Atlas（Relay + 云端站点）
+#/settings/wiki                      → 知识库配置（目录、Agent 默认、编译模型、编译轮次、编译记录）
 #/settings/account/providers        → 自定义提供商
 #/settings/account/extras           → 拓展（官方工具注入 / 扩展 MCP）
 #/settings/remote_im                → 远程控制 · IM 通信

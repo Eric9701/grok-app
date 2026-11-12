@@ -77,6 +77,7 @@ export const zhSettingsUi = {
   "settings.nav.extensions": "扩展",
   "settings.nav.runtime": "CLI / 运行时",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "知识库配置",
   "settings.nav.shortcuts": "键盘",
   "settings.nav.about": "关于",
   "settings.tab.composer": "对话偏好",

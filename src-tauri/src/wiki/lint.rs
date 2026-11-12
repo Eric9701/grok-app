@@ -38,6 +38,48 @@ pub fn list_raw(project: &Path) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+/// Directories under `raw/` and `wiki/`, including those two roots.
+/// Hidden names and symlinks are skipped, so empty template folders still show.
+pub fn list_dirs(project: &Path) -> Result<Vec<String>, String> {
+    let root = require_project(project)?;
+    let mut dirs = Vec::new();
+    for top in ["raw", "wiki"] {
+        let base = root.join(top);
+        if base.is_dir() && !is_link(&base) {
+            dirs.push(top.to_string());
+            collect_dirs(&base, top, &mut dirs)?;
+        }
+    }
+    dirs.sort();
+    Ok(dirs)
+}
+
+fn is_link(path: &Path) -> bool {
+    path.symlink_metadata()
+        .map(|meta| meta.file_type().is_symlink())
+        .unwrap_or(false)
+}
+
+fn collect_dirs(dir: &Path, prefix: &str, out: &mut Vec<String>) -> Result<(), String> {
+    let entries = fs::read_dir(dir).map_err(|e| format!("wiki_io:{e}"))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("wiki_io:{e}"))?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with('.') || name.contains('/') || name.contains('\\') {
+            continue;
+        }
+        let path = entry.path();
+        if is_link(&path) || !path.is_dir() {
+            continue;
+        }
+        let rel = format!("{prefix}/{name}");
+        out.push(rel.clone());
+        collect_dirs(&path, &rel, out)?;
+    }
+    Ok(())
+}
+
 pub fn list_pages(project: &Path) -> Result<Vec<String>, String> {
     let root = require_project(project)?;
     let wiki = root.join("wiki");

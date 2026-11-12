@@ -42,8 +42,9 @@ pub(super) enum StallTickAction {
     },
 }
 
-/// Strip bulky MCP/RPC dumps so chat errors stay human-readable.
+/// Drop stderr tails so the stored error is the provider exception, not an MCP dump.
 /// Full stderr is still logged via `tracing` on the ACP client side.
+/// The chat pill shows a short summary; this text is what “original error” expands.
 pub(super) fn sanitize_error_detail(raw: &str) -> String {
     let mut s = raw.trim().to_string();
     if s.is_empty() {
@@ -82,13 +83,11 @@ pub(super) fn sanitize_error_detail(raw: &str) -> String {
     if lower.contains("rpc channel closed") {
         return "agent_disconnected".into();
     }
-    // Cap leftover technical lines.
-    if s.len() > 160 {
-        let mut end = 160;
-        while end > 0 && !s.is_char_boundary(end) {
-            end -= 1;
-        }
-        return format!("{}…", &s[..end]);
+    // Cap the expandable original. The summary stays a short deck line.
+    const MAX_ERROR_DETAIL_CHARS: usize = 4000;
+    if s.chars().count() > MAX_ERROR_DETAIL_CHARS {
+        let truncated: String = s.chars().take(MAX_ERROR_DETAIL_CHARS).collect();
+        return format!("{truncated}…");
     }
     s
 }
@@ -2161,6 +2160,42 @@ mod background_tool_journal_lock_tests {
         assert_eq!(*background.lock().get("bg-sid").unwrap(), 2);
 
         *TOOL_JOURNAL_PERSIST_TEST_HOOK.lock() = None;
+    }
+}
+
+#[cfg(test)]
+mod sanitize_error_detail_tests {
+    use super::sanitize_error_detail;
+
+    #[test]
+    fn drops_stderr_and_keeps_the_provider_exception() {
+        let raw = "API error (status 400): Incorrect API key provided; stderr: worker quit";
+        assert_eq!(
+            sanitize_error_detail(raw),
+            "API error (status 400): Incorrect API key provided"
+        );
+    }
+
+    #[test]
+    fn keeps_exceptions_past_the_old_bubble_cap() {
+        let body = "x".repeat(500);
+        assert_eq!(sanitize_error_detail(&body).len(), 500);
+    }
+
+    #[test]
+    fn caps_very_long_exceptions() {
+        let body = "y".repeat(5000);
+        let out = sanitize_error_detail(&body);
+        assert!(out.ends_with('…'));
+        assert_eq!(out.chars().count(), 4001);
+    }
+
+    #[test]
+    fn still_collapses_prompt_timeout() {
+        assert_eq!(
+            sanitize_error_detail("rpc timeout on session/prompt after 600s; stderr: boom"),
+            "turn_timeout"
+        );
     }
 }
 

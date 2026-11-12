@@ -35,7 +35,7 @@ import {
   IconWorld,
 } from "@/components/icons";
 import { createT } from "@/i18n";
-import { useRemoteChromeVisible } from "@/lib/api/launchChrome";
+import { useFeatureMask } from "@/lib/featureMask";
 import {
   isDesktopHost,
   type AccountStatus,
@@ -213,7 +213,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
     onSwitchAccount,
     onUserMenuOpened,
   } = props;
-  const remoteChromeVisible = useRemoteChromeVisible().visible;
+  const featureMask = useFeatureMask();
 
   const providerSupportsBalance =
     !!activeCustomProvider &&
@@ -416,6 +416,7 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
             </span>
             {tr("sidebar.kanban")}
           </button>
+          {featureMask.fleet ? (
           <button
             type="button"
             className={
@@ -428,6 +429,8 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
             </span>
             {tr("fleet.nav")}
           </button>
+          ) : null}
+          {featureMask.wiki ? (
           <button
             type="button"
             className={
@@ -443,7 +446,8 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
             </span>
             {tr("wiki.nav")}
           </button>
-          {isDesktopHost() && remoteChromeVisible ? (
+          ) : null}
+          {isDesktopHost() && featureMask.remote ? (
             <button
               type="button"
               className="nav-item"

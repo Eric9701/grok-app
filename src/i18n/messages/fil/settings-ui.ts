@@ -77,6 +77,7 @@ export const filSettingsUi = {
   "settings.nav.extensions": "Mga extension",
   "settings.nav.runtime": "CLI / Runtime",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "Keyboard",
   "settings.nav.about": "Tungkol",
   "settings.tab.composer": "Composer",

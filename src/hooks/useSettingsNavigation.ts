@@ -30,6 +30,7 @@ import {
   resolveOpenSettingsLocation,
   saveSettingsLastRoute,
 } from "@/lib/settingsLastRoute";
+import { useFeatureMask } from "@/lib/featureMask";
 import {
   resolveWorkbenchHash,
   type WorkbenchHashPane,
@@ -76,6 +77,7 @@ export function useSettingsNavigation(opts: {
     () => buildSettingsLabels(opts.tr),
     [opts.tr],
   );
+  const featureMask = useFeatureMask();
 
   const navigateSettings = useCallback(
     (section?: SettingsSectionId | null, tab?: string | null) => {
@@ -117,6 +119,24 @@ export function useSettingsNavigation(opts: {
     if (typeof window === "undefined") return;
     const syncFromHash = () => {
       const route = resolveWorkbenchHash(window.location.hash || "");
+      if (route.kind === "pane" && route.pane === "fleet" && !featureMask.fleet) {
+        window.location.hash = "#/workbench";
+        optsRef.current.onWorkbenchPane("chat");
+        return;
+      }
+      if (route.kind === "pane" && route.pane === "wiki" && !featureMask.wiki) {
+        window.location.hash = "#/workbench";
+        optsRef.current.onWorkbenchPane("chat");
+        return;
+      }
+      if (
+        route.kind === "settings-explicit" &&
+        ((route.section === "wiki" && !featureMask.wiki) ||
+          (route.section === "remote_im" && !featureMask.remote))
+      ) {
+        window.location.hash = "#/settings/general";
+        return;
+      }
       if (route.kind === "settings-explicit") {
         ensureSettingsNativeCover();
         optsRef.current.onMenuClose();
@@ -155,7 +175,12 @@ export function useSettingsNavigation(opts: {
     syncFromHash();
     window.addEventListener("hashchange", syncFromHash);
     return () => window.removeEventListener("hashchange", syncFromHash);
-  }, [ensureSettingsNativeCover]);
+  }, [
+    ensureSettingsNativeCover,
+    featureMask.fleet,
+    featureMask.wiki,
+    featureMask.remote,
+  ]);
 
   useEffect(() => {
     let stop: (() => void) | undefined;

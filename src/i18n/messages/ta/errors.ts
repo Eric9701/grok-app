@@ -2,6 +2,8 @@
 export const taErrors = {
   "error.details": "விவரங்கள்",
   "error.hideDetails": "விவரங்களை மறை",
+  "error.viewOriginal": "அசல் பிழை",
+  "error.hideOriginal": "அசல் பிழையை மறை",
   "error.action.reconnect": "மீண்டும் இணை",
   "error.action.retry": "மீண்டும் முயல்",
   "error.action.openDoctor": "Doctor ஐத் திற",

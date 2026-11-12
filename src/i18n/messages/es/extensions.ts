@@ -381,7 +381,7 @@ export const esExtensions = {
   "ext.skills.newDescriptionHint": "Se escribe en el frontmatter de SKILL.md. Puedes editar el cuerpo completo tras crear.",
   "ext.skills.newScope": "Ubicación",
   "ext.skills.newScopeUser": "Usuario (GROK_HOME /skills con ámbito de ruta)",
-  "ext.skills.newScopeProject": "Proyecto (.grok/skills del proyecto activo)",
+  "ext.skills.newScopeProject": "Proyecto (.atlas/skills del proyecto activo)",
   "ext.skills.newScopeProjectDisabled": "Proyecto (abre primero un proyecto)",
   "ext.skills.newScopeProjectNeed": "Abre un proyecto para crear una skill de proyecto.",
   "ext.skills.newScopeHint": "Las skills de usuario siguen el agent home activo (GROK_HOME independiente o ~/.atlas). Las skills de proyecto viajan con el repo.",

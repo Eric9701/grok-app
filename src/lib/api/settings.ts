@@ -89,6 +89,10 @@ export interface AppSettings {
   sshWatchAliases?: string[] | null;
   /** Personal knowledge-base directories. One may be the agent default. */
   wikiLibraries?: WikiLibraryRecord[] | null;
+  /** Turns for one knowledge-base compile step. 1–20; other values become 6. */
+  wikiCompileMaxTurns?: number | null;
+  /** Model id for knowledge-base compile. Empty uses the app model. */
+  wikiCompileModelId?: string | null;
   /** Max warm/live agent processes (default 3). */
   maxConcurrentAgents?: number;
   /** Recycle idle agent processes after N minutes (default 30). */

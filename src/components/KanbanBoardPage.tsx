@@ -21,8 +21,11 @@ import { useAtlasRelayStatus } from "@/hooks/useAtlasRelayStatus";
 import { RelayTaskTracePanel } from "@/components/RelayTaskTracePanel";
 import { formatWikiNotice } from "@/wiki/errors";
 import {
+  ensureWikiCompileEvents,
+  formatWikiElapsed,
   getWikiCompileTasks,
   subscribeWikiCompileTasks,
+  wikiCompileActivity,
   type WikiCompileStage,
 } from "@/wiki/compileTasks";
 import { WikiCompileTracePanel } from "@/wiki/WikiCompileTracePanel";
@@ -207,6 +210,16 @@ export function KanbanBoardPage({
     getWikiCompileTasks,
     getWikiCompileTasks,
   );
+  const wikiRunning = wikiTasks.some((task) => task.status === "running");
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    ensureWikiCompileEvents();
+  }, []);
+  useEffect(() => {
+    if (!wikiRunning) return;
+    const id = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [wikiRunning]);
   const [relayTrace, setRelayTrace] = useState<{
     agentId: string;
     taskId: string;
@@ -235,16 +248,24 @@ export function KanbanBoardPage({
         ),
         wikiTasks.map((task) => {
           const step = task.steps.find((item) => item.status === "in_progress");
+          const fileName = task.sourcePath.split("/").pop() || task.sourcePath;
+          const stage = step ? tr(WIKI_STAGE_KEY[step.id]) : "";
+          const progress =
+            task.status === "failed"
+              ? formatWikiNotice(tr, task.error, task.sourcePath)
+              : task.status === "running" && stage
+                ? wikiCompileActivity(task, clock) === "quiet"
+                  ? tr("wiki.compilingQuiet")
+                  : tr("wiki.compilingLive", {
+                      stage,
+                      time: formatWikiElapsed(clock - task.startedAt),
+                    })
+                : null;
           return {
             id: task.id,
-            title: task.sourcePath,
+            title: fileName,
             status: task.status,
-            progress:
-              task.status === "failed"
-                ? formatWikiNotice(tr, task.error, task.sourcePath)
-                : task.status === "running" && step
-                  ? tr(WIKI_STAGE_KEY[step.id])
-                  : null,
+            progress,
             atMs: task.atMs,
             projectName: task.projectName,
             projectPath: task.projectPath,
@@ -266,6 +287,7 @@ export function KanbanBoardPage({
       recentDoneAt,
       relayTasks,
       wikiTasks,
+      clock,
       tr,
     ],
   );

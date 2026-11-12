@@ -10,6 +10,17 @@ use std::time::Duration;
 use serde::Serialize;
 use serde_json::Value;
 
+/// Emitted after the Atlas CLI process is running, before it returns.
+pub const WIKI_CLI_STARTED_EVENT: &str = "wiki://cli-started";
+pub const WIKI_CLI_PULSE_EVENT: &str = "wiki://cli-pulse";
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WikiCliPulse {
+    pub project: String,
+    pub elapsed_ms: u64,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct WikiUsage {
@@ -34,11 +45,20 @@ pub fn resolve_model_id(settings_model: Option<&str>, config_text: &str) -> Resu
         .ok_or_else(|| "wiki_model_missing".to_string())
 }
 
+/// Compile turns outside 1–20 become the default of 6.
+pub fn clamp_wiki_compile_turns(raw: u32) -> u32 {
+    if (1..=20).contains(&raw) {
+        raw
+    } else {
+        6
+    }
+}
+
 /// Argument list for a text-only compile. No config path and no `--always-approve`.
 ///
 /// `--max-turns 1` treats reasoning as the whole turn and returns no reply.
 /// Tools stay disallowed so the child cannot wait on an approval prompt.
-pub fn headless_args(model_id: &str, prompt_file: &str) -> Vec<String> {
+pub fn headless_args(model_id: &str, prompt_file: &str, max_turns: u32) -> Vec<String> {
     vec![
         "--no-auto-update".into(),
         "--prompt-file".into(),
@@ -46,11 +66,12 @@ pub fn headless_args(model_id: &str, prompt_file: &str) -> Vec<String> {
         "-m".into(),
         model_id.to_string(),
         "--max-turns".into(),
-        "2".into(),
+        clamp_wiki_compile_turns(max_turns).to_string(),
+        "--no-plan".into(),
         "--no-subagents".into(),
         "--disable-web-search".into(),
         "--disallowed-tools".into(),
-        "run_terminal_cmd,run_terminal_command,web_search,web_fetch,search_replace,write,Agent,spawn_subagent,bash,bash_tool".into(),
+        "run_terminal_cmd,run_terminal_command,web_search,web_fetch,search_replace,write,edit,read_file,Read,grep,glob,list_dir,search_tool,NotebookRead,Agent,spawn_subagent,bash,bash_tool".into(),
         "--output-format".into(),
         "json".into(),
     ]
@@ -213,6 +234,9 @@ pub fn run(
     prompt: &str,
     cwd: &Path,
     timeout: Duration,
+    max_turns: u32,
+    on_started: impl FnOnce(),
+    on_pulse: impl Fn(u64),
 ) -> Result<ParsedComplete, String> {
     if model_id.trim().is_empty() {
         return Err("wiki_model_missing".into());
@@ -222,7 +246,11 @@ pub fn run(
     }
     let prompt_file = PromptFile::create(prompt)?;
     let mut cmd = Command::new(cli);
-    cmd.args(headless_args(model_id, &prompt_file.path.display().to_string()));
+    cmd.args(headless_args(
+        model_id,
+        &prompt_file.path.display().to_string(),
+        max_turns,
+    ));
     cmd.env("GROK_HOME", grok_home);
     cmd.current_dir(cwd);
     crate::process_util::apply_no_window_std(&mut cmd);
@@ -232,12 +260,14 @@ pub fn run(
     crate::proxy::apply_to_std_command(&mut cmd);
 
     let started = std::time::Instant::now();
+    let mut next_pulse = Duration::from_secs(2);
     let mut child = cmd
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("wiki_complete_spawn:{e}"))?;
+    on_started();
     loop {
         match child.try_wait() {
             Ok(Some(_)) => break,
@@ -246,7 +276,13 @@ pub fn run(
                 let _ = child.wait();
                 return Err("wiki_complete_timeout".into());
             }
-            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+            Ok(None) => {
+                if started.elapsed() >= next_pulse {
+                    on_pulse(started.elapsed().as_millis() as u64);
+                    next_pulse += Duration::from_secs(2);
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
             Err(e) => return Err(format!("wiki_complete_spawn:{e}")),
         }
     }
@@ -255,12 +291,29 @@ pub fn run(
         .map_err(|e| format!("wiki_complete_spawn:{e}"))?;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let parsed = parse_complete_output(&stdout);
-    if is_model_rejection(&parsed.text) || is_model_rejection(&stderr) {
+    finish_complete(output.status.success(), &stdout, &stderr, model_id)
+}
+
+/// Keep a page draft when the process stops on the turn cap after already
+/// printing FILE blocks. A cap with no pages is `wiki_turn_cap`.
+pub fn finish_complete(
+    status_ok: bool,
+    stdout: &str,
+    stderr: &str,
+    model_id: &str,
+) -> Result<ParsedComplete, String> {
+    let parsed = parse_complete_output(stdout);
+    if is_model_rejection(&parsed.text) || is_model_rejection(stderr) {
         return Err(format!("wiki_model_unknown:{model_id}"));
     }
-    if !output.status.success() {
-        let preview = failure_preview(&parsed.text, &stderr);
+    if parsed.text.contains("---FILE:") {
+        return Ok(parsed);
+    }
+    if is_turn_cap(&parsed.text) || is_turn_cap(stderr) {
+        return Err("wiki_turn_cap".into());
+    }
+    if !status_ok {
+        let preview = failure_preview(&parsed.text, stderr);
         return Err(format!("wiki_complete_failed:{preview}"));
     }
     if parsed.text.trim().is_empty() {
@@ -268,6 +321,10 @@ pub fn run(
         return Err(format!("wiki_complete_empty:{preview}"));
     }
     Ok(parsed)
+}
+
+fn is_turn_cap(text: &str) -> bool {
+    text.to_ascii_lowercase().contains("max turns reached")
 }
 
 /// Prompt body stays off the command line. Windows rejects argv past 32 KB.
@@ -383,6 +440,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn cli_started_event_is_the_page_notice() {
+        assert_eq!(WIKI_CLI_STARTED_EVENT, "wiki://cli-started");
+        assert_eq!(WIKI_CLI_PULSE_EVENT, "wiki://cli-pulse");
+    }
+
+    #[test]
+    fn turn_cap_keeps_file_blocks_and_rejects_an_empty_stop() {
+        let kept = finish_complete(
+            false,
+            "---FILE: wiki/a.md---\nbody\n---END FILE---\nError: max turns reached",
+            "Error: max turns reached",
+            "arch-minimax",
+        )
+        .unwrap();
+        assert!(kept.text.contains("wiki/a.md"));
+        assert_eq!(
+            finish_complete(false, "Error: max turns reached", "", "arch-minimax").unwrap_err(),
+            "wiki_turn_cap"
+        );
+    }
+
+    #[test]
     fn json_output_keeps_the_reply_and_the_token_counts() {
         let parsed = parse_complete_output(
             r#"{"result":"---FILE: wiki/a.md---\nbody\n---END FILE---","usage":{"input_tokens":12,"output_tokens":8,"total_tokens":20}}"#,
@@ -398,7 +477,7 @@ mod tests {
     fn long_prompt_goes_to_a_file_instead_of_the_command_line() {
         let body = "知识库".repeat(40_000);
         let file = PromptFile::create(&body).unwrap();
-        let args = headless_args("arch-minimax", &file.path.display().to_string());
+        let args = headless_args("arch-minimax", &file.path.display().to_string(), 6);
         assert!(args.windows(2).any(|pair| {
             pair[0] == "--prompt-file" && pair[1] == file.path.display().to_string()
         }));

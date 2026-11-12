@@ -121,6 +121,19 @@ describe("wiki engine", () => {
       },
     });
     expect(result.written).toEqual(["wiki/concepts/pump.md"]);
+    const aggregate = vi.mocked(bound.writePages).mock.calls[1];
+    expect(aggregate?.[0]).toBe("/proj");
+    expect(aggregate?.[2]).toBe(true);
+    const files = aggregate?.[1] as Array<{ path: string; content: string }>;
+    expect(files.map((file) => file.path)).toEqual([
+      "wiki/index.md",
+      "wiki/overview.md",
+      "wiki/log.md",
+    ]);
+    expect(files[0]?.content).toContain("- [[concepts/pump]] — 水泵");
+    expect(files[1]?.content).toContain("<!-- llm-wiki:recent-start -->");
+    expect(files[1]?.content).toContain("- [[concepts/pump]] — 水泵");
+    expect(files[2]?.content).toContain("ingest | raw/sources/note.md");
     expect(result.usage).toBeNull();
     expect(bound.cachePut).toHaveBeenCalledWith("/proj", "raw/sources/note.md", "abc");
     expect(buildAnalysisPrompt({

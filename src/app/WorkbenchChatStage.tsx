@@ -502,8 +502,8 @@ export function WorkbenchChatStage(p: WorkbenchChatStageProps) {
                     onClick={() => setErrorDetailOpen((v: boolean) => !v)}
                   >
                     {errorDetailOpen
-                      ? tr("error.hideDetails")
-                      : tr("error.details")}
+                      ? tr("error.hideOriginal")
+                      : tr("error.viewOriginal")}
                   </button>
                 ) : null}
               </div>

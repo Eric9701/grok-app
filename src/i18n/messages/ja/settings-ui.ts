@@ -77,6 +77,7 @@ export const jaSettingsUi = {
   "settings.nav.extensions": "拡張機能",
   "settings.nav.runtime": "CLI / ランタイム",
   "settings.nav.atlas": "Atlas",
+  "settings.nav.wiki": "Knowledge base",
   "settings.nav.shortcuts": "キーボード",
   "settings.nav.about": "情報",
   "settings.tab.composer": "コンポーザー",

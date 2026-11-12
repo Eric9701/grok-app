@@ -2,6 +2,8 @@
 export const deErrors = {
   "error.details": "Details",
   "error.hideDetails": "Details ausblenden",
+  "error.viewOriginal": "Ursprünglicher Fehler",
+  "error.hideOriginal": "Ursprünglichen Fehler ausblenden",
   "error.action.reconnect": "Neu verbinden",
   "error.action.retry": "Wiederholen",
   "error.action.openDoctor": "Doctor öffnen",

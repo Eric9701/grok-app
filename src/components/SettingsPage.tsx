@@ -55,7 +55,7 @@ import {
   loadUiFontFamily,
   saveUiFontFamily,
 } from "@/lib/uiFontPref";
-import { useRemoteChromeVisible } from "@/lib/api/launchChrome";
+import { useFeatureMask } from "@/lib/featureMask";
 import {
   DEFAULT_TERMINAL_FONT_SIZE,
   loadTerminalFontFamily,
@@ -219,6 +219,7 @@ import { ExtensionsSection } from "@/components/settings/ExtensionsSection";
 import { RemoteImSection } from "@/components/settings/RemoteImSection";
 import { RuntimeSection } from "@/components/settings/RuntimeSection";
 import { AtlasSection } from "@/components/settings/AtlasSection";
+import { WikiSection } from "@/components/settings/WikiSection";
 import { FleetListenCard } from "@/fleet/FleetListenCard";
 import { ShortcutsSection } from "@/components/settings/ShortcutsSection";
 import { AboutSection } from "@/components/settings/AboutSection";
@@ -1047,8 +1048,9 @@ export function SettingsPage({
   const activeTab = localTab ?? tabFromProps;
   const sectionNav = useMemo(() => getNavDef(section), [section]);
 
-  const remoteChrome = useRemoteChromeVisible();
-  const remoteChromeVisible = remoteChrome.visible;
+  const featureMask = useFeatureMask();
+  const remoteChromeVisible = featureMask.remote;
+  const wikiChromeVisible = featureMask.wiki;
 
   const navigateTo = useCallback(
     (
@@ -1089,9 +1091,9 @@ export function SettingsPage({
   );
 
   useEffect(() => {
-    if (!remoteChrome.ready || remoteChromeVisible || section !== "remote_im") return;
-    navigateTo("general");
-  }, [remoteChrome.ready, remoteChromeVisible, section, navigateTo]);
+    if (section === "remote_im" && !remoteChromeVisible) navigateTo("general");
+    if (section === "wiki" && !wikiChromeVisible) navigateTo("general");
+  }, [remoteChromeVisible, wikiChromeVisible, section, navigateTo]);
 
   const openSection = useCallback(
     (id: SettingsSectionId) => {
@@ -1154,9 +1156,12 @@ export function SettingsPage({
           (k) => tEn(k),
         )
       : [];
-    if (remoteChromeVisible) return hits;
-    return hits.filter((hit) => hit.entry.section !== "remote_im");
-  }, [trimmedQuery, t, tEn, remoteChromeVisible]);
+    return hits.filter((hit) => {
+      if (!remoteChromeVisible && hit.entry.section === "remote_im") return false;
+      if (!wikiChromeVisible && hit.entry.section === "wiki") return false;
+      return true;
+    });
+  }, [trimmedQuery, t, tEn, remoteChromeVisible, wikiChromeVisible]);
 
   const hitSections = useMemo(() => {
     if (!trimmedQuery) return null;
@@ -1164,12 +1169,14 @@ export function SettingsPage({
   }, [trimmedQuery, searchHits]);
 
   const nav = useMemo(() => {
-    const base = remoteChromeVisible
-      ? SETTINGS_NAV
-      : SETTINGS_NAV.filter((n) => n.id !== "remote_im");
+    const base = SETTINGS_NAV.filter((n) => {
+      if (!remoteChromeVisible && n.id === "remote_im") return false;
+      if (!wikiChromeVisible && n.id === "wiki") return false;
+      return true;
+    });
     if (!hitSections) return [...base];
     return base.filter((n) => hitSections.has(n.id));
-  }, [hitSections, remoteChromeVisible]);
+  }, [hitSections, remoteChromeVisible, wikiChromeVisible]);
 
   const personalNav = useMemo(
     () => nav.filter((n) => n.group === "personal"),
@@ -1998,6 +2005,7 @@ export function SettingsPage({
             <FleetListenCard />
           </>
         )}
+        {section === "wiki" && wikiChromeVisible && <WikiSection />}
         {section === "shortcuts" && <ShortcutsSection />}
         {section === "about" && <AboutSection />}
       </main>

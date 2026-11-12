@@ -32,6 +32,12 @@ describe("pathSuggestsSkillCatalogChange", () => {
     expect(
       pathSuggestsSkillCatalogChange("/Users/me/.grok/skills/new-skill"),
     ).toBe(true);
+    expect(
+      pathSuggestsSkillCatalogChange("/Users/me/.atlas/skills/new-skill"),
+    ).toBe(true);
+    expect(
+      pathSuggestsSkillCatalogChange("/repo/.atlas/skills/local"),
+    ).toBe(true);
   });
 
   it("matches plugin install trees", () => {

@@ -330,12 +330,22 @@ export function mergeWikiTasksIntoKanban(
     touched.add(card.kanbanColumn);
   }
   for (const col of touched) {
-    out[col].sort((a, b) => {
-      if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
-      return b.lastActivityAt - a.lastActivityAt;
-    });
+    out[col].sort(compareKanbanCards);
   }
   return out;
+}
+
+function compareKanbanCards(a: AgentKanbanCard, b: AgentKanbanCard): number {
+  const rank = kanbanCardRank(a) - kanbanCardRank(b);
+  if (rank !== 0) return rank;
+  return b.lastActivityAt - a.lastActivityAt;
+}
+
+/** A running knowledge compile stays above the current chat. */
+function kanbanCardRank(card: AgentKanbanCard): number {
+  if (card.source === "wiki" && card.status === "busy") return 0;
+  if (card.isCurrent) return 1;
+  return 2;
 }
 
 /** Append cloud prompts beside session cards. Does not write sessions. */

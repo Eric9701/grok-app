@@ -14,6 +14,7 @@ See `docs/llm-wiki/release.md`.
 ## [Unreleased]
 
 ### Added
+- Chat errors can be expanded to show the original exception.
 - WeCom can receive a file or image in chat and hand it to the agent with the next message.
 - WeCom can send a PNG, JPEG, or GIF from the agent reply back to that chat.
 
@@ -22,6 +23,7 @@ See `docs/llm-wiki/release.md`.
 - WeCom group chats can switch projects with /p after mentioning the bot.
 
 **中文 · 新增**
+- 对话里的错误可以展开，查看服务返回的原始异常。
 - 企业微信可以接收文件或图片，并在下一条消息里交给 Agent。
 - 企业微信可以把 Agent 回复里的 PNG、JPEG 或 GIF 发回当前会话。
 

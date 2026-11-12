@@ -81,9 +81,9 @@ describe("buildSkillEditRoots", () => {
       projectPath: "/Users/me/Code/demo",
     });
     expect(roots).toEqual([
-      "/Users/me/.grok/skills",
+      "/Users/me/.atlas/skills",
       "/Users/me/Library/Application Support/com.grokapp.grok-app/agent-home/skills",
-      "/Users/me/Code/demo/.grok/skills",
+      "/Users/me/Code/demo/.atlas/skills",
     ]);
   });
 
@@ -91,11 +91,11 @@ describe("buildSkillEditRoots", () => {
     expect(buildSkillEditRoots({})).toEqual([]);
     const roots = buildSkillEditRoots({
       userHome: "/u",
-      agentHome: "/u/.grok", // would yield /u/.grok/skills
+      agentHome: "/u/.atlas", // would yield /u/.atlas/skills
       projectPath: null,
     });
-    // userHome → /u/.grok/skills, agentHome /u/.grok → /u/.grok/skills (deduped)
-    expect(roots).toEqual(["/u/.grok/skills"]);
+    // userHome → /u/.atlas/skills, agentHome /u/.atlas → /u/.atlas/skills (deduped)
+    expect(roots).toEqual(["/u/.atlas/skills"]);
   });
 });
 

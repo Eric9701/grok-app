@@ -397,30 +397,6 @@ export const GENERAL_ENTRIES: readonly SettingsEntry[] = [
   },
   // ── general / agent ──
   {
-    id: "general.wikiLibraries",
-    section: "general",
-    tab: "agent",
-    anchorId: "settings-anchor-wikiLibraries",
-    labelKey: "wiki.settingsTitle",
-    descKeys: [
-      "wiki.settingsDesc",
-      "wiki.addDirectory",
-      "wiki.agentDefault",
-      "wiki.makeDefault",
-      "settings.section.agent",
-    ],
-    keywords: [
-      "wiki",
-      "knowledge base",
-      "knowledge",
-      "agent default",
-      "个人知识库",
-      "個人知識庫",
-      "知识库目录",
-      "知識庫目錄",
-    ],
-  },
-  {
     id: "general.maxAgentTurns",
     section: "general",
     tab: "agent",

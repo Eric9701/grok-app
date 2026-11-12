@@ -1552,8 +1552,8 @@ impl SessionManager {
     /// the optimistic thinking bubble becomes a record without holding session locks
     /// across disk RMW / `app.emit`.
     ///
-    /// Content is intentionally short (code + compact reason). The UI maps codes to i18n copy
-    /// and must not dump raw RPC/MCP stderr into the chat bubble.
+    /// Content is the code plus the provider exception (stderr stripped, capped).
+    /// The UI maps the code to a short summary and can expand this original text.
     ///
     /// Stream payloads are pushed into `pending_emits` for emit after locks drop.
     pub(super) fn prepare_turn_error(

@@ -2,6 +2,8 @@
 export const jaErrors = {
   "error.details": "詳細",
   "error.hideDetails": "詳細を隠す",
+  "error.viewOriginal": "元のエラー",
+  "error.hideOriginal": "元のエラーを隠す",
   "error.action.reconnect": "再接続",
   "error.action.retry": "再試行",
   "error.action.openDoctor": "ドクターを開く",

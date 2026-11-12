@@ -381,7 +381,7 @@ export const zhTWExtensions = {
   "ext.skills.newDescriptionHint": "寫入 SKILL.md 前置中繼資料。建立後可繼續編輯正文。",
   "ext.skills.newScope": "位置",
   "ext.skills.newScopeUser": "使用者（路徑作用域 GROK_HOME /skills）",
-  "ext.skills.newScopeProject": "專案（目前專案 .grok/skills）",
+  "ext.skills.newScopeProject": "專案（目前專案 .atlas/skills）",
   "ext.skills.newScopeProjectDisabled": "專案（請先開啟專案）",
   "ext.skills.newScopeProjectNeed": "請先開啟專案以建立專案技能。",
   "ext.skills.newScopeHint": "使用者技能跟隨目前 agent home（獨立 GROK_HOME 或 ~/.atlas）。專案技能隨倉庫共用。",

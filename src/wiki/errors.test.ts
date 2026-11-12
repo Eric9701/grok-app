@@ -12,6 +12,7 @@ describe("formatWikiNotice", () => {
     );
     expect(formatWikiNotice(tr, new Error("wiki_no_pages"))).toBe("wiki.errNoPages");
     expect(formatWikiNotice(tr, "wiki_complete_timeout")).toBe("wiki.errTimeout");
+    expect(formatWikiNotice(tr, "wiki_turn_cap")).toBe("wiki.errTurns");
     expect(formatWikiNotice(tr, "wiki_complete_spawn:filename too long")).toBe(
       'wiki.errSpawn:{"detail":" filename too long"}',
     );

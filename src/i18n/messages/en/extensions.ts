@@ -382,7 +382,7 @@ export const enExtensions = {
   "ext.skills.newDescriptionHint": "Written into SKILL.md frontmatter. You can edit the full body after create.",
   "ext.skills.newScope": "Location",
   "ext.skills.newScopeUser": "User (path-scoped GROK_HOME /skills)",
-  "ext.skills.newScopeProject": "Project (.grok/skills in active project)",
+  "ext.skills.newScopeProject": "Project (.atlas/skills in active project)",
   "ext.skills.newScopeProjectDisabled": "Project (open a project first)",
   "ext.skills.newScopeProjectNeed": "Open a project to create a project skill.",
   "ext.skills.newScopeHint": "User skills follow the active agent home (independent GROK_HOME or ~/.atlas). Project skills ship with the repo.",

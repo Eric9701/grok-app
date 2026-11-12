@@ -2,6 +2,8 @@
 export const filErrors = {
   "error.details": "Mga detalye",
   "error.hideDetails": "Itago ang mga detalye",
+  "error.viewOriginal": "Orihinal na error",
+  "error.hideOriginal": "Itago ang orihinal na error",
   "error.action.reconnect": "Kumonekta ulit",
   "error.action.retry": "Subukan ulit",
   "error.action.openDoctor": "Buksan ang Doctor",

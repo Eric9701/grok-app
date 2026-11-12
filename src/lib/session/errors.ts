@@ -25,7 +25,8 @@ export function turnErrorRowId(messageId: string, partialId: string): string {
  * Convert in-flight thinking bubble into a persistent error row in the thread.
  * If no streaming assistant exists, append a new error message.
  *
- * Stores a friendly, locale-aware body (not raw RPC/MCP dumps).
+ * Stores a friendly, locale-aware body. The provider exception stays on
+ * `errorRaw` so the pill can reveal it without putting it in the summary.
  */
 export function applyTurnError(
   messages: ChatMessage[],
@@ -33,6 +34,8 @@ export function applyTurnError(
   locale: Locale = "en",
 ): ChatMessage[] {
   const content = formatTurnErrorBody(payload, locale);
+  const errorRaw = captureTurnErrorRaw(payload);
+  const rawPatch = errorRaw ? { errorRaw } : {};
   const mid = payload.messageId || "";
 
   let idx = mid ? messages.findIndex((m) => m.id === mid) : -1;
@@ -73,6 +76,7 @@ export function applyTurnError(
           content,
           streaming: false,
           isError: true,
+          ...rawPatch,
         };
       } else {
         next.push({
@@ -81,6 +85,7 @@ export function applyTurnError(
           content,
           streaming: false,
           isError: true,
+          ...rawPatch,
         });
       }
       return next.map((m, i) =>
@@ -94,6 +99,7 @@ export function applyTurnError(
       thought: undefined,
       streaming: false,
       isError: true,
+      ...rawPatch,
     };
     // Clear any other lingering streaming flags
     return next.map((m, i) =>
@@ -109,6 +115,7 @@ export function applyTurnError(
       content,
       streaming: false,
       isError: true,
+      ...rawPatch,
     },
   ];
 }
@@ -173,6 +180,45 @@ export function stripErrorNoise(text: string): string {
   if (stderrIdx >= 0) s = s.slice(0, stderrIdx).trim();
   // Collapse multi-line dumps to first useful line for classification.
   return s;
+}
+
+/** Host tags that replace the exception with a stable token. */
+const COLLAPSED_ERROR_TAGS = new Set(["turn_timeout", "agent_disconnected"]);
+
+/** Journal body: `**CODE**` plus the provider exception. */
+const JOURNAL_ERROR_RE = /^\*\*([A-Z0-9_]+)\*\*(?:\s*[\r\n]+([\s\S]*))?$/;
+
+const ORIGINAL_ERROR_MAX = 4000;
+
+/**
+ * Exception text behind a friendly deck line.
+ * Returns null when the raw text is empty, a collapsed tag, or already visible
+ * in `friendly` (so the pill does not offer a duplicate).
+ */
+export function turnErrorOriginalDetail(
+  raw: string | null | undefined,
+  friendly?: string | null,
+): string | null {
+  let text = stripErrorNoise(raw || "").trim();
+  if (!text) return null;
+  const md = text.match(JOURNAL_ERROR_RE);
+  if (md) text = (md[2] || "").trim();
+  if (!text || COLLAPSED_ERROR_TAGS.has(text)) return null;
+  if (text.length > ORIGINAL_ERROR_MAX) {
+    text = `${text.slice(0, ORIGINAL_ERROR_MAX)}…`;
+  }
+  const shown = (friendly || "").trim();
+  if (shown && (text === shown || shown.includes(text))) return null;
+  return text;
+}
+
+/** Provider exception to keep beside the friendly turn-error body. */
+export function captureTurnErrorRaw(
+  payload: Pick<TurnErrorPayload, "message" | "content">,
+): string | undefined {
+  const message = (payload.message || "").trim();
+  const content = (payload.content || "").trim();
+  return turnErrorOriginalDetail(message || content) ?? undefined;
 }
 
 /**
@@ -402,7 +448,11 @@ export function presentErrorBanner(
     const deck = buildErrorDeck(deckCode, locale);
     // Prefer refined deck code on the banner (AUTH_NO_CONTEXT etc.) when Host
     // only sent AUTH_FAILED — still keep raw host code out of the way.
-    return bannerFromDeck(deck, deckCode === "GENERIC" ? error.code : deckCode, null);
+    return bannerFromDeck(
+      deck,
+      deckCode === "GENERIC" ? error.code : deckCode,
+      turnErrorOriginalDetail(error.message, `${deck.problem}\n${deck.cause}`),
+    );
   }
   if (!localError?.trim()) return null;
 
@@ -421,7 +471,11 @@ export function presentErrorBanner(
       activeSource: opts?.activeSource,
     });
     const deck = buildErrorDeck(deckCode, locale);
-    return bannerFromDeck(deck, deckCode === "GENERIC" ? code : deckCode, null);
+    return bannerFromDeck(
+      deck,
+      deckCode === "GENERIC" ? code : deckCode,
+      turnErrorOriginalDetail(rest, `${deck.problem}\n${deck.cause}`),
+    );
   }
 
   const summary = formatTurnErrorBody(
@@ -437,7 +491,11 @@ export function presentErrorBanner(
         : "TURN_TIMEOUT",
       locale,
     );
-    return bannerFromDeck(deck, null, null);
+    return bannerFromDeck(
+      deck,
+      null,
+      turnErrorOriginalDetail(cleaned, `${deck.problem}\n${deck.cause}`),
+    );
   }
 
   // Classify free-form localError (trust / path / permission / MCP …).
@@ -448,7 +506,11 @@ export function presentErrorBanner(
   if (classified !== "GENERIC") {
     const deck = buildErrorDeck(classified, locale);
     if (isAuthDeckCode(classified)) {
-      return bannerFromDeck(deck, classified, null);
+      return bannerFromDeck(
+        deck,
+        classified,
+        turnErrorOriginalDetail(cleaned, `${deck.problem}\n${deck.cause}`),
+      );
     }
     const short =
       cleaned.length > 200 ? `${cleaned.slice(0, 200)}…` : cleaned;
@@ -456,7 +518,7 @@ export function presentErrorBanner(
       code: classified,
       summary: short,
       cause: deck.cause,
-      detail: null,
+      detail: turnErrorOriginalDetail(cleaned, `${short}\n${deck.cause}`),
       reconnectHint:
         deck.primary.id === "reconnect" || deck.secondary?.id === "reconnect",
       primary: deck.primary,
@@ -467,11 +529,13 @@ export function presentErrorBanner(
 
   // Unknown local UX strings — show as-is, soft dismiss.
   const deck = buildErrorDeck("GENERIC", locale);
+  const genericSummary =
+    cleaned.length > 200 ? `${cleaned.slice(0, 200)}…` : cleaned;
   return {
     code: null,
-    summary: cleaned.length > 200 ? `${cleaned.slice(0, 200)}…` : cleaned,
+    summary: genericSummary,
     cause: null,
-    detail: null,
+    detail: turnErrorOriginalDetail(cleaned, genericSummary),
     reconnectHint: false,
     primary: { id: "dismiss", label: deck.primary.label },
     secondary: null,

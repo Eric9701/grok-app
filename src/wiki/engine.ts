@@ -1,5 +1,14 @@
 /** Wiki ingest orchestration. The model is injected; this file never writes. */
 
+import {
+  buildIngestLog,
+  isAggregateWikiPath,
+  recentPageLines,
+  updateRecentIndex,
+  updateRecentOverview,
+  wikiDate,
+} from "./aggregates";
+
 export type WikiPage = {
   path: string;
   content: string;
@@ -147,13 +156,14 @@ export function buildGenerationPrompt(input: {
   analysis: string;
 }): string {
   return [
-    "Write wiki pages from the analysis. Reply with text only. Do not create or edit files.",
+    "Write wiki pages from the analysis. Reply with text only. Do not call tools. Do not create or edit files.",
     "The entire reply is one or more FILE blocks and nothing else. No introduction.",
     "Each page must use this exact fence:",
     "---FILE: wiki/concepts/example.md---",
     "page body",
     "---END FILE---",
     "Paths stay under wiki/ and end in .md.",
+    "Do not emit wiki/index.md, wiki/overview.md, or wiki/log.md.",
     "",
     "Schema:",
     input.schema || "(none)",
@@ -267,6 +277,7 @@ async function runIngest(args: {
     };
     pages = repairedPages;
   }
+  pages = pages.filter((page) => !isAggregateWikiPath(page.path));
   if (pages.length === 0) {
     const one = fallbackWikiPage(args.sourcePath, generated.text);
     if (one) pages = [one];
@@ -280,6 +291,7 @@ async function runIngest(args: {
   }
   args.onProgress?.("write");
   const written = await args.io.writePages(args.project, pages, args.force === true);
+  await writeAggregates(args, pages.filter((page) => written.includes(page.path)));
   const fallbackPath = `wiki/sources/${sourceStem(args.sourcePath)}.md`;
   if (!written.includes(fallbackPath)) {
     await args.io.remove?.(args.project, fallbackPath);
@@ -291,6 +303,36 @@ async function runIngest(args: {
     usage: addUsage(analysis.usage, generated.usage),
     modelId: generated.modelId || analysis.modelId || "",
   };
+}
+
+async function writeAggregates(
+  args: {
+    project: string;
+    sourcePath: string;
+    io: WikiIo;
+  },
+  pages: WikiPage[],
+): Promise<void> {
+  if (pages.length === 0) return;
+  const [index, overview, log] = await Promise.all([
+    readOptional(args.io, args.project, "wiki/index.md"),
+    readOptional(args.io, args.project, "wiki/overview.md"),
+    readOptional(args.io, args.project, "wiki/log.md"),
+  ]);
+  const lines = recentPageLines(index, pages);
+  const next: WikiPage[] = [
+    {
+      path: "wiki/log.md",
+      content: buildIngestLog(log, args.sourcePath, wikiDate()),
+    },
+  ];
+  if (lines.length > 0) {
+    next.unshift(
+      { path: "wiki/index.md", content: updateRecentIndex(index, lines) },
+      { path: "wiki/overview.md", content: updateRecentOverview(overview, lines) },
+    );
+  }
+  await args.io.writePages(args.project, next, true);
 }
 
 function completionOf(value: string | Completion): Completion {

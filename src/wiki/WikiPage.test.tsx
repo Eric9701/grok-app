@@ -2,7 +2,12 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { listeners } = vi.hoisted(() => ({
+  listeners: new Map<string, Array<(payload: string) => void>>(),
+}));
 import "@/test/jsdomStubs";
+import { resetWikiCompileTasksForTests } from "./compileTasks";
 import { WikiPage } from "./WikiPage";
 import { ingestWithAtlas } from "./host";
 
@@ -15,6 +20,13 @@ vi.mock("@/lib/api", () => ({
   })),
   wikiList: vi.fn(async () => ["wiki/concepts/pump.md"]),
   wikiListRaw: vi.fn(async () => ["raw/sources/note.md"]),
+  wikiListDirs: vi.fn(async () => ["raw", "raw/sources", "wiki", "wiki/concepts"]),
+  wikiImportFiles: vi.fn(async () => ["raw/sources/note.md"]),
+  wikiImportUrl: vi.fn(async () => "raw/sources/page.md"),
+  wikiRemoveRaw: vi.fn(async () => undefined),
+  wikiScaffold: vi.fn(async () => "E:/notes"),
+  pickAttachFiles: vi.fn(async () => []),
+  pickDirectory: vi.fn(async () => null),
   wikiFingerprint: vi.fn(async () => "new"),
   wikiCacheGet: vi.fn(async () => null),
   wikiLint: vi.fn(async () => ({
@@ -30,6 +42,12 @@ vi.mock("@/lib/api", () => ({
     models: [{ id: "grok-4.7", label: "Grok 4.7", source: "official" }],
     defaultModelId: "grok-4.7",
   })),
+  listen: vi.fn(async (event: string, handler: (payload: string) => void) => {
+    const list = listeners.get(event) ?? [];
+    list.push(handler);
+    listeners.set(event, list);
+    return () => {};
+  }),
   wikiUsageList: vi.fn(async () => [
     {
       at: "2026-11-09T02:00:00Z",
@@ -47,7 +65,10 @@ vi.mock("./host", () => ({
   ingestWithAtlas: vi.fn(async () => ({ skipped: true, written: [] })),
 }));
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  resetWikiCompileTasksForTests();
+});
 
 describe("WikiPage", () => {
   it("lists a page and opens it from the single knowledge rail", async () => {
@@ -56,15 +77,16 @@ describe("WikiPage", () => {
     fireEvent.click(page);
     expect(await screen.findByText("水泵")).toBeTruthy();
     expect(screen.getByText(/缺少 missing/)).toBeTruthy();
-    expect(screen.getAllByText(/20 token/).length).toBeGreaterThan(0);
-    expect(await screen.findByText("Grok 4.7")).toBeTruthy();
+    expect(screen.queryByText(/20 token/)).toBeNull();
+    expect(screen.queryByText("Grok 4.7")).toBeNull();
   });
 
   it("says the example source is missing instead of claiming there are no pages", async () => {
     vi.mocked(ingestWithAtlas).mockRejectedValueOnce("wiki_missing");
     render(<WikiPage locale="zh" />);
+    fireEvent.click(await screen.findByRole("button", { name: "原始资料" }));
     expect(await screen.findByText("sources/note.md")).toBeTruthy();
-    fireEvent.submit(screen.getByRole("button", { name: "编译" }).closest("form")!);
+    fireEvent.click(screen.getByRole("button", { name: "提取" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "找不到这篇原文：raw/sources/note.md",
     );
@@ -73,25 +95,60 @@ describe("WikiPage", () => {
 
   it("asks before compiling a source that is already recorded", async () => {
     const { wikiFingerprint, wikiCacheGet } = await import("@/lib/api");
-    vi.mocked(wikiFingerprint).mockResolvedValueOnce("abc");
-    vi.mocked(wikiCacheGet).mockResolvedValueOnce("abc");
-    render(<WikiPage locale="zh" />);
-    expect(await screen.findByText("sources/note.md")).toBeTruthy();
-    expect(await screen.findByText("Grok 4.7")).toBeTruthy();
-    vi.mocked(ingestWithAtlas).mockClear();
-    fireEvent.submit(screen.getByRole("button", { name: "编译" }).closest("form")!);
-    expect(await screen.findByRole("dialog")).toHaveTextContent("已经编译过");
-    expect(ingestWithAtlas).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "再次编译" }));
-    await waitFor(() => {
-      expect(ingestWithAtlas).toHaveBeenCalledWith(
-        "E:/notes",
-        "raw/sources/note.md",
-        "grok-4.7",
-        expect.any(Function),
-        true,
+    vi.mocked(wikiFingerprint).mockResolvedValue("abc");
+    vi.mocked(wikiCacheGet).mockResolvedValue("abc");
+    try {
+      render(<WikiPage locale="zh" />);
+      fireEvent.click(await screen.findByRole("button", { name: "原始资料" }));
+      expect(await screen.findByText("sources/note.md")).toBeTruthy();
+      vi.mocked(ingestWithAtlas).mockClear();
+      fireEvent.click(screen.getByRole("button", { name: "提取" }));
+      expect(await screen.findByRole("dialog")).toHaveTextContent("已经编译过");
+      expect(ingestWithAtlas).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "再次编译" }));
+      await waitFor(() => {
+        expect(ingestWithAtlas).toHaveBeenCalledWith(
+          "E:/notes",
+          "raw/sources/note.md",
+          "grok-4.7",
+          expect.any(Function),
+          true,
+        );
+      });
+    } finally {
+      vi.mocked(wikiFingerprint).mockResolvedValue("new");
+      vi.mocked(wikiCacheGet).mockResolvedValue(null);
+    }
+  });
+
+  it("says compilation has started after the Atlas CLI starts", async () => {
+    vi.mocked(ingestWithAtlas).mockImplementationOnce(() => new Promise(() => {}));
+    try {
+      const toast = vi.fn();
+      render(<WikiPage locale="zh" onToast={toast} />);
+      fireEvent.click(await screen.findByRole("button", { name: "原始资料" }));
+      expect(await screen.findByText("sources/note.md")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "提取" }));
+      expect(await screen.findByRole("button", { name: "正在编译…" })).toBeTruthy();
+      expect(await screen.findByRole("status")).toHaveTextContent(
+        /正在编译 · 读取原文 · \d+:\d{2}/,
       );
-    });
+      const notify = listeners.get("wiki://cli-started")?.at(-1);
+      expect(notify).toBeTypeOf("function");
+      notify!("E:/notes");
+      expect(screen.getByRole("status")).toHaveTextContent(/正在编译 · 读取原文 · \d+:\d{2}/);
+      expect(toast).toHaveBeenCalledWith("已经开始编译。");
+      notify!("E:/notes");
+      expect(toast).toHaveBeenCalledTimes(1);
+      notify!("E:/other");
+      expect(toast).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.mocked(ingestWithAtlas).mockReset();
+      vi.mocked(ingestWithAtlas).mockImplementation(async () => ({
+        skipped: true,
+        written: [],
+      }));
+    }
   });
 
   it("asks for a configured library when settings are empty", async () => {
