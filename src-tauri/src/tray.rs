@@ -54,12 +54,9 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
             s.title.clone()
         };
         let proj = project_name(&s.project_id);
-        let label = if proj.is_empty() {
-            title
-        } else {
-            // ChatGPT shows title + project subtitle; native menu uses " · "
-            format!("{title}  ·  {proj}")
-        };
+        // Native menus size to the longest row. Recent titles are often the
+        // raw first message, so cap the visible text.
+        let label = recent_menu_label(&title, &proj);
         let id = format!("session:{}", s.id);
         builder = builder.item(&MenuItem::with_id(app, &id, &label, true, None::<&str>)?);
         count += 1;
@@ -138,6 +135,49 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     )?);
 
     builder.build()
+}
+
+/// Visible character cap for one Recent row. The menu grows to the longest
+/// item, so an uncapped first-message title makes the whole tray menu huge.
+const RECENT_LABEL_MAX_CHARS: usize = 30;
+
+/// Title, or `title  ·  project` when the session belongs to a project.
+/// Newlines collapse to spaces; anything past [`RECENT_LABEL_MAX_CHARS`]
+/// ends with `…` and still fits in that budget.
+fn recent_menu_label(title: &str, project: &str) -> String {
+    let title = collapse_ws(title);
+    let project = collapse_ws(project);
+    let full = if project.is_empty() {
+        title
+    } else {
+        format!("{title}  ·  {project}")
+    };
+    truncate_menu_chars(&full, RECENT_LABEL_MAX_CHARS)
+}
+
+fn collapse_ws(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Keep at most `max_chars` Unicode scalars. A longer string keeps
+/// `max_chars - 1` scalars plus an ellipsis, so the result never exceeds the cap.
+fn truncate_menu_chars(s: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    let mut chars = s.chars();
+    let mut out = String::new();
+    for _ in 0..max_chars {
+        match chars.next() {
+            Some(c) => out.push(c),
+            None => return out,
+        }
+    }
+    if chars.next().is_some() {
+        out.pop();
+        out.push('…');
+    }
+    out
 }
 
 /// Tray Quit label plus a Ctrl+Q hint on Windows/Linux.
@@ -711,6 +751,49 @@ mod badge_tests {
     fn busy_tooltip_suffix() {
         assert_eq!(busy_tooltip("Grok", 0), "Grok");
         assert_eq!(busy_tooltip("Grok", 2), "Grok · 2");
+    }
+
+    #[test]
+    fn recent_label_keeps_short_titles() {
+        assert_eq!(recent_menu_label("hello", ""), "hello");
+        assert_eq!(recent_menu_label("HR数字助理", ""), "HR数字助理");
+    }
+
+    #[test]
+    fn recent_label_caps_at_thirty_chars() {
+        let long = "为下面这条用户消息起一个简短会话标题。要求：最多16个汉字或8个英文单词";
+        let label = recent_menu_label(long, "");
+        assert_eq!(label.chars().count(), RECENT_LABEL_MAX_CHARS);
+        assert!(label.ends_with('…'));
+        assert_eq!(
+            label,
+            format!("{}…", long.chars().take(RECENT_LABEL_MAX_CHARS - 1).collect::<String>())
+        );
+    }
+
+    #[test]
+    fn recent_label_leaves_exact_cap_untouched() {
+        let exact: String = "字".repeat(RECENT_LABEL_MAX_CHARS);
+        assert_eq!(recent_menu_label(&exact, ""), exact);
+    }
+
+    #[test]
+    fn recent_label_collapses_whitespace_before_truncating() {
+        assert_eq!(recent_menu_label("hello\n\nworld", ""), "hello world");
+        let padded = format!("  {}\n", "测".repeat(40));
+        assert_eq!(
+            recent_menu_label(&padded, "").chars().count(),
+            RECENT_LABEL_MAX_CHARS
+        );
+    }
+
+    #[test]
+    fn recent_label_includes_project_inside_the_same_cap() {
+        let label = recent_menu_label("会话标题", "人力项目");
+        assert_eq!(label, "会话标题  ·  人力项目");
+        let long = recent_menu_label(&"标".repeat(40), "项目");
+        assert_eq!(long.chars().count(), RECENT_LABEL_MAX_CHARS);
+        assert!(long.ends_with('…'));
     }
 
     #[test]
