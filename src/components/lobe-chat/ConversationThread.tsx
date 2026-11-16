@@ -270,6 +270,7 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
   findQuery,
   findActiveOccurrence,
   findOccurrenceBase = 0,
+  chunkEnds,
 }: {
   content: string;
   /** Session message id — used to cache the spilled .txt path. */
@@ -291,6 +292,8 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
   findActiveOccurrence?: number | null;
   /** Offset into the message-level occurrence index for multi-segment bodies. */
   findOccurrenceBase?: number;
+  /** Stream chunk end offsets for live reveal (absent on history). */
+  chunkEnds?: number[];
 }) {
   // Never show silent grok-automation fences in the transcript.
   const displayContent = content?.trim()
@@ -350,6 +353,10 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
   const markdownSource = spill
     ? previewLongAssistant(displayContent || "")
     : displayContent;
+  // Boundaries only line up with the exact body text — sanitized or spilled
+  // previews would reveal at the wrong offsets.
+  const revealEnds =
+    !spill && displayContent === content ? chunkEnds : undefined;
 
   const body = (displayContent || "").trim() ? (
     <MarkdownChat
@@ -365,6 +372,7 @@ const AssistantMessageBody = memo(function AssistantMessageBody({
       findQuery={findQuery}
       findActiveOccurrence={findActiveOccurrence}
       findOccurrenceBase={findOccurrenceBase}
+      chunkEnds={revealEnds}
     >
       {markdownSource}
     </MarkdownChat>
@@ -1433,6 +1441,13 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                 // React does not keep the first episode’s startRef ticking.
                 const leading = isLeadingThoughtUnit(timelineUnits, unit.si);
                 const live = !!m.streaming && !!streaming;
+                // The body renders trimmed text; chunk boundaries only stay
+                // aligned when nothing but trailing whitespace was trimmed.
+                const thoughtEnds =
+                  unit.kind === "thought" &&
+                  unit.text.trimEnd() === joined
+                    ? unit.chunkEnds
+                    : undefined;
                 const thinkKey = leading
                   ? `${m.id}-thinking-live`
                   : `${m.id}-th-${unit.si}`;
@@ -1445,6 +1460,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                       locale={locale}
                       thinking={live}
                       content={joined}
+                      chunkEnds={thoughtEnds}
                       startedAt={thinkingUnitStartedAt({
                         turnStartedAt: thinkingStartedAt,
                         leading,
@@ -1496,6 +1512,7 @@ const TranscriptMessageRow = memo(function TranscriptMessageRow({
                       : null
                   }
                   findOccurrenceBase={segBase}
+                  chunkEnds={unit.chunkEnds}
                 />
               );
             });

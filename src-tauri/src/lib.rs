@@ -78,6 +78,8 @@ mod cli_worktrees;
 
 mod customize_commands;
 
+mod director;
+
 /// Prompts the Host injected into a chat (wakes / external sends): remembered so
 /// the transcript can show them as automatic follow-ups, not user messages.
 mod injected_prompts;
@@ -148,6 +150,8 @@ mod paths;
 mod remote_updates;
 
 mod self_update;
+
+mod workflow_followup;
 
 mod plan_chrome;
 
@@ -301,6 +305,10 @@ mod win_caption_pass;
 mod win_file_drop;
 #[cfg(windows)]
 mod win_shell;
+#[cfg(windows)]
+mod win_webview_recovery;
+
+mod webview_recovery;
 
 mod x_evidence;
 
@@ -540,6 +548,15 @@ pub fn run() {
                     if window.label() == "main" => {
                         schedule_persist_main_window_state(window.app_handle());
                     }
+                WindowEvent::Destroyed => {
+                    // WebView2 rebuild listens only while a recovery destroy
+                    // is in flight. User close / tray hide does not set that.
+                    #[cfg(windows)]
+                    crate::win_webview_recovery::on_window_destroyed(
+                        window.app_handle(),
+                        window.label(),
+                    );
+                }
                 WindowEvent::Focused(focused) if window.label() == "main" => {
                     // Launch first-interaction dead-zone diagnosis: trace every
                     // key-window transition so a lost activation race is visible
@@ -554,6 +571,15 @@ pub fn run() {
                 }
                 _ => {}
             }
+        })
+        // Every webview, including ones created after setup (session, pet,
+        // album, side browser). Windows-only; the hook is idempotent per
+        // live ICoreWebView2. macOS / Linux ignore the callback.
+        .on_page_load(|webview, _payload| {
+            #[cfg(windows)]
+            crate::win_webview_recovery::install(webview);
+            #[cfg(not(windows))]
+            let _ = webview;
         })
 
         .setup(|app| {
@@ -775,7 +801,12 @@ pub fn run() {
             }));
 
             #[cfg(windows)]
-            win_shell::ensure_main_window_shell_integration(&window);
+            {
+                win_shell::ensure_main_window_shell_integration(&window);
+                if let Some(webview) = app.get_webview(window.label()) {
+                    win_webview_recovery::install(&webview);
+                }
+            }
 
             let want_maximized = saved_geometry
                 .as_ref()
@@ -1083,6 +1114,15 @@ pub fn run() {
         .expect("error while building Atlas")
 
         .run(|app, event| {
+            // Destroying the last window during a WebView2 rebuild asks the
+            // process to exit (`code == None`). Tray Quit / app.exit pass
+            // Some(code) and still leave.
+            #[cfg(windows)]
+            if let tauri::RunEvent::ExitRequested { code, api, .. } = &event {
+                if crate::win_webview_recovery::should_block_exit(*code) {
+                    api.prevent_exit();
+                }
+            }
 
             // macOS: Dock click. The pet overlay is a visible skip-taskbar
             // window, so `has_visible_windows` stays true and must not block

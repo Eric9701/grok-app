@@ -1,7 +1,7 @@
 {
   "name": "grok-app",
   "private": true,
-  "version": "0.2.46",
+  "version": "0.2.51",
   "description": "Desktop workbench for Grok Build CLI (English-first)",
   "author": "RongleCat",
   "license": "MIT",
@@ -117,7 +117,11 @@
   },
   "pnpm": {
     "overrides": {
-      "markdown-it": "14.3.2"
+      "markdown-it": "14.3.3",
+      "dompurify": "^3.4.17"
+    },
+    "patchedDependencies": {
+      "mdast-util-gfm-autolink-literal@2.0.1": "patches/mdast-util-gfm-autolink-literal@2.0.1.patch"
     }
   }
 }

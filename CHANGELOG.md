@@ -97,6 +97,192 @@ See `docs/llm-wiki/release.md`.
 - 桌面宠物可以听写、发送提示，以及停掉对话。
 - 界面语言现在可以选择土耳其语。
 
+## [0.2.51] - 2026-11-14
+
+> **Highlight:** Rewound chats keep their new replies, and model menus use a fresh catalog.
+>
+> **中文 · 亮点：** 回退后的对话保留新回复，模型菜单采用更新的目录。
+
+### Fixed
+
+- Rewound replies no longer return after you send a new message.
+- Official model menus use the newest available catalog.
+- CLI bulk import counts eligible sessions and reports complete import failures.
+- Markdown paste keeps block structure and stops formatting the next text.
+
+**中文 · 修复**
+
+- 回退后发送新消息，不再重新显示已丢弃的旧回复。
+- 官方模型菜单采用最新可用目录。
+- CLI 批量导入只统计符合条件的会话，全部失败时会显示错误。
+- Markdown 粘贴保留块结构，后续输入不再沿用粘贴内容的格式。
+
+## [0.2.50] - 2026-10-28
+
+> **Highlight:** Every model of a custom provider is selectable again, and the chosen one is the one used.
+>
+> **中文 · 亮点：** 自定义供应商的每个模型都能重新选择，选哪个就用哪个。
+
+### Fixed
+- Every model of a custom provider shows in the model menu again, and the model you pick is the one sent.
+- Desktop notifications play their short sound when the sound setting is on, including the test notification.
+
+**中文 · 修复**
+- 自定义供应商的每个模型重新出现在模型菜单里，选哪个模型就发送哪个。
+- 开启提示音后，桌面通知（包括测试通知）会播放一声短音。
+
+## [0.2.49] - 2026-10-28
+
+> **Highlight:** Director mode in Settings can send large work to a background workflow.
+>
+> **中文 · 亮点：** 设置里的导演模式可以把大块工作交给后台工作流。
+
+### Added
+
+- Director mode in Settings asks Grok to put large work in a background workflow. A new chat still gets that rule when an agent is already running.
+
+**中文 · 新增**
+
+- 设置中的导演模式会请 Grok 把大块工作放进后台工作流。已经有代理在跑时，新对话仍会带上这条规则。
+
+## [0.2.48] - 2026-10-28
+
+> **Highlight:** A finished background workflow reports back in the chat that started it.
+>
+> **中文 · 亮点：** 后台工作流结束后，结果会回到发起它的对话。
+
+### Fixed
+
+- A finished background workflow reports its result in the chat that started it. Switching chats or loading another session does not drop that result.
+
+**中文 · 修复**
+
+- 后台工作流结束后，结果会回到发起它的对话。切换对话或加载其他会话时，这个结果也不会丢。
+
+## [0.2.47] - 2026-10-27
+
+> **Highlight:** Paste from the right-click menu works when the page clipboard is empty.
+>
+> **中文 · 亮点：** 页面剪贴板为空时，右键菜单里的粘贴也能用。
+
+### Fixed
+
+- Paste uses the system clipboard when the page clipboard is empty.
+
+**中文 · 修复**
+
+- 页面剪贴板为空时，粘贴会改用系统剪贴板。
+
+## [0.2.46] - 2026-10-27
+
+> **Highlight:** macOS chats start again when the Grok home has a bundles folder.
+>
+> **中文 · 亮点：** Grok 目录里有 bundles 文件夹时，macOS 对话也能正常启动。
+
+### Fixed
+- Chats with the macOS workspace sandbox start again when the Grok home has a `bundles` folder.
+
+**中文 · 修复**
+- Grok 目录里有 `bundles` 文件夹时，开了工作区沙箱的 macOS 对话也能正常启动。
+
+## [0.2.45] - 2026-10-27
+
+> **Highlight:** Scheduled tasks can pick their own model, and macOS sandboxed chats start again.
+>
+> **中文 · 亮点：** 定时任务可以指定模型，macOS 沙箱对话也能重新正常启动。
+
+### Added
+- Scheduled tasks can run on a chosen model from the official catalog or a custom provider. They no longer fall back to your current default model.
+- The interface zoom you set with Ctrl/Cmd and +/- is remembered the next time you open the app.
+- The local session API can put a new chat in an existing git worktree of a trusted project.
+
+**中文 · 新增**
+- 定时任务可以使用指定的官方或自定义提供商模型，不再回退到当前默认模型。
+- 用 Ctrl/Cmd 加减号调好的界面缩放，下次打开应用时会保留。
+- 本地会话接口可以把新对话放进受信项目已有的 git worktree。
+
+### Changed
+- Sidebar text in the default light theme is darker and easier to read.
+- A custom relay channel shows only its own model in the model menu.
+
+**中文 · 变更**
+- 默认浅色主题下，侧栏文字更深、更清晰。
+- 自定义中转通道在模型菜单里只显示它自己的模型。
+
+### Fixed
+- Chats started with the macOS workspace sandbox can create sessions again.
+- The Markdown composer no longer leaves a box character when you press the right arrow at the end.
+
+**中文 · 修复**
+- macOS 工作区沙箱下的对话可以重新正常新建会话。
+- Markdown 输入框在行尾按右方向键时，不再留下方框字符。
+
+## [0.2.44] - 2026-10-26
+
+> **Highlight:** Scheduled tasks can reuse a chat, and replies fade in as they stream.
+>
+> **中文 · 亮点：** 定时任务可以复用指定会话，回复也会边流式输出边淡入。
+
+### Added
+- Scheduled tasks can run in a chat you choose instead of opening a new one every time. The chosen chat keeps its own model and reasoning.
+- Streamed replies fade in smoothly. Turn it off in Appearance; it follows the system Reduce Motion setting.
+- The local session API can start a new chat and report its status.
+
+**中文 · 新增**
+- 定时任务可以选择在指定会话中执行，不必每次新建。所选会话保留自己的模型与推理强度。
+- 流式回复会平滑淡入。可在外观里关闭，并跟随系统的减少动态效果设置。
+- 本地会话接口可以新建对话并查询状态。
+
+### Changed
+- Long-running chats stay responsive: background chats now update the screen less often.
+
+**中文 · 变更**
+- 长时间运行的对话更不容易卡：后台对话降低了刷新频率。
+
+### Fixed
+- Small icons in macOS System Settings no longer show colored stripes.
+- Follow System stays Simplified Chinese when that is the preferred language.
+- A trusted workspace no longer blocks sandboxed chats from starting.
+- Chats open again on macOS 12. Markdown no longer uses a pattern Monterey rejects.
+- JSON code blocks in a reply stay visible.
+- Composer markdown no longer stalls on a crafted link reference.
+- A chat connects when leader mode is on but no leader is running.
+- Show more lists the next chats after the open chat expands the group.
+- A long subagent no longer shows its time as 1m 60s.
+- A slow new chat keeps its text instead of opening an empty second chat.
+- A file on a Windows network share opens from the chat.
+- Review keeps a Windows network path pointed at that share.
+- A task due in under a minute no longer says 0 min.
+- Math written inside a code span stays as code.
+- A fullwidth @ or / from an IME opens the same composer panel.
+- A PR the agent starts watching shows up in the chat's watch chip and menu.
+- A subagent that is still running stays in the Tasks list when the list is full.
+- Queued messages in background chats now send on their own when the turn ends.
+- Memory embedding URL, key and model save, and a cleared extra prompt stays cleared.
+- The window rebuilds itself after a Windows WebView2 crash instead of staying blank.
+
+**中文 · 修复**
+- macOS 系统设置里的小图标不再出现彩色横纹。
+- 跟随系统时，首选简体中文就会显示简体。
+- 信任过工作区之后，沙箱对话可以正常启动。
+- macOS 12 上的对话可以重新打开。Markdown 不再使用旧系统会拒绝的正则。
+- 回复里的 JSON 代码块会照常显示。
+- 输入框里的 Markdown 不再会因一段特制链接引用而卡住。
+- 开了 leader、但本机没有 leader 时，对话也能连上。
+- 当前对话把分组撑开之后，显示更多会继续列出后面的会话。
+- 长时间运行的子任务不再把时长显示成 1 分 60 秒。
+- 新建对话连得很慢时，已输入的内容仍留在这一条会话里。
+- 对话里的 Windows 网络共享路径可以打开对应的文件。
+- 审查列表里的 Windows 网络路径仍指向原来的共享文件。
+- 不到一分钟就要运行的任务，不再显示成 0 分钟后。
+- 代码里的公式分隔符保持原样，不会被改成公式。
+- 输入法打出的全角＠或／，也会打开文件面板或斜杠面板。
+- Agent 主动开始监视的 PR，会出现在对话的监视标记和菜单里。
+- 任务列表满了以后，仍在运行的子任务会继续留在列表里。
+- 后台对话里排队的消息，会在这一轮结束后自动发出。
+- 记忆 Embedding 的地址、密钥和模型可以正常保存，清空的追加提示词不会再回来。
+- Windows 上 WebView2 崩溃后，窗口会自动重建，不再一直白屏。
+
 ## [0.2.42] - 2026-10-19
 
 > **Highlight:** The desktop pet can dictate, send, and stop a chat.

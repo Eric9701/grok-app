@@ -14,7 +14,7 @@
    - [providers.md](docs/llm-wiki/providers.md) — custom relays, agent `GROK_HOME`, editors  
    - [model-routing.md](docs/llm-wiki/model-routing.md) — **official tool inject for custom main only** (never official subscription; MCP `official-aux` tools-first; Host vision for text-only custom)
    - [session-continuity.md](docs/llm-wiki/session-continuity.md) — load/bootstrap; **pasted UUIDs default to Grok App session ids** (not CLI agent ids)
-   - [session-api.md](docs/llm-wiki/session-api.md) — **local session API**: list + continue-by-id (#626 first slice)
+   - [session-api.md](docs/llm-wiki/session-api.md) — **local session API**: list + continue-by-id (#626); create in a trusted project + one-session status + optional existing worktree (#1356, no badge)
    - [setup.md](docs/llm-wiki/setup.md) — first-run gate (CLI required, account optional)  
    - [icons.md](docs/llm-wiki/icons.md) — app dock icons vs tray/status-bar icons (never mix)  
    - [remote-im.md](docs/llm-wiki/remote-im.md) — **Remote IM** GUI 配置全渠道 · Bridge · Grok Build；goal 见 `docs/plans/GOAL-remote-im.md`  
@@ -35,7 +35,7 @@
 
 1c. **Open-source surface** — public docs: `README.md` / `README_EN.md`, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`. Do not commit secrets, `auth.json`, or local agent homes.
 
-2. Do **not** hardcode user-facing copy in any language. Use `createT(locale)` / `t()`. Fifteen locales ship (`de` `en` `es` `fil` `fr` `id` `it` `ja` `ko` `pt-BR` `ru` `ta` `uk` `zh` `zh-TW`); `en` is the key authority. Complete catalogs must stay in lockstep with `en`. Never fork a date or number format on `locale === "zh"` — use `intlLocale()` / `isTightScript()`. See [i18n.md](docs/llm-wiki/i18n.md).
+2. Do **not** hardcode user-facing copy in any language. Use `createT(locale)` / `t()`. Sixteen locales ship (`de` `en` `es` `fil` `fr` `id` `it` `ja` `ko` `pt-BR` `ru` `ta` `tr` `uk` `zh` `zh-TW`); `en` is the key authority. Complete catalogs must stay in lockstep with `en`. Never fork a date or number format on `locale === "zh"` — use `intlLocale()` / `isTightScript()`. See [i18n.md](docs/llm-wiki/i18n.md).
 
 2b. **Dialogs & overlays** — never use `window.confirm` / `window.prompt` / `window.alert` in Tauri UI. Use App `setAppDialog`, `GlassModal`, or the same in-app portal + modal/menu CSS. Prefer existing panel styles (`.cmm__pop`, solid context `.menu-panel`, `.modal`); frosted glass is **not** required. Details: [docs/llm-wiki/dialogs.md](docs/llm-wiki/dialogs.md).
 

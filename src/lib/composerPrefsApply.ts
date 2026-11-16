@@ -27,7 +27,10 @@ export type ComposerPrefsSelectionInput = {
 export type ComposerPrefsProvider = Pick<
   CustomProvider,
   "id" | "model" | "models" | "efforts" | "baseUrl"
->;
+> & {
+  /** Missing means generic. Every catalog id is selectable (#1394). */
+  providerMode?: CustomProvider["providerMode"];
+};
 
 function isCustomProviderId(providerId: string | null | undefined): boolean {
   const id = providerId?.trim() ?? "";
@@ -77,6 +80,36 @@ function draftModelIdIsKnown(
   return providerModelList(provider).some((m) => m.id === modelId);
 }
 
+function resolvedCustomModel(
+  provider: ComposerPrefsProvider,
+  storedModel: string,
+): string {
+  const selectable = providerModelList(provider);
+  if (storedModel && selectable.some((m) => m.id === storedModel)) {
+    return storedModel;
+  }
+  return provider.model?.trim() || selectable[0]?.id || "";
+}
+
+function customSelection(
+  provider: ComposerPrefsProvider,
+  storedModel: string,
+  effort: string | null | undefined,
+): { modelId: string; effort: string } | null {
+  const nextModelId = resolvedCustomModel(provider, storedModel);
+  if (!nextModelId) return null;
+  const efforts = effortOptionsFromProvider(
+    resolveProviderEfforts(
+      { ...provider, baseUrl: provider.baseUrl ?? "" },
+      nextModelId,
+    ),
+  );
+  return {
+    modelId: nextModelId,
+    effort: pickEffort(effort, efforts),
+  };
+}
+
 export function resolveComposerPrefsSelection(opts: {
   prefs: ComposerPrefsSelectionInput;
   catalog: ModelOption[];
@@ -93,7 +126,22 @@ export function resolveComposerPrefsSelection(opts: {
   const providerId = opts.prefs.providerId?.trim() ?? "";
 
   const draftModelId = opts.draft?.modelId?.trim() ?? "";
-  if (
+  if (draftModelId && isCustomProviderId(opts.draft?.providerId)) {
+    const drafted = providers.find((p) => p.id === opts.draft?.providerId?.trim());
+    if (!drafted) {
+      // List not back yet: nothing disproves the pick, so keep it.
+      if (providers.length === 0) {
+        const draftEffort = opts.draft?.effort?.trim() ?? "";
+        return {
+          modelId: draftModelId,
+          effort: draftEffort || pickDefaultEffort(null),
+        };
+      }
+    } else {
+      const picked = customSelection(drafted, draftModelId, opts.draft?.effort);
+      if (picked) return picked;
+    }
+  } else if (
     draftModelId &&
     draftModelIdIsKnown(
       draftModelId,
@@ -123,21 +171,11 @@ export function resolveComposerPrefsSelection(opts: {
         };
       }
     } else {
-      const models = providerModelList(provider);
-      const known = !!storedModel && models.some((m) => m.id === storedModel);
-      const configured = provider.model?.trim() ?? "";
-      const nextModelId = known
-        ? storedModel
-        : configured || pickDefaultModelId(catalog);
-      const efforts = effortOptionsFromProvider(
-        resolveProviderEfforts(
-          { ...provider, baseUrl: provider.baseUrl ?? "" },
-          nextModelId,
-        ),
-      );
+      const picked = customSelection(provider, storedModel, opts.prefs.effort);
+      if (picked) return picked;
       return {
-        modelId: nextModelId,
-        effort: pickEffort(opts.prefs.effort, efforts),
+        modelId: pickDefaultModelId(catalog),
+        effort: pickEffort(opts.prefs.effort, null),
       };
     }
   }

@@ -172,6 +172,15 @@ pub enum AcpEvent {
     ProcessExited {
         code: Option<i32>,
     },
+    /// CLI-started turn after a background workflow finishes
+    /// (`promptId` prefix `workflow-completed-`). Not a Host `session/prompt`.
+    WorkflowFollowup(crate::workflow_followup::Wire),
+    /// Stream or tool chunk from a `workflow-completed-` turn.
+    /// Applied only when that prompt is the armed follow-up.
+    WorkflowScoped {
+        prompt_id: String,
+        event: Box<AcpEvent>,
+    },
     /// Subagent lifecycle from `_x.ai/session_notification`.
     ///
     /// CLI 1.0.x emits `subagent_spawned` / `subagent_progress` /
@@ -466,10 +475,14 @@ pub struct AcpClient {
     runtime_profile_id: Option<String>,
     /// Claude/Cursor resume ids stay in `agent-runtimes.json`.
     hides_agent_session_meta: bool,
+    /// When true, `session/new` reads Director mode at that moment.
+    /// On for chat processes (warm start and TCP included). Off for
+    /// official aux side tasks.
+    use_app_director_rules: bool,
 }
 
 /// Options applied at agent process start (CLI flags).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SpawnOptions {
     pub model_id: Option<String>,
     /// `official` or a custom section id. `None` follows the global route.
@@ -490,6 +503,10 @@ pub struct SpawnOptions {
     pub plugin_dirs: Vec<String>,
     /// Per-session extra rules → top-level `grok --rules <TEXT>` (before `agent`).
     pub extra_rules: Option<String>,
+    /// When true (the default), `session/new` reads `director_enabled` and
+    /// may send the director rule as `_meta.rules`. Official aux sets this
+    /// false. Not a process flag and not `grok --rules`.
+    pub use_app_director_rules: bool,
     /// Per-session max turns override → top-level `grok --max-turns N`.
     /// When set (after normalize), wins over `AppSettings.max_agent_turns`.
     pub max_agent_turns: Option<u32>,
@@ -520,6 +537,34 @@ pub struct SpawnOptions {
     /// App session (chat) this agent process serves. The PR-monitor MCP tools
     /// watch PRs *for a chat*, so the injected server needs to know which one.
     pub app_session_id: Option<String>,
+}
+
+impl Default for SpawnOptions {
+    fn default() -> Self {
+        Self {
+            model_id: None,
+            route_provider_id: None,
+            effort: None,
+            permission_policy: None,
+            product_mode: None,
+            sandbox_profile: None,
+            json_schema: None,
+            plugin_dirs: Vec::new(),
+            extra_rules: None,
+            // Warm `..Default::default()` must keep this on. The rule text
+            // is chosen later, when `session/new` is built.
+            use_app_director_rules: true,
+            max_agent_turns: None,
+            system_prompt_override: None,
+            no_ask_user: None,
+            fork_session: false,
+            grok_home_override: None,
+            empty_mcp_servers: false,
+            ssh_alias: None,
+            folder_trust: false,
+            app_session_id: None,
+        }
+    }
 }
 
 mod spawn_flags;
@@ -591,7 +636,7 @@ impl AcpClient {
             .map(str::trim)
             .filter(|s| !s.is_empty())
         {
-            return Self::connect_tcp(addr, cwd).await;
+            return Self::connect_tcp(addr, cwd, opts.use_app_director_rules).await;
         }
 
         let ssh_alias = opts
@@ -767,7 +812,17 @@ impl AcpClient {
             }
         } else if opts.route_provider_id.is_some() {
             let m = opts.model_id.as_deref().unwrap_or("").trim();
-            if m.is_empty() || custom_route {
+            if m.is_empty() {
+                route_provider_id.clone()
+            } else if custom_route
+                && crate::providers::provider_mode_for_id(&route_provider_id)
+                    != crate::providers::PROVIDER_MODE_GROK_BUILD_PROXY
+            {
+                // Generic: `--model` is the per-model section, not the channel id.
+                // The id passed in may already be that section (connect) or the
+                // catalog id. Proxy relays took the catalog id above.
+                crate::providers::spawn_model_for_provider(&route_provider_id, m)
+            } else if custom_route {
                 route_provider_id.clone()
             } else {
                 m.to_string()
@@ -839,6 +894,17 @@ impl AcpClient {
         } else {
             None
         };
+        // Sealed homes link sessions/memory/skills out of `$GROK_HOME`. The
+        // built-in profile cannot grow extra write roots, so the CLI flag is a
+        // wrapper defined in the sealed sandbox.toml (#1341). Process reuse
+        // still compares the profile the user asked for.
+        let sandbox_cli = sandbox.as_ref().map(|sb| {
+            let mut cli = sb.clone();
+            if agent_home_prep {
+                cli.profile = crate::agent_proc_home::sealed_share_spawn_profile(&sb.profile);
+            }
+            cli
+        });
         // Soft-fail older CLIs for GROK_SUBAGENT_WORKTREE_SNAPSHOT env.
         let cli_ver = version_raw.clone();
 
@@ -929,7 +995,7 @@ impl AcpClient {
         for a in permission_mode_spawn_flags(spawn_policy, spawn_product_mode) {
             cmd.arg(a);
         }
-        if let Some(ref sb) = sandbox {
+        if let Some(ref sb) = sandbox_cli {
             for a in sb.cli_args() {
                 cmd.arg(a);
             }
@@ -1016,7 +1082,23 @@ impl AcpClient {
             session_data_mode,
         );
         cmd.arg("agent");
-        cmd.arg(leader_spawn_flag(use_leader));
+        let local_native_spawn = ssh_alias.is_none() && wsl_launch.is_none();
+        let leader_flag = if local_native_spawn && use_leader {
+            let socket = crate::leader::default_leader_socket_path();
+            #[cfg(unix)]
+            let socket_present = {
+                use std::os::unix::fs::FileTypeExt;
+                std::fs::metadata(&socket)
+                    .map(|meta| meta.file_type().is_socket())
+                    .unwrap_or(false)
+            };
+            #[cfg(not(unix))]
+            let socket_present = socket.exists();
+            local_leader_spawn_flag(use_leader, socket_present)
+        } else {
+            leader_spawn_flag(use_leader)
+        };
+        cmd.arg(leader_flag);
         // Agent option: `--agent-profile <PATH>` (before `stdio`). Path only —
         // does not rewrite app agent-home or shared ~/.grok. Skip on SSH — the
         // path is local and would not exist on the host.
@@ -1062,7 +1144,7 @@ impl AcpClient {
         // Local native only: process-group + no-window so Windows tree-kill
         // can reap tool/shell grandchildren. SSH/WSL keep CREATE_NO_WINDOW
         // alone — do not apply local process-group / taskkill semantics.
-        let owns_local_process_tree = ssh_alias.is_none() && wsl_launch.is_none();
+        let owns_local_process_tree = local_native_spawn;
         if owns_local_process_tree {
             cmd.current_dir(&cwd);
         }
@@ -1088,7 +1170,23 @@ impl AcpClient {
             // Last writer before the sealed copy. Shared ~/.grok is not this path.
             let _ = crate::providers::ensure_custom_ids_in_allowed_models();
             match crate::agent_proc_home::create(&grok_home, custom_route) {
-                Ok(dir) => Some(dir),
+                Ok(dir) => {
+                    if let Some(sb) = sandbox.as_ref() {
+                        if let Err(e) = crate::agent_proc_home::install_sealed_share_grant(
+                            &dir,
+                            &grok_home,
+                            &sb.profile,
+                        ) {
+                            crate::agent_proc_home::discard(&dir);
+                            drop(route_auth_guard);
+                            return Err(AgentError::new(
+                                AgentErrorCode::ConnectFailed,
+                                format!("failed to grant sealed session directories: {e}"),
+                            ));
+                        }
+                    }
+                    Some(dir)
+                }
                 Err(e) => {
                     drop(route_auth_guard);
                     return Err(AgentError::new(
@@ -1168,7 +1266,7 @@ impl AcpClient {
         // Route agent traffic through the configured proxy (NEW-02). Windows
         // system proxy is registry-only and never reaches children as env vars.
         crate::proxy::apply_to_tokio_command(&mut cmd);
-        if let Some(ref sb) = sandbox {
+        if let Some(ref sb) = sandbox_cli {
             let (k, v) = sb.env_pair();
             cmd.env(k, v);
         }
@@ -1177,7 +1275,7 @@ impl AcpClient {
             crate::wsl_backend::apply_wslenv(&mut cmd);
         }
         tracing::info!(
-            "acp: spawn home={} ssh={:?} mode={} model={} effort={:?} native_grok_proxy={} sandbox={:?} max_turns={:?} fork_session={} no_ask_user={} leader={} subagents={} memory={} compaction_mode={} compaction_detail={} compaction_flags={} agent_profile={:?} agents_json={}",
+            "acp: spawn home={} ssh={:?} mode={} model={} effort={:?} native_grok_proxy={} sandbox={:?} max_turns={:?} fork_session={} no_ask_user={} leader_requested={} leader_flag={} subagents={} memory={} compaction_mode={} compaction_detail={} compaction_flags={} agent_profile={:?} agents_json={}",
             grok_home.display(),
             ssh_alias,
             session_data_mode,
@@ -1189,6 +1287,7 @@ impl AcpClient {
             opts.fork_session,
             no_ask_user,
             use_leader,
+            leader_flag,
             subagents_enabled,
             memory_enabled,
             normalize_compaction_mode(&compaction_mode),
@@ -1234,6 +1333,7 @@ impl AcpClient {
             AgentError::new(AgentErrorCode::AgentCrashed, "no stderr on child")
         })?;
 
+        let use_app_director_rules = opts.use_app_director_rules;
         let client = Arc::new(Self {
             child: AsyncMutex::new(Some(child)),
             child_pid,
@@ -1262,6 +1362,7 @@ impl AcpClient {
             proc_home: std::sync::Mutex::new(proc_home),
             runtime_profile_id: None,
             hides_agent_session_meta: false,
+            use_app_director_rules,
         });
 
         client.start_read_loop(Box::new(stdout));
@@ -1306,6 +1407,7 @@ impl AcpClient {
     pub async fn connect_tcp(
         addr: &str,
         cwd: PathBuf,
+        use_app_director_rules: bool,
     ) -> Result<
         (
             Arc<Self>,
@@ -1367,6 +1469,7 @@ impl AcpClient {
             proc_home: std::sync::Mutex::new(None),
             runtime_profile_id: None,
             hides_agent_session_meta: false,
+            use_app_director_rules,
         });
         client.start_read_loop(Box::new(read_half));
         Ok((client, event_rx))
@@ -1428,6 +1531,7 @@ impl AcpClient {
             proc_home: std::sync::Mutex::new(None),
             runtime_profile_id: Some(profile_id),
             hides_agent_session_meta: hides_meta,
+            use_app_director_rules: true,
         });
         client.start_read_loop(stdout);
         if let Some(stderr) = stderr {
@@ -1830,6 +1934,16 @@ impl AcpClient {
         }
     }
 
+    fn session_load_blocks(&self, event_session: Option<&str>) -> bool {
+        let pending = self.pending.lock();
+        let loading: Vec<Option<&str>> = pending
+            .values()
+            .filter(|p| p.method == "session/load")
+            .map(|p| p.session_id.as_deref())
+            .collect();
+        crate::workflow_followup::session_load_suppresses(&loading, event_session)
+    }
+
     fn touch_last_update(&self, session_id: Option<&str>, at: Instant) {
         if let Some(sid) = session_id.filter(|s| !s.is_empty()) {
             self.last_update_by_session
@@ -1922,7 +2036,16 @@ impl AcpClient {
         // decoded events so the SessionManager can route them to the right
         // App session when one process hosts several. Missing sid → None
         // (process-scoped fallback).
-        let events = decode_session_update(params);
+        // A finished background workflow starts its own turn. The open is
+        // prepended so the stream/tool events in this same notification are
+        // not dropped as load replay. The end is appended so usage on
+        // `turn_completed` still sees the turn open. Suppress only while this
+        // session's `session/load` is pending: those copies are history, and
+        // the id stays suppressed for this session after the RPC result
+        // removes the pending entry. Stream and tool chunks of that turn are
+        // wrapped so a busy user turn cannot absorb them.
+        let during_load = self.session_load_blocks(sid.as_deref());
+        let events = adopt_session_update(params, during_load, sid.as_deref());
         if events.is_empty() {
             let update = params.get("update").unwrap_or(params);
             let kind = update
@@ -2308,12 +2431,15 @@ impl AcpClient {
         }
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
+        // `session/load` must name its session. A pending load with no id
+        // would suppress every chat's workflow follow-up.
+        let session_id = session_id_for_pending(method, &params);
         self.pending.lock().insert(
             id,
             Pending {
                 method: method.to_string(),
                 tx,
-                session_id: None,
+                session_id,
             },
         );
         let msg = json!({
@@ -2474,9 +2600,68 @@ impl AcpClient {
         self.reader_alive.load(Ordering::SeqCst)
     }
 
+    /// Alive-or-dead client with no child. Park and unpark tests use this
+    /// instead of spawning `grok`.
+    #[cfg(test)]
+    pub(crate) fn test_stub(alive: bool) -> Arc<Self> {
+        Self::test_stub_with(alive, true)
+    }
+
+    /// Alive-or-dead client with no child. `use_app_director_rules` is the
+    /// same flag warm start and TCP keep on, and official aux turns off.
+    #[cfg(test)]
+    pub(crate) fn test_stub_with(alive: bool, use_app_director_rules: bool) -> Arc<Self> {
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        Arc::new(Self {
+            child: AsyncMutex::new(None),
+            child_pid: None,
+            owns_local_process_tree: false,
+            stdin: AsyncMutex::new(None),
+            next_id: AtomicU64::new(1),
+            pending: ParkingMutex::new(HashMap::new()),
+            event_tx,
+            agent_session_id: ParkingMutex::new(None),
+            cli_path: PathBuf::from("test-stub"),
+            cwd: PathBuf::from("."),
+            stopped: AtomicBool::new(false),
+            reader_alive: AtomicBool::new(alive),
+            reader_stop: Arc::new(Notify::new()),
+            stderr_tail: ParkingMutex::new(Vec::new()),
+            last_update_by_session: ParkingMutex::new(HashMap::new()),
+            last_update_unstamped: ParkingMutex::new(None),
+            empty_mcp_servers: false,
+            app_session_id: None,
+            sandbox_profile: ParkingMutex::new(None),
+            custom_route: false,
+            route_provider_id: crate::providers::SESSION_PROVIDER_OFFICIAL.to_string(),
+            rewind_supported: ParkingMutex::new(None),
+            ssh_alias: None,
+            wsl_active: false,
+            proc_home: std::sync::Mutex::new(None),
+            runtime_profile_id: None,
+            hides_agent_session_meta: false,
+            use_app_director_rules,
+        })
+    }
+
     /// Working directory this process was spawned with.
     pub fn cwd(&self) -> &std::path::Path {
         &self.cwd
+    }
+
+    /// `session/new` body. `director_enabled` is the app setting at this
+    /// call, not a copy taken when the process started.
+    pub(crate) fn session_new_params(
+        &self,
+        cwd: &str,
+        mcp_servers: &Value,
+        director_enabled: bool,
+    ) -> Value {
+        wire_session_new_params(
+            cwd,
+            mcp_servers,
+            crate::director::rules_for_session_new(self.use_app_director_rules, director_enabled),
+        )
     }
 
     /// Initialize + auth, then open a session.
@@ -2811,10 +2996,11 @@ impl AcpClient {
         let result = self
             .request_timeout(
                 "session/new",
-                json!({
-                    "cwd": cwd,
-                    "mcpServers": mcp_servers
-                }),
+                self.session_new_params(
+                    &cwd,
+                    &mcp_servers,
+                    crate::store::load_settings().director_enabled,
+                ),
                 HANDSHAKE_TIMEOUT_SECS,
             )
             .await
@@ -3995,6 +4181,78 @@ fn parse_goal_updated(update: &Value) -> Option<AcpEvent> {
     })
 }
 
+/// Session id stamped on a pending `session/load`. Other methods stay unstamped.
+fn session_id_for_pending(method: &str, params: &Value) -> Option<String> {
+    if method != "session/load" {
+        return None;
+    }
+    params
+        .get("sessionId")
+        .or_else(|| params.get("session_id"))
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+/// Decode one `session/update`, admit a workflow follow-up, and wrap that
+/// turn's stream and tool chunks so a busy user turn cannot absorb them.
+pub(crate) fn adopt_session_update(
+    params: &Value,
+    during_session_load: bool,
+    event_session: Option<&str>,
+) -> Vec<AcpEvent> {
+    let mut events = decode_session_update(params);
+    if let Some(wire) = crate::workflow_followup::decode_followup(params) {
+        if let Some(place) =
+            crate::workflow_followup::admission(during_session_load, event_session, &wire)
+        {
+            let ev = AcpEvent::WorkflowFollowup(wire);
+            match place {
+                crate::workflow_followup::Admission::Before => events.insert(0, ev),
+                crate::workflow_followup::Admission::After => events.push(ev),
+            }
+        }
+    }
+    let prompt_id = crate::workflow_followup::notification_workflow_prompt(params);
+    scope_workflow_output(events, prompt_id.as_deref())
+}
+
+fn scope_workflow_output(events: Vec<AcpEvent>, prompt_id: Option<&str>) -> Vec<AcpEvent> {
+    let Some(prompt_id) = prompt_id else {
+        return events;
+    };
+    events
+        .into_iter()
+        .map(|ev| match ev {
+            AcpEvent::Stream { .. }
+            | AcpEvent::ToolCall { .. }
+            | AcpEvent::ToolOpenReleased { .. } => AcpEvent::WorkflowScoped {
+                prompt_id: prompt_id.to_string(),
+                event: Box::new(ev),
+            },
+            other => other,
+        })
+        .collect()
+}
+
+/// `session/new` params. `rules` is ACP `_meta.rules` (per session, not a
+/// `~/.grok` write). Empty rules omit `_meta` so the body stays
+/// `{ cwd, mcpServers }`.
+///
+/// Live check, grok 1.0.46: `session/new` with `_meta.rules` returned a
+/// `sessionId` (no prompt sent).
+pub fn wire_session_new_params(cwd: &str, mcp_servers: &Value, rules: Option<&str>) -> Value {
+    let mut params = json!({
+        "cwd": cwd,
+        "mcpServers": mcp_servers,
+    });
+    if let Some(text) = rules.map(str::trim).filter(|s| !s.is_empty()) {
+        params["_meta"] = json!({ "rules": text });
+    }
+    params
+}
+
 /// Pure decode of `session/update` params → host events (no I/O).
 /// Used by the live client and golden fixture tests.
 pub fn decode_session_update(params: &Value) -> Vec<AcpEvent> {
@@ -4580,6 +4838,46 @@ fn parse_ask_user_options(v: &Value) -> Vec<AskUserOption> {
         });
     }
     out
+}
+
+#[cfg(test)]
+mod director_session_new_tests {
+    use super::*;
+
+    #[test]
+    fn warm_default_reads_director_when_session_new_is_built() {
+        let warm = SpawnOptions {
+            model_id: Some("grok".into()),
+            effort: Some("high".into()),
+            ..Default::default()
+        };
+        assert!(warm.use_app_director_rules);
+        let client = AcpClient::test_stub(true);
+        let mcp = json!([]);
+        assert!(client
+            .session_new_params("/work", &mcp, false)
+            .get("_meta")
+            .is_none());
+        assert_eq!(
+            client.session_new_params("/work", &mcp, true)["_meta"]["rules"],
+            crate::director::DIRECTOR_RULE
+        );
+    }
+
+    #[test]
+    fn official_aux_flag_omits_rules_even_when_the_setting_is_on() {
+        let aux = SpawnOptions {
+            use_app_director_rules: false,
+            ..Default::default()
+        };
+        assert!(!aux.use_app_director_rules);
+        let client = AcpClient::test_stub_with(true, false);
+        let mcp = json!([]);
+        assert!(client
+            .session_new_params("/work", &mcp, true)
+            .get("_meta")
+            .is_none());
+    }
 }
 
 #[cfg(test)]
@@ -7112,5 +7410,106 @@ mod live_handshake_tests {
         eprintln!("OK session={} in {:?}", sid, t0.elapsed());
         client.kill().await;
         assert!(!sid.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod workflow_followup_host_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn session_load_pending_records_its_session_id() {
+        let params = json!({ "sessionId": "agent-b", "cwd": "/tmp" });
+        assert_eq!(
+            session_id_for_pending("session/load", &params).as_deref(),
+            Some("agent-b")
+        );
+        assert!(session_id_for_pending("session/prompt", &params).is_none());
+        assert!(session_id_for_pending("session/load", &json!({ "cwd": "/tmp" })).is_none());
+    }
+
+    #[test]
+    fn workflow_chunks_are_scoped_and_other_synthetic_cues_are_not() {
+        let id = "workflow-completed-wf_host_scope-1";
+        let params = json!({
+            "sessionId": "agent-a",
+            "update": {
+                "sessionUpdate": "agent_message_chunk",
+                "content": { "type": "text", "text": "the workflow says done" }
+            },
+            "_meta": { "promptId": id }
+        });
+        let events = adopt_session_update(&params, false, Some("agent-a"));
+        assert!(matches!(
+            events.first(),
+            Some(AcpEvent::WorkflowFollowup(crate::workflow_followup::Wire::Start { prompt_id }))
+                if prompt_id == id
+        ));
+        assert!(matches!(
+            events.get(1),
+            Some(AcpEvent::WorkflowScoped { prompt_id, event })
+                if prompt_id == id && matches!(event.as_ref(), AcpEvent::Stream { .. })
+        ));
+
+        let tool = json!({
+            "sessionId": "agent-a",
+            "update": {
+                "sessionUpdate": "tool_call",
+                "toolCallId": "call-1",
+                "title": "read",
+                "kind": "read",
+                "status": "completed"
+            },
+            "_meta": { "promptId": id }
+        });
+        let tool_events = adopt_session_update(&tool, false, Some("agent-a"));
+        assert!(tool_events.iter().any(|ev| matches!(
+            ev,
+            AcpEvent::WorkflowScoped { prompt_id, event }
+                if prompt_id == id && matches!(event.as_ref(), AcpEvent::ToolCall { .. })
+        )));
+
+        let reminder = json!({
+            "sessionId": "agent-a",
+            "update": {
+                "sessionUpdate": "user_message_chunk",
+                "content": {
+                    "type": "text",
+                    "text": "<system-reminder> Background task abc completed"
+                },
+                "_meta": { "syntheticPrompt": true }
+            }
+        });
+        let reminder_events = adopt_session_update(&reminder, false, Some("agent-a"));
+        assert!(reminder_events
+            .iter()
+            .all(|ev| !matches!(ev, AcpEvent::WorkflowFollowup(_))));
+
+        let replay_id = "workflow-completed-wf_host_replay-1";
+        let replay = json!({
+            "sessionId": "agent-b",
+            "update": {
+                "sessionUpdate": "agent_message_chunk",
+                "content": { "type": "text", "text": "old result" }
+            },
+            "_meta": { "promptId": replay_id }
+        });
+        assert!(adopt_session_update(&replay, true, Some("agent-b"))
+            .iter()
+            .all(|ev| !matches!(ev, AcpEvent::WorkflowFollowup(_))));
+        let live_elsewhere = json!({
+            "sessionId": "agent-a",
+            "update": {
+                "sessionUpdate": "agent_thought_chunk",
+                "content": { "type": "text", "text": "still working" }
+            },
+            "_meta": { "promptId": "workflow-completed-wf_host_other-1" }
+        });
+        assert!(
+            adopt_session_update(&live_elsewhere, false, Some("agent-a"))
+                .iter()
+                .any(|ev| matches!(ev, AcpEvent::WorkflowFollowup(_)))
+        );
     }
 }

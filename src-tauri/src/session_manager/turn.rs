@@ -139,6 +139,9 @@ impl SessionManager {
             s.fsm.begin_stream().map_err(|e| e.to_string())?;
             s.prompt_in_flight = true;
             s.sent_prompt_this_visit = true;
+            // This send owns the turn. A late workflow `turn_completed` must
+            // not finish it. The follow-up arm is a process-lifetime slot.
+            crate::workflow_followup::disarm(&s.app_session_id);
             Self::touch_stream_progress_locked(s);
             let turn_id = Uuid::new_v4().to_string();
             s.active_turn_id = Some(turn_id.clone());
@@ -431,6 +434,11 @@ impl SessionManager {
                 agent_prompt,
                 Duration::from_millis(25),
                 move |chunk: StreamChunk| {
+                    let chunk_lens = if chunk.text.is_empty() {
+                        Vec::new()
+                    } else {
+                        vec![utf16_len(&chunk.text)]
+                    };
                     let _ = app_done.emit(
                         "session://stream",
                         serde_json::json!({
@@ -438,7 +446,8 @@ impl SessionManager {
                             "messageId": chunk.message_id,
                             "text": chunk.text,
                             "done": chunk.done,
-                            "kind": "assistant"
+                            "kind": "assistant",
+                            "chunkLens": chunk_lens,
                         }),
                     );
                     let pending_journal = mgr.with_session_mut(&turn_sid, |s| {

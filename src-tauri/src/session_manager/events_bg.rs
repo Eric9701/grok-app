@@ -115,10 +115,15 @@ impl SessionManager {
                     let pending_journal = Self::prepare_stream_journal_flush(s, done, para);
                     let mid = s.streaming_message_id.clone().unwrap_or_default();
                     let (need, pending_emits) =
-                        Self::queue_stream_emit(s, kind, mid, text, thought_phase, done);
+                        Self::queue_stream_emit(s, kind, mid, text, thought_phase, done, true);
                     let need_schedule = if need {
+                        let delay_ms = s
+                            .pending_stream_emit
+                            .as_ref()
+                            .map(|p| p.interval.as_millis() as u64)
+                            .unwrap_or(crate::stream_emit::BACKGROUND_STREAM_EMIT_MS);
                         s.stream_emit_flush_gen = s.stream_emit_flush_gen.wrapping_add(1);
-                        Some((s.app_session_id.clone(), s.stream_emit_flush_gen))
+                        Some((s.app_session_id.clone(), s.stream_emit_flush_gen, delay_ms))
                     } else {
                         None
                     };
@@ -128,8 +133,8 @@ impl SessionManager {
                 if let Some(pending) = pending_journal {
                     Self::commit_stream_journal_flush(pending);
                 }
-                if let Some((sid, gen)) = need_schedule {
-                    self.schedule_stream_emit_flush(app.clone(), sid, gen);
+                if let Some((sid, gen, delay_ms)) = need_schedule {
+                    self.schedule_stream_emit_flush(app.clone(), sid, gen, delay_ms);
                 }
             }
             AcpEvent::PromptComplete {
@@ -612,6 +617,7 @@ impl SessionManager {
                 }
             }
             AcpEvent::ProcessExited { code } => {
+                crate::workflow_followup::disarm(app_session_id);
                 self.pending_soft_respawn.lock().remove(app_session_id);
                 let mut gate_invalidations: Vec<serde_json::Value> = Vec::new();
                 let mut pending_emits = Vec::new();
@@ -949,6 +955,29 @@ impl SessionManager {
                     self.promote_background_ready_to_parked(app_session_id);
                     Self::emit_state(app, &self.snapshot());
                 }
+            }
+            AcpEvent::WorkflowScoped { prompt_id, event } => {
+                if crate::workflow_followup::workflow_output_dropped(app_session_id, &prompt_id) {
+                    tracing::debug!(
+                        session = %app_session_id,
+                        prompt = %prompt_id,
+                        "background workflow follow-up output dropped: prompt is not the armed turn"
+                    );
+                    return;
+                }
+                // The inner chunk is a plain stream or tool event. Box the
+                // re-entry: an async fn cannot recurse into itself directly.
+                Box::pin(self.handle_acp_event_on_background(
+                    app,
+                    app_session_id,
+                    process_id,
+                    agent_session_id,
+                    *event,
+                ))
+                .await;
+            }
+            AcpEvent::WorkflowFollowup(wire) => {
+                self.handle_workflow_followup(app, app_session_id, wire);
             }
             _ => {
                 // stderr / other variants — log only

@@ -6,6 +6,7 @@ import {
   claimIsStale,
   claimReleasableBy,
   newConnectClaim,
+  rebindConnectClaim,
   type ConnectClaim,
 } from "@/lib/sessionConnectClaim";
 import {
@@ -285,6 +286,31 @@ export function useSessionConnect(opts: {
             h.tr("session.new"),
           )) as { id: string; title?: string };
           sessionId = meta.id;
+          const materializedKey = queueSessionKey(sessionId);
+          if (!heldConnectKeys.has(materializedKey)) {
+            // sessionCreate can outlive the claim budget. A newer connect then
+            // owns `__draft__`. Moving that claim, or the draft text, onto the
+            // session this attempt just created opens an empty second chat.
+            if (
+              !myClaim ||
+              !rebindConnectClaim(
+                connectingBySessionRef.current,
+                claimOwnerRef.current,
+                connectKey,
+                materializedKey,
+                myClaim,
+              )
+            ) {
+              try {
+                await api.sessionDelete(meta.id);
+              } catch {
+                /* empty shell must not stay in the sidebar */
+              }
+              return null;
+            }
+            heldConnectKeys.delete(connectKey);
+            heldConnectKeys.add(materializedKey);
+          }
           if (pickedRuntime !== undefined) {
             if (draftRuntimeOverride() === pickedRuntime) {
               clearDraftRuntimeOverride();
@@ -309,17 +335,6 @@ export function useSessionConnect(opts: {
             } catch {
               /* connect still follows the global route if the stamp fails */
             }
-          }
-          const materializedKey = queueSessionKey(sessionId);
-          if (!heldConnectKeys.has(materializedKey)) {
-            const claims = connectingBySessionRef.current;
-            if (claims.has(materializedKey)) return null;
-            claims.delete(connectKey);
-            claimOwnerRef.current.delete(connectKey);
-            heldConnectKeys.delete(connectKey);
-            claims.add(materializedKey);
-            if (myClaim) claimOwnerRef.current.set(materializedKey, myClaim);
-            heldConnectKeys.add(materializedKey);
           }
           if (
             migrateDraftSendClaim(

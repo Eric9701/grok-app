@@ -13,6 +13,7 @@ import {
 import { useThemeShell } from "@/providers/ThemeShellContext";
 import { useSshWatch } from "@/providers/SshWatchProvider";
 import { usePetCompanion } from "@/hooks/usePetCompanion";
+import { useAutomationRunNow } from "@/hooks/useAutomationRunNow";
 import { useFloatingMenu } from "@/lib/floatingMenu";
 import type { WorkbenchHashPane } from "@/lib/workbenchHash";
 import { restoreSessionGate } from "@/lib/sessionGateRestore";
@@ -365,7 +366,12 @@ import {
   resolveHostOnlyAttach,
   resolveNativeClipboardEmpty,
 } from "@/lib/attachmentsPro";
-import { fileKey as clipboardFileKey, readClipboardMediaFiles } from "@/lib/clipboardPaste";
+import {
+  clipboardTextIsFileList,
+  fileKey as clipboardFileKey,
+  readClipboardMediaFiles,
+  readClipboardPlainText,
+} from "@/lib/clipboardPaste";
 import {
   applyPluginAtSlash,
   applySkillAtSlash,
@@ -536,10 +542,6 @@ import {
 import { PhoneAccountSheet } from "@/components/PhoneAccountSheet";
 import { PhoneComposerToolsSheet } from "@/components/PhoneComposerToolsSheet";
 import { type ContextMenuItem } from "@/components/ContextMenu";
-import {
-  computeNextRunAt,
-  type Automation,
-} from "@/lib/automations";
 import { automationsBackgroundStatus } from "@/lib/automationsBackgroundStatus";
 import { recordAutomationRun } from "@/lib/automationRunHistory";
 import {
@@ -549,7 +551,10 @@ import {
   shouldAutoApplyAutomationFence,
 } from "@/lib/automationSetup";
 
-import type { ComposerModelPick } from "@/lib/composerModelGroups";
+import {
+  composerMenuProviders,
+  type ComposerModelPick,
+} from "@/lib/composerModelGroups";
 import {
   resolveProviderBrandId,
 } from "@/lib/providerPresets";
@@ -774,6 +779,8 @@ export function AppWorkbench() {
     setReplaceProviderBrandLogo,
     welcomeMotionEnabled,
     setWelcomeMotionEnabled,
+    outputMotionEnabled,
+    setOutputMotionEnabled,
     goalOrchUiEnabled,
     setGoalOrchUiEnabled,
     goalOrchEvents,
@@ -1277,12 +1284,14 @@ export function AppWorkbench() {
   const [phoneAccountOpen, setPhoneAccountOpen] = useState(false);
   /** Inside workbench: chat thread vs scheduled tasks vs agent kanban. */
   const [mainPane, setMainPane] = useState<WorkbenchHashPane>("chat");
-  /** Prevent overlapping automation runs. */
-  const automationRunLock = useRef(false);
   /** Conversation is guiding the user to create a scheduled task. */
   const automationSetupDraftRef = useRef(false);
   const automationSetupSessionsRef = useRef(new Set<string>());
   const automationAppliedRef = useRef(new Set<string>());
+  /** Full provider list for composer model menu groups. */
+  const [customProviders, setCustomProviders] = useState<api.CustomProvider[]>(
+    [],
+  );
   const sessionNavHostRef = useRef(createSessionNavHost());
   const sessionConnectHostRef = useRef(createSessionConnectHost());
   const gitWorktreeHostRef = useRef(createGitWorktreeChromeHost());
@@ -3895,290 +3904,37 @@ export function AppWorkbench() {
     return groups;
   }, [sessions, projects, tr]);
 
-  /**
-   * Run a scheduled automation now: open chat under its project (or orphan),
-   * connect, and send the stored prompt.
-   * @returns true if the prompt was handed to the agent (mark_run applied).
-   */
-  const runAutomation = useCallback(
-    async (
-      auto: Automation,
-      opts?: { fromScheduler?: boolean },
-    ): Promise<boolean> => {
-      if (automationRunLock.current) {
-        // Soft skip — do not invent a fire; only note busy contention.
-        recordAutomationRun({
-          scheduleId: auto.id,
-          name: auto.title,
-          outcome: "skipped",
-          source: "run_now",
-          error: "busy",
-        });
-        return false;
-      }
-      if (opts?.fromScheduler && (session.state === "streaming" || connecting)) {
-        recordAutomationRun({
-          scheduleId: auto.id,
-          name: auto.title,
-          outcome: "skipped",
-          source: "run_now",
-          error: "session_busy",
-        });
-        return false;
-      }
-      automationRunLock.current = true;
-      let createdSessionId: string | null = null;
-      try {
-        const proj = auto.projectId
-          ? projects.find((p) => p.id === auto.projectId) ?? null
-          : null;
-        if (proj && !proj.trusted) {
-          const detail = tr("project.trustFirst", { name: proj.name });
-          setLocalError(detail);
-          recordAutomationRun({
-            scheduleId: auto.id,
-            name: auto.title,
-            outcome: "error",
-            source: "run_now",
-            error: detail,
-          });
-          return false;
-        }
-        if (proj && isProjectFolderMissing(proj)) {
-          const detail = tr("project.pathMissing", { name: proj.name });
-          setLocalError(detail);
-          recordAutomationRun({
-            scheduleId: auto.id,
-            name: auto.title,
-            outcome: "error",
-            source: "run_now",
-            error: detail,
-          });
-          return false;
-        }
-        setMainPane("chat");
-        closeSettings();
-        setActiveProject(proj);
-        if (proj) {
-          setExpandedProjects((e) => ({ ...e, [proj.id]: true }));
-        } else {
-          setHistoryOpen(true);
-        }
-        openingSessionIdRef.current = null;
-        invalidateOpenPipelines();
-        bumpViewEpoch();
-        viewingSessionIdRef.current = null;
-        sessionTranscriptStore.setViewingSessionId(null);
-        sessionTranscriptStore.clearJournalLoad();
-        setMessages([]);
-        setAttachments([]);
-        setQuotes([]);
-        setPerm(null);
-        setAskUser(null);
-        setRetryStatus(null);
-        setLocalError(null);
-        setDraft("");
-        if (api.isTauri()) {
-          try {
-            await api.sessionDisconnect();
-          } catch {
-            /* ignore */
-          }
-        }
-        setSession({
-          ...IDLE_SNAPSHOT,
-          sessionId: null,
-          title: auto.title || tr("session.new"),
-          state: "idle",
-          backend: "grok_agent_stdio",
-        });
-        {
-          const idle = { ...IDLE_SNAPSHOT };
-          setLiveHost(idle);
-          liveHostRef.current = idle;
-        }
-
-        let sessionId: string | null = null;
-        if (api.isTauri()) {
-          const meta = (await api.sessionCreate(
-            proj?.id,
-            auto.title || tr("session.new"),
-            { scheduled: true },
-          )) as { id: string; title?: string; scheduled?: boolean };
-          sessionId = meta.id;
-          createdSessionId = meta.id;
-          viewingSessionIdRef.current = meta.id;
-          setSession((prev) => ({
-            ...prev,
-            sessionId: meta.id,
-            title: meta.title || auto.title,
-          }));
-          await refreshSessions();
-        }
-
-        // Persist model/effort for this session before connect when possible.
-        if (sessionId && api.isTauri() && (auto.modelId || auto.effort)) {
-          try {
-            await api.composerPrefsSet({
-              sessionId,
-              projectId: proj?.id ?? null,
-              modelId: auto.modelId,
-              effort: auto.effort,
-            });
-          } catch {
-            /* soft-fail */
-          }
-        }
-
-        const snap = await api.sessionConnect({
-          projectPath: proj?.path || generalWorkspacePath || undefined,
-          sessionId: sessionId ?? undefined,
-          mode: "agent",
-          sshAlias: proj?.sshAlias ?? null,
-        });
-        setLiveHost(snap);
-        liveHostRef.current = snap;
-        if (snap.sessionId) {
-          viewingSessionIdRef.current = snap.sessionId;
-          sessionId = snap.sessionId;
-        }
-        setSession({
-          ...snap,
-          title: snap.title || auto.title || snap.title,
-        });
-        if (snap.lastError || snap.state !== "ready") {
-          const code = snap.lastError?.code ?? "AGENT_CRASHED";
-          const msg = snap.lastError?.message ?? "connect failed";
-          const detail = `${code}: ${msg}`;
-          setLocalError(
-            tr("automations.connectFailed", { detail }),
-          );
-          recordAutomationRun({
-            scheduleId: auto.id,
-            name: auto.title,
-            outcome: "error",
-            source: "run_now",
-            error: detail,
-          });
-          // Drop empty shell sessions so sidebar does not show SuperGrok ghosts.
-          if (createdSessionId && api.isTauri()) {
-            try {
-              await api.sessionDelete(createdSessionId);
-              await refreshSessions();
-            } catch {
-              /* ignore */
-            }
-            if (viewingSessionIdRef.current === createdSessionId) {
-              viewingSessionIdRef.current = null;
-              setMessages([]);
-              setSession({ ...IDLE_SNAPSHOT, state: "idle" });
-            }
-          }
-          return false;
-        }
-
-        if (sessionId && auto.modelId && api.isTauri()) {
-          try {
-            await api.sessionSetModel(auto.modelId, {
-              sessionId,
-              projectId: proj?.id ?? null,
-            });
-          } catch {
-            /* soft-fail */
-          }
-        }
-
-        const header = `[Scheduled: ${auto.title}]\n\n`;
-        const promptBody = header + auto.prompt;
-        const autoMsgs: ChatMessage[] = [
-          {
-            id: `u-auto-${Date.now()}`,
-            role: "user",
-            content: promptBody,
-            createdAt: new Date().toISOString(),
-          },
-        ];
-        if (sessionId) {
-          messagesBySessionRef.current.set(sessionId, autoMsgs);
-        }
-        setMessages(autoMsgs);
-        setSession((prev) => ({
-          ...prev,
-          state: "streaming",
-          lastError: null,
-          title: auto.title || prev.title,
-        }));
-
-        try {
-          await api.sessionSend(promptBody, null, sessionId);
-        } catch (sendErr) {
-          const errText = String(sendErr);
-          const failed: ChatMessage[] = [
-            ...autoMsgs,
-            {
-              id: `err-auto-${Date.now()}`,
-              role: "assistant",
-              content: errText,
-              isError: true,
-              createdAt: new Date().toISOString(),
-            },
-          ];
-          if (sessionId) {
-            messagesBySessionRef.current.set(sessionId, failed);
-          }
-          setMessages(failed);
-          setLocalError(errText);
-          setSession((prev) =>
-            prev.sessionId === sessionId
-              ? { ...prev, state: "ready" }
-              : prev,
-          );
-          recordAutomationRun({
-            scheduleId: auto.id,
-            name: auto.title,
-            outcome: "error",
-            source: "run_now",
-            error: errText,
-          });
-          return false;
-        }
-
-        const lastRunAt = new Date().toISOString();
-        const nextRunAt =
-          auto.frequency === "once"
-            ? null
-            : computeNextRunAt(
-                { ...auto, enabled: auto.frequency !== "once" },
-                new Date(Date.now() + 60_000),
-              );
-        await api.automationMarkRun(auto.id, lastRunAt, nextRunAt);
-        if (auto.frequency === "once") {
-          await api.automationSetEnabled(auto.id, false);
-        }
-        recordAutomationRun({
-          scheduleId: auto.id,
-          name: auto.title,
-          outcome: "ok",
-          source: "run_now",
-          at: lastRunAt,
-        });
-        return true;
-      } catch (e) {
-        setLocalError(String(e));
-        recordAutomationRun({
-          scheduleId: auto.id,
-          name: auto.title,
-          outcome: "error",
-          source: "run_now",
-          error: e,
-        });
-        return false;
-      } finally {
-        automationRunLock.current = false;
-      }
-    },
-    [projects, session.state, connecting, tr],
-  );
+  const runAutomation = useAutomationRunNow({
+    projects,
+    sessions,
+    availableModels,
+    customProviders,
+    generalWorkspacePath,
+    tr,
+    applyComposerPrefs,
+    setLocalError,
+    setMainPane,
+    closeSettings,
+    setActiveProject,
+    setExpandedProjects,
+    setHistoryOpen,
+    invalidateOpenPipelines,
+    bumpViewEpoch,
+    composer: { setDraft, setAttachments, setQuotes },
+    setMessages,
+    setPerm,
+    setAskUser,
+    setRetryStatus,
+    setSession,
+    setLiveHost,
+    refreshSessions,
+    openSessionRef,
+    openingSessionIdRef,
+    viewingSessionIdRef,
+    liveHostRef,
+    messagesBySessionRef,
+    sessionNavHostRef,
+  });
 
   // Host automation_runner ticks while the process is alive (including tray).
   // UI only surfaces toasts / refreshes list — do not double-fire from WebView.
@@ -5974,18 +5730,13 @@ export function AppWorkbench() {
    */
   const pasteIntoComposer = useCallback(() => {
     void (async () => {
-      // 1. Text on the clipboard.
-      let text = "";
-      try {
-        text = ((await navigator.clipboard.readText()) ?? "").trim();
-      } catch {
-        /* not readable as text — fall through to media */
-      }
-      // Bare file:// URL(s) from copying a file in the OS — not useful as
-      // draft text; the real payload is handled by the media paths below.
-      const lines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-      const fileUrlOnly =
-        lines.length > 0 && lines.every((l) => /^file:\/\//i.test(l));
+      // 1. Text. The web clipboard is often empty on Linux; the host clipboard
+      // is the one Ctrl+V reads.
+      const text = (
+        await readClipboardPlainText(() => api.clipboardReadText())
+      ).trim();
+      // file:// list from an OS file copy — attach it, do not insert the URL.
+      const fileUrlOnly = clipboardTextIsFileList(text);
       if (text && !fileUrlOnly) {
         setDraft((prev) => {
           if (!prev) return text;
@@ -7374,21 +7125,6 @@ export function AppWorkbench() {
       .catch((e) => showToast(String(e), 4000));
   }, [activeProject?.id, session.sessionId, showToast]);
 
-  const sendQueueLabels = useMemo(
-    () => ({
-      sendFailed: tr("composer.queueSendFailed"),
-      droppedOldest: (n: number, max: number) =>
-        tr("composer.queueDroppedOldest", {
-          n: String(n),
-          max: String(max),
-        }),
-      externalAdded: (preview: string) =>
-        tr("composer.queueExternalAdded", { preview }),
-      externalAddedOther: (preview: string) =>
-        tr("composer.queueExternalAddedOther", { preview }),
-    }),
-    [tr],
-  );
   const sendQueue = useSendQueue({
     sessionId: session.sessionId,
     sessionState: session.state,
@@ -7401,7 +7137,7 @@ export function AppWorkbench() {
     executeSendRef: executeSendFromQueueRef,
     showToast,
     acceptExternal: !isSecondaryWindow,
-    labels: sendQueueLabels,
+    tr,
   });
 
   sendQueueRef.current = sendQueue;
@@ -9219,10 +8955,6 @@ export function AppWorkbench() {
     };
   }, [contextUsage, messages, locale, currentModelWindow]);
   const sessionSpend = useSessionSpend(session.sessionId);
-  /** Full provider list for composer model menu groups. */
-  const [customProviders, setCustomProviders] = useState<api.CustomProvider[]>(
-    [],
-  );
   const [providerActiveSource, setProviderActiveSource] =
     useState<string>("official");
   const [providerActiveId, setProviderActiveId] = useState<string | null>(null);
@@ -9230,18 +8962,7 @@ export function AppWorkbench() {
   const modelPickBusyRef = useRef(false);
   const customRouteActive = activeCustomProvider != null;
   const composerProviderInputs = useMemo(
-    () =>
-      customProviders.map((p) => ({
-        id: p.id,
-        name: p.name,
-        model: p.model,
-        models: (p.models?.length
-          ? p.models
-          : p.model
-            ? [{ id: p.model, name: p.model }]
-            : []
-        ).map((m) => ({ id: m.id, name: m.name || m.id })),
-      })),
+    () => composerMenuProviders(customProviders),
     [customProviders],
   );
   sessionProviderChip.bind({
@@ -12305,6 +12026,8 @@ export function AppWorkbench() {
         replaceProviderBrandLogo={replaceProviderBrandLogo}
         welcomeMotionEnabled={welcomeMotionEnabled}
         setWelcomeMotionEnabled={setWelcomeMotionEnabled}
+        outputMotionEnabled={outputMotionEnabled}
+        setOutputMotionEnabled={setOutputMotionEnabled}
         restoreSessions={restoreSessions}
         runAccountLogin={runAccountLogin}
         runAccountLogout={runAccountLogout}
@@ -12669,6 +12392,12 @@ export function AppWorkbench() {
             onNewChat={newChat}
             onToast={setToast}
             onRunNow={(auto) => void runAutomation(auto)}
+            providers={customProviders}
+            defaultProviderId={
+              providerActiveSource === "custom"
+                ? (providerActiveId ?? "official")
+                : "official"
+            }
           >
           <>
           {activeProject && isProjectFolderMissing(activeProject) && (

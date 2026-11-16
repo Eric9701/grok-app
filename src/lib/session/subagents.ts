@@ -140,6 +140,34 @@ export function applySubagentEvent(
 }
 
 /**
+ * Keep at most `max` runs. Finished rows leave first, oldest first, so a live
+ * run stays on screen while the Tasks list is full. Live rows are dropped only
+ * after every finished row is gone, still oldest first. Under the cap the same
+ * array is returned.
+ */
+export function trimSubagentRuns(
+  runs: readonly SubagentRun[],
+  max: number,
+): readonly SubagentRun[] {
+  const cap = Math.max(0, Math.trunc(max));
+  if (runs.length <= cap) return runs;
+  let overflow = runs.length - cap;
+  const keep = runs.map((run) => {
+    if (overflow > 0 && run.finished) {
+      overflow -= 1;
+      return false;
+    }
+    return true;
+  });
+  for (let i = 0; i < keep.length && overflow > 0; i += 1) {
+    if (!keep[i]) continue;
+    keep[i] = false;
+    overflow -= 1;
+  }
+  return runs.filter((_, i) => keep[i]);
+}
+
+/**
  * Coarse panel status. Anything other than a recognised terminal status stays
  * `finished` — a cancelled run is not a failure, and an outcome the CLI never
  * reported must not be invented.
@@ -186,8 +214,13 @@ export function formatSubagentDuration(ms: number | undefined): string {
   if (ms < 1000) return `${ms}ms`;
   const totalSeconds = ms / 1000;
   if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.round(totalSeconds % 60);
+  let minutes = Math.floor(totalSeconds / 60);
+  let seconds = Math.round(totalSeconds % 60);
+  // 119.6s rounds to 60 leftover seconds ("1m 60s"). Carry that into the next minute.
+  if (seconds === 60) {
+    seconds = 0;
+    minutes += 1;
+  }
   if (minutes < 60) return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   const remMinutes = minutes % 60;

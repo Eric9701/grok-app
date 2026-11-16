@@ -80,6 +80,10 @@ import {
   loadMessageActionsVisibility,
 } from "./lib/messageActionsPref";
 import {
+  applyOutputMotionToDocument,
+  loadOutputMotionPref,
+} from "./lib/outputMotionPref";
+import {
   applyComposerMinRows,
   loadComposerMinRows,
 } from "./lib/composerMinRows";
@@ -87,7 +91,11 @@ import {
   applyWindowAlwaysOnTop,
   loadWindowAlwaysOnTopPref,
 } from "./lib/windowAlwaysOnTop";
-import { installZoomHotkeys } from "./lib/zoomHotkeys";
+import {
+  installZoomHotkeys,
+  readCurrentWebviewLabel,
+  shouldRestoreUiZoom,
+} from "./lib/zoomHotkeys";
 
 // Apply persisted theme preference (default: system) before first React paint.
 // Optional clock schedule (under System) wins over OS scheme when enabled.
@@ -117,6 +125,8 @@ applyMsgRailSide(loadMsgRailSide(localStorage));
 applySidebarDensity(loadSidebarDensity(localStorage), undefined, false);
 // Message action buttons (Appearance) — html[data-msg-actions].
 applyMessageActionsVisibility(loadMessageActionsVisibility(localStorage));
+// Model output motion (Appearance) — html[data-output-motion="off"].
+applyOutputMotionToDocument(loadOutputMotionPref(localStorage));
 // Composer empty min-height (General → Composer) — html[data-composer-min-rows].
 applyComposerMinRows(loadComposerMinRows(localStorage));
 // Windows WebView2: a page text-drag can stick input until the process restarts.
@@ -171,11 +181,14 @@ if (petQuickShell) {
 
   // The app has document-level capture handlers. Install the zoom handler on
   // window capture so Command +/- is handled before those shortcuts.
+  // Persisted scale is restored only for the main window and session windows.
   if (
     typeof window !== "undefined" &&
     ("__TAURI_INTERNALS__" in window || "__TAURI__" in window)
   ) {
-    installZoomHotkeys(window);
+    installZoomHotkeys(window, undefined, {
+      restore: shouldRestoreUiZoom(readCurrentWebviewLabel()),
+    });
   }
 }
 

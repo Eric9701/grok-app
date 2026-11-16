@@ -462,22 +462,29 @@ fn parse_reasoning_efforts(body: &serde_json::Value) -> Vec<ReasoningEffort> {
     efforts
 }
 
-#[allow(clippy::type_complexity)]
-fn read_models_cache(
-    path: &PathBuf,
-) -> Option<(
-    BTreeMap<String, ParsedCacheModel>,
-    Option<String>,
-    Option<String>,
-)> {
+struct ParsedModelsCache {
+    models: BTreeMap<String, ParsedCacheModel>,
+    origin: Option<String>,
+    fetched_at: Option<String>,
+}
+
+fn read_models_cache(path: &Path) -> Option<ParsedModelsCache> {
     let raw = fs::read_to_string(path).ok()?;
     let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
     let models_obj = v.get("models")?.as_object()?;
     let mut map = BTreeMap::new();
+    let mut has_valid_entry = false;
     for (id, body) in models_obj {
-        if id.trim().is_empty() {
+        // Keep the existing ID-only fallback for object bodies without `info`.
+        // Scalar bodies / malformed `info` are corrupt entries, not selectable
+        // model IDs, and cannot make a newer snapshot authoritative.
+        if id.trim().is_empty()
+            || !body.is_object()
+            || body.get("info").is_some_and(|info| !info.is_object())
+        {
             continue;
         }
+        has_valid_entry = true;
         let hidden = body
             .pointer("/info/hidden")
             .and_then(|x| x.as_bool())
@@ -515,6 +522,11 @@ fn read_models_cache(
             },
         );
     }
+    // No usable entries means this snapshot cannot mask another home. Valid
+    // hidden entries still count, so an all-hidden latest snapshot stays empty.
+    if !has_valid_entry {
+        return None;
+    }
     let origin = v
         .get("origin")
         .and_then(|x| x.as_str())
@@ -523,16 +535,23 @@ fn read_models_cache(
         .get("fetched_at")
         .and_then(|x| x.as_str())
         .map(|s| s.to_string());
-    Some((map, origin, fetched_at))
+    Some(ParsedModelsCache {
+        models: map,
+        origin,
+        fetched_at,
+    })
 }
 
 /// Models the user can select in the composer.
 ///
-/// Sources (first id wins, later files only fill gaps):
-/// 1. `models_cache.json` under live GROK_HOME, then `~/.atlas`, then `~/.grok`
-/// 2. Atlas / Grok Build `[model.*]` in the same homes' `config.toml`
-///    (enterprise managed catalog — this is what `atlas /model` lists)
-/// 3. Hard fallback `grok-4.6` when both are empty
+/// Sources:
+/// 1. The newest complete `models_cache.json` among live GROK_HOME, `~/.atlas`,
+///    and `~/.grok`. One snapshot only — an older home must not resurrect ids
+///    the newer catalog hid or removed.
+/// 2. Atlas / Grok Build `[model.*]` in those same homes' `config.toml`
+///    (enterprise managed catalog — this is what `atlas /model` lists).
+///    These fill gaps; they do not replace the chosen snapshot.
+/// 3. Hard fallback `grok-4.6` only when no usable snapshot and no catalog exist.
 ///
 /// App Settings → Providers relays are still channels; they are written only
 /// to App `agent-home` and are not the Atlas enterprise list.
@@ -542,33 +561,59 @@ pub fn list_available_models() -> AvailableModelsResult {
     let atlas_home = shared_cli_home();
     let legacy_home = user_grok_home();
 
-    let mut by_id: BTreeMap<String, AvailableModel> = BTreeMap::new();
+    let mut cache_paths = vec![agent_home.join("models_cache.json")];
+    if atlas_home != agent_home {
+        cache_paths.push(atlas_home.join("models_cache.json"));
+    }
+    if legacy_home != agent_home && legacy_home != atlas_home {
+        cache_paths.push(legacy_home.join("models_cache.json"));
+    }
+
+    list_available_models_from_caches(&cache_paths, settings.model_id.as_deref())
+}
+
+/// Select one complete snapshot, never a union: newer hidden / removed entries
+/// must not be resurrected from an older home. Valid RFC3339 timestamps win over
+/// missing / invalid timestamps. Ties keep the first path (the configured home).
+fn newest_models_cache(paths: &[PathBuf]) -> Option<ParsedModelsCache> {
+    let mut selected = None;
+    let mut newest_time = None;
+    for path in paths {
+        let Some(cache) = read_models_cache(path) else {
+            continue;
+        };
+        let time = cache
+            .fetched_at
+            .as_deref()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok());
+        if selected.is_none() || time > newest_time {
+            newest_time = time;
+            selected = Some(cache);
+        }
+    }
+    selected
+}
+
+fn list_available_models_from_caches(
+    paths: &[PathBuf],
+    settings_model: Option<&str>,
+) -> AvailableModelsResult {
+    let mut by_id = BTreeMap::new();
     let mut origin = None;
     let mut fetched_at = None;
     let mut config_default = None;
-
-    let mut cache_homes: Vec<PathBuf> = vec![agent_home.clone()];
-    if atlas_home != agent_home {
-        cache_homes.push(atlas_home.clone());
-    }
-    if legacy_home != agent_home && legacy_home != atlas_home {
-        cache_homes.push(legacy_home.clone());
-    }
-
-    for home in &cache_homes {
-        let cache = home.join("models_cache.json");
-        if let Some((map, o, f)) = read_models_cache(&cache) {
-            if origin.is_none() {
-                origin = o;
-            }
-            if fetched_at.is_none() {
-                fetched_at = f;
-            }
-            insert_parsed_models(&mut by_id, map);
-        }
+    let selected = newest_models_cache(paths);
+    let had_authoritative_cache = selected.is_some();
+    if let Some(cache) = selected {
+        origin = cache.origin;
+        fetched_at = cache.fetched_at;
+        insert_parsed_models(&mut by_id, cache.models);
     }
 
-    for home in &cache_homes {
+    for path in paths {
+        let Some(home) = path.parent() else {
+            continue;
+        };
         let cfg_path = home.join("config.toml");
         let Ok(text) = fs::read_to_string(&cfg_path) else {
             continue;
@@ -584,9 +629,10 @@ pub fn list_available_models() -> AvailableModelsResult {
 
     apply_editable_flags(&mut by_id);
 
-    // Hard fallback — known official ids when cache + Atlas catalog empty.
-    // Live CLI cache replaces this list, including Fast when the CLI ships it.
-    if by_id.is_empty() {
+    // Only no usable snapshot permits the offline fallback. A live catalog
+    // that hides every known id must stay empty of those ids. Enterprise
+    // `[model.*]` rows above still count as a real catalog.
+    if by_id.is_empty() && !had_authoritative_cache {
         insert_static_fallback(&mut by_id);
     }
 
@@ -603,10 +649,12 @@ pub fn list_available_models() -> AvailableModelsResult {
         }
     }
 
-    // Settings model id, then CLI `[models].default`, then newest official (4.6 > 4.5).
+    // Settings model id, then CLI `[models].default`, then newest official.
+    // A saved provider route id (e.g. "yunyi") is ignored when it is not in
+    // this catalog.
     let preferred = preferred_official_model_id(
         &by_id,
-        settings.model_id.as_deref(),
+        settings_model,
         config_default.as_deref(),
     );
 
@@ -693,7 +741,11 @@ mod tests {
             }"#,
         )
         .unwrap();
-        let (map, origin, _) = read_models_cache(&path).expect("cache");
+        let ParsedModelsCache {
+            models: map,
+            origin,
+            ..
+        } = read_models_cache(&path).expect("cache");
         assert_eq!(
             map.get("grok-4.5").map(|m| m.label.as_str()),
             Some("Grok 4.5")
@@ -839,7 +891,7 @@ mod tests {
             }"#,
         )
         .unwrap();
-        let (map, _, _) = read_models_cache(&path).expect("cache");
+        let ParsedModelsCache { models: map, .. } = read_models_cache(&path).expect("cache");
         let m = map.get("grok-4.5").expect("model");
         assert_eq!(m.reasoning_efforts.len(), 1);
         assert_eq!(m.reasoning_efforts[0].id, "high");
@@ -876,7 +928,7 @@ mod tests {
             }"#,
         )
         .unwrap();
-        let (map, _, _) = read_models_cache(&path).expect("cache");
+        let ParsedModelsCache { models: map, .. } = read_models_cache(&path).expect("cache");
         assert_eq!(
             map.get("grok-4.5").and_then(|m| m.context_window),
             Some(256000)
@@ -991,7 +1043,7 @@ name = "ENC(not-a-label)"
             }"#,
         )
         .unwrap();
-        let (map, _, _) = read_models_cache(&path).expect("cache");
+        let ParsedModelsCache { models: map, .. } = read_models_cache(&path).expect("cache");
         let grok = map.get("grok-4.7").expect("4.7");
         assert_eq!(grok.context_window, Some(256000));
         assert_eq!(grok.context_windows, vec![256000, 500000]);
@@ -1113,3 +1165,7 @@ name = "ENC(not-a-label)"
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+#[cfg(test)]
+#[path = "models_catalog_cache_tests.rs"]
+mod cache_tests;

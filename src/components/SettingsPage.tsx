@@ -176,6 +176,7 @@ import {
   ensureNotifyPermission,
   refreshNotifyPermission,
   notificationSupport,
+  resolveNotifySoundEnabled,
   takeLastNativeNotifyError,
 } from "@/lib/desktopNotify";
 import {
@@ -278,6 +279,8 @@ export function SettingsPage({
   onReplaceProviderBrandLogo,
   welcomeMotionEnabled = true,
   onWelcomeMotionEnabled,
+  outputMotionEnabled = true,
+  onOutputMotionEnabled,
   goalOrchUiEnabled = true,
   onGoalOrchUiEnabled,
   messageTimeFormat = "absolute",
@@ -889,6 +892,7 @@ export function SettingsPage({
           title: t("settings.notify.honesty.test"),
           body: t("settings.notify.honesty.testOk"),
           sessionId: null,
+          sound: resolveNotifySoundEnabled(notifySound),
         });
         // Honest path-specific copy: bare tauri dev → Script Editor; .app → Grok.
         if (path === "osascript") {
@@ -915,7 +919,7 @@ export function SettingsPage({
     } finally {
       setNotifyTestBusy(false);
     }
-  }, [notifyTestBusy, t, showSettingsToast]);
+  }, [notifyTestBusy, notifySound, t, showSettingsToast]);
   const runClearWorkspaceMemory = useCallback(async () => {
     if (!workspaceCwd || clearMemoryBusy) return;
     setClearMemoryBusy(true);
@@ -1519,6 +1523,8 @@ export function SettingsPage({
     onReplaceProviderBrandLogo,
     welcomeMotionEnabled,
     onWelcomeMotionEnabled,
+    outputMotionEnabled,
+    onOutputMotionEnabled,
     goalOrchUiEnabled,
     onGoalOrchUiEnabled,
     messageTimeFormat,

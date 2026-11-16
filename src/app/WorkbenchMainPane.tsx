@@ -3,7 +3,12 @@ import { FleetPage } from "@/fleet/FleetPage";
 import { WikiPage } from "@/wiki/WikiPage";
 import type { AutomationsPageProps } from "@/components/AutomationsPage";
 import type { KanbanBoardPageProps } from "@/components/KanbanBoardPage";
-import { aiCreateSeedPrompt, type Automation } from "@/lib/automations";
+import {
+  aiCreateSeedPrompt,
+  automationProjectOptions,
+  automationSessionOptions,
+  type Automation,
+} from "@/lib/automations";
 import * as api from "@/lib/api";
 import type { ModelOption } from "@/lib/grokCatalog";
 import { useFeatureMask } from "@/lib/featureMask";
@@ -42,12 +47,19 @@ export function WorkbenchMainPane({
   onNewChat,
   onToast,
   onRunNow,
+  providers,
+  defaultProviderId,
   children,
 }: {
   mainPane: WorkbenchHashPane;
   locale: Locale;
   sessions: KanbanBoardPageProps["sessions"];
-  projects: Array<{ id: string; name: string; path: string }>;
+  projects: Array<{
+    id: string;
+    name: string;
+    path: string;
+    sshAlias?: string | null;
+  }>;
   liveMap: KanbanBoardPageProps["liveMap"];
   currentSessionId?: string | null;
   generalWorkspacePath?: string | null;
@@ -71,6 +83,8 @@ export function WorkbenchMainPane({
   ) => void | Promise<void>;
   onToast: (message: string | null) => void;
   onRunNow: (auto: Automation) => void;
+  providers: NonNullable<AutomationsPageProps["providers"]>;
+  defaultProviderId: string;
   children: ReactNode;
 }) {
   const featureMask = useFeatureMask();
@@ -135,10 +149,18 @@ export function WorkbenchMainPane({
       <Suspense fallback={null}>
         <AutomationsPage
           t={t}
-          projects={projects.map((project) => ({
-            id: project.id,
-            name: project.name,
-          }))}
+          projects={automationProjectOptions(projects)}
+          sessionOptions={automationSessionOptions(
+            sessions.map((session) => ({
+              id: session.id,
+              title: session.title?.trim() || tr("session.untitled"),
+              projectId: session.projectId ?? null,
+              updatedAt: session.updatedAt ?? "",
+              archived: session.archived,
+            })),
+          )}
+          providers={providers}
+          defaultProviderId={defaultProviderId}
           defaultModelId={modelId}
           defaultEffort={effort}
           models={models}
