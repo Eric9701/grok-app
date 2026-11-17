@@ -164,12 +164,10 @@ pub fn normalize(mut file: AgentRuntimesFile) -> AgentRuntimesFile {
     if !known(&file.desktop_default_profile_id) {
         file.desktop_default_profile_id.clear();
     }
-    file.session_bindings.retain(|b| {
-        !b.session_id.trim().is_empty() && known(b.profile_id.trim())
-    });
-    file.relay_bindings.retain(|b| {
-        !b.relay_agent_id.trim().is_empty() && known(b.profile_id.trim())
-    });
+    file.session_bindings
+        .retain(|b| !b.session_id.trim().is_empty() && known(b.profile_id.trim()));
+    file.relay_bindings
+        .retain(|b| !b.relay_agent_id.trim().is_empty() && known(b.profile_id.trim()));
     for binding in &mut file.session_bindings {
         binding.session_id = binding.session_id.trim().to_string();
         binding.profile_id = binding.profile_id.trim().to_string();
@@ -269,10 +267,18 @@ pub fn apply_desktop_default(session_id: &str) {
     if default_id.is_empty() {
         return;
     }
-    if file.session_bindings.iter().any(|b| b.session_id == session_id) {
+    if file
+        .session_bindings
+        .iter()
+        .any(|b| b.session_id == session_id)
+    {
         return;
     }
-    if !file.profiles.iter().any(|p| p.id == default_id && p.enabled) {
+    if !file
+        .profiles
+        .iter()
+        .any(|p| p.id == default_id && p.enabled)
+    {
         return;
     }
     file.session_bindings.push(SessionBinding {
@@ -283,7 +289,10 @@ pub fn apply_desktop_default(session_id: &str) {
     let _ = save_unlocked(&file);
 }
 
-pub fn set_session_binding(session_id: &str, profile_id: &str) -> Result<AgentRuntimesFile, String> {
+pub fn set_session_binding(
+    session_id: &str,
+    profile_id: &str,
+) -> Result<AgentRuntimesFile, String> {
     let session_id = session_id.trim();
     if session_id.is_empty() {
         return Err("empty session id".into());
@@ -293,7 +302,11 @@ pub fn set_session_binding(session_id: &str, profile_id: &str) -> Result<AgentRu
     file.session_bindings.retain(|b| b.session_id != session_id);
     let profile_id = profile_id.trim();
     if !profile_id.is_empty() {
-        if !file.profiles.iter().any(|p| p.id == profile_id && p.enabled) {
+        if !file
+            .profiles
+            .iter()
+            .any(|p| p.id == profile_id && p.enabled)
+        {
             return Err("runtime profile is not available".into());
         }
         file.session_bindings.push(SessionBinding {
@@ -316,7 +329,11 @@ pub fn set_relay_binding(agent_id: &str, profile_id: &str) -> Result<AgentRuntim
     file.relay_bindings.retain(|b| b.relay_agent_id != agent_id);
     let profile_id = profile_id.trim();
     if !profile_id.is_empty() {
-        if !file.profiles.iter().any(|p| p.id == profile_id && p.enabled) {
+        if !file
+            .profiles
+            .iter()
+            .any(|p| p.id == profile_id && p.enabled)
+        {
             return Err("runtime profile is not available".into());
         }
         file.relay_bindings.push(RelayBinding {
@@ -721,10 +738,8 @@ mod tests {
     use super::*;
 
     fn isolated(f: impl FnOnce()) {
-        let dir = std::env::temp_dir().join(format!(
-            "agent-runtimes-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("agent-runtimes-test-{}", uuid::Uuid::new_v4()));
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("agent-runtimes.json");
         STORE_OVERRIDE.with(|slot| *slot.borrow_mut() = Some(path));

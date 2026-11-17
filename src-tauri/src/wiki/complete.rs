@@ -334,10 +334,8 @@ struct PromptFile {
 
 impl PromptFile {
     fn create(prompt: &str) -> Result<Self, String> {
-        let path = std::env::temp_dir().join(format!(
-            "atlas-wiki-prompt-{}.txt",
-            uuid::Uuid::new_v4()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("atlas-wiki-prompt-{}.txt", uuid::Uuid::new_v4()));
         std::fs::write(&path, prompt.as_bytes()).map_err(|e| format!("wiki_complete_spawn:{e}"))?;
         Ok(Self { path })
     }
@@ -355,7 +353,11 @@ fn is_model_rejection(text: &str) -> bool {
 }
 
 fn failure_preview(stdout: &str, stderr: &str) -> String {
-    let source = if stderr.trim().is_empty() { stdout } else { stderr };
+    let source = if stderr.trim().is_empty() {
+        stdout
+    } else {
+        stderr
+    };
     source.trim().chars().take(400).collect()
 }
 
@@ -422,8 +424,8 @@ pub fn configured_model() -> Result<(String, std::path::PathBuf), String> {
     let model = match resolve_model_id(settings.model_id.as_deref(), &config) {
         Ok(id) => id,
         Err(_) => {
-            let shared = fs_read(&crate::paths::shared_cli_home().join("config.toml"))
-                .unwrap_or_default();
+            let shared =
+                fs_read(&crate::paths::shared_cli_home().join("config.toml")).unwrap_or_default();
             resolve_model_id(None, &shared)?
         }
     };

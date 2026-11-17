@@ -11127,7 +11127,6 @@ export function AppWorkbench() {
     exportSessionStreamNdjson,
     exportSessionDiagnostic,
     exportSessionTrace,
-    confirmExportSessionTraceUpload,
   } = useSessionExportText({
     session,
     sessions,
@@ -11136,7 +11135,6 @@ export function AppWorkbench() {
     activeProject,
     tr,
     showToast,
-    setAppDialog,
   });
   const {
     exportImageTarget,
@@ -13323,7 +13321,6 @@ export function AppWorkbench() {
             composerCtxItems={composerCtxItems}
             composerCtxMenu={composerCtxMenu}
             confirmArchiveOlderThan={confirmArchiveOlderThan}
-            confirmExportSessionTraceUpload={confirmExportSessionTraceUpload}
             confirmForkSession={confirmForkSession}
             confirmRemoveWorktree={confirmRemoveWorktree}
             confirmResumeWithCodeRestore={confirmResumeWithCodeRestore}

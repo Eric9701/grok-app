@@ -66,6 +66,10 @@ export function wikiRead(project: string, path: string) {
   return invoke<WikiText>("wiki_read", { project, path });
 }
 
+export function wikiReadPages(project: string, paths: string[]) {
+  return invoke<WikiText[]>("wiki_read_pages", { project, paths });
+}
+
 export function wikiWritePages(
   project: string,
   pages: WikiPageInput[],
@@ -140,6 +144,69 @@ export function wikiComplete(prompt: string, project: string, modelId?: string) 
 
 export function wikiUsageList(project: string) {
   return invoke<WikiUsageEntry[]>("wiki_usage_list", { project });
+}
+
+export type WikiSessionSource = {
+  runtime: "atlas" | "claude" | "cursor" | "codex" | string;
+  enabled: boolean;
+  home: string;
+};
+
+export type WikiSessionRef = {
+  runtime: string;
+  id: string;
+};
+
+export type WikiSessionConfig = {
+  sources: WikiSessionSource[];
+  cwdPrefixes: string[];
+  included: WikiSessionRef[];
+  excluded: WikiSessionRef[];
+  autoIncludeNew: boolean;
+};
+
+export type WikiPrompts = {
+  digest: string;
+  analyze: string;
+  generate: string;
+};
+
+export type WikiSessionHit = {
+  runtime: string;
+  id: string;
+  title: string;
+  cwd: string;
+  updatedAt: string;
+  included: boolean;
+};
+
+export type WikiSessionSync = {
+  written: string[];
+  rollups: string[];
+};
+
+export function wikiSessionConfigGet(project: string) {
+  return invoke<WikiSessionConfig>("wiki_session_config_get", { project });
+}
+
+export function wikiSessionConfigSet(project: string, config: WikiSessionConfig) {
+  return invoke<WikiSessionConfig>("wiki_session_config_set", { project, config });
+}
+
+export function wikiPromptsGet(project: string) {
+  return invoke<WikiPrompts>("wiki_prompts_get", { project });
+}
+
+export function wikiPromptsSet(project: string, prompts: WikiPrompts) {
+  return invoke<WikiPrompts>("wiki_prompts_set", { project, prompts });
+}
+
+export function wikiSessionsScan(project: string) {
+  return invoke<WikiSessionHit[]>("wiki_sessions_scan", { project });
+}
+
+export function wikiSessionsSync(project: string) {
+  return invoke<WikiSessionSync>("wiki_sessions_sync", { project });
 }
 
 export function wikiUsageAppend(

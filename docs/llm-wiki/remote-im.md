@@ -147,6 +147,8 @@
 | GUI 控件 | 类型 | 说明 | 默认 |
 |----------|------|------|------|
 | 启用远程控制 | Toggle | 关：停 Bridge、不随 App 启动 | 关（用户首次打开引导开启） |
+
+控制码位 2（值 4）为 0 时，上面这个开关即使原先是开的，已保存的各渠道也不连接、不随应用拉起，看门狗也不会把它们重新拉起来。配置本身不改；这一位变为 1 之后才按原配置启动。
 | 运行状态 | Status badge | 运行中 / 已停止 / 错误 | — |
 | 启动 / 停止 / 重启 | Button group | Attached 生命周期 | — |
 | 打开日志 | Button | 应用内日志面板或 reveal 文件 | — |
@@ -189,7 +191,7 @@
 
 | 能力 | 首版 | GUI 位置 |
 |------|------|----------|
-| `/p` `/r` `/new` `/status` `/context` `/compact` `/help` `/stop` `/whoami` `/account` `/quota` `/switch` | ✅ | 总览说明 + 帮助文案；上下文用量与压缩；账号列表含剩余额度 |
+| `/p` `/r` `/new` `/status` `/context` `/compact` `/help` `/stop` `/whoami` `/account` `/quota` `/switch` `/$` | ✅ | 总览说明 + 帮助文案；上下文用量与压缩；账号列表含剩余额度。`/$` 只把正文记入当前会话，不调用 Agent，也不进 Telegram 原生命令菜单 |
 | `/model` `/mode` 远程改模型 | 二期 | 总览高级 |
 | `/shell` `/cron` | 默认关 | 总览高级 + admin_from |
 
@@ -211,6 +213,7 @@
 | `/account` `/accounts` `/quota` | 列出已保存 Grok 账号 + SuperGrok 剩余额度（`★` 为当前） |
 | `/account <序号\|标签>` `/switch <n>` | 切换活动账号（写 `~/.grok/auth.json` + agent-home，软断桌面 ACP） |
 | `/stop` | 中断 turn |
+| `/$ <内容>` | 把内容记入当前 App 会话并显示。不调用 Agent，不改变绑定模式。无正文且无待收附件时只回复用法。Telegram 原生命令菜单不收录（`$` 不是合法命令名） |
 | `/whoami` | 平台 user id |
 | `0` / 取消 | 退出编号选择模式 |
 
@@ -486,7 +489,7 @@ Bridge **启动**与 **测试连接成功** 时自动调用 `setMyCommands`，�
 
 群聊里 @ 机器人后发 `/p`、序号或 `/status`。正文开头的 `@机器人` 会去掉，后面的命令与私聊相同。形如 `@E:\文件` 的路径会保留。
 
-长连接可以接收单聊图片、文件、视频和图文混排。文件写到当前工作目录的 `.remote/{msgid}/` 下。同一条消息里的文字会立刻交给 Agent；只有文件时先收下，下一条文字再带上这些路径。下载地址只接受 `https` 的 `weixin.qq.com`，以及企业微信自己的 COS 桶 `ww-aibot-*.cos.<区域>.myqcloud.com`。纯文本主模型（GLM、MiniMax、Kimi 等）不会收到像素；Host 先按 CLI 实际使用的 `config.toml` 识图，再把文字描述交给 Agent。Agent 回复里的本地 PNG、JPEG、GIF 会上传后作为图片发回当前这条会话。相对路径和 Markdown 图片按当前工作目录解析。单张不超过 10MB。Webhook 与主动推送图片仍不支持。
+长连接可以接收单聊图片、文件、视频和图文混排。收下的图片不超过 10MB，文件和视频不超过 100MB。文件写到当前工作目录的 `.remote/{msgid}/` 下。百分号编码的文件名先解码一次再落盘，已经是中文的名字保持不变。同一条消息里的文字会立刻交给 Agent；只有文件时先收下，下一条文字再带上这些路径。下载地址只接受 `https` 的 `weixin.qq.com`，以及企业微信自己的 COS 桶 `ww-aibot-*.cos.<区域>.myqcloud.com`。纯文本主模型（GLM、MiniMax、Kimi 等）不会收到像素；Host 先按 CLI 实际使用的 `config.toml` 识图，再把文字描述交给 Agent。Agent 回复里的本地 PNG、JPEG、GIF 会上传后作为图片发回当前这条会话。相对路径和 Markdown 图片按当前工作目录解析。单张不超过 10MB。Webhook 与主动推送图片仍不支持。
 
 ---
 
@@ -609,7 +612,8 @@ Callout：社区桥、风险自负。
 
 | 项 | 规格 |
 |----|------|
-| Agent | 仅 Grok Build CLI / ACP（`--resume` + `GROK_HOME=agent-home`） |
+| Agent | 仅 Grok Build CLI / ACP（`--resume` + `GROK_HOME` 与桌面同一套） |
+| 模型 | 新回合 `--model` 用 `[models].default`。会话已保存 `model_id` 时用该会话的模型。只 `--resume`、会话上还没有模型时，不传 `--model`，沿用 CLI 会话里的模型 |
 | work_dir | 仅 App 信任项目 path。`{ allow: [] }` / 未知 scope **不**回退 `$HOME`，自由文本不 spawn，回复「没有可用项目，请 /p」 |
 | 新会话 | IM 首轮后写入 `sessions_index` + `sessions/<id>/messages.json`；标题取自首条用户消息 |
 | 继续 | 绑定 `agentSessionId`；每轮 append user/assistant 到 App journal |

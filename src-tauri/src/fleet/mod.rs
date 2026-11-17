@@ -22,10 +22,10 @@ use serde_json::Value;
 use tokio::sync::{mpsc, oneshot, Notify};
 
 use protocol::{
-    dispatch_agent_id, initialize_line, parse_incoming, permission_result_line, preview_text,
-    remote_cwd_ok, session_cancel_line, session_id_from_result, session_new_line,
-    session_prompt_line, validate_listen, worker_command, InFrame, LineEvent, Step,
-    DEFAULT_BIND, LOCAL_AGENT,
+    dispatch_agent_id, initialize_line, models_from_acp_result, normalize_model_id, parse_incoming,
+    permission_result_line, preview_text, remote_cwd_ok, session_cancel_line,
+    session_id_from_result, session_new_line, session_prompt_line, session_set_model_line,
+    validate_listen, worker_command, InFrame, LineEvent, Step, DEFAULT_BIND, LOCAL_AGENT,
 };
 use schedule::{is_terminal, TaskRecord, GRACE_MS, MAX_TERMINAL};
 
@@ -207,7 +207,17 @@ async fn drive(
         if out.send(initialize_line(id)).is_err() {
             return DriveEnd::Disconnected;
         }
-        match next_matching(out, lines, cancel, stop, id, Some(Instant::now() + Duration::from_secs(30)), on_step).await {
+        match next_matching(
+            out,
+            lines,
+            cancel,
+            stop,
+            id,
+            Some(Instant::now() + Duration::from_secs(30)),
+            on_step,
+        )
+        .await
+        {
             Seen::Result(_) => {}
             Seen::Error(message) => return env_failed(message),
             Seen::Cancelled => return DriveEnd::Cancelled,
@@ -247,6 +257,45 @@ async fn drive(
     if cancel.load(Ordering::Relaxed) {
         let _ = out.send(session_cancel_line(&session_id));
         return DriveEnd::Cancelled;
+    }
+    if !task.model.is_empty() {
+        let set_id = next_rpc();
+        if out
+            .send(session_set_model_line(set_id, &session_id, &task.model))
+            .is_err()
+        {
+            return DriveEnd::Disconnected;
+        }
+        match next_matching(
+            out,
+            lines,
+            cancel,
+            stop,
+            set_id,
+            Some(Instant::now() + Duration::from_secs(30)),
+            on_step,
+        )
+        .await
+        {
+            Seen::Result(_) => {}
+            Seen::Error(message) => {
+                return DriveEnd::Failed {
+                    reason: "model_rejected".into(),
+                    message,
+                };
+            }
+            Seen::Cancelled => {
+                let _ = out.send(session_cancel_line(&session_id));
+                return DriveEnd::Cancelled;
+            }
+            Seen::Disconnected => return DriveEnd::Disconnected,
+            Seen::TimedOut => {
+                return DriveEnd::Failed {
+                    reason: "model_rejected".into(),
+                    message: "session/set_model timed out".into(),
+                };
+            }
+        }
     }
     let prompt_id = next_rpc();
     if out
@@ -394,7 +443,8 @@ async fn local_loop(stop: Arc<AtomicBool>) {
                 },
                 Ok(mut pipe) => {
                     let mut on_step = |step| note_step(&task_id, step);
-                    let mut on_session = |sid: &str, rpc: &str| mark_task_running(&task_id, sid, rpc);
+                    let mut on_session =
+                        |sid: &str, rpc: &str| mark_task_running(&task_id, sid, rpc);
                     let end = drive(
                         &task,
                         &pipe.out_tx,
@@ -559,7 +609,12 @@ fn expire_now() {
         let before: HashMap<String, String> = h
             .tasks
             .iter()
-            .map(|task| (task.id.clone(), format!("{}:{}", task.status, task.unreachable)))
+            .map(|task| {
+                (
+                    task.id.clone(),
+                    format!("{}:{}", task.status, task.unreachable),
+                )
+            })
             .collect();
         let now = now_ms();
         let created = schedule::expire_unreachable(&mut h.tasks, now, GRACE_MS);
@@ -617,7 +672,12 @@ fn stop_listener() {
     });
 }
 
-async fn restart_listener(enabled: bool, bind: String, token: String, sample_agent: Option<String>) -> ListenApply {
+async fn restart_listener(
+    enabled: bool,
+    bind: String,
+    token: String,
+    sample_agent: Option<String>,
+) -> ListenApply {
     stop_listener();
     if !enabled {
         with_hub(|h| {
@@ -758,6 +818,7 @@ pub struct TaskDto {
     pub session_id: String,
     pub retry_of: Option<String>,
     pub unreachable: bool,
+    pub model: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -772,7 +833,22 @@ pub struct TraceDto {
     pub failure_reason: Option<String>,
     pub session_id: String,
     pub unreachable: bool,
+    pub model: String,
     pub steps: Vec<Step>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FleetModelDto {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FleetModelsDto {
+    pub models: Vec<FleetModelDto>,
+    pub current_model_id: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -798,10 +874,16 @@ fn task_dto(task: &TaskRecord) -> TaskDto {
         session_id: task.session_id.clone(),
         retry_of: task.retry_of.clone(),
         unreachable: task.unreachable,
+        model: task.model.clone(),
     }
 }
 
-fn check_dispatch(agent_id: &str, cwd: &str, prompt: &str) -> Result<(String, String, String), String> {
+fn check_dispatch(
+    agent_id: &str,
+    cwd: &str,
+    prompt: &str,
+    model: &str,
+) -> Result<(String, String, String, String), String> {
     let agent = dispatch_agent_id(agent_id).map_err(|_| "empty_agent".to_string())?;
     if !remote_cwd_ok(cwd) {
         return Err("cwd_not_absolute".into());
@@ -810,7 +892,8 @@ fn check_dispatch(agent_id: &str, cwd: &str, prompt: &str) -> Result<(String, St
     if prompt.is_empty() {
         return Err("empty_prompt".into());
     }
-    Ok((agent, cwd.trim().to_string(), prompt.to_string()))
+    let model = normalize_model_id(model).map_err(|_| "invalid_model".to_string())?;
+    Ok((agent, cwd.trim().to_string(), prompt.to_string(), model))
 }
 
 #[tauri::command]
@@ -879,20 +962,132 @@ pub fn fleet_task_trace(id: String) -> Result<TraceDto, String> {
         failure_reason: task.failure_reason,
         session_id: task.session_id,
         unreachable: task.unreachable,
+        model: task.model,
         steps,
     })
 }
 
+/// Ask the local Atlas CLI which models it advertises, over ACP.
+///
+/// `initialize` is enough when the result already lists models. Otherwise a
+/// throwaway `session/new` is cancelled before the process exits. This does
+/// not use the worker socket and does not write `config.toml`.
 #[tauri::command]
-pub fn fleet_dispatch(agent_id: String, cwd: String, prompt: String) -> Result<TaskDto, String> {
-    let (agent, cwd, prompt) = check_dispatch(&agent_id, &cwd, &prompt)?;
-    let task = schedule::new_task(
+pub async fn fleet_models() -> Result<FleetModelsDto, String> {
+    static GATE: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+    let _hold = GATE
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .lock()
+        .await;
+    let mut pipe = local_agent::open().await?;
+    let listed = probe_models(&pipe.out_tx, &mut pipe.line_rx).await;
+    local_agent::shutdown(pipe).await;
+    if let Err(err) = &listed {
+        tracing::warn!(target: "fleet", "model probe: {err}");
+    }
+    listed
+}
+
+async fn probe_models(
+    out: &mpsc::UnboundedSender<String>,
+    lines: &mut mpsc::UnboundedReceiver<LineEvent>,
+) -> Result<FleetModelsDto, String> {
+    let init_id = next_rpc();
+    if out.send(initialize_line(init_id)).is_err() {
+        return Err("probe_failed".into());
+    }
+    let init = read_rpc(out, lines, init_id, 45).await?;
+    let (models, current) = models_from_acp_result(&init);
+    if !models.is_empty() {
+        return Ok(models_dto(models, current));
+    }
+    let cwd = probe_cwd();
+    let new_id = next_rpc();
+    if out.send(session_new_line(new_id, &cwd)).is_err() {
+        return Err("probe_failed".into());
+    }
+    let created = read_rpc(out, lines, new_id, 30).await?;
+    let session_id = session_id_from_result(&created);
+    if !session_id.is_empty() {
+        let _ = out.send(session_cancel_line(&session_id));
+    }
+    let (models, current) = models_from_acp_result(&created);
+    Ok(models_dto(models, current))
+}
+
+async fn read_rpc(
+    out: &mpsc::UnboundedSender<String>,
+    lines: &mut mpsc::UnboundedReceiver<LineEvent>,
+    id: u64,
+    secs: u64,
+) -> Result<Value, String> {
+    let cancel = AtomicBool::new(false);
+    let stop = AtomicBool::new(false);
+    let mut on_step = |_: Step| {};
+    match next_matching(
+        out,
+        lines,
+        &cancel,
+        &stop,
+        id,
+        Some(Instant::now() + Duration::from_secs(secs)),
+        &mut on_step,
+    )
+    .await
+    {
+        Seen::Result(result) => Ok(result),
+        Seen::Error(message) => Err(message),
+        Seen::TimedOut => Err("timed_out".into()),
+        Seen::Cancelled | Seen::Disconnected => Err("probe_failed".into()),
+    }
+}
+
+fn models_dto(models: Vec<protocol::ListedModel>, current_model_id: String) -> FleetModelsDto {
+    FleetModelsDto {
+        models: models
+            .into_iter()
+            .map(|model| FleetModelDto {
+                id: model.id,
+                name: model.name,
+            })
+            .collect(),
+        current_model_id,
+    }
+}
+
+fn probe_cwd() -> String {
+    let settings = crate::store::load_settings();
+    let home = crate::paths::resolve_agent_grok_home(&settings.session_data_mode);
+    if home.is_absolute() && home.is_dir() {
+        return home.to_string_lossy().into_owned();
+    }
+    let temp = std::env::temp_dir();
+    if temp.is_absolute() && temp.is_dir() {
+        return temp.to_string_lossy().into_owned();
+    }
+    if cfg!(windows) {
+        "C:\\".into()
+    } else {
+        "/".into()
+    }
+}
+
+#[tauri::command]
+pub fn fleet_dispatch(
+    agent_id: String,
+    cwd: String,
+    prompt: String,
+    model: String,
+) -> Result<TaskDto, String> {
+    let (agent, cwd, prompt, model) = check_dispatch(&agent_id, &cwd, &prompt, &model)?;
+    let mut task = schedule::new_task(
         &uuid::Uuid::new_v4().simple().to_string(),
         &agent,
         &cwd,
         &prompt,
         now_ms(),
     );
+    task.model = model;
     let dto = task_dto(&task);
     with_hub(|h| {
         let _ = store::save_task(&h.dir, &task);
@@ -966,10 +1161,18 @@ mod tests {
 
     #[test]
     fn dispatch_rejects_relative_cwd_without_touching_disk() {
-        let err = check_dispatch("box", "relative/path", "hello").unwrap_err();
+        let err = check_dispatch("box", "relative/path", "hello", "").unwrap_err();
         assert_eq!(err, "cwd_not_absolute");
-        assert!(check_dispatch("box", "/data/proj", "hello").is_ok());
-        assert!(super::protocol::token_matches("secret-token", "secret-token"));
+        let ok = check_dispatch("box", "/data/proj", "hello", " grok-4.7 ").unwrap();
+        assert_eq!(ok.3, "grok-4.7");
+        assert_eq!(
+            check_dispatch("box", "/data/proj", "hello", "bad\nid").unwrap_err(),
+            "invalid_model"
+        );
+        assert!(super::protocol::token_matches(
+            "secret-token",
+            "secret-token"
+        ));
         assert!(token_last4("secret-token").len() <= 4);
         assert_ne!(token_last4("secret-token"), "secret-token");
     }
@@ -1033,5 +1236,111 @@ mod tests {
         let saved = steps.lock().unwrap();
         assert!(saved.iter().any(|step| step.text.contains("done-step")));
         assert!(!saved.iter().any(|step| step.text.contains("jsonrpc")));
+    }
+
+    #[tokio::test]
+    async fn chosen_model_is_set_before_the_prompt() {
+        let methods = Arc::new(Mutex::new(Vec::new()));
+        let (out_tx, mut line_rx) = scripted_cli(methods.clone(), false);
+        let mut task = schedule::new_task("t", "local", "/data/proj", "say hi", 1);
+        task.model = "grok-4.7".into();
+        let mut on_step = |_: Step| {};
+        let mut on_session = |_: &str, _: &str| {};
+        let end = drive(
+            &task,
+            &out_tx,
+            &mut line_rx,
+            &AtomicBool::new(false),
+            &AtomicBool::new(false),
+            true,
+            &mut on_step,
+            &mut on_session,
+        )
+        .await;
+        assert!(matches!(end, DriveEnd::Completed { .. }));
+        assert_eq!(
+            methods.lock().unwrap().as_slice(),
+            [
+                "initialize",
+                "session/new",
+                "session/set_model",
+                "session/prompt"
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn rejected_model_stops_before_the_prompt() {
+        let methods = Arc::new(Mutex::new(Vec::new()));
+        let (out_tx, mut line_rx) = scripted_cli(methods.clone(), true);
+        let mut task = schedule::new_task("t", "local", "/data/proj", "say hi", 1);
+        task.model = "missing".into();
+        let mut on_step = |_: Step| {};
+        let mut on_session = |_: &str, _: &str| {};
+        let end = drive(
+            &task,
+            &out_tx,
+            &mut line_rx,
+            &AtomicBool::new(false),
+            &AtomicBool::new(false),
+            true,
+            &mut on_step,
+            &mut on_session,
+        )
+        .await;
+        match end {
+            DriveEnd::Failed { reason, .. } => assert_eq!(reason, "model_rejected"),
+            other => panic!("unexpected {other:?}"),
+        }
+        assert_eq!(
+            methods.lock().unwrap().as_slice(),
+            ["initialize", "session/new", "session/set_model"]
+        );
+    }
+
+    fn scripted_cli(
+        methods: Arc<Mutex<Vec<String>>>,
+        reject_model: bool,
+    ) -> (
+        mpsc::UnboundedSender<String>,
+        mpsc::UnboundedReceiver<LineEvent>,
+    ) {
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel::<String>();
+        let (line_tx, line_rx) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            while let Some(line) = out_rx.recv().await {
+                let value: Value = serde_json::from_str(&line).unwrap();
+                let method = value
+                    .get("method")
+                    .and_then(|item| item.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if method.is_empty() {
+                    continue;
+                }
+                methods.lock().unwrap().push(method.clone());
+                let id = value.get("id").and_then(|item| item.as_u64()).unwrap_or(0);
+                if reject_model && method == "session/set_model" {
+                    let _ = line_tx.send(LineEvent::Line(
+                        json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "error": { "code": -32602, "message": "unknown model" }
+                        })
+                        .to_string(),
+                    ));
+                    continue;
+                }
+                let result = if method == "session/new" {
+                    json!({ "sessionId": "sess-1" })
+                } else {
+                    json!({ "ok": true })
+                };
+                let _ = line_tx.send(LineEvent::Line(
+                    json!({ "jsonrpc": "2.0", "id": id, "result": result }).to_string(),
+                ));
+            }
+        });
+        (out_tx, line_rx)
     }
 }

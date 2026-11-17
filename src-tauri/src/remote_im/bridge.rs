@@ -178,7 +178,19 @@ impl BridgeRuntime {
         Ok(())
     }
 
+    pub fn connectors_running(&self) -> bool {
+        *self.running.lock()
+    }
+
+    /// Stop connectors without clearing the saved "enabled" flag.
+    pub async fn stop_keep_config(&mut self) -> Result<(), String> {
+        self.stop_async_inner(false).await
+    }
+
     pub async fn start_async(&mut self) -> Result<(), String> {
+        if !crate::feature_mask::remote_control_allowed() {
+            return Err("remote control is turned off".into());
+        }
         self.enabled = true;
         self.last_error = None;
         *self.phase.lock() = "starting".into();
@@ -249,7 +261,11 @@ impl BridgeRuntime {
     }
 
     /// Called on App launch: if Bridge was enabled (or ready channels exist), start connectors.
+    /// A closed remote-control bit leaves the saved config alone and does not connect.
     pub async fn try_autostart_async(&mut self) -> Result<(), String> {
+        if !crate::feature_mask::remote_control_allowed() {
+            return Ok(());
+        }
         if *self.running.lock() {
             return Ok(());
         }
@@ -269,6 +285,9 @@ impl BridgeRuntime {
     }
 
     pub async fn reload_async(&mut self, _channel: &str, _instance_id: &str) -> Result<(), String> {
+        if !crate::feature_mask::remote_control_allowed() {
+            return Err("remote control is turned off".into());
+        }
         // Always (re)start after save/connect so channels actually receive messages.
         self.enabled = true;
         self.persist_config();
@@ -325,6 +344,13 @@ impl BridgeRuntime {
     /// **Does not sleep** while holding the runtime lock — schedules
     /// `NEXT_RETRY_UNIX` and returns so status IPC stays responsive.
     pub async fn health_tick_async(&mut self) {
+        if !crate::feature_mask::remote_control_allowed() {
+            if *self.running.lock() {
+                tracing::info!("remote_im: remote control bit is off; stopping connectors");
+                let _ = self.stop_async_inner(false).await;
+            }
+            return;
+        }
         if !self.enabled {
             return;
         }

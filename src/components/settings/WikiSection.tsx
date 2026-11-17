@@ -8,6 +8,7 @@ import type { WikiUsageEntry } from "@/lib/api";
 import { intlLocale, type Vars } from "@/i18n";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
 import { WikiLibrariesField } from "./WikiLibrariesField";
+import { WikiSessionFields } from "./WikiSessionFields";
 
 export const DEFAULT_WIKI_COMPILE_TURNS = 6;
 
@@ -267,6 +268,7 @@ export function WikiSection() {
   return (
     <>
       <WikiLibrariesField t={t} rowHighlight={rowHighlight} />
+      <WikiSessionFields t={t} rowHighlight={rowHighlight} />
       <WikiCompileModelField t={t} rowHighlight={rowHighlight} />
       <WikiCompileTurnsField t={t} rowHighlight={rowHighlight} />
       <WikiCompileHistory />

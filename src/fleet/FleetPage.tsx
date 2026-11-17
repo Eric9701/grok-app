@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createT, type Locale } from "@/i18n";
 import * as api from "@/lib/api";
-import type { FleetStatus, FleetTask, FleetTrace } from "@/lib/api/fleet";
+import type { FleetModel, FleetStatus, FleetTask, FleetTrace } from "@/lib/api/fleet";
 import { FleetBoard } from "./FleetBoard";
 import { preferredAgent } from "./pickAgent";
 
 export function FleetPage({ locale }: { locale: Locale }) {
-  const tr = createT(locale);
+  const tr = useMemo(() => createT(locale), [locale]);
   const [status, setStatus] = useState<FleetStatus | null>(null);
   const [tasks, setTasks] = useState<FleetTask[]>([]);
   const [trace, setTrace] = useState<FleetTrace | null>(null);
@@ -15,6 +15,13 @@ export function FleetPage({ locale }: { locale: Locale }) {
   const [agentTouched, setAgentTouched] = useState(false);
   const [cwd, setCwd] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [models, setModels] = useState<FleetModel[]>([]);
+  const [modelId, setModelId] = useState("");
+  const [modelsBusy, setModelsBusy] = useState(false);
+  const [modelsError, setModelsError] = useState("");
+  const modelTouched = useRef(false);
+  const modelsGen = useRef(0);
+  const alive = useRef(true);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -31,6 +38,50 @@ export function FleetPage({ locale }: { locale: Locale }) {
       /* keep the last snapshot */
     }
   }, []);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  const loadModels = useCallback(async () => {
+    if (!api.isTauri()) return;
+    const mine = ++modelsGen.current;
+    setModelsBusy(true);
+    setModelsError("");
+    try {
+      const next = await api.fleetModels();
+      if (!alive.current || mine !== modelsGen.current) return;
+      setModels(next.models);
+      setModelId((prev) => {
+        const known = prev !== "" && next.models.some((model) => model.id === prev);
+        if (modelTouched.current && (prev === "" || known)) return prev;
+        if (
+          next.currentModelId &&
+          next.models.some((model) => model.id === next.currentModelId)
+        ) {
+          return next.currentModelId;
+        }
+        return "";
+      });
+    } catch (err) {
+      if (!alive.current || mine !== modelsGen.current) return;
+      const code = invokeError(err);
+      setModelsError(
+        code.includes("runtime_missing_executable")
+          ? tr("fleet.cliMissing")
+          : tr("fleet.modelRefreshFailed"),
+      );
+    } finally {
+      if (alive.current && mine === modelsGen.current) setModelsBusy(false);
+    }
+  }, [tr]);
+
+  useEffect(() => {
+    void loadModels();
+  }, [loadModels]);
 
   useEffect(() => {
     void refresh();
@@ -71,16 +122,17 @@ export function FleetPage({ locale }: { locale: Locale }) {
     if (!api.isTauri()) return;
     setBusy(true);
     try {
-      await api.fleetDispatch(agentId.trim(), cwd.trim(), prompt);
+      await api.fleetDispatch(agentId.trim(), cwd.trim(), prompt, modelId);
       setPrompt("");
       await refresh();
     } catch (err) {
-      const code =
-        typeof err === "string" ? err : err instanceof Error ? err.message : "";
+      const code = invokeError(err);
       setFormError(
         code.includes("cwd_not_absolute")
           ? tr("fleet.cwdRelative")
-          : tr("fleet.dispatchFailed"),
+          : code.includes("invalid_model")
+            ? tr("fleet.modelInvalid")
+            : tr("fleet.dispatchFailed"),
       );
     } finally {
       setBusy(false);
@@ -106,6 +158,10 @@ export function FleetPage({ locale }: { locale: Locale }) {
       agentId={agentId}
       cwd={cwd}
       prompt={prompt}
+      models={models}
+      modelId={modelId}
+      modelsBusy={modelsBusy}
+      modelsError={modelsError}
       busy={busy}
       formError={formError}
       onAgentId={(id) => {
@@ -114,6 +170,11 @@ export function FleetPage({ locale }: { locale: Locale }) {
       }}
       onCwd={setCwd}
       onPrompt={setPrompt}
+      onModelId={(id) => {
+        modelTouched.current = true;
+        setModelId(id);
+      }}
+      onRefreshModels={() => void loadModels()}
       onDispatch={() => void dispatch()}
       onCancel={(id) => void cancel(id)}
       onOpen={setOpenId}
@@ -123,4 +184,8 @@ export function FleetPage({ locale }: { locale: Locale }) {
       }}
     />
   );
+}
+
+function invokeError(err: unknown) {
+  return typeof err === "string" ? err : err instanceof Error ? err.message : "";
 }

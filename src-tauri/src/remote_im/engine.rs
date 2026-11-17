@@ -1091,6 +1091,10 @@ impl Engine {
             BuiltinCommand::Account { query } => {
                 self.handle_account(query.as_deref(), scope, msg).await;
             }
+            BuiltinCommand::Note { text } => {
+                self.handle_note(text.as_deref(), scope, msg, default_wd)
+                    .await;
+            }
             BuiltinCommand::Unknown { raw } => {
                 let t = if self.lang() == "en" {
                     format!("Unknown command `/{raw}`. Send `/help`.")
@@ -1098,6 +1102,53 @@ impl Engine {
                     format!("未知命令 `/{raw}`。发送 `/help` 查看。")
                 };
                 let _ = self.reply_msg(msg, &t).await;
+            }
+        }
+    }
+
+    /// `/$`: persist the message on the App session and reply. Never starts a turn.
+    async fn handle_note(
+        &self,
+        text: Option<&str>,
+        scope: &str,
+        msg: &IncomingMessage,
+        default_wd: &str,
+    ) {
+        let Some(binding) = self.ensure_binding(msg, scope, default_wd).await else {
+            return;
+        };
+        let body = text.unwrap_or("").trim();
+        let files = binding.pending_attachments.clone();
+        if body.is_empty() && files.is_empty() {
+            let key = if msg.media_refs.is_empty() {
+                MessageKey::NoteNeedsText
+            } else {
+                MessageKey::AttachmentFailed
+            };
+            let _ = self.reply_msg(msg, i18n::t(&self.lang(), key)).await;
+            return;
+        }
+        let stored: Vec<crate::store::MessageAttachmentStored> = files
+            .iter()
+            .map(|file| crate::store::MessageAttachmentStored {
+                path: file.path.clone(),
+                name: file.name.clone(),
+                is_dir: false,
+            })
+            .collect();
+        match app_sessions::append_note_to_app(&binding, body, &msg.channel, &stored) {
+            Ok(mut next) => {
+                next.pending_attachments.clear();
+                self.store.set(scope, next);
+                let _ = self
+                    .reply_msg(msg, i18n::t(&self.lang(), MessageKey::NoteRecorded))
+                    .await;
+            }
+            Err(error) => {
+                tracing::warn!(%error, "remote_im: note was not journaled");
+                let _ = self
+                    .reply_msg(msg, i18n::t(&self.lang(), MessageKey::NoteFailed))
+                    .await;
             }
         }
     }
@@ -1179,6 +1230,7 @@ impl Engine {
                     .as_ref()
                     .and_then(|item| item.tokens_after)
             });
+        let compact_model = headless_model_for_binding(&binding, true);
         let result = grok_agent::run_turn(
             &PathBuf::from(&binding.work_dir),
             &compact_prompt,
@@ -1186,6 +1238,7 @@ impl Engine {
             self.allow_remote_yolo,
             Some(cancel_rx),
             None,
+            compact_model.as_deref(),
         )
         .await;
         if result.cancelled || !active_turn.complete() {
@@ -1612,6 +1665,7 @@ impl Engine {
             } => (work_dir.clone(), Some(agent_session_id.clone())),
         };
 
+        let turn_model = headless_model_for_binding(&binding, resume_id.is_some());
         let result = grok_agent::run_turn(
             &PathBuf::from(&wd),
             &agent_prompt,
@@ -1619,6 +1673,7 @@ impl Engine {
             self.allow_remote_yolo,
             Some(cancel_rx),
             None,
+            turn_model.as_deref(),
         )
         .await;
 
@@ -1700,6 +1755,11 @@ impl Engine {
         );
         if let Some(compact) = compact.as_ref() {
             app_sessions::sync_compact_to_app(&next, compact);
+        }
+        if !had_error {
+            if let Some(model) = turn_model.as_deref() {
+                let _ = crate::store::set_session_model_if_empty(&next.local_session_id, model);
+            }
         }
         let work_dir = next.work_dir.clone();
         self.store.set(scope, next);
@@ -1830,6 +1890,20 @@ impl Engine {
 
 /// Empty / narrowed project scope must not start a compact or resume turn
 /// (and leftover out-of-scope bindings are treated as blocked).
+fn headless_model_for_binding(binding: &ScopeBinding, resuming: bool) -> Option<String> {
+    let session_model = crate::store::load_sessions_index()
+        .into_iter()
+        .find(|row| row.id == binding.local_session_id)
+        .and_then(|row| row.model_id);
+    let default_model = crate::store::resolve_composer_prefs(None, None).model_id;
+    control_plane::headless_turn_model(
+        session_model.as_deref(),
+        resuming,
+        Some(default_model.as_str()),
+    )
+    .map(str::to_string)
+}
+
 fn scope_blocks_agent_io(
     default_wd: &str,
     scoped: &[TrustedProject],

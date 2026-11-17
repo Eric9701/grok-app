@@ -194,6 +194,7 @@ pub async fn run_turn(
     always_approve: bool,
     cancel: Option<oneshot::Receiver<()>>,
     on_delta: Option<tokio::sync::mpsc::Sender<String>>,
+    model: Option<&str>,
 ) -> GrokTurnResult {
     let binary = resolve_grok_binary();
     run_turn_with_binary(
@@ -204,6 +205,7 @@ pub async fn run_turn(
         always_approve,
         cancel,
         on_delta,
+        model,
     )
     .await
 }
@@ -216,6 +218,7 @@ async fn run_turn_with_binary(
     always_approve: bool,
     cancel: Option<oneshot::Receiver<()>>,
     on_delta: Option<tokio::sync::mpsc::Sender<String>>,
+    model: Option<&str>,
 ) -> GrokTurnResult {
     run_turn_with_binary_and_env(
         binary,
@@ -225,6 +228,7 @@ async fn run_turn_with_binary(
         always_approve,
         cancel,
         on_delta,
+        model,
         apply_agent_env,
     )
     .await
@@ -239,6 +243,7 @@ async fn run_turn_with_binary_and_env(
     always_approve: bool,
     mut cancel: Option<oneshot::Receiver<()>>,
     on_delta: Option<tokio::sync::mpsc::Sender<String>>,
+    model: Option<&str>,
     configure_command: ConfigureCommand,
 ) -> GrokTurnResult {
     if cancellation_requested(&mut cancel) {
@@ -258,6 +263,7 @@ async fn run_turn_with_binary_and_env(
         fmt,
         &partial,
         &bg_wait,
+        model,
     );
 
     if cancellation_requested(&mut cancel) {
@@ -784,6 +790,7 @@ mod tests {
                 false,
                 Some(cancel_rx),
                 None,
+                None,
                 |_| {},
             )
             .await
@@ -866,6 +873,7 @@ mod tests {
                 None,
                 false,
                 Some(cancel_rx),
+                None,
                 None,
                 |_| {},
             )

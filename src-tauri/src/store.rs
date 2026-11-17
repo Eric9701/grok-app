@@ -607,6 +607,11 @@ pub struct AppSettings {
     /// so an older CLI is not asked to spawn an unknown id.
     #[serde(default)]
     pub official_model_47_migrated: bool,
+    /// One-shot: drop a product Grok id when CLI `[models].default` is a
+    /// different catalog id. Stays false until that default is present.
+    /// After it runs, a later Composer pick (including Grok) is kept.
+    #[serde(default)]
+    pub atlas_enterprise_default_migrated: bool,
     /// One-shot: official grok-4.6 product effort high → xhigh.
     #[serde(default)]
     pub official_effort_xhigh_migrated: bool,
@@ -1024,6 +1029,7 @@ impl Default for AppSettings {
             effort_default_migrated: true,
             official_model_default_migrated: true,
             official_model_47_migrated: true,
+            atlas_enterprise_default_migrated: false,
             official_effort_xhigh_migrated: true,
             official_effort_xhigh_rows_migrated: true,
             workflows_default_migrated: true,
@@ -1328,6 +1334,16 @@ pub fn load_settings() -> AppSettings {
         s.official_model_47_migrated = true;
         let _ = write_json(&settings_file(), &s);
     }
+    // One-time: product Grok ids are not the CLI default. Clear grok-4.5 /
+    // 4.6 / 4.7 / Fast when `[models].default` is a different catalog id.
+    // Existing session rows are left alone. A later Composer pick sticks
+    // because this flag does not run again.
+    if !s.atlas_enterprise_default_migrated {
+        let catalog = crate::models_catalog::read_authoritative_catalog(&s.session_data_mode);
+        if apply_enterprise_default_migration(&mut s, &catalog) {
+            let _ = write_json(&settings_file(), &s);
+        }
+    }
     // One-time: official 4.6 product effort high → xhigh. Unset / empty / the
     // previous product default high lift; deliberate low/medium/max stay.
     // Skip custom-provider route ids (not grok-* / empty).
@@ -1420,6 +1436,93 @@ pub fn migrate_official_model_46_to_47(stored: Option<&str>) -> Option<String> {
         Some(PREVIOUS_OFFICIAL_MODEL_ID) => Some(DEFAULT_OFFICIAL_MODEL_ID.into()),
         Some(_) => None,
     }
+}
+
+const PRODUCT_GROK_CATALOG_IDS: &[&str] =
+    &["grok-4.5", "grok-4.6", "grok-4.7", "grok-4.7-build-fast"];
+
+fn is_product_grok_catalog_id(id: &str) -> bool {
+    PRODUCT_GROK_CATALOG_IDS
+        .iter()
+        .any(|known| known.eq_ignore_ascii_case(id.trim()))
+}
+
+/// True when a stored product Grok id should be cleared so new chats follow
+/// `[models].default`. Same id, empty values, and non-Grok picks stay.
+pub(crate) fn should_clear_product_grok_default(
+    stored: Option<&str>,
+    enterprise_default: Option<&str>,
+) -> bool {
+    let Some(stored) = stored.map(str::trim).filter(|s| !s.is_empty()) else {
+        return false;
+    };
+    let Some(enterprise) = enterprise_default.map(str::trim).filter(|s| !s.is_empty()) else {
+        return false;
+    };
+    if stored.eq_ignore_ascii_case(enterprise) {
+        return false;
+    }
+    is_product_grok_catalog_id(stored)
+}
+
+/// New chats use CLI `[models].default` when that id is in the catalog.
+/// A saved id outside the catalog (custom route) stays. Empty settings with
+/// no CLI default fall back to the product model. A chat that already stored
+/// `model_id` is resolved separately and is not changed here.
+pub(crate) fn resolve_global_model_choice(
+    saved: Option<&str>,
+    catalog_ids: &std::collections::BTreeSet<String>,
+    enterprise_default: Option<&str>,
+) -> String {
+    let saved = saved.map(str::trim).filter(|s| !s.is_empty());
+    let enterprise = enterprise_default
+        .map(str::trim)
+        .filter(|id| !id.is_empty() && catalog_ids.contains(*id));
+    if let Some(enterprise) = enterprise.as_deref() {
+        let saved_is_catalog = saved.is_some_and(|id| catalog_ids.contains(id));
+        if saved.is_none() || saved_is_catalog {
+            return enterprise.to_string();
+        }
+    }
+    if let Some(id) = saved {
+        if catalog_ids.contains(id) {
+            return id.to_string();
+        }
+        // A product Grok id that is only in the static fallback must not
+        // override the CLI default. Any other saved id (custom route) stays.
+        if is_product_grok_catalog_id(id) {
+            if let Some(enterprise) = enterprise {
+                return enterprise.to_string();
+            }
+        }
+        return id.to_string();
+    }
+    if let Some(enterprise) = enterprise {
+        return enterprise.to_string();
+    }
+    DEFAULT_OFFICIAL_MODEL_ID.to_string()
+}
+
+/// Returns true when settings were changed and should be written.
+fn apply_enterprise_default_migration(
+    settings: &mut AppSettings,
+    catalog: &crate::models_catalog::AuthoritativeCatalog,
+) -> bool {
+    if settings.atlas_enterprise_default_migrated {
+        return false;
+    }
+    let Some(enterprise) = catalog.default_id.as_deref() else {
+        return false;
+    };
+    if should_clear_product_grok_default(settings.model_id.as_deref(), Some(enterprise)) {
+        tracing::info!(
+            "settings migration: modelId {:?} cleared (CLI [models].default is {enterprise})",
+            settings.model_id
+        );
+        settings.model_id = None;
+    }
+    settings.atlas_enterprise_default_migrated = true;
+    true
 }
 
 /// One-shot: lift the old factory locale `"en"` (or empty) to `"system"`.
@@ -3422,13 +3525,18 @@ pub fn redact_text(input: &str) -> String {
     cleaned
 }
 
+fn global_model_id(settings: &AppSettings) -> String {
+    let catalog = crate::models_catalog::read_authoritative_catalog(&settings.session_data_mode);
+    resolve_global_model_choice(
+        settings.model_id.as_deref(),
+        &catalog.ids,
+        catalog.default_id.as_deref(),
+    )
+}
+
 fn global_prefs(settings: &AppSettings) -> (String, String, String, String) {
     (
-        settings
-            .model_id
-            .clone()
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| DEFAULT_OFFICIAL_MODEL_ID.into()),
+        global_model_id(settings),
         settings
             .effort
             .clone()
@@ -3642,6 +3750,34 @@ fn save_model_on_session(
         sess.model_id = Some(model_id);
         sess.updated_at = Utc::now();
         Ok(None)
+    })
+}
+
+/// Record the model on a chat that does not have one yet.
+///
+/// A chat that already chose a model keeps it when the default changes.
+pub fn set_session_model_if_empty(session_id: &str, model_id: &str) -> Result<(), String> {
+    let session_id = session_id.trim();
+    let model_id = model_id.trim();
+    if session_id.is_empty() || model_id.is_empty() {
+        return Ok(());
+    }
+    let session_id = session_id.to_string();
+    let model_id = model_id.to_string();
+    update_sessions_index(move |list| {
+        if let Some(sess) = list.iter_mut().find(|s| s.id == session_id) {
+            if sess
+                .model_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .is_none()
+            {
+                sess.model_id = Some(model_id);
+                sess.updated_at = Utc::now();
+            }
+        }
+        Ok(())
     })
 }
 
@@ -4264,6 +4400,141 @@ mod tests {
             migrate_legacy_official_model_default(Some("custom-relay")),
             None
         );
+    }
+
+    #[test]
+    fn clear_product_grok_only_when_cli_default_differs() {
+        assert!(should_clear_product_grok_default(
+            Some("grok-4.6"),
+            Some("arch-kimi-for-coding")
+        ));
+        assert!(should_clear_product_grok_default(
+            Some(" grok-4.7 "),
+            Some("arch-kimi-for-coding")
+        ));
+        assert!(should_clear_product_grok_default(
+            Some("grok-4.5"),
+            Some("arch-kimi-for-coding")
+        ));
+        assert!(should_clear_product_grok_default(
+            Some("grok-4.7-build-fast"),
+            Some("arch-kimi-for-coding")
+        ));
+        assert!(!should_clear_product_grok_default(
+            Some("grok-4.6"),
+            Some("grok-4.6")
+        ));
+        assert!(!should_clear_product_grok_default(
+            Some("arch-kimi-for-coding"),
+            Some("other")
+        ));
+        assert!(!should_clear_product_grok_default(
+            None,
+            Some("arch-kimi-for-coding")
+        ));
+        assert!(!should_clear_product_grok_default(Some("grok-4.6"), None));
+    }
+
+    #[test]
+    fn resolve_global_model_follows_cli_default_for_product_grok() {
+        use std::collections::BTreeSet;
+        let mut ids = BTreeSet::new();
+        ids.insert("arch-kimi-for-coding".to_string());
+        assert_eq!(
+            resolve_global_model_choice(Some("grok-4.6"), &ids, Some("arch-kimi-for-coding")),
+            "arch-kimi-for-coding"
+        );
+        assert_eq!(
+            resolve_global_model_choice(None, &ids, Some("arch-kimi-for-coding")),
+            "arch-kimi-for-coding"
+        );
+        assert_eq!(
+            resolve_global_model_choice(
+                Some("deepseek-v4-flash"),
+                &ids,
+                Some("arch-kimi-for-coding")
+            ),
+            "deepseek-v4-flash"
+        );
+        ids.insert("grok-4.6".to_string());
+        assert_eq!(
+            resolve_global_model_choice(Some("grok-4.6"), &ids, Some("arch-kimi-for-coding")),
+            "arch-kimi-for-coding",
+            "a catalog id saved in settings does not override the CLI default for a new chat"
+        );
+        let empty = BTreeSet::new();
+        assert_eq!(
+            resolve_global_model_choice(Some("grok-4.6"), &empty, None),
+            "grok-4.6"
+        );
+        assert_eq!(resolve_global_model_choice(None, &empty, None), "grok-4.7");
+    }
+
+    #[test]
+    fn load_settings_clears_product_grok_and_keeps_existing_session() {
+        with_temp_app_home("enterprise-default", |home| {
+            let atlas = home.join("cli-home");
+            fs::create_dir_all(&atlas).expect("cli home");
+            fs::write(
+                atlas.join("config.toml"),
+                r#"
+[models]
+default = "arch-kimi-for-coding"
+
+[model.arch-kimi-for-coding]
+name = "kimi"
+
+[model.grok-4.6]
+name = "Grok 4.6"
+"#,
+            )
+            .expect("config");
+            let mut seeded = AppSettings::default();
+            seeded.model_id = Some("grok-4.6".into());
+            seeded.atlas_enterprise_default_migrated = false;
+            save_settings(&seeded).expect("seed");
+
+            crate::models_catalog::with_test_catalog_homes(vec![atlas], || {
+                let loaded = load_settings();
+                assert_eq!(loaded.model_id, None);
+                assert!(loaded.atlas_enterprise_default_migrated);
+                assert_eq!(
+                    resolve_composer_prefs(None, None).model_id,
+                    "arch-kimi-for-coding"
+                );
+
+                let existing = create_session(None, Some("kept".into()), false).expect("session");
+                update_sessions_index({
+                    let sid = existing.id.clone();
+                    move |list| {
+                        let row = list.iter_mut().find(|s| s.id == sid).expect("row");
+                        row.model_id = Some("grok-4.6".into());
+                        Ok(())
+                    }
+                })
+                .expect("stamp session");
+                assert_eq!(
+                    resolve_composer_prefs(None, Some(&existing.id)).model_id,
+                    "grok-4.6"
+                );
+                let fresh = create_session(None, Some("fresh".into()), false).expect("fresh");
+                assert_eq!(
+                    resolve_composer_prefs(None, Some(&fresh.id)).model_id,
+                    "arch-kimi-for-coding"
+                );
+
+                let mut picked = load_settings();
+                picked.model_id = Some("grok-4.6".into());
+                save_settings(&picked).expect("explicit pick");
+                assert_eq!(
+                    resolve_composer_prefs(None, None).model_id,
+                    "arch-kimi-for-coding",
+                    "new chats follow [models].default even after a later settings.modelId write"
+                );
+                let _ = delete_session(&existing.id);
+                let _ = delete_session(&fresh.id);
+            });
+        });
     }
 
     #[test]

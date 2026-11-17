@@ -1024,7 +1024,8 @@ pub fn run() {
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
                     tracing::info!("remote_im: deferred autostart begin");
-                    remote_im::try_autostart(&rim).await;
+                    let _mask = crate::feature_mask::fetch_feature_mask().await;
+                    remote_im::apply_feature_gate(&rim).await;
                     tracing::info!("remote_im: deferred autostart finished");
                 });
 

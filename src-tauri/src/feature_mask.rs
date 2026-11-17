@@ -4,14 +4,38 @@
 //! Any failure, including a missing token, is mask 0. The token never leaves the host.
 
 use serde_json::Value;
+use std::sync::atomic::{AtomicI64, Ordering};
+
+/// Last mask from a host fetch. `-1` means not fetched yet, which is treated as off.
+static CACHED_MASK: AtomicI64 = AtomicI64::new(-1);
+
+/// Bits from the right: 1 fleet, 2 wiki, 4 remote, 8 agent CLI.
+pub(crate) fn remote_bit_on(mask: i64) -> bool {
+    (0..=65535).contains(&mask) && (mask & 4) != 0
+}
+
+/// Remote integrations may run only after a fetch that has bit 2 set.
+pub(crate) fn remote_control_allowed() -> bool {
+    remote_bit_on(CACHED_MASK.load(Ordering::Relaxed))
+}
 
 /// Bits from the right: 1 fleet, 2 wiki, 4 remote, 8 agent CLI.
 #[tauri::command]
 pub async fn feature_mask_get() -> i64 {
-    fetch_feature_mask().await
+    let mask = fetch_feature_mask().await;
+    // Login, switch, and logout all come through this command. Saved IM
+    // channels follow the new bit instead of staying up from the last config.
+    crate::remote_im::apply_feature_gate_from_app().await;
+    mask
 }
 
-async fn fetch_feature_mask() -> i64 {
+pub(crate) async fn fetch_feature_mask() -> i64 {
+    let mask = fetch_feature_mask_now().await;
+    CACHED_MASK.store(mask, Ordering::Relaxed);
+    mask
+}
+
+async fn fetch_feature_mask_now() -> i64 {
     let Some(token) = crate::account::read_access_token_for_mask() else {
         return 0;
     };
@@ -24,12 +48,7 @@ async fn fetch_feature_mask() -> i64 {
         Ok(c) => c,
         Err(_) => return 0,
     };
-    let response = match client
-        .get(url)
-        .bearer_auth(token)
-        .send()
-        .await
-    {
+    let response = match client.get(url).bearer_auth(token).send().await {
         Ok(r) => r,
         Err(_) => return 0,
     };
@@ -58,7 +77,11 @@ pub fn mask_from_body(body: &str) -> i64 {
     let Some(n) = v.get("featureMask").and_then(Value::as_i64) else {
         return 0;
     };
-    if (0..=65535).contains(&n) { n } else { 0 }
+    if (0..=65535).contains(&n) {
+        n
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]
@@ -68,6 +91,16 @@ mod tests {
     #[test]
     fn three_is_fleet_and_wiki() {
         assert_eq!(mask_from_body(r#"{"featureMask":3}"#), 3);
+    }
+
+    #[test]
+    fn remote_bit_is_four() {
+        assert!(!remote_bit_on(-1));
+        assert!(!remote_bit_on(0));
+        assert!(!remote_bit_on(3));
+        assert!(remote_bit_on(4));
+        assert!(remote_bit_on(15));
+        assert!(!remote_bit_on(65536));
     }
 
     #[test]

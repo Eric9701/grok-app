@@ -5,7 +5,7 @@
 //! `managed = true`) and is what `atlas /model` shows — merge those ids here.
 //! App-written custom relays under Settings → Providers stay channels.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
@@ -542,6 +542,105 @@ fn read_models_cache(path: &Path) -> Option<ParsedModelsCache> {
     })
 }
 
+/// Ids from `models_cache.json` and `config.toml` `[model.*]`, without the
+/// static Grok fallback. `default_id` is `[models].default` when that id is
+/// in the set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoritativeCatalog {
+    pub ids: BTreeSet<String>,
+    pub default_id: Option<String>,
+}
+
+impl AuthoritativeCatalog {
+    fn empty() -> Self {
+        Self {
+            ids: BTreeSet::new(),
+            default_id: None,
+        }
+    }
+}
+
+#[cfg(not(test))]
+fn catalog_homes(session_data_mode: &str) -> Vec<PathBuf> {
+    let agent_home = resolve_agent_grok_home(session_data_mode);
+    let atlas_home = shared_cli_home();
+    let legacy_home = user_grok_home();
+    let mut homes = vec![agent_home];
+    if homes[0] != atlas_home {
+        homes.push(atlas_home);
+    }
+    if !homes.iter().any(|home| home == &legacy_home) {
+        homes.push(legacy_home);
+    }
+    homes
+}
+
+fn authoritative_catalog_from_homes(homes: &[PathBuf]) -> AuthoritativeCatalog {
+    let cache_paths: Vec<PathBuf> = homes
+        .iter()
+        .map(|home| home.join("models_cache.json"))
+        .collect();
+    let mut ids = BTreeSet::new();
+    if let Some(cache) = newest_models_cache(&cache_paths) {
+        ids.extend(cache.models.into_keys());
+    }
+    let mut config_default = None;
+    for home in homes {
+        let Ok(text) = fs::read_to_string(home.join("config.toml")) else {
+            continue;
+        };
+        if text.trim().is_empty() {
+            continue;
+        }
+        if config_default.is_none() {
+            config_default = crate::providers::get_models_default(&text);
+        }
+        ids.extend(parse_config_catalog_models(&text).into_keys());
+    }
+    let default_id = config_default.filter(|id| ids.contains(id));
+    AuthoritativeCatalog { ids, default_id }
+}
+
+/// Cache + enterprise `[model.*]` for this session mode.
+///
+/// Tests do not read the developer machine's `~/.atlas` unless the calling
+/// thread opts in with [`with_test_catalog_homes`].
+pub fn read_authoritative_catalog(session_data_mode: &str) -> AuthoritativeCatalog {
+    #[cfg(test)]
+    {
+        let _ = session_data_mode;
+        let homes = TEST_CATALOG_HOMES.with(|cell| cell.borrow().clone());
+        return match homes {
+            Some(homes) => authoritative_catalog_from_homes(&homes),
+            None => AuthoritativeCatalog::empty(),
+        };
+    }
+    #[cfg(not(test))]
+    {
+        authoritative_catalog_from_homes(&catalog_homes(session_data_mode))
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_CATALOG_HOMES: std::cell::RefCell<Option<Vec<PathBuf>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Point [`read_authoritative_catalog`] at fixture homes for this thread.
+#[cfg(test)]
+pub(crate) fn with_test_catalog_homes<R>(homes: Vec<PathBuf>, f: impl FnOnce() -> R) -> R {
+    TEST_CATALOG_HOMES.with(|cell| *cell.borrow_mut() = Some(homes));
+    struct Clear;
+    impl Drop for Clear {
+        fn drop(&mut self) {
+            TEST_CATALOG_HOMES.with(|cell| *cell.borrow_mut() = None);
+        }
+    }
+    let _clear = Clear;
+    f()
+}
+
 /// Models the user can select in the composer.
 ///
 /// Sources:
@@ -551,7 +650,8 @@ fn read_models_cache(path: &Path) -> Option<ParsedModelsCache> {
 /// 2. Atlas / Grok Build `[model.*]` in those same homes' `config.toml`
 ///    (enterprise managed catalog — this is what `atlas /model` lists).
 ///    These fill gaps; they do not replace the chosen snapshot.
-/// 3. Hard fallback `grok-4.6` only when no usable snapshot and no catalog exist.
+/// 3. Static Grok fallback (`grok-4.7`, Fast, `grok-4.6`, `grok-4.5`) only when
+///    no usable snapshot and no `[model.*]` catalog exist.
 ///
 /// App Settings → Providers relays are still channels; they are written only
 /// to App `agent-home` and are not the Atlas enterprise list.
@@ -651,22 +751,26 @@ fn list_available_models_from_caches(
 
     // Settings model id, then CLI `[models].default`, then newest official.
     // A saved provider route id (e.g. "yunyi") is ignored when it is not in
-    // this catalog.
-    let preferred = preferred_official_model_id(
-        &by_id,
-        settings_model,
-        config_default.as_deref(),
-    );
+    // this catalog. The badge on Available Models is the CLI default when
+    // that id is actually listed; the preferred id only fills in when the
+    // config has no usable default.
+    let preferred = preferred_official_model_id(&by_id, settings_model, config_default.as_deref());
+    let marked = config_default
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty() && by_id.contains_key(*id))
+        .unwrap_or(preferred.as_str())
+        .to_string();
 
     let mut models: Vec<AvailableModel> = by_id.into_values().collect();
     models.sort_by(|a, b| a.id.cmp(&b.id));
     for m in &mut models {
-        m.is_default = m.id == preferred;
+        m.is_default = m.id == marked;
     }
 
     AvailableModelsResult {
         models,
-        default_model_id: preferred,
+        default_model_id: marked,
         origin,
         fetched_at,
     }
@@ -987,6 +1091,39 @@ name = "ENC(not-a-label)"
             crate::providers::get_models_default(text).as_deref(),
             Some("arch-kimi-for-coding")
         );
+    }
+
+    #[test]
+    fn authoritative_catalog_uses_cli_default_and_skips_hidden() {
+        let dir = std::env::temp_dir().join(format!(
+            "grok-app-auth-catalog-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = fs::create_dir_all(&dir);
+        fs::write(
+            dir.join("config.toml"),
+            r#"
+[models]
+default = "arch-kimi-for-coding"
+
+[model.arch-kimi-for-coding]
+name = "kimi"
+
+[model.hidden-one]
+name = "nope"
+hidden = true
+"#,
+        )
+        .unwrap();
+        let catalog = authoritative_catalog_from_homes(std::slice::from_ref(&dir));
+        assert!(catalog.ids.contains("arch-kimi-for-coding"));
+        assert!(!catalog.ids.contains("hidden-one"));
+        assert_eq!(catalog.default_id.as_deref(), Some("arch-kimi-for-coding"));
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

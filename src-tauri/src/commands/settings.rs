@@ -162,6 +162,11 @@ pub async fn settings_set(
     let schedules_launch_agent_flip =
         prev.schedules_launch_agent != settings.schedules_launch_agent;
 
+    // A one-shot flag omitted by an older settings payload must not re-arm
+    // and wipe a model the user picked after the migration.
+    settings.atlas_enterprise_default_migrated =
+        settings.atlas_enterprise_default_migrated || prev.atlas_enterprise_default_migrated;
+
     store::save_settings_async(&settings).await?;
 
     if proxy_flip {

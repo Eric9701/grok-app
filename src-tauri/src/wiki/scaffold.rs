@@ -66,7 +66,7 @@ pub fn init_existing(project: &Path, template: &str) -> Result<PathBuf, String> 
     for name in ["wiki", "raw", ".atlas-wiki"] {
         remove_child(&dest, name)?;
     }
-    apply_template(&dest, template, false)?;
+    apply_template(&dest, template, true)?;
     Ok(dest)
 }
 
@@ -101,21 +101,71 @@ fn remove_tree(root: &Path, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn apply_template(dest: &Path, template: &str, refresh_schema: bool) -> Result<(), String> {
+fn apply_template(dest: &Path, template: &str, replace_root_guides: bool) -> Result<(), String> {
     let spec = template_spec(template).ok_or_else(|| "wiki_template".to_string())?;
     for dir in spec.dirs {
         fs::create_dir_all(dest.join(dir)).map_err(|e| format!("wiki_io:{e}"))?;
     }
     for (rel, body) in spec.files {
-        let path = dest.join(rel);
-        if path.exists() && !(refresh_schema && *rel == "wiki/schema.md") {
-            continue;
+        write_guide(dest, rel, body, false)?;
+        if let Some(root_rel) = root_guide(rel) {
+            write_guide(dest, root_rel, body, replace_root_guides)?;
         }
-        if let Some(parent_dir) = path.parent() {
-            fs::create_dir_all(parent_dir).map_err(|e| format!("wiki_io:{e}"))?;
-        }
-        fs::write(&path, body).map_err(|e| format!("wiki_io:{e}"))?;
     }
+    Ok(())
+}
+
+/// llm-wiki opens a project only when these two files sit at the root.
+fn root_guide(rel: &str) -> Option<&'static str> {
+    match rel {
+        "wiki/schema.md" => Some("schema.md"),
+        "wiki/purpose.md" => Some("purpose.md"),
+        _ => None,
+    }
+}
+
+fn write_guide(dest: &Path, rel: &str, body: &str, replace: bool) -> Result<(), String> {
+    let path = dest.join(rel);
+    if path
+        .symlink_metadata()
+        .map(|meta| meta.file_type().is_symlink())
+        .unwrap_or(false)
+    {
+        return Err("wiki_symlink".into());
+    }
+    if path.exists() && !replace {
+        return Ok(());
+    }
+    if let Some(parent_dir) = path.parent() {
+        fs::create_dir_all(parent_dir).map_err(|e| format!("wiki_io:{e}"))?;
+    }
+    fs::write(&path, body).map_err(|e| format!("wiki_io:{e}"))
+}
+
+pub fn ensure_root_guides(project: &Path) -> Result<(), String> {
+    let root = require_project(project)?;
+    copy_if_missing(&root, "schema.md", "wiki/schema.md")?;
+    copy_if_missing(&root, "purpose.md", "wiki/purpose.md")?;
+    Ok(())
+}
+
+fn copy_if_missing(root: &Path, dest_rel: &str, src_rel: &str) -> Result<(), String> {
+    let dest = root.join(dest_rel);
+    if dest.symlink_metadata().is_ok() {
+        return Ok(());
+    }
+    let src = root.join(src_rel);
+    if !src.is_file() {
+        return Ok(());
+    }
+    if src
+        .symlink_metadata()
+        .map(|meta| meta.file_type().is_symlink())
+        .unwrap_or(true)
+    {
+        return Ok(());
+    }
+    fs::copy(&src, &dest).map_err(|e| format!("wiki_io:{e}"))?;
     Ok(())
 }
 
@@ -177,7 +227,9 @@ pub fn import_url(project: &Path, url: &str) -> Result<String, String> {
     fs::write(&dest, body).map_err(|e| format!("wiki_io:{e}"))?;
     written.push(format!(
         "raw/sources/{}",
-        dest.file_name().and_then(|n| n.to_str()).unwrap_or("page.md")
+        dest.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("page.md")
     ));
     Ok(written[0].clone())
 }
@@ -264,17 +316,15 @@ fn unique_dest(dir: &Path, name: &str) -> Result<PathBuf, String> {
 fn split_name(name: &str) -> (String, String) {
     let clean = safe_file_name(name);
     match clean.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() && text_ext(ext) => (stem.to_string(), ext.to_string()),
+        Some((stem, ext)) if !stem.is_empty() && text_ext(ext) => {
+            (stem.to_string(), ext.to_string())
+        }
         _ => (clean, "md".into()),
     }
 }
 
 fn safe_file_name(name: &str) -> String {
-    let tail = name
-        .rsplit(['/', '\\'])
-        .next()
-        .unwrap_or("source")
-        .trim();
+    let tail = name.rsplit(['/', '\\']).next().unwrap_or("source").trim();
     let mut out = String::new();
     for ch in tail.chars() {
         if ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '|' | '?' | '*') {
@@ -312,7 +362,9 @@ fn safe_name(name: &str) -> Result<String, String> {
         || text.contains('\\')
         || text.contains("..")
         || text.starts_with('.')
-        || text.chars().any(|ch| ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
+        || text
+            .chars()
+            .any(|ch| ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
     {
         return Err("wiki_name".into());
     }
@@ -350,9 +402,7 @@ fn host_blocked(host: &str) -> bool {
                 || v4.is_unspecified()
                 || v4.is_broadcast()
         }
-        std::net::IpAddr::V6(v6) => {
-            v6.is_loopback() || v6.is_unspecified() || is_v6_local(&v6)
-        }
+        std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified() || is_v6_local(&v6),
     }
 }
 
@@ -368,7 +418,8 @@ fn strip_tags(input: &str) -> String {
     let mut out = String::new();
     let mut chars = input.char_indices().peekable();
     while let Some((index, ch)) = chars.next() {
-        if !skip && (lower[index..].starts_with("<script") || lower[index..].starts_with("<style")) {
+        if !skip && (lower[index..].starts_with("<script") || lower[index..].starts_with("<style"))
+        {
             skip = true;
         }
         if skip {
@@ -548,7 +599,8 @@ mod tests {
     use super::*;
 
     fn scratch() -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("atlas-wiki-scaffold-{}", uuid::Uuid::new_v4()));
+        let dir =
+            std::env::temp_dir().join(format!("atlas-wiki-scaffold-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -560,9 +612,32 @@ mod tests {
         assert!(created.join("wiki/thesis").is_dir());
         assert!(created.join("raw/sources").is_dir());
         assert!(created.join("wiki/schema.md").is_file());
+        assert_eq!(
+            fs::read_to_string(created.join("schema.md")).unwrap(),
+            fs::read_to_string(created.join("wiki/schema.md")).unwrap()
+        );
+        assert!(created.join("purpose.md").is_file());
         fs::write(created.join("wiki/purpose.md"), "keep").unwrap();
+        fs::write(created.join("purpose.md"), "keep-root").unwrap();
         scaffold(&parent, "notes", "research").unwrap();
-        assert_eq!(fs::read_to_string(created.join("wiki/purpose.md")).unwrap(), "keep");
+        assert_eq!(
+            fs::read_to_string(created.join("wiki/purpose.md")).unwrap(),
+            "keep"
+        );
+        assert_eq!(
+            fs::read_to_string(created.join("purpose.md")).unwrap(),
+            "keep-root"
+        );
+        fs::remove_file(created.join("schema.md")).unwrap();
+        ensure_root_guides(&created).unwrap();
+        assert_eq!(
+            fs::read_to_string(created.join("schema.md")).unwrap(),
+            fs::read_to_string(created.join("wiki/schema.md")).unwrap()
+        );
+        assert_eq!(
+            fs::read_to_string(created.join("purpose.md")).unwrap(),
+            "keep-root"
+        );
         assert!(scaffold(&parent, "../escape", "research").is_err());
         assert!(scaffold(&parent, "notes", "nope").is_err());
         let _ = fs::remove_dir_all(&parent);
@@ -578,6 +653,9 @@ mod tests {
         fs::write(created.join("raw/sources/clip.md"), "source").unwrap();
         fs::create_dir_all(created.join(".atlas-wiki")).unwrap();
         fs::write(created.join(".atlas-wiki/usage.json"), "[]").unwrap();
+        fs::create_dir_all(created.join(".llm-wiki")).unwrap();
+        fs::write(created.join(".llm-wiki/project.json"), "{}").unwrap();
+        fs::write(created.join("purpose.md"), "keep-root").unwrap();
         assert!(init_existing(&created, "nope").is_err());
         assert_eq!(
             fs::read_to_string(created.join("wiki/purpose.md")).unwrap(),
@@ -587,12 +665,23 @@ mod tests {
         assert!(!created.join("wiki/concepts/pump.md").exists());
         assert!(!created.join("raw/sources/clip.md").exists());
         assert!(!created.join(".atlas-wiki/usage.json").exists());
+        assert_eq!(
+            fs::read_to_string(created.join(".llm-wiki/project.json")).unwrap(),
+            "{}"
+        );
         assert!(created.join("wiki/thesis").is_dir());
         assert!(created.join("raw/sources").is_dir());
         let purpose = fs::read_to_string(created.join("wiki/purpose.md")).unwrap();
         assert!(purpose.contains("目的"));
         let schema = fs::read_to_string(created.join("wiki/schema.md")).unwrap();
         assert!(schema.contains("wiki/thesis/"));
+        assert_eq!(
+            fs::read_to_string(created.join("schema.md")).unwrap(),
+            schema
+        );
+        assert!(fs::read_to_string(created.join("purpose.md"))
+            .unwrap()
+            .contains("目的"));
         let _ = fs::remove_dir_all(&parent);
     }
 

@@ -2392,7 +2392,10 @@ pub(crate) fn connected_model_source(
     if !foreign {
         return ConnectedModelSource::Catalog;
     }
-    match profile_model.map(str::trim).filter(|model| !model.is_empty()) {
+    match profile_model
+        .map(str::trim)
+        .filter(|model| !model.is_empty())
+    {
         Some(model) => ConnectedModelSource::Profile(model.to_string()),
         None => ConnectedModelSource::Skip,
     }

@@ -1,5 +1,7 @@
+import { IconRefresh } from "@/components/icons";
+import { Select } from "@/components/Select";
 import type { MessageKey } from "@/i18n";
-import type { FleetStatus, FleetTask, FleetTrace } from "@/lib/api/fleet";
+import type { FleetModel, FleetStatus, FleetTask, FleetTrace } from "@/lib/api/fleet";
 
 type TFn = (
   key: MessageKey,
@@ -11,6 +13,7 @@ const REASON_KEY: Record<string, MessageKey> = {
   environment_prepare_failed: "fleet.reason.prepare",
   runtime_missing_executable: "fleet.cliMissing",
   prompt_failed: "fleet.reason.prompt",
+  model_rejected: "fleet.reason.model",
 };
 
 function machineBusy(tasks: FleetTask[], agent: string, exceptId: string) {
@@ -52,11 +55,17 @@ export function FleetBoard({
   agentId,
   cwd,
   prompt,
+  models,
+  modelId,
+  modelsBusy,
+  modelsError,
   busy,
   formError,
   onAgentId,
   onCwd,
   onPrompt,
+  onModelId,
+  onRefreshModels,
   onDispatch,
   onCancel,
   onOpen,
@@ -69,17 +78,38 @@ export function FleetBoard({
   agentId: string;
   cwd: string;
   prompt: string;
+  models: FleetModel[];
+  modelId: string;
+  modelsBusy: boolean;
+  modelsError?: string;
   busy: boolean;
   formError?: string;
   onAgentId: (value: string) => void;
   onCwd: (value: string) => void;
   onPrompt: (value: string) => void;
+  onModelId: (value: string) => void;
+  onRefreshModels: () => void;
   onDispatch: () => void;
   onCancel: (id: string) => void;
   onOpen: (id: string) => void;
   onCloseTrace: () => void;
 }) {
   const remotes = (status?.machines ?? []).filter((machine) => !machine.local);
+  const modelOptions = models.length
+    ? [
+        { value: "", label: tr("fleet.modelDefault") },
+        ...models.map((model) => ({
+          value: model.id,
+          label: modelLabel(model, models),
+          keywords: `${model.name} ${model.id}`.toLowerCase(),
+        })),
+      ]
+    : [
+        {
+          value: "",
+          label: modelsBusy ? tr("fleet.modelRefreshing") : tr("fleet.modelEmpty"),
+        },
+      ];
   const tone = listenTone(status);
   const listenLabel = !status
     ? tr("fleet.listen")
@@ -187,6 +217,41 @@ export function FleetBoard({
                   <span className="fleet-form__hint">{tr("fleet.cwdHint")}</span>
                 </label>
               </div>
+              <div className="fleet-form__field">
+                <span>{tr("fleet.model")}</span>
+                <div className="fleet-form__model">
+                  <Select
+                    value={models.some((model) => model.id === modelId) ? modelId : ""}
+                    options={modelOptions}
+                    onChange={onModelId}
+                    disabled={modelsBusy || models.length === 0}
+                    aria-label={tr("fleet.model")}
+                    searchable={models.length > 8}
+                    searchPlaceholder={tr("fleet.model")}
+                    emptyLabel={tr("fleet.modelNoMatch")}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn--ghost fleet-form__model-refresh"
+                    disabled={modelsBusy}
+                    aria-label={
+                      modelsBusy ? tr("fleet.modelRefreshing") : tr("fleet.modelRefresh")
+                    }
+                    onClick={() => {
+                      if (!modelsBusy) onRefreshModels();
+                    }}
+                  >
+                    <IconRefresh size={14} />
+                    {modelsBusy ? tr("fleet.modelRefreshing") : tr("fleet.modelRefresh")}
+                  </button>
+                </div>
+                <span className="fleet-form__hint">{tr("fleet.modelHint")}</span>
+                {modelsError ? (
+                  <p className="fleet-page__error" role="alert">
+                    {modelsError}
+                  </p>
+                ) : null}
+              </div>
               <label>
                 <span>{tr("fleet.prompt")}</span>
                 <textarea
@@ -246,6 +311,9 @@ export function FleetBoard({
                             <span>
                               {task.agentId === "local" ? tr("fleet.local") : task.agentId}
                             </span>
+                            {task.model ? (
+                              <span className="fleet-task__model">{task.model}</span>
+                            ) : null}
                             <span className={`fleet-pill fleet-pill--${task.status}`}>
                               {statusLabel(tr, task.status)}
                             </span>
@@ -290,6 +358,7 @@ export function FleetBoard({
               <aside className="fleet-trace" aria-label={tr("fleet.traceClose")}>
                 <div className="fleet-trace__head">
                   <p className="fleet-trace__prompt">{trace.prompt}</p>
+                  {trace.model ? <p className="fleet-trace__model">{trace.model}</p> : null}
                   <button type="button" className="btn" onClick={onCloseTrace}>
                     {tr("fleet.traceClose")}
                   </button>
@@ -317,4 +386,10 @@ export function FleetBoard({
       )}
     </div>
   );
+}
+
+function modelLabel(model: FleetModel, models: FleetModel[]) {
+  const name = model.name.trim() || model.id;
+  const same = models.filter((item) => (item.name.trim() || item.id) === name).length;
+  return same > 1 && name !== model.id ? `${name} · ${model.id}` : name;
 }

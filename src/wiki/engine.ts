@@ -48,6 +48,73 @@ export type IngestResult = {
   modelId: string;
 };
 
+export type WikiPromptSet = {
+  digest?: string;
+  analyze?: string;
+  generate?: string;
+};
+
+/** Always appended after a custom or built-in generation prompt. */
+export const LOCKED_GENERATION_RULES = [
+  "Reply with text only. Do not call tools. Do not create or edit files.",
+  "The entire reply is one or more FILE blocks and nothing else. No introduction.",
+  "Each page must use this exact fence:",
+  "---FILE: wiki/concepts/example.md---",
+  "page body",
+  "---END FILE---",
+  "Paths stay under wiki/ and end in .md.",
+  "Do not emit wiki/index.md, wiki/overview.md, or wiki/log.md.",
+  "Each page starts with frontmatter containing title, type, sources (the raw source path), and related.",
+  "In the body, link an existing page as [[concepts/name]], using its path under wiki/ without the wiki/ prefix or .md.",
+].join("\n");
+
+export const LOCKED_ANALYSIS_RULES =
+  "Reply with text only. Do not call tools. Do not create or edit files.";
+
+export function promptRevision(prompts: WikiPromptSet | undefined): string {
+  const text = [prompts?.digest ?? "", prompts?.analyze ?? "", prompts?.generate ?? ""].join("\n\0");
+  let hash = 2_166_136_261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+export function cacheToken(fingerprint: string, revision: string): string {
+  return `${fingerprint}:${revision}`;
+}
+
+/** A source counts as extracted when its file is unchanged since the last compile. */
+export function sourceIsIngested(
+  cached: string | null | undefined,
+  fingerprint: string,
+  revision: string,
+): boolean {
+  if (!fingerprint || !cached) return false;
+  return cached === fingerprint || cached === cacheToken(fingerprint, revision);
+}
+
+function fillPrompt(
+  template: string,
+  vars: Record<string, string>,
+  required: string[],
+): string {
+  let text = template;
+  const missing: string[] = [];
+  for (const key of Object.keys(vars)) {
+    const token = `{{${key}}}`;
+    if (text.includes(token)) text = text.split(token).join(vars[key] ?? "");
+    else if (required.includes(key)) missing.push(key);
+  }
+  if (missing.length > 0) {
+    text +=
+      "\n\n" +
+      missing.map((key) => `${key}:\n${vars[key] ?? ""}`).join("\n\n");
+  }
+  return text;
+}
+
 const FILE_HEADER = /---\s*FILE:\s*([^\n]+?)\s*---\s*\n/gi;
 
 const tails = new Map<string, Promise<unknown>>();
@@ -131,22 +198,34 @@ export function buildAnalysisPrompt(input: {
   schema: string;
   purpose: string;
   index: string;
+  instruction?: string;
 }): string {
-  return [
-    "You analyze one source for a wiki. Reply with text only. Do not create or edit files.",
-    "",
-    "Purpose:",
-    input.purpose || "(none)",
-    "",
-    "Schema:",
-    input.schema || "(none)",
-    "",
-    "Index:",
-    input.index || "(none)",
-    "",
-    `Source path: ${input.sourcePath}`,
-    input.source,
-  ].join("\n");
+  const vars = {
+    purpose: input.purpose || "(none)",
+    schema: input.schema || "(none)",
+    index: input.index || "(none)",
+    sourcePath: input.sourcePath,
+    source: input.source,
+  };
+  const custom = input.instruction?.trim() ?? "";
+  const body = custom
+    ? fillPrompt(custom, vars, ["purpose", "schema", "index", "sourcePath", "source"])
+    : [
+        "You analyze one source for a wiki. Reply with text only. Do not create or edit files.",
+        "",
+        "Purpose:",
+        vars.purpose,
+        "",
+        "Schema:",
+        vars.schema,
+        "",
+        "Index:",
+        vars.index,
+        "",
+        `Source path: ${input.sourcePath}`,
+        input.source,
+      ].join("\n");
+  return `${body}\n\n${LOCKED_ANALYSIS_RULES}`;
 }
 
 export function buildGenerationPrompt(input: {
@@ -154,26 +233,39 @@ export function buildGenerationPrompt(input: {
   source: string;
   schema: string;
   analysis: string;
+  instruction?: string;
 }): string {
-  return [
-    "Write wiki pages from the analysis. Reply with text only. Do not call tools. Do not create or edit files.",
-    "The entire reply is one or more FILE blocks and nothing else. No introduction.",
-    "Each page must use this exact fence:",
-    "---FILE: wiki/concepts/example.md---",
-    "page body",
-    "---END FILE---",
-    "Paths stay under wiki/ and end in .md.",
-    "Do not emit wiki/index.md, wiki/overview.md, or wiki/log.md.",
-    "",
-    "Schema:",
-    input.schema || "(none)",
-    "",
-    "Analysis:",
-    input.analysis,
-    "",
-    `Source path: ${input.sourcePath}`,
-    input.source,
-  ].join("\n");
+  const vars = {
+    schema: input.schema || "(none)",
+    analysis: input.analysis,
+    sourcePath: input.sourcePath,
+    source: input.source,
+  };
+  const custom = input.instruction?.trim() ?? "";
+  const body = custom
+    ? fillPrompt(custom, vars, ["schema", "analysis", "sourcePath", "source"])
+    : [
+        "Write wiki pages from the analysis. Reply with text only. Do not call tools. Do not create or edit files.",
+        "The entire reply is one or more FILE blocks and nothing else. No introduction.",
+        "Each page must use this exact fence:",
+        "---FILE: wiki/concepts/example.md---",
+        "page body",
+        "---END FILE---",
+        "Paths stay under wiki/ and end in .md.",
+        "Do not emit wiki/index.md, wiki/overview.md, or wiki/log.md.",
+        "Each page starts with frontmatter containing title, type, sources (the raw source path), and related.",
+        "In the body, link an existing page as [[concepts/name]], using its path under wiki/ without the wiki/ prefix or .md.",
+        "",
+        "Schema:",
+        vars.schema,
+        "",
+        "Analysis:",
+        input.analysis,
+        "",
+        `Source path: ${input.sourcePath}`,
+        input.source,
+      ].join("\n");
+  return `${body}\n\n${LOCKED_GENERATION_RULES}`;
 }
 
 export function buildRepairPrompt(input: { sourcePath: string; draft: string }): string {
@@ -191,6 +283,17 @@ export function buildRepairPrompt(input: { sourcePath: string; draft: string }):
     "Previous reply:",
     draft || "(empty)",
   ].join("\n");
+}
+
+async function readGuide(
+  io: WikiIo,
+  project: string,
+  rootPath: string,
+  wikiPath: string,
+): Promise<string> {
+  const root = await readOptional(io, project, rootPath);
+  if (root.trim()) return root;
+  return readOptional(io, project, wikiPath);
 }
 
 async function readOptional(io: WikiIo, project: string, path: string): Promise<string> {
@@ -212,6 +315,7 @@ export function ingest(args: {
   io: WikiIo;
   onProgress?: (stage: IngestStage) => void;
   force?: boolean;
+  prompts?: WikiPromptSet;
 }): Promise<IngestResult> {
   return enqueue(args.project, () => runIngest(args));
 }
@@ -223,16 +327,18 @@ async function runIngest(args: {
   io: WikiIo;
   onProgress?: (stage: IngestStage) => void;
   force?: boolean;
+  prompts?: WikiPromptSet;
 }): Promise<IngestResult> {
   args.onProgress?.("read");
   const fingerprint = await args.io.fingerprint(args.project, args.sourcePath);
+  const token = cacheToken(fingerprint, promptRevision(args.prompts));
   const cached = await args.io.cacheGet(args.project, args.sourcePath);
-  if (!args.force && cached === fingerprint) {
+  if (!args.force && cached === token) {
     return { skipped: true, written: [], usage: null, modelId: "" };
   }
   const [schema, purpose, index, source] = await Promise.all([
-    readOptional(args.io, args.project, "wiki/schema.md"),
-    readOptional(args.io, args.project, "wiki/purpose.md"),
+    readGuide(args.io, args.project, "schema.md", "wiki/schema.md"),
+    readGuide(args.io, args.project, "purpose.md", "wiki/purpose.md"),
     readOptional(args.io, args.project, "wiki/index.md"),
     args.io.read(args.project, args.sourcePath),
   ]);
@@ -245,6 +351,7 @@ async function runIngest(args: {
         schema,
         purpose,
         index,
+        instruction: args.prompts?.analyze,
       }),
     ),
   );
@@ -256,6 +363,7 @@ async function runIngest(args: {
         source,
         schema,
         analysis: analysis.text,
+        instruction: args.prompts?.generate,
       }),
     ),
   );
@@ -296,7 +404,7 @@ async function runIngest(args: {
   if (!written.includes(fallbackPath)) {
     await args.io.remove?.(args.project, fallbackPath);
   }
-  await args.io.cachePut(args.project, args.sourcePath, fingerprint);
+  await args.io.cachePut(args.project, args.sourcePath, token);
   return {
     skipped: false,
     written,

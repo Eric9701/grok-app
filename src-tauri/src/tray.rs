@@ -767,7 +767,12 @@ mod badge_tests {
         assert!(label.ends_with('…'));
         assert_eq!(
             label,
-            format!("{}…", long.chars().take(RECENT_LABEL_MAX_CHARS - 1).collect::<String>())
+            format!(
+                "{}…",
+                long.chars()
+                    .take(RECENT_LABEL_MAX_CHARS - 1)
+                    .collect::<String>()
+            )
         );
     }
 

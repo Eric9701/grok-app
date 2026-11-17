@@ -74,6 +74,9 @@ fn collect_dirs(dir: &Path, prefix: &str, out: &mut Vec<String>) -> Result<(), S
             continue;
         }
         let rel = format!("{prefix}/{name}");
+        if super::sessions::is_hidden_session_dir(&rel) {
+            continue;
+        }
         out.push(rel.clone());
         collect_dirs(&path, &rel, out)?;
     }
@@ -151,6 +154,13 @@ fn collect_files(dir: &Path, root: &Path, out: &mut Vec<String>) -> Result<(), S
             continue;
         }
         if path.is_dir() {
+            let rel = path
+                .strip_prefix(root)
+                .map(|item| item.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_default();
+            if super::sessions::is_hidden_session_file(&rel) {
+                continue;
+            }
             collect_files(&path, root, out)?;
             continue;
         }
@@ -162,7 +172,13 @@ fn collect_files(dir: &Path, root: &Path, out: &mut Vec<String>) -> Result<(), S
             .map_err(|_| "wiki_path".to_string())?
             .to_string_lossy()
             .replace('\\', "/");
-        if rel.split('/').any(|segment| segment.is_empty() || segment.starts_with('.')) {
+        if super::sessions::is_hidden_session_file(&rel) {
+            continue;
+        }
+        if rel
+            .split('/')
+            .any(|segment| segment.is_empty() || segment.starts_with('.'))
+        {
             continue;
         }
         out.push(format!("raw/{rel}"));

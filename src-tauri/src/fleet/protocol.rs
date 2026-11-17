@@ -73,10 +73,7 @@ pub fn remote_cwd_ok(cwd: &str) -> bool {
         return true;
     }
     let b = t.as_bytes();
-    b.len() >= 3
-        && b[0].is_ascii_alphabetic()
-        && b[1] == b':'
-        && (b[2] == b'\\' || b[2] == b'/')
+    b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/')
 }
 
 /// Remote socket id. `local` is reserved for the leader's own CLI.
@@ -291,6 +288,96 @@ pub fn session_new_line(id: u64, cwd: &str) -> String {
     .to_string()
 }
 
+pub fn session_set_model_line(id: u64, session_id: &str, model_id: &str) -> String {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "method": "session/set_model",
+        "params": {
+            "sessionId": session_id,
+            "modelId": model_id
+        }
+    })
+    .to_string()
+}
+
+/// Empty means the CLI default. Control characters and over-long ids are rejected.
+pub fn normalize_model_id(raw: &str) -> Result<String, ()> {
+    let id = raw.trim();
+    if id.is_empty() {
+        return Ok(String::new());
+    }
+    if id.chars().count() > 128 || id.chars().any(|c| c.is_control()) {
+        return Err(());
+    }
+    Ok(id.to_string())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListedModel {
+    pub id: String,
+    pub name: String,
+}
+
+/// Models advertised on an `initialize` or `session/new` result.
+pub fn models_from_acp_result(result: &Value) -> (Vec<ListedModel>, String) {
+    let mut models = Vec::new();
+    for pointer in [
+        "/models/availableModels",
+        "/_meta/modelState/availableModels",
+        "/modelState/availableModels",
+    ] {
+        push_listed_models(&mut models, result.pointer(pointer));
+    }
+    let current = [
+        "/models/currentModelId",
+        "/_meta/modelState/currentModelId",
+        "/modelState/currentModelId",
+    ]
+    .iter()
+    .find_map(|pointer| {
+        result
+            .pointer(pointer)
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+            .map(str::to_string)
+    })
+    .unwrap_or_default();
+    (models, current)
+}
+
+fn push_listed_models(out: &mut Vec<ListedModel>, value: Option<&Value>) {
+    let Some(items) = value.and_then(|v| v.as_array()) else {
+        return;
+    };
+    for item in items {
+        let Some(id) = item
+            .get("modelId")
+            .or_else(|| item.get("id"))
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+        else {
+            continue;
+        };
+        if out.iter().any(|model| model.id == id) {
+            continue;
+        }
+        let name = item
+            .get("name")
+            .or_else(|| item.get("displayName"))
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .unwrap_or(id);
+        out.push(ListedModel {
+            id: id.to_string(),
+            name: name.to_string(),
+        });
+    }
+}
+
 pub fn session_prompt_line(id: u64, session_id: &str, text: &str) -> String {
     json!({
         "jsonrpc": "2.0",
@@ -385,7 +472,9 @@ pub fn session_id_from_result(result: &Value) -> String {
 }
 
 fn fold_update(frame: &Value) -> Option<Step> {
-    let update = frame.pointer("/params/update").or_else(|| frame.get("update"))?;
+    let update = frame
+        .pointer("/params/update")
+        .or_else(|| frame.get("update"))?;
     let kind = update
         .get("sessionUpdate")
         .or_else(|| update.get("session_update"))
@@ -611,5 +700,59 @@ mod tests {
     fn local_id_cannot_register_as_remote() {
         assert!(remote_agent_id("local").is_err());
         assert_eq!(dispatch_agent_id("local").unwrap(), "local");
+    }
+
+    #[test]
+    fn model_id_rejects_control_characters() {
+        assert_eq!(normalize_model_id("  grok-4.7 ").unwrap(), "grok-4.7");
+        assert_eq!(normalize_model_id("   ").unwrap(), "");
+        assert!(normalize_model_id("bad\nid").is_err());
+        assert!(normalize_model_id(&"x".repeat(129)).is_err());
+    }
+
+    #[test]
+    fn session_new_result_lists_models_once() {
+        let (models, current) = models_from_acp_result(&json!({
+            "sessionId": "sess-1",
+            "models": {
+                "currentModelId": "grok-4.7",
+                "availableModels": [
+                    { "modelId": "grok-4.7", "name": "Grok 4.7" },
+                    { "modelId": "grok-4.7", "name": "duplicate" },
+                    { "modelId": "kimi", "name": "" }
+                ]
+            },
+            "_meta": {
+                "modelState": {
+                    "availableModels": [
+                        { "modelId": "grok-4.7", "name": "again" },
+                        { "modelId": "extra", "name": "Extra" }
+                    ]
+                }
+            }
+        }));
+        assert_eq!(current, "grok-4.7");
+        assert_eq!(
+            models,
+            vec![
+                ListedModel {
+                    id: "grok-4.7".into(),
+                    name: "Grok 4.7".into()
+                },
+                ListedModel {
+                    id: "kimi".into(),
+                    name: "kimi".into()
+                },
+                ListedModel {
+                    id: "extra".into(),
+                    name: "Extra".into()
+                },
+            ]
+        );
+        let line = session_set_model_line(4, "sess-1", "grok-4.7");
+        let value: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(value["method"], "session/set_model");
+        assert_eq!(value["params"]["modelId"], "grok-4.7");
+        assert_eq!(value["params"]["sessionId"], "sess-1");
     }
 }

@@ -42,7 +42,6 @@ export type WorkbenchSessionContextMenuProps = {
   /** Rewind stays available while this chat's turn is running. Fork does not. */
   canRewindNow: boolean;
   clearSessionPluginDirs: (s: SessionRow) => Promise<void>;
-  confirmExportSessionTraceUpload: (sessionId?: string | null) => void;
   confirmForkSession: (source: SessionRow, throughUserPromptIndex?: number | null) => void;
   confirmRemoveWorktree: (wt: GitWorktreeEntry) => void;
   confirmResumeWithCodeRestore: (source: SessionRow) => void;
@@ -58,10 +57,7 @@ export type WorkbenchSessionContextMenuProps = {
     format: StreamSessionExportFormat,
     sessionMeta?: SessionExportTarget,
   ) => Promise<void>;
-  exportSessionTrace: (
-    sessionId?: string | null,
-    opts?: { localOnly?: boolean },
-  ) => Promise<void>;
+  exportSessionTrace: (sessionId?: string | null) => Promise<void>;
   forkBusy: boolean;
   gitWorktrees: GitWorktreeEntry[];
   gitWorktreesAvailable: boolean | null;
@@ -117,7 +113,6 @@ export function buildSessionContextMenuItems(
     canRewindSession,
     canRewindNow,
     clearSessionPluginDirs,
-    confirmExportSessionTraceUpload,
     confirmForkSession,
     confirmRemoveWorktree,
     confirmResumeWithCodeRestore,
@@ -514,15 +509,7 @@ export function buildSessionContextMenuItems(
                 label: tr("session.exportTraceLocal"),
                 icon: <IconArchive size={16} />,
                 onClick: () => {
-                  void exportSessionTrace(s.id, { localOnly: true });
-                },
-              },
-              {
-                id: "export-trace-upload",
-                label: tr("session.exportTraceUpload"),
-                icon: <IconArchive size={16} />,
-                onClick: () => {
-                  confirmExportSessionTraceUpload(s.id);
+                  void exportSessionTrace(s.id);
                 },
               },
               {

@@ -59,9 +59,11 @@ fn overlay(base: &mut Value, over: Value) {
     let Some(env) = over.get("env").and_then(|v| v.as_object()) else {
         return;
     };
-    let dest = base
-        .as_object_mut()
-        .and_then(|obj| obj.entry("env").or_insert_with(|| json!({})).as_object_mut());
+    let dest = base.as_object_mut().and_then(|obj| {
+        obj.entry("env")
+            .or_insert_with(|| json!({}))
+            .as_object_mut()
+    });
     if let Some(dest) = dest {
         for (key, value) in env {
             dest.insert(key.clone(), value.clone());

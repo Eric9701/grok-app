@@ -11,9 +11,8 @@ use serde_json::{json, Value};
 
 use crate::acp_client::{
     decode_permission_request, decode_session_update, init_offers_auth_method,
-    initialize_advertises_rewind,
-    parse_ask_user_question_params, rewind_execute_method_candidates, wire_ask_user_result,
-    wire_exit_plan_mode_result, wire_initialize_params, wire_jsonrpc_result,
+    initialize_advertises_rewind, parse_ask_user_question_params, rewind_execute_method_candidates,
+    wire_ask_user_result, wire_exit_plan_mode_result, wire_initialize_params, wire_jsonrpc_result,
     wire_permission_result, wire_session_cancel_params, wire_session_interject_params,
     wire_session_new_params, wire_session_prompt_params, AcpEvent, AskUserOutcome,
     PermissionOutcome, StreamKind,

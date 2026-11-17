@@ -15,7 +15,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 个人：`general` · `appearance` · `account` · `archived` · `pet`（展示名「宠物」）  
 系统：`extensions` · `runtime` · `atlas` · `wiki`（展示名「知识库配置」）· `agent_cli`（展示名「智能体 CLI」）· `remote_im`（展示名「远程控制」）· `shortcuts` · `about`
 
-机群、个人知识库、远程控制、智能体 CLI 是否出现，由 atlas-server `GET /atlas/v1/feature-mask` 的十进制控制码决定。从右往左：位 0（1）机群，位 1（2）个人知识库，位 2（4）远程控制，位 3（8）智能体 CLI。为 1 才显示侧栏入口、对应页面和设置节；搜索命中同样滤掉。直接打开被关掉的 `#/fleet`、`#/wiki` 或 `#/settings/remote_im`、`#/settings/wiki`、`#/settings/agent_cli` 时回到工作台或常规设置。接口失败、未登录或结果还没回来都按 0。不写入设置。目录注册表仍保留这些节。`--show-remote` 不再决定远程控制是否可见。
+机群、个人知识库、远程控制、智能体 CLI 是否出现，由 atlas-server `GET /atlas/v1/feature-mask` 的十进制控制码决定。从右往左：位 0（1）机群，位 1（2）个人知识库，位 2（4）远程控制，位 3（8）智能体 CLI。为 1 才显示侧栏入口、对应页面和设置节；搜索命中同样滤掉。直接打开被关掉的 `#/fleet`、`#/wiki` 或 `#/settings/remote_im`、`#/settings/wiki`、`#/settings/agent_cli` 时回到工作台或常规设置。接口失败、未登录或结果还没回来都按 0。不写入设置。目录注册表仍保留这些节。`--show-remote` 不再决定远程控制是否可见。远程控制这一位为 0 时，原先已保存的 IM 渠道也不连接、不随应用拉起；已保存的启用配置保留，这一位重新变为 1 后才按原配置启动。
 
 **不要**再往 `SETTINGS_NAV` 塞重复 `runtime`。
 
@@ -29,7 +29,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 | extensions | `plugins`（含 Discover **+** 本地路径安装 `settings-anchor-ext-plugins-install`）· `mcp` · `skills`（含 **探测 Claude/Cursor 技能** 开关，`#/settings/extensions/skills` → `settings-anchor-ext-skills-discover`）· `rules`（Cursor 式规则编辑，写 CLI 真实文件）· `commands`（斜杠命令 markdown）· `agents` · `hooks`（**无** `market` / `apps`；`#/settings/extensions/market` → `plugins` 可安装目录锚点） |
 | runtime | `cli` · `connection` · `ssh` · `network` · `pool` · `tools` · `privacy` |
 | atlas | 无 tab（每条 Relay 选 CLI 与模型、云端站点） |
-| wiki | 无 tab（知识库目录、Agent 默认、编译轮次） |
+| wiki | 无 tab（知识库目录、Agent 默认、会话来源、提取提示词、编译模型、编译轮次、编译记录） |
 | agent_cli | 无 tab（多 CLI 运行时、新建会话默认） |
 | remote_im（远程控制） | `im`（IM 通信）· `mirror`（手机镜像） |
 | pet | `look`（外观设置：顶栏开关+尺寸，左侧预览，右侧形体/表情/颜色/眼睛）· `bubbles`（气泡设置：提示框、进度条、自动关闭、形状/背景） |
@@ -47,7 +47,7 @@ Agent / 贡献者维护设置 UI 时**必读**。目标：层次清晰、可搜�
 #/settings/runtime/tools?pr=42      → 诊断 · PR hub（可选高亮 PR #42；ship 成功「在 PR 中心打开」）
 #/settings/runtime/privacy          → CLI · 隐私中心
 #/settings/atlas                     → Atlas（Relay + 云端站点）
-#/settings/wiki                      → 知识库配置（目录、Agent 默认、编译模型、编译轮次、编译记录）
+#/settings/wiki                      → 知识库配置（目录、Agent 默认、会话来源、提取提示词、编译模型、编译轮次、编译记录）
 #/settings/agent_cli                 → 智能体 CLI（独立 `agent-runtimes.json`）
 #/settings/account/providers        → 官方账户（自定义提供商已从界面隐藏）
 #/settings/account/extras           → 官方账户（拓展已从界面隐藏）

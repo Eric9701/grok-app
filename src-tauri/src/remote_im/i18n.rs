@@ -14,6 +14,11 @@ pub enum MessageKey {
     AttachmentReceived,
     AttachmentFailed,
     ImageSendFailed,
+    /// `/$` wrote the text into the App session and did not start an agent turn.
+    NoteRecorded,
+    /// `/$` had no text and no waiting attachment.
+    NoteNeedsText,
+    NoteFailed,
 }
 
 /// Canonical catalog id: `en` | `de` | … | `zh-TW`.
@@ -125,8 +130,96 @@ pub fn t(lang: &str, key: MessageKey) -> &'static str {
         }
         (_, key) => attachment_copy(locale, key)
             .or_else(|| image_send_copy(locale, key))
+            .or_else(|| note_copy(locale, key))
             .unwrap_or(""),
     }
+}
+
+fn note_copy(locale: Locale, key: MessageKey) -> Option<&'static str> {
+    let recorded = matches!(key, MessageKey::NoteRecorded);
+    let needs = matches!(key, MessageKey::NoteNeedsText);
+    let failed = matches!(key, MessageKey::NoteFailed);
+    if !recorded && !needs && !failed {
+        return None;
+    }
+    Some(match locale {
+        Locale::De if recorded => "In dieser Sitzung gespeichert. Der Agent wurde nicht aufgerufen.",
+        Locale::De if needs => {
+            "Schreib den Text nach `/$`. Er erscheint in der Sitzung und ruft den Agenten nicht auf."
+        }
+        Locale::De => "Die Nachricht konnte nicht in der Sitzung gespeichert werden.",
+        Locale::Es if recorded => "Guardado en esta sesión. No se llamó al agente.",
+        Locale::Es if needs => {
+            "Escribe el texto después de `/$`. Se muestra en la sesión y no llama al agente."
+        }
+        Locale::Es => "No se pudo guardar ese mensaje en la sesión.",
+        Locale::Fil if recorded => "Na-save sa session na ito. Hindi tinawag ang agent.",
+        Locale::Fil if needs => {
+            "Isulat ang text pagkatapos ng `/$`. Ipinapakita ito sa session at hindi tumatawag ng agent."
+        }
+        Locale::Fil => "Hindi ma-save ang mensaheng iyon sa session.",
+        Locale::Fr if recorded => "Enregistré dans cette session. L’agent n’a pas été appelé.",
+        Locale::Fr if needs => {
+            "Écrivez le texte après `/$`. Il s’affiche dans la session et n’appelle pas l’agent."
+        }
+        Locale::Fr => "Impossible d’enregistrer ce message dans la session.",
+        Locale::Id if recorded => "Disimpan di sesi ini. Agen tidak dipanggil.",
+        Locale::Id if needs => {
+            "Tulis teks setelah `/$`. Pesan tampil di sesi dan tidak memanggil agen."
+        }
+        Locale::Id => "Pesan itu tidak dapat disimpan di sesi.",
+        Locale::It if recorded => "Salvato in questa sessione. L’agente non è stato chiamato.",
+        Locale::It if needs => {
+            "Scrivi il testo dopo `/$`. Compare nella sessione e non chiama l’agente."
+        }
+        Locale::It => "Impossibile salvare il messaggio nella sessione.",
+        Locale::Ja if recorded => "このセッションに記録しました。Agent は呼び出していません。",
+        Locale::Ja if needs => {
+            "`/$` の後に表示したい内容を書いてください。セッションにだけ残り、Agent は呼び出しません。"
+        }
+        Locale::Ja => "このメッセージをセッションに保存できませんでした。",
+        Locale::Ko if recorded => "이 세션에 기록했습니다. Agent는 호출하지 않았습니다.",
+        Locale::Ko if needs => {
+            "`/$` 뒤에 표시할 내용을 쓰세요. 세션에만 보이고 Agent는 호출하지 않습니다."
+        }
+        Locale::Ko => "이 메시지를 세션에 저장하지 못했습니다.",
+        Locale::PtBr if recorded => "Salvo nesta sessão. O agente não foi chamado.",
+        Locale::PtBr if needs => {
+            "Escreva o texto depois de `/$`. Ele aparece na sessão e não chama o agente."
+        }
+        Locale::PtBr => "Não foi possível salvar essa mensagem na sessão.",
+        Locale::Ru if recorded => "Сохранено в этой сессии. Агент не вызывался.",
+        Locale::Ru if needs => {
+            "Напишите текст после `/$`. Он появится в сессии и не вызовет агента."
+        }
+        Locale::Ru => "Не удалось сохранить это сообщение в сессии.",
+        Locale::Ta if recorded => "இந்த அமர்வில் சேமிக்கப்பட்டது. Agent அழைக்கப்படவில்லை.",
+        Locale::Ta if needs => {
+            "`/$` க்குப் பிறகு உரையை எழுதுங்கள். அமர்வில் மட்டும் தோன்றும்; Agent அழைக்கப்படாது."
+        }
+        Locale::Ta => "இந்த செய்தியை அமர்வில் சேமிக்க முடியவில்லை.",
+        Locale::Tr if recorded => "Bu oturuma kaydedildi. Agent çağrılmadı.",
+        Locale::Tr if needs => {
+            "Metni `/$` sonrasına yazın. Oturumda görünür ve agent çağırmaz."
+        }
+        Locale::Tr => "Bu mesaj oturuma kaydedilemedi.",
+        Locale::Uk if recorded => "Збережено в цій сесії. Агента не викликано.",
+        Locale::Uk if needs => {
+            "Напишіть текст після `/$`. Він з’явиться в сесії й не викличе агента."
+        }
+        Locale::Uk => "Не вдалося зберегти це повідомлення в сесії.",
+        Locale::Zh if recorded => "已记入当前会话，未调用 Agent。",
+        Locale::Zh if needs => "请在 /$ 后面写上要显示的内容。只进入会话，不调用 Agent。",
+        Locale::Zh => "这条消息没能写入会话。",
+        Locale::ZhTw if recorded => "已記入目前工作階段，未呼叫 Agent。",
+        Locale::ZhTw if needs => "請在 /$ 後面寫上要顯示的內容。只進入工作階段，不呼叫 Agent。",
+        Locale::ZhTw => "這則訊息沒能寫入工作階段。",
+        _ if recorded => "Saved in this session. The agent was not called.",
+        _ if needs => {
+            "Write the text after `/$`. It is shown in the session and does not call the agent."
+        }
+        _ => "Couldn't save that message in the session.",
+    })
 }
 
 fn attachment_copy(locale: Locale, key: MessageKey) -> Option<&'static str> {
@@ -259,9 +352,16 @@ mod tests {
                 MessageKey::AttachmentReceived,
                 MessageKey::AttachmentFailed,
                 MessageKey::ImageSendFailed,
+                MessageKey::NoteRecorded,
+                MessageKey::NoteNeedsText,
+                MessageKey::NoteFailed,
             ] {
                 assert!(!t(tag, key).trim().is_empty(), "{tag} has empty copy");
             }
+            assert!(
+                t(tag, MessageKey::NoteNeedsText).contains("/$"),
+                "{tag} dropped /$"
+            );
             assert!(
                 t(tag, MessageKey::AttachmentReceived).contains("{name}"),
                 "{tag} dropped the file name"

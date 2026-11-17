@@ -219,15 +219,35 @@ pub async fn remote_im_bridge_reload(
     Ok(rt.status_dto())
 }
 
-/// Called from App setup to restore long-poll / Feishu WS after process restart.
-pub async fn try_autostart(state: &RemoteImState) {
+/// Start saved channels when the remote bit is on, or stop them without
+/// wiping the saved enable flag when it is off.
+pub async fn apply_feature_gate(state: &RemoteImState) {
     let mut rt = state.inner.lock().await;
-    match rt.try_autostart_async().await {
-        Ok(()) => {}
-        Err(e) => {
-            tracing::warn!(error = %e, "remote_im: auto-start skipped/failed");
+    if crate::feature_mask::remote_control_allowed() {
+        match rt.try_autostart_async().await {
+            Ok(()) => {}
+            Err(e) => {
+                tracing::warn!(error = %e, "remote_im: auto-start skipped/failed");
+            }
         }
+        return;
     }
+    if rt.connectors_running() {
+        tracing::info!("remote_im: remote control bit is off; stopping saved channels");
+        let _ = rt.stop_keep_config().await;
+    } else {
+        tracing::info!("remote_im: remote control bit is off; saved channels stay stopped");
+    }
+}
+
+/// Same gate, using the App handle wired in setup. No-op before setup.
+pub async fn apply_feature_gate_from_app() {
+    let Some(app) = app_sessions::try_app_handle() else {
+        return;
+    };
+    use tauri::Manager;
+    let state = app.state::<std::sync::Arc<RemoteImState>>();
+    apply_feature_gate(state.inner()).await;
 }
 
 pub use bridge::start_health_watchdog;

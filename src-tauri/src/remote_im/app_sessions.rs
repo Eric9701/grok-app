@@ -268,6 +268,87 @@ pub fn sync_turn_to_app(
     next
 }
 
+/// `/$`: journal the inbound text (and any waiting files) on the bound App
+/// session so the desktop transcript shows it. Does not write an assistant
+/// row, does not change `pending_mode`, and does not start an agent turn.
+pub fn append_note_to_app(
+    binding: &ScopeBinding,
+    user_prompt: &str,
+    channel: &str,
+    attachments: &[crate::store::MessageAttachmentStored],
+) -> Result<ScopeBinding, String> {
+    let agent_id = binding
+        .agent_session_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    let mut app_id = find_app_session_id(binding.local_session_id.as_str(), agent_id);
+    let mut next = binding.clone();
+
+    if app_id.is_none() {
+        let title = title_from_prompt(user_prompt, channel);
+        let mut meta = store::create_session(binding.project_id.clone(), Some(title), false)?;
+        if let Some(aid) = agent_id {
+            meta.agent_session_id = Some(aid.to_string());
+            let _ = store::update_session_meta(&meta);
+        }
+        app_id = Some(meta.id.clone());
+        next.local_session_id = meta.id;
+    } else if let Some(ref id) = app_id {
+        let id_for_update = id.clone();
+        let project_id = binding.project_id.clone();
+        let title = title_from_prompt(user_prompt, channel);
+        let _ = store::update_sessions_index(move |list| {
+            if let Some(s) = list.iter_mut().find(|s| s.id == id_for_update) {
+                if let Some(aid) = agent_id {
+                    s.agent_session_id = Some(aid.to_string());
+                }
+                if s.project_id.is_none() {
+                    s.project_id = project_id;
+                }
+                if is_placeholder_title(&s.title) && !user_prompt.trim().is_empty() {
+                    s.title = title;
+                }
+                s.updated_at = Utc::now();
+            }
+            Ok(())
+        });
+        next.local_session_id = id.clone();
+    }
+
+    let Some(sid) = app_id else {
+        return Err("remote_im: note has no session".into());
+    };
+
+    let mut user_content = if user_prompt.trim().is_empty() {
+        format!("[Remote IM · {channel}]")
+    } else {
+        format!("[Remote IM · {channel}]\n{user_prompt}")
+    };
+    let user_attachments = if attachments.is_empty() {
+        None
+    } else {
+        user_content =
+            crate::session_manager::append_journal_attachment_refs(user_content, attachments);
+        Some(attachments.to_vec())
+    };
+    store::append_message(
+        &sid,
+        ChatMessageStored {
+            id: uuid::Uuid::new_v4().to_string(),
+            role: "user".into(),
+            content: user_content,
+            thought: None,
+            created_at: Utc::now(),
+            is_error: false,
+            attachments: user_attachments,
+            marker: None,
+        },
+    )?;
+    emit_index_changed(&sid);
+    Ok(next)
+}
+
 fn find_app_session_id(local_id: &str, agent_id: Option<&str>) -> Option<String> {
     let list = store::load_sessions_index();
     if list.iter().any(|s| s.id == local_id) {

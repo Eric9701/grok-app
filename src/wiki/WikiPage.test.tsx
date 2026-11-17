@@ -37,6 +37,10 @@ vi.mock("@/lib/api", () => ({
     path: "wiki/concepts/pump.md",
     content: "# 水泵",
   })),
+  wikiReadPages: vi.fn(async () => [
+    { path: "wiki/concepts/pump.md", content: "# 水泵" },
+  ]),
+  wikiPromptsGet: vi.fn(async () => ({ digest: "", analyze: "", generate: "" })),
   wikiSearch: vi.fn(async () => []),
   modelsListAvailable: vi.fn(async () => ({
     models: [{ id: "grok-4.7", label: "Grok 4.7", source: "official" }],
@@ -156,6 +160,12 @@ describe("WikiPage", () => {
         modelId: "",
       }));
     }
+  });
+
+  it("opens the read-only graph and returns to the selected page", async () => {
+    render(<WikiPage locale="zh" />);
+    fireEvent.click(await screen.findByRole("button", { name: "图谱" }));
+    expect(await screen.findByText(/还没有链接|画不出图谱/)).toBeTruthy();
   });
 
   it("asks for a configured library when settings are empty", async () => {

@@ -33,8 +33,8 @@ export const GENERAL_ENTRIES: readonly SettingsEntry[] = [
     tab: "composer",
     anchorId: "settings-anchor-availableModels",
     labelKey: "settings.availableModels",
-    descKeys: ["settings.availableModelsDesc"],
-    keywords: ["models", "model list", "refresh", "atlas models refresh", "add model", "edit model", "delete model", "remote managed", "模型", "模型列表", "模型清單", "可用模型", "刷新", "新增模型", "编辑模型", "删除模型", "編輯模型", "刪除模型", "远程管控", "遠端管控"],
+    descKeys: ["settings.availableModelsDesc", "settings.availableModelsDefaultHint"],
+    keywords: ["models", "model list", "refresh", "atlas models refresh", "add model", "edit model", "delete model", "remote managed", "default model", "set default", "模型", "模型列表", "模型清單", "可用模型", "刷新", "新增模型", "编辑模型", "删除模型", "編輯模型", "刪除模型", "远程管控", "遠端管控", "默认模型", "預設模型", "设为默认", "設為預設"],
   },
   {
     id: "general.composerMinRows",

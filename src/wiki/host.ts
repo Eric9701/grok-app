@@ -50,6 +50,11 @@ export async function ingestWithAtlas(
   onProgress?: (stage: IngestStage) => void,
   force?: boolean,
 ): Promise<IngestResult> {
+  const prompts = await api.wikiPromptsGet(project).catch(() => ({
+    digest: "",
+    analyze: "",
+    generate: "",
+  }));
   const result = await ingest({
     project,
     sourcePath,
@@ -57,6 +62,7 @@ export async function ingestWithAtlas(
     io: wikiIo,
     onProgress,
     force,
+    prompts,
   });
   if (!result.skipped) {
     try {

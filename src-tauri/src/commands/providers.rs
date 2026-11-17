@@ -62,6 +62,19 @@ pub async fn providers_atlas_model_update(
     .map_err(|e| e.to_string())?
 }
 
+/// Set shared `[models].default` to a catalog id. Existing session rows stay.
+#[tauri::command]
+pub async fn providers_atlas_model_set_default(
+    id: String,
+) -> Result<crate::models_catalog::AvailableModelsResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::cc_switch_import::set_atlas_catalog_default(&id)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(crate::models_catalog::list_available_models())
+}
+
 #[tauri::command]
 pub async fn providers_atlas_model_delete(id: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {

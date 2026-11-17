@@ -41,10 +41,15 @@ describe("FleetBoard", () => {
         agentId="box"
         cwd="/data/proj"
         prompt=""
+        models={[]}
+        modelId=""
+        modelsBusy={false}
         busy={false}
         onAgentId={() => {}}
         onCwd={() => {}}
         onPrompt={() => {}}
+        onModelId={() => {}}
+        onRefreshModels={() => {}}
         onDispatch={() => {}}
         onCancel={() => {}}
         onOpen={() => {}}
@@ -73,10 +78,15 @@ describe("FleetBoard", () => {
         agentId="local"
         cwd=""
         prompt=""
+        models={[]}
+        modelId=""
+        modelsBusy={false}
         busy={false}
         onAgentId={() => {}}
         onCwd={() => {}}
         onPrompt={() => {}}
+        onModelId={() => {}}
+        onRefreshModels={() => {}}
         onDispatch={() => {}}
         onCancel={() => {}}
         onOpen={() => {}}
@@ -107,10 +117,15 @@ describe("FleetBoard", () => {
         agentId="local"
         cwd=""
         prompt=""
+        models={[]}
+        modelId=""
+        modelsBusy={false}
         busy={false}
         onAgentId={onAgentId}
         onCwd={() => {}}
         onPrompt={() => {}}
+        onModelId={() => {}}
+        onRefreshModels={() => {}}
         onDispatch={() => {}}
         onCancel={() => {}}
         onOpen={() => {}}
@@ -134,10 +149,15 @@ describe("FleetBoard", () => {
         agentId="worker-2"
         cwd=""
         prompt=""
+        models={[]}
+        modelId=""
+        modelsBusy={false}
         busy={false}
         onAgentId={() => {}}
         onCwd={() => {}}
         onPrompt={() => {}}
+        onModelId={() => {}}
+        onRefreshModels={() => {}}
         onDispatch={() => {}}
         onCancel={() => {}}
         onOpen={() => {}}
@@ -160,10 +180,15 @@ describe("FleetBoard", () => {
         agentId="worker-2"
         cwd=""
         prompt=""
+        models={[]}
+        modelId=""
+        modelsBusy={false}
         busy={false}
         onAgentId={() => {}}
         onCwd={() => {}}
         onPrompt={() => {}}
+        onModelId={() => {}}
+        onRefreshModels={() => {}}
         onDispatch={() => {}}
         onCancel={() => {}}
         onOpen={() => {}}
@@ -172,6 +197,40 @@ describe("FleetBoard", () => {
     );
     expect(screen.getByText("重试 ship the note")).toBeTruthy();
     expect(screen.getByText(tr("fleet.reason.offline"))).toBeTruthy();
+  });
+
+  it("lists models and refreshes them from the dispatch form", () => {
+    const onRefreshModels = vi.fn();
+    const onModelId = vi.fn();
+    render(
+      <FleetBoard
+        tr={tr}
+        status={idleStatus}
+        tasks={[task({ id: "done", status: "completed", preview: "ship", model: "grok-4.7" })]}
+        trace={null}
+        agentId="worker-2"
+        cwd=""
+        prompt=""
+        models={[{ id: "grok-4.7", name: "Grok 4.7" }]}
+        modelId="grok-4.7"
+        modelsBusy={false}
+        busy={false}
+        onAgentId={() => {}}
+        onCwd={() => {}}
+        onPrompt={() => {}}
+        onModelId={onModelId}
+        onRefreshModels={onRefreshModels}
+        onDispatch={() => {}}
+        onCancel={() => {}}
+        onOpen={() => {}}
+        onCloseTrace={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: tr("fleet.model") })).toBeTruthy();
+    expect(screen.getAllByText("Grok 4.7").length).toBeGreaterThan(0);
+    expect(screen.getByText("grok-4.7")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: tr("fleet.modelRefresh") }));
+    expect(onRefreshModels).toHaveBeenCalledOnce();
   });
 });
 

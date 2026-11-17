@@ -37,8 +37,8 @@ pub fn open(project: &Path) -> Result<WikiOpen, String> {
     let root = require_project(project)?;
     Ok(WikiOpen {
         project: root.display().to_string(),
-        has_schema: root.join("wiki/schema.md").is_file(),
-        has_purpose: root.join("wiki/purpose.md").is_file(),
+        has_schema: root.join("schema.md").is_file() || root.join("wiki/schema.md").is_file(),
+        has_purpose: root.join("purpose.md").is_file() || root.join("wiki/purpose.md").is_file(),
         has_index: root.join("wiki/index.md").is_file(),
     })
 }
@@ -47,6 +47,31 @@ pub fn read(project: &Path, rel: &str) -> Result<WikiText, String> {
     let rel = path::normalize_rel(rel)?;
     let content = path::read_text(project, &rel)?;
     Ok(WikiText { path: rel, content })
+}
+
+const READ_PAGE_CAP: usize = 400;
+
+/// Read many wiki pages in one call. A bad path rejects the batch.
+/// A missing page is skipped. The cap keeps a large library off the window thread.
+pub fn read_pages(project: &Path, paths: &[String]) -> Result<Vec<WikiText>, String> {
+    let _root = require_project(project)?;
+    let mut out = Vec::new();
+    let mut seen = BTreeMap::<String, ()>::new();
+    for raw in paths {
+        if out.len() >= READ_PAGE_CAP {
+            break;
+        }
+        let rel = path::require_wiki_page(raw)?;
+        if seen.insert(rel.clone(), ()).is_some() {
+            continue;
+        }
+        match path::read_text(project, &rel) {
+            Ok(content) => out.push(WikiText { path: rel, content }),
+            Err(err) if err == "wiki_missing" => continue,
+            Err(err) => return Err(err),
+        }
+    }
+    Ok(out)
 }
 
 pub fn write_pages(

@@ -106,7 +106,10 @@ pub fn push_acp_line(state: &mut BridgeState, line: &str) -> Vec<Effect> {
         "session/cancel" => {
             let mut out = vec![Effect::ToCli(interrupt_line())];
             if let Some(pid) = state.prompt_id.take() {
-                out.push(Effect::ToHost(ok(&pid, json!({ "stopReason": "cancelled" }))));
+                out.push(Effect::ToHost(ok(
+                    &pid,
+                    json!({ "stopReason": "cancelled" }),
+                )));
             }
             if let Some(id) = id.as_ref() {
                 out.push(Effect::ToHost(ok(id, json!({}))));
@@ -119,7 +122,13 @@ pub fn push_acp_line(state: &mut BridgeState, line: &str) -> Vec<Effect> {
             .unwrap_or_default(),
         _ => id
             .as_ref()
-            .map(|id| vec![Effect::ToHost(err(id, -32601, &format!("Method not found: {method}")))])
+            .map(|id| {
+                vec![Effect::ToHost(err(
+                    id,
+                    -32601,
+                    &format!("Method not found: {method}"),
+                ))]
+            })
             .unwrap_or_default(),
     }
 }
@@ -208,10 +217,7 @@ fn assistant_blocks(state: &mut BridgeState, msg: &Value) -> Vec<Effect> {
         return out;
     }
     let Some(blocks) = content.as_array() else {
-        if let Some(text) = msg
-            .pointer("/message/text")
-            .and_then(|v| v.as_str())
-        {
+        if let Some(text) = msg.pointer("/message/text").and_then(|v| v.as_str()) {
             push_chunk(&mut out, state, "agent_message_chunk", text);
         }
         return out;
@@ -220,7 +226,11 @@ fn assistant_blocks(state: &mut BridgeState, msg: &Value) -> Vec<Effect> {
         let kind = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
         match kind {
             "thinking" | "reasoning" => {
-                if let Some(text) = block.get("thinking").or_else(|| block.get("text")).and_then(|v| v.as_str()) {
+                if let Some(text) = block
+                    .get("thinking")
+                    .or_else(|| block.get("text"))
+                    .and_then(|v| v.as_str())
+                {
                     push_chunk(&mut out, state, "agent_thought_chunk", text);
                 }
             }
@@ -250,10 +260,7 @@ fn assistant_blocks(state: &mut BridgeState, msg: &Value) -> Vec<Effect> {
 
 fn tool_results(state: &BridgeState, msg: &Value) -> Vec<Effect> {
     let mut out = Vec::new();
-    let Some(blocks) = msg
-        .pointer("/message/content")
-        .and_then(|v| v.as_array())
-    else {
+    let Some(blocks) = msg.pointer("/message/content").and_then(|v| v.as_array()) else {
         return out;
     };
     for block in blocks {
@@ -509,10 +516,15 @@ mod tests {
         );
         let hosts = host_json(&effects);
         assert_eq!(hosts[0]["method"], "session/update");
-        assert_eq!(hosts[0]["params"]["update"]["sessionUpdate"], "agent_message_chunk");
+        assert_eq!(
+            hosts[0]["params"]["update"]["sessionUpdate"],
+            "agent_message_chunk"
+        );
         assert_eq!(hosts[0]["params"]["update"]["content"]["text"], "Hello");
         assert_eq!(hosts[1]["params"]["update"]["sessionUpdate"], "tool_call");
-        assert!(effects.iter().any(|e| matches!(e, Effect::RememberCliSession(id) if id == "cli-1")));
+        assert!(effects
+            .iter()
+            .any(|e| matches!(e, Effect::RememberCliSession(id) if id == "cli-1")));
 
         let done = push_cli_line(
             &mut state,
@@ -527,7 +539,10 @@ mod tests {
     fn result_text_is_a_message_when_nothing_streamed() {
         let mut state = BridgeState::new("claude", "yolo", None);
         state.prompt_id = Some(json!(9));
-        let done = push_cli_line(&mut state, r#"{"type":"result","subtype":"success","result":"done"}"#);
+        let done = push_cli_line(
+            &mut state,
+            r#"{"type":"result","subtype":"success","result":"done"}"#,
+        );
         let hosts = host_json(&done);
         assert_eq!(hosts[0]["params"]["update"]["content"]["text"], "done");
         assert_eq!(hosts[1]["result"]["stopReason"], "end_turn");

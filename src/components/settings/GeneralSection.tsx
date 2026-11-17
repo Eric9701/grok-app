@@ -260,6 +260,9 @@ export function GeneralSection() {
   // webview, mirroring the big-model key fields).
   const [sttCustomApiKeyDraft, setSttCustomApiKeyDraft] = useState("");
   const [modelsRefreshBusy, setModelsRefreshBusy] = useState(false);
+  const [modelsDefaultBusyId, setModelsDefaultBusyId] = useState<string | null>(
+    null,
+  );
   const [modelsAddOpen, setModelsAddOpen] = useState(false);
   const [modelsEditId, setModelsEditId] = useState<string | null>(null);
   const [modelsDelete, setModelsDelete] = useState<{
@@ -391,6 +394,9 @@ export function GeneralSection() {
                   <div className="settings-row__desc">
                     {t("settings.availableModelsDesc")}
                   </div>
+                  <div className="settings-row__desc">
+                    {t("settings.availableModelsDefaultHint")}
+                  </div>
                   {modelsRefreshError ? (
                     <div className="settings-row__desc settings-models-refresh__error">
                       {modelsRefreshError}
@@ -413,35 +419,82 @@ export function GeneralSection() {
                           {m.label}
                         </span>
                         <span className="settings-models-list__id">{m.id}</span>
-                        {m.editable ? (
-                          <span className="settings-models-list__actions">
+                        <span className="settings-models-list__actions">
+                          {m.isDefault ? (
+                            <span className="settings-models-list__badge">
+                              {t("settings.availableModelsDefault")}
+                            </span>
+                          ) : (
                             <button
                               type="button"
                               className="btn btn--ghost btn--sm"
+                              disabled={
+                                modelsRefreshBusy || modelsDefaultBusyId != null
+                              }
                               onClick={() => {
-                                setModelsAddOpen(false);
-                                setModelsEditId(m.id);
+                                if (modelsDefaultBusyId) return;
+                                setModelsDefaultBusyId(m.id);
+                                setModelsRefreshError(null);
+                                void api
+                                  .providersAtlasModelSetDefault(m.id)
+                                  .then((res) => {
+                                    const next = catalogFromAvailableModels(res);
+                                    if (next.length > 0) onAvailableModels?.(next);
+                                    showSettingsToast(
+                                      t("settings.availableModelsSetDefaultDone"),
+                                      2400,
+                                    );
+                                  })
+                                  .catch((err: unknown) => {
+                                    const detail =
+                                      err instanceof Error
+                                        ? err.message
+                                        : String(err ?? "");
+                                    const failed = t(
+                                      "settings.availableModelsSetDefaultFailed",
+                                    );
+                                    setModelsRefreshError(
+                                      detail && detail !== failed
+                                        ? `${failed} ${detail}`
+                                        : failed,
+                                    );
+                                  })
+                                  .finally(() => setModelsDefaultBusyId(null));
                               }}
                             >
-                              {t("settings.availableModelsEdit")}
+                              {modelsDefaultBusyId === m.id
+                                ? t("settings.availableModelsSettingDefault")
+                                : t("settings.availableModelsSetDefault")}
                             </button>
-                            <button
-                              type="button"
-                              className="btn btn--ghost btn--sm"
-                              onClick={() =>
-                                setModelsDelete({ id: m.id, label: m.label })
-                              }
-                            >
-                              {t("settings.availableModelsDelete")}
-                            </button>
-                          </span>
-                        ) : (
-                          <span className="settings-models-list__actions">
+                          )}
+                          {m.editable ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn--ghost btn--sm"
+                                onClick={() => {
+                                  setModelsAddOpen(false);
+                                  setModelsEditId(m.id);
+                                }}
+                              >
+                                {t("settings.availableModelsEdit")}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn--ghost btn--sm"
+                                onClick={() =>
+                                  setModelsDelete({ id: m.id, label: m.label })
+                                }
+                              >
+                                {t("settings.availableModelsDelete")}
+                              </button>
+                            </>
+                          ) : (
                             <span className="settings-models-list__badge">
                               {t("settings.availableModelsRemoteManaged")}
                             </span>
-                          </span>
-                        )}
+                          )}
+                        </span>
                       </div>
                     ))
                   )}

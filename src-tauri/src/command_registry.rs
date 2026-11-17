@@ -5,10 +5,10 @@
 
 use crate::{
     agent_runtimes, atlas_endpoints, atlas_relay_agent, cli_worktrees, commands, desktop_notify,
-    feature_mask, fleet, git_pr_hub, wiki,
-    launch_chrome, leader, mirror, os_theme, pet_quick, pet_window, pr_monitor, remote_im,
-    self_update, serve, session_api, ssh_remote, system_fonts, theme_editor_window, tray, updater,
-    voice_host, wallpaper_grok_album, wallpaper_remote_commands, window_min,
+    feature_mask, fleet, git_pr_hub, launch_chrome, leader, mirror, os_theme, pet_quick,
+    pet_window, pr_monitor, remote_im, self_update, serve, session_api, ssh_remote, system_fonts,
+    theme_editor_window, tray, updater, voice_host, wallpaper_grok_album,
+    wallpaper_remote_commands, wiki, window_min,
 };
 
 /// Single invoke handler consumed by `Builder::invoke_handler` in `run()`.
@@ -78,11 +78,13 @@ pub fn app_invoke_handler(
         fleet::fleet_tasks,
         fleet::fleet_task_trace,
         fleet::fleet_dispatch,
+        fleet::fleet_models,
         fleet::fleet_cancel,
         fleet::fleet_listen_apply,
         // ── Wiki engine ──
         wiki::wiki_open,
         wiki::wiki_read,
+        wiki::wiki_read_pages,
         wiki::wiki_write_pages,
         wiki::wiki_remove_page,
         wiki::wiki_list,
@@ -101,6 +103,12 @@ pub fn app_invoke_handler(
         wiki::wiki_complete,
         wiki::wiki_usage_list,
         wiki::wiki_usage_append,
+        wiki::wiki_session_config_get,
+        wiki::wiki_session_config_set,
+        wiki::wiki_prompts_get,
+        wiki::wiki_prompts_set,
+        wiki::wiki_sessions_scan,
+        wiki::wiki_sessions_sync,
         commands::cli_install_latest,
         commands::cli_install_commands,
         commands::cli_update_check,
@@ -429,6 +437,7 @@ pub fn app_invoke_handler(
         commands::providers_atlas_model_get,
         commands::providers_atlas_model_update,
         commands::providers_atlas_model_delete,
+        commands::providers_atlas_model_set_default,
         commands::models_aux_get,
         commands::models_aux_set,
         commands::models_aux_apply_save_grok,

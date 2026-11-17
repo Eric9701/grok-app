@@ -30,6 +30,7 @@ export type FleetTask = {
   sessionId: string;
   retryOf?: string | null;
   unreachable: boolean;
+  model?: string;
 };
 
 export type FleetStep = {
@@ -51,7 +52,18 @@ export type FleetTrace = {
   failureReason?: string | null;
   sessionId: string;
   unreachable: boolean;
+  model?: string;
   steps: FleetStep[];
+};
+
+export type FleetModel = {
+  id: string;
+  name: string;
+};
+
+export type FleetModels = {
+  models: FleetModel[];
+  currentModelId: string;
 };
 
 export type FleetListenApply = {
@@ -73,8 +85,17 @@ export function fleetTaskTrace(id: string) {
   return invoke<FleetTrace>("fleet_task_trace", { id });
 }
 
-export function fleetDispatch(agentId: string, cwd: string, prompt: string) {
-  return invoke<FleetTask>("fleet_dispatch", { agentId, cwd, prompt });
+export function fleetDispatch(
+  agentId: string,
+  cwd: string,
+  prompt: string,
+  model: string,
+) {
+  return invoke<FleetTask>("fleet_dispatch", { agentId, cwd, prompt, model });
+}
+
+export function fleetModels() {
+  return invoke<FleetModels>("fleet_models");
 }
 
 export function fleetCancel(id: string) {

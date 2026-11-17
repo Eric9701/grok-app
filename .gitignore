@@ -31,7 +31,8 @@ dist-portable
 *.sln
 *.sw?
 Thumbs.db
-
+# Local issue dumps / session traces (not for the published tree)
+docs/issue/
 # Tauri / Rust
 src-tauri/target
 src-tauri/gen/schemas

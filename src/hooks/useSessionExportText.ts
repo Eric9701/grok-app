@@ -1,11 +1,10 @@
 /**
  * Session text export: markdown modal, JSON/plain/HTML/NDJSON, diagnostic zip, traces.
- * Host supplies toast, confirm dialog, and live session/messages.
+ * Host supplies toast and live session/messages.
  */
 import { useCallback, useMemo, useState } from "react";
 import { createT } from "@/i18n";
 import * as api from "@/lib/api";
-import type { AppDialog } from "@/lib/app/appDialogTypes";
 import type { Project, SessionRow } from "@/lib/app/sidebarModels";
 import type { ChatMessage } from "@/lib/session";
 import {
@@ -50,7 +49,6 @@ export function useSessionExportText(opts: {
   activeProject: Project | null;
   tr: TFn;
   showToast: (msg: string, ms?: number) => void;
-  setAppDialog: (dialog: NonNullable<AppDialog>) => void;
 }) {
   const {
     session,
@@ -60,7 +58,6 @@ export function useSessionExportText(opts: {
     activeProject,
     tr,
     showToast,
-    setAppDialog,
   } = opts;
 
   type ExportMdTarget = {
@@ -830,38 +827,26 @@ export function useSessionExportText(opts: {
     [session.sessionId, showToast, tr],
   );
 
-  /**
-   * Export Grok Build CLI session trace.
-   * `localOnly` default true → `grok trace --local`. False omits `--local` (may upload).
-   */
+  /** Export the CLI session trace locally (`trace --local`). */
   const exportSessionTrace = useCallback(
-    async (
-      sessionId?: string | null,
-      opts?: { localOnly?: boolean },
-    ) => {
+    async (sessionId?: string | null) => {
       const id = sessionId || session.sessionId;
-      const localOnly = opts?.localOnly !== false;
       if (!id) {
         showToast(tr("session.exportTraceFail"));
         return;
       }
       try {
-        const res = await api.sessionTraceExport(id, { localOnly });
+        const res = await api.sessionTraceExport(id, { localOnly: true });
         if (res?.ok && res.path) {
           const row = sessions.find((s) => s.id === id);
-          const uploaded = res.uploaded === true;
           recordTraceExport({
             sessionId: id,
             path: res.path,
             title: row?.title ?? null,
             sizeBytes:
               typeof res.sizeBytes === "number" ? res.sizeBytes : null,
-            uploaded: uploaded || null,
+            uploaded: res.uploaded === true ? true : null,
           });
-          if (!localOnly && !uploaded) {
-            // Network allowed but CLI only wrote local (upload disabled / fallback).
-            showToast(tr("session.exportTraceDoneLocalFallback"), 5000);
-          }
         } else {
           showToast(tr("session.exportTraceFail"));
         }
@@ -876,39 +861,12 @@ export function useSessionExportText(opts: {
             `${tr("session.exportTraceFail")}: ${tr("session.exportTraceTimeout")}`,
             5500,
           );
-        } else if (!localOnly && /upload|network|telemetry|403|401|forbidden/i.test(msg)) {
-          showToast(
-            `${tr("session.exportTraceUploadFail")}: ${msg}`,
-            6000,
-          );
         } else {
-          // Actionable: surface host/CLI reason (already redacted server-side).
           showToast(`${tr("session.exportTraceFail")}: ${msg}`, 5500);
         }
       }
     },
     [session.sessionId, sessions, showToast, tr],
-  );
-
-  /** Confirm network upload before `grok trace` without `--local`. */
-  const confirmExportSessionTraceUpload = useCallback(
-    (sessionId?: string | null) => {
-      const id = sessionId || session.sessionId;
-      if (!id) {
-        showToast(tr("session.exportTraceFail"));
-        return;
-      }
-      setAppDialog({
-        kind: "confirm",
-        title: tr("session.exportTraceUploadTitle"),
-        message: tr("session.exportTraceUploadMessage"),
-        confirmLabel: tr("session.exportTraceUploadConfirm"),
-        onConfirm: () => {
-          void exportSessionTrace(id, { localOnly: false });
-        },
-      });
-    },
-    [exportSessionTrace, session.sessionId, showToast, tr],
   );
 
   const closeExportSessionMd = useCallback(() => setExportMdTarget(null), []);
@@ -932,6 +890,5 @@ export function useSessionExportText(opts: {
     exportSessionStreamNdjson,
     exportSessionDiagnostic,
     exportSessionTrace,
-    confirmExportSessionTraceUpload,
   };
 }

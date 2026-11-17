@@ -1085,6 +1085,38 @@ pub(crate) fn add_atlas_catalog_model_at(
     Ok(())
 }
 
+/// Write `[models].default` in the shared Atlas CLI config.
+///
+/// Does not rewrite model sections or API keys. The id must already be in the
+/// catalog the settings list shows.
+pub fn set_atlas_catalog_default(id: &str) -> Result<(), String> {
+    let id = id.trim();
+    if id.is_empty() {
+        return Err(ATLAS_MODEL_ADD_MISSING.into());
+    }
+    let listed = crate::models_catalog::list_available_models();
+    if !listed.models.iter().any(|model| model.id == id) {
+        return Err(ATLAS_MODEL_ADD_NOT_FOUND.into());
+    }
+    crate::agent_home_config::with_config_write_lock(|| {
+        write_atlas_models_default(&atlas_config_path(), id)
+    })?;
+    let mut settings = crate::store::load_settings();
+    settings.model_id = Some(id.to_string());
+    crate::store::save_settings(&settings)?;
+    tracing::info!(target: "atlas_model", %id, "set atlas default model");
+    Ok(())
+}
+
+pub(crate) fn write_atlas_models_default(path: &Path, id: &str) -> Result<(), String> {
+    let original = fs::read_to_string(path).unwrap_or_default();
+    let next = providers::set_models_default(&original, id);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(path, next).map_err(|e| e.to_string())
+}
+
 /// Editable view of one plaintext catalog section. The API key stays on disk.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1290,10 +1322,7 @@ pub(crate) fn delete_atlas_catalog_model_at(path: &Path, id: &str) -> Result<(),
     Ok(())
 }
 
-fn find_atlas_section(
-    text: &str,
-    id: &str,
-) -> Result<crate::providers::ModelSection, String> {
+fn find_atlas_section(text: &str, id: &str) -> Result<crate::providers::ModelSection, String> {
     let needle = id.trim();
     if needle.is_empty() {
         return Err(ATLAS_MODEL_ADD_NOT_FOUND.into());
@@ -1316,10 +1345,7 @@ fn require_field(raw: &str) -> Result<String, String> {
 fn normalize_atlas_section_id(raw: &str) -> Result<String, String> {
     let id = raw.trim().to_ascii_lowercase();
     let ok = !id.is_empty()
-        && id
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_alphanumeric())
+        && id.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
         && id
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-');
@@ -1397,6 +1423,46 @@ api_key = "sk-testkey1234"
             p.extra,
             vec![("context_window".to_string(), "500000".to_string())]
         );
+    }
+
+    #[test]
+    fn write_atlas_models_default_keeps_keys() {
+        let dir = std::env::temp_dir().join(format!(
+            "grok-app-set-default-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("config.toml");
+        fs::write(
+            &path,
+            r#"
+[models]
+default = "arch-minimax"
+
+[model.arch-minimax]
+name = "MiniMax"
+api_key = "sk-keep"
+
+[model.arch-kimi-for-coding]
+name = "kimi"
+api_key = "sk-other"
+"#,
+        )
+        .unwrap();
+        write_atlas_models_default(&path, "arch-kimi-for-coding").unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            providers::get_models_default(&text).as_deref(),
+            Some("arch-kimi-for-coding")
+        );
+        assert!(text.contains("sk-keep"));
+        assert!(text.contains("sk-other"));
+        assert!(text.contains("[model.arch-minimax]"));
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

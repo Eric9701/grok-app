@@ -12,7 +12,7 @@
 | `config.toml` `[model.*]` | **Atlas 企业目录**（`atlas models refresh` 同步的托管段）。只读 `id` / `name` / `context_window`，不把 `api_key` 或 ENC 路由名送进 UI |
 | 静态兜底 | `grok-4.7`（默认）+ `grok-4.7-build-fast` + `grok-4.6` + `grok-4.5`；cache + 企业目录皆空时才用 |
 
-默认模型：设置里已保存且仍在目录中的 id → CLI `[models].default` → `grok-4.6` / `grok-4.5`。
+默认模型：新会话用 CLI `[models].default`（该 id 必须在 `models_cache.json` 或 `config.toml` `[model.*]` 里）。设置 → 常规 → 可用模型里可以改这个默认值，写入共享 `config.toml` 的 `[models].default`，并同步 `settings.modelId`。已经写上 `model_id` 的会话继续用自己的模型，不随默认值变化。设置里另存的目录 id 不再压过这个默认。自定义通道的模型 id（不在这份目录里）仍按原样保留。没有 `[models].default` 时才回到产品默认 `grok-4.7`。只存在于静态兜底里的 `grok-4.6` 不能压过企业默认。一次性迁移：当 `[models].default` 是目录里的另一个 id 时，清掉设置里的产品 Grok id（`grok-4.5` / `grok-4.6` / `grok-4.7` / `grok-4.7-build-fast`）。
 
 探测：`scripts/probe-models.sh`。Host：`models_list_available`。本分支细节见 [atlas.md](./atlas.md)。
 

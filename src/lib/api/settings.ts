@@ -418,6 +418,11 @@ export async function providersAtlasModelDelete(id: string) {
   return invoke<void>("providers_atlas_model_delete", { id });
 }
 
+/** Write shared `[models].default` and return the catalog the settings list reads. */
+export async function providersAtlasModelSetDefault(id: string) {
+  return invoke<AvailableModelsResult>("providers_atlas_model_set_default", { id });
+}
+
 /** Run `atlas models refresh`, then return the catalog the composer reads. */
 export async function modelsRefreshCatalog() {
   return invoke<AvailableModelsResult>("models_refresh_catalog");

@@ -64,11 +64,7 @@ export const RUNTIME_TOOLS_ENTRIES: readonly SettingsEntry[] = [
     tab: "tools",
     anchorId: "settings-anchor-traces",
     labelKey: "session.tracesTitle",
-    descKeys: [
-      "session.tracesDesc",
-      "session.exportTraceLocal",
-      "session.exportTraceUpload",
-    ],
+    descKeys: ["session.tracesDesc", "session.exportTraceLocal"],
     keywords: [
       "trace",
       "traces",

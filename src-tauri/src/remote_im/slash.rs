@@ -24,6 +24,11 @@ pub enum BuiltinCommand {
     Resume {
         query: Option<String>,
     },
+    /// Write the text into the bound App session and do not start an agent turn.
+    /// `$` is not a Telegram `setMyCommands` name (only `[a-z0-9_]`) — type `/$`.
+    Note {
+        text: Option<String>,
+    },
     Unknown {
         raw: String,
     },
@@ -167,6 +172,7 @@ pub fn parse_slash(text: &str) -> Option<BuiltinCommand> {
         "account" | "accounts" | "quota" | "usage" | "switch" => BuiltinCommand::Account { query },
         "p" | "project" => BuiltinCommand::Project { query },
         "r" | "resume" => BuiltinCommand::Resume { query },
+        "$" => BuiltinCommand::Note { text: query },
         other => BuiltinCommand::Unknown {
             raw: other.to_string(),
         },
@@ -192,6 +198,7 @@ pub fn help_text(lang: &str) -> String {
             "- `/context` — current context usage (agent-reported or clearly marked estimate)",
             "- `/compact [note]` — compact the current session context",
             "- `/stop` — cancel in-flight turn",
+            "- `/$ <text>` — show the text in the session; do not call the agent",
             "- `0` — cancel number-pick mode",
         ]
         .join("\n")
@@ -213,6 +220,7 @@ pub fn help_text(lang: &str) -> String {
             "- `/context` — 当前会话上下文用量（上报值或明确标注的估算值）",
             "- `/compact [备注]` — 压缩当前会话上下文",
             "- `/stop` — 中断当前任务",
+            "- `/$ <内容>` — 只把内容记入当前会话，不调用 Agent",
             "- `0` — 取消序号选择",
         ]
         .join("\n")
@@ -270,6 +278,27 @@ mod tests {
     fn start_is_help() {
         assert_eq!(parse_slash("/start"), Some(BuiltinCommand::Help));
         assert_eq!(parse_slash("/start payload"), Some(BuiltinCommand::Help));
+    }
+
+    #[test]
+    fn parses_note_without_calling_it_a_native_menu_command() {
+        assert_eq!(parse_slash("/$"), Some(BuiltinCommand::Note { text: None }));
+        assert_eq!(
+            parse_slash("/$  keep this"),
+            Some(BuiltinCommand::Note {
+                text: Some("keep this".into())
+            })
+        );
+        assert_eq!(
+            parse_slash("/$@MyBot keep this"),
+            Some(BuiltinCommand::Note {
+                text: Some("keep this".into())
+            })
+        );
+        assert!(native_bot_commands().iter().all(|c| c.command != "$"));
+        assert!(help_text("en").contains("/$"));
+        assert!(help_text("zh").contains("/$"));
+        assert!(help_text("zh").contains("不调用 Agent"));
     }
 
     #[test]

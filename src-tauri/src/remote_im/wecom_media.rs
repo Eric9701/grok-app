@@ -130,6 +130,21 @@ pub fn push_capped(buf: &mut Vec<u8>, chunk: &[u8], max: usize) -> Result<(), ()
     Ok(())
 }
 
+/// One percent-decode. Already-decoded names (no `%HH`) stay unchanged, so a
+/// second pass does not turn `%2541` into `A`.
+pub fn decode_received_filename(raw: &str) -> String {
+    if !raw
+        .as_bytes()
+        .windows(3)
+        .any(|w| w[0] == b'%' && w[1].is_ascii_hexdigit() && w[2].is_ascii_hexdigit())
+    {
+        return raw.to_string();
+    }
+    percent_encoding::percent_decode_str(raw)
+        .decode_utf8_lossy()
+        .into_owned()
+}
+
 pub fn sanitize_filename(raw: &str, kind: &str) -> String {
     let base = raw
         .rsplit(['/', '\\'])
@@ -195,9 +210,10 @@ pub fn inbound_file_path(
     if remote.is_file() {
         return Err("wecom media: .remote is a file".into());
     }
+    let decoded = decode_received_filename(filename);
     let dest = remote
         .join(sanitize_segment(message_id))
-        .join(sanitize_filename(filename, kind));
+        .join(sanitize_filename(&decoded, kind));
     if !path_stays_under(&dest, &remote) {
         return Err("wecom media: path escaped".into());
     }
@@ -434,6 +450,25 @@ mod tests {
         assert_eq!(sanitize_filename("a<b>.txt", "file"), "a_b_.txt");
         let dir = std::env::temp_dir().join(format!("wecom-media-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
+        let encoded = "%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE_17945419404491.png";
+        let decoded = inbound_file_path(&dir, "msg", encoded, "image").unwrap();
+        assert!(decoded.ends_with("企业微信截图_17945419404491.png"));
+        assert!(!decoded
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .contains('%'));
+        let once = inbound_file_path(&dir, "msg", "%2541.txt", "file").unwrap();
+        assert!(once.ends_with("%41.txt"));
+        let plain = inbound_file_path(&dir, "msg", "企业微信截图.png", "image").unwrap();
+        assert!(plain.ends_with("企业微信截图.png"));
+        assert_eq!(decode_received_filename("100%"), "100%");
+        let slipped = inbound_file_path(&dir, "msg", "%2e%2e%2fsecret.txt", "file").unwrap();
+        assert!(slipped.ends_with("secret.txt"));
+        assert!(slipped.starts_with(dir.join(".remote")));
+        assert!(!slipped
+            .components()
+            .any(|c| matches!(c, Component::ParentDir)));
         let dest = inbound_file_path(&dir, "msg/../x", "../aa.doc", "file").unwrap();
         assert!(dest.starts_with(dir.join(".remote")));
         assert!(dest.ends_with("aa.doc"));

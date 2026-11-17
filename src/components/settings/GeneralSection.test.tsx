@@ -133,7 +133,7 @@ describe("GeneralSection voice — custom STT", () => {
         composerMinRows: "3",
         availableModels: [
           { id: "glm-5", label: "glm-5" },
-          { id: "arch-kimi-new", label: "Kimi", editable: true },
+          { id: "arch-kimi-new", label: "Kimi", editable: true, isDefault: true },
         ],
       }),
     );
@@ -142,6 +142,9 @@ describe("GeneralSection voice — custom STT", () => {
     expect(html).toContain("settings.availableModelsEdit");
     expect(html).toContain("settings.availableModelsDelete");
     expect(html).toContain("settings.availableModelsRemoteManaged");
+    expect(html).toContain("settings.availableModelsDefault");
+    expect(html).toContain("settings.availableModelsSetDefault");
+    expect(html).toContain("settings.availableModelsDefaultHint");
     expect(html).toContain("glm-5");
   });
 

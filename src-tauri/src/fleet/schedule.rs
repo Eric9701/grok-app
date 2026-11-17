@@ -32,6 +32,9 @@ pub struct TaskRecord {
     pub unreachable: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unreachable_at_ms: Option<u64>,
+    /// ACP model id. Empty means the CLI default.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub model: String,
 }
 
 pub fn is_active(status: &str) -> bool {
@@ -148,6 +151,7 @@ pub fn expire_unreachable(tasks: &mut Vec<TaskRecord>, now: u64, grace_ms: u64) 
             retry_of: Some(src.id),
             unreachable: false,
             unreachable_at_ms: None,
+            model: src.model,
         });
         created.push(id);
     }
@@ -196,6 +200,7 @@ pub fn new_task(id: &str, agent_id: &str, cwd: &str, prompt: &str, now: u64) -> 
         retry_of: None,
         unreachable: false,
         unreachable_at_ms: None,
+        model: String::new(),
     }
 }
 
@@ -222,6 +227,7 @@ mod tests {
     #[test]
     fn grace_fails_once_and_retries_once() {
         let mut tasks = vec![queued("t1", "box", 1)];
+        tasks[0].model = "grok-4.7".into();
         claim_next(&mut tasks, "box", 2);
         mark_agent_unreachable(&mut tasks, "box", 1_000);
         assert!(expire_unreachable(&mut tasks, 1_000 + GRACE_MS - 1, GRACE_MS).is_empty());
@@ -232,14 +238,12 @@ mod tests {
         assert_eq!(created.len(), 1);
         assert_eq!(tasks[1].status, "queued");
         assert_eq!(tasks[1].retry_of.as_deref(), Some("t1"));
+        assert_eq!(tasks[1].model, "grok-4.7");
         claim_next(&mut tasks, "box", 9_000);
         mark_agent_unreachable(&mut tasks, "box", 9_000);
         let again = expire_unreachable(&mut tasks, 9_000 + GRACE_MS, GRACE_MS);
         assert!(again.is_empty());
-        assert_eq!(
-            tasks.iter().filter(|t| t.status == "queued").count(),
-            0
-        );
+        assert_eq!(tasks.iter().filter(|t| t.status == "queued").count(), 0);
     }
 
     #[test]

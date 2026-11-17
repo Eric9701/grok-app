@@ -902,6 +902,7 @@ pub fn grok_turn_cli_args_with_bg_wait(
         "streaming-json",
         &[],
         bg_wait_flags,
+        None,
     )
 }
 
@@ -922,10 +923,31 @@ pub fn grok_turn_cli_args_with_stream(
         output_format,
         partial_flags,
         &[],
+        None,
     )
 }
 
-/// Full headless `-p` argv: format, optional partial-stream flags, resume, bg-wait.
+/// Model passed to a headless turn.
+///
+/// A model already saved on the App session wins. Resuming a CLI session that
+/// has no saved App model keeps the model on that CLI session. A new turn
+/// uses the default.
+pub fn headless_turn_model<'a>(
+    session_model: Option<&'a str>,
+    resuming: bool,
+    default_model: Option<&'a str>,
+) -> Option<&'a str> {
+    let session_model = session_model.map(str::trim).filter(|id| !id.is_empty());
+    if session_model.is_some() {
+        return session_model;
+    }
+    if resuming {
+        return None;
+    }
+    default_model.map(str::trim).filter(|id| !id.is_empty())
+}
+
+/// Full headless `-p` argv: format, optional partial-stream flags, model, resume, bg-wait.
 pub fn grok_turn_cli_args_full(
     prompt: &str,
     session_id: Option<&str>,
@@ -933,6 +955,7 @@ pub fn grok_turn_cli_args_full(
     output_format: &str,
     partial_flags: &[&str],
     bg_wait_flags: &[String],
+    model: Option<&str>,
 ) -> Vec<String> {
     let mut args = vec!["-p".into(), prompt.to_string()];
     if always_approve {
@@ -954,6 +977,10 @@ pub fn grok_turn_cli_args_full(
         if !t.is_empty() {
             args.push(t.into());
         }
+    }
+    if let Some(id) = model.map(str::trim).filter(|s| !s.is_empty()) {
+        args.push("--model".into());
+        args.push(id.to_string());
     }
     if let Some(sid) = session_id.map(|s| s.trim()).filter(|s| !s.is_empty()) {
         args.push("--resume".into());
@@ -1341,6 +1368,46 @@ mod tests {
         // CLI path for turn 2
         let args = grok_turn_cli_args("follow up", Some("agent-xyz"), false);
         assert!(args.contains(&"--resume".into()));
+    }
+
+    #[test]
+    fn headless_turn_uses_session_model_or_default() {
+        assert_eq!(
+            headless_turn_model(Some("arch-kimi-for-coding"), false, Some("arch-minimax")),
+            Some("arch-kimi-for-coding")
+        );
+        assert_eq!(
+            headless_turn_model(Some(" arch-kimi-for-coding "), true, Some("arch-minimax")),
+            Some("arch-kimi-for-coding")
+        );
+        assert_eq!(
+            headless_turn_model(None, true, Some("arch-minimax")),
+            None,
+            "resume with no saved model keeps the CLI session model"
+        );
+        assert_eq!(
+            headless_turn_model(None, false, Some("arch-minimax")),
+            Some("arch-minimax")
+        );
+        assert_eq!(
+            headless_turn_model(Some("  "), false, Some("arch-minimax")),
+            Some("arch-minimax")
+        );
+        let args = grok_turn_cli_args_full(
+            "hi",
+            None,
+            false,
+            "streaming-json",
+            &[],
+            &[],
+            Some("arch-minimax"),
+        );
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--model" && w[1] == "arch-minimax"));
+        assert!(!grok_turn_cli_args("hi", None, false)
+            .iter()
+            .any(|a| a == "--model"));
     }
 
     #[test]

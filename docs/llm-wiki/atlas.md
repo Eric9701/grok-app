@@ -38,7 +38,7 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 例外：设置 → 常规 → 对话偏好 → **可用模型** 旁的 **新增模型**（Host `providers_atlas_model_add`）只往共享 `~/.atlas/config.toml` **追加**一段 `[model.<id>]`。段 id 已存在则拒绝（含大小写、企业 `ENC(...)` 与 `hidden` 段），不覆盖。不改 `[models].default`，不写 App `agent-home`，也不把这段变成自定义中转，不删除 `auth.json`。终端 `atlas` 和共享模式会读到这段；独立模式的对话进程仍读 `agent-home`。
 
-同一列表里，只有共享配置中**非托管**的明文段（没有 `managed = true`、`api_key = "ENC(...)"`、`hidden = true`）在行尾显示 **编辑** / **删除**（`providers_atlas_model_get` / `update` / `delete`）。编辑不改段 id；API Key 留空则保留原密钥。删除不改 `[models].default`，默认模型本身不能删。托管段和只存在于模型缓存或 `agent-home` 的条目没有这两个按钮。
+同一列表里，每一行都可以 **设为默认**（`providers_atlas_model_set_default`）。它只改共享配置的 `[models].default`，并同步应用设置里的 `modelId`。已经保存模型的会话不改。当前默认行显示「默认」，不再出现这个按钮。只有共享配置中**非托管**的明文段（没有 `managed = true`、`api_key = "ENC(...)"`、`hidden = true`）另外显示 **编辑** / **删除**（`providers_atlas_model_get` / `update` / `delete`）。编辑不改段 id；API Key 留空则保留原密钥。删除不改 `[models].default`，默认模型本身不能删。托管段和只存在于模型缓存或 `agent-home` 的条目没有编辑和删除。
 
 例外：应用代装 CLI 成功后，按安装脚本把 `[cli] installer = "internal"` 和 `[endpoints]` 的 `login_base_url`、`cli_chat_proxy_base_url`、`cli_update_base_url` upsert 进共享 `~/.atlas/config.toml`，并同步到 App `agent-home/config.toml`。只替换这几项；stable 安装会去掉已有的 `[cli] channel`。不整文件重写，不动 `[model.*]` 和其它密钥。其它写入仍禁止改 shared CLI home。
 
@@ -103,11 +103,11 @@ Composer / 设置「可用模型」走 Host `models_list_available`（`src-tauri
 
 1. `models_cache.json`：live `GROK_HOME`（shared = `~/.atlas`）→ 再扫 `~/.atlas` → 历史 `~/.grok`
 2. 同一套家目录里的 `config.toml` **`[model.<catalog-id>]`**（企业托管目录；`atlas models refresh` / `/refresh-model` 会同步到这里）
-3. 都空才硬插 `grok-4.6`
+3. 都空才插入静态兜底：`grok-4.7`、`grok-4.7-build-fast`、`grok-4.6`、`grok-4.5`
 
 Atlas 企业环境常常**没有** `models_cache.json`（或托管 ENC 校验失败后整文件作废），目录只在 `config.toml`。旧逻辑故意不合并 `[model.*]`（对外 Grok App 把它们当自定义渠道），白标下会导致 Composer 看不到 `arch-kimi-for-coding` 等分配模型。
 
-默认：`[models].default`（例如 `arch-kimi-for-coding`）。展示名用明文 `name`，跳过 `ENC(...)` 与 `hidden = true`。密钥不下发前端。
+默认：新建对话用 CLI `[models].default`（例如 `arch-kimi-for-coding`），只要这个 id 在目录里。可用模型列表里的「设为默认」改的就是这个值。设置里另存的目录 id 不再盖过它。已经绑定 `model_id` 的旧会话继续用自己的模型。设置里若还留着产品默认 `grok-4.5` / `grok-4.6` / `grok-4.7` / Fast，启动时清掉一次。展示名用明文 `name`，跳过 `ENC(...)` 与 `hidden = true`。密钥不下发前端。远程 IM 的新建 headless 回合带上这个默认 `--model`；续跑时若该会话已保存模型，则带上那个模型。
 
 立刻刷新企业目录：设置 → 常规 → 对话偏好里「可用模型」的刷新按钮会跑 `atlas models refresh`，然后重读这份目录（Composer 下拉用同一份）。终端 `atlas models refresh` 或会话 `/refresh-model` 仍然有效。
 

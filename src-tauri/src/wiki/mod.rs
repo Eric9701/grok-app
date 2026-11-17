@@ -8,6 +8,8 @@ mod lint;
 mod path;
 mod scaffold;
 mod search;
+mod session_config;
+mod sessions;
 mod usage;
 
 use std::path::PathBuf;
@@ -41,6 +43,11 @@ pub fn wiki_read(project: String, path: String) -> Result<WikiText, String> {
 }
 
 #[tauri::command]
+pub fn wiki_read_pages(project: String, paths: Vec<String>) -> Result<Vec<WikiText>, String> {
+    gate::read_pages(PathBuf::from(project).as_path(), &paths)
+}
+
+#[tauri::command]
 pub fn wiki_write_pages(
     project: String,
     pages: Vec<WikiPageInput>,
@@ -60,7 +67,9 @@ pub fn wiki_remove_page(project: String, path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn wiki_list(project: String) -> Result<Vec<String>, String> {
-    lint::list_pages(PathBuf::from(project).as_path())
+    let root = PathBuf::from(&project);
+    scaffold::ensure_root_guides(root.as_path())?;
+    lint::list_pages(root.as_path())
 }
 
 #[tauri::command]
@@ -201,6 +210,48 @@ fn complete_prompt(
 #[tauri::command]
 pub fn wiki_usage_list(project: String) -> Result<Vec<usage::WikiUsageEntry>, String> {
     usage::list(PathBuf::from(project).as_path())
+}
+
+#[tauri::command]
+pub fn wiki_session_config_get(
+    project: String,
+) -> Result<session_config::SessionIngestConfig, String> {
+    session_config::load_config(PathBuf::from(project).as_path())
+}
+
+#[tauri::command]
+pub fn wiki_session_config_set(
+    project: String,
+    config: session_config::SessionIngestConfig,
+) -> Result<session_config::SessionIngestConfig, String> {
+    session_config::save_config(PathBuf::from(project).as_path(), config)
+}
+
+#[tauri::command]
+pub fn wiki_prompts_get(project: String) -> Result<session_config::WikiPrompts, String> {
+    session_config::load_prompts(PathBuf::from(project).as_path())
+}
+
+#[tauri::command]
+pub fn wiki_prompts_set(
+    project: String,
+    prompts: session_config::WikiPrompts,
+) -> Result<session_config::WikiPrompts, String> {
+    session_config::save_prompts(PathBuf::from(project).as_path(), prompts)
+}
+
+#[tauri::command]
+pub async fn wiki_sessions_scan(project: String) -> Result<Vec<sessions::SessionHit>, String> {
+    tauri::async_runtime::spawn_blocking(move || sessions::scan(PathBuf::from(project).as_path()))
+        .await
+        .map_err(|_| "wiki_sessions_scan".to_string())?
+}
+
+#[tauri::command]
+pub async fn wiki_sessions_sync(project: String) -> Result<sessions::SessionSync, String> {
+    tauri::async_runtime::spawn_blocking(move || sessions::sync(PathBuf::from(project).as_path()))
+        .await
+        .map_err(|_| "wiki_sessions_sync".to_string())?
 }
 
 #[tauri::command]
@@ -385,8 +436,18 @@ mod tests {
         fs::write(dir.join("raw/.secret.md"), "no").unwrap();
         fs::create_dir_all(dir.join("wiki")).unwrap();
         fs::write(dir.join("wiki/index.md"), "index").unwrap();
+        fs::create_dir_all(dir.join("raw/sessions/atlas")).unwrap();
+        fs::write(dir.join("raw/sessions/atlas/parent.md"), "session").unwrap();
+        fs::create_dir_all(dir.join("raw/sessions/projects")).unwrap();
+        fs::write(dir.join("raw/sessions/projects/app.md"), "project").unwrap();
         let listed = lint::list_raw(&dir).unwrap();
-        assert_eq!(listed, vec!["raw/sources/note.md".to_string()]);
+        assert_eq!(
+            listed,
+            vec![
+                "raw/sessions/projects/app.md".to_string(),
+                "raw/sources/note.md".to_string(),
+            ]
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -416,6 +477,30 @@ mod tests {
         assert!(listed.iter().any(|p| p == "wiki/index.md"));
         assert!(!listed.iter().any(|p| p.ends_with("note.md")));
         assert!(gate::remove_page(&dir, "wiki/../secret.md").is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_pages_stays_inside_wiki_markdown() {
+        let dir = scratch();
+        fs::create_dir_all(dir.join("wiki/concepts")).unwrap();
+        fs::create_dir_all(dir.join("raw")).unwrap();
+        fs::write(dir.join("wiki/concepts/pump.md"), "# 水泵\n").unwrap();
+        fs::write(dir.join("raw/note.txt"), "secret").unwrap();
+        let pages = gate::read_pages(
+            &dir,
+            &[
+                "wiki/concepts/pump.md".into(),
+                "wiki/missing.md".into(),
+                "wiki/concepts/pump.md".into(),
+            ],
+        )
+        .unwrap();
+        assert_eq!(pages.len(), 1);
+        assert_eq!(pages[0].path, "wiki/concepts/pump.md");
+        assert!(pages[0].content.contains("水泵"));
+        let err = gate::read_pages(&dir, &["raw/note.txt".into()]).unwrap_err();
+        assert_eq!(err, "wiki_path");
         let _ = fs::remove_dir_all(&dir);
     }
 

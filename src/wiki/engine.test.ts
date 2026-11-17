@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildAnalysisPrompt,
+  buildGenerationPrompt,
+  cacheToken,
   fallbackWikiPage,
+  sourceIsIngested,
   ingest,
   pagePathOk,
   parseFileBlocks,
+  promptRevision,
   type WikiIo,
   type WikiPage,
 } from "./engine";
@@ -27,6 +31,46 @@ function io(partial: Partial<WikiIo> = {}): WikiIo {
 }
 
 describe("wiki engine", () => {
+  it("reads the root schema and purpose before the wiki copies", async () => {
+    const bound = io({
+      read: vi.fn(async (_project: string, path: string) => {
+        if (path === "schema.md") return "root schema";
+        if (path === "wiki/schema.md") return "wiki schema";
+        if (path === "purpose.md") return "root purpose";
+        if (path === "wiki/purpose.md") return "wiki purpose";
+        if (path === "raw/sources/note.md") return "A pump moves water.";
+        if (path.endsWith(".md")) return "";
+        throw new Error("wiki_missing");
+      }),
+    });
+    let seen = "";
+    await ingest({
+      project: "/proj",
+      sourcePath: "raw/sources/note.md",
+      io: bound,
+      complete: async (prompt) => {
+        if (prompt.includes("Purpose:")) {
+          seen = prompt;
+          return "entities";
+        }
+        return "---FILE: wiki/concepts/pump.md---\n# 水泵\n---END FILE---";
+      },
+    });
+    expect(seen).toContain("root schema");
+    expect(seen).not.toContain("wiki schema");
+    expect(seen).toContain("root purpose");
+    expect(seen).not.toContain("wiki purpose");
+  });
+
+  it("treats a prompt-tagged cache and a legacy fingerprint as extracted", () => {
+    const revision = promptRevision(undefined);
+    expect(sourceIsIngested(cacheToken("abc", revision), "abc", revision)).toBe(true);
+    expect(sourceIsIngested("abc", "abc", revision)).toBe(true);
+    expect(sourceIsIngested(cacheToken("abc", "other"), "abc", revision)).toBe(false);
+    expect(sourceIsIngested(null, "abc", revision)).toBe(false);
+    expect(sourceIsIngested("abc", "", revision)).toBe(false);
+  });
+
   it("removes the leftover source page after real pages are written", async () => {
     const bound = io();
     bound.remove = vi.fn(async () => undefined);
@@ -81,7 +125,9 @@ describe("wiki engine", () => {
 
   it("skips a source whose fingerprint is unchanged", async () => {
     const complete = vi.fn(async () => "no");
-    const bound = io({ cacheGet: vi.fn(async () => "abc") });
+    const bound = io({
+      cacheGet: vi.fn(async () => cacheToken("abc", promptRevision(undefined))),
+    });
     const result = await ingest({
       project: "/proj",
       sourcePath: "raw/sources/note.md",
@@ -93,7 +139,9 @@ describe("wiki engine", () => {
   });
 
   it("compiles again when forced even if the fingerprint matches", async () => {
-    const bound = io({ cacheGet: vi.fn(async () => "abc") });
+    const bound = io({
+      cacheGet: vi.fn(async () => cacheToken("abc", promptRevision(undefined))),
+    });
     const result = await ingest({
       project: "/proj",
       sourcePath: "raw/sources/note.md",
@@ -138,7 +186,11 @@ describe("wiki engine", () => {
     expect(files[1]?.content).toContain("- [[concepts/pump]] — 水泵");
     expect(files[2]?.content).toContain("ingest | raw/sources/note.md");
     expect(result.usage).toBeNull();
-    expect(bound.cachePut).toHaveBeenCalledWith("/proj", "raw/sources/note.md", "abc");
+    expect(bound.cachePut).toHaveBeenCalledWith(
+      "/proj",
+      "raw/sources/note.md",
+      cacheToken("abc", promptRevision(undefined)),
+    );
     expect(buildAnalysisPrompt({
       sourcePath: "raw/sources/note.md",
       source: "A pump",
@@ -245,5 +297,49 @@ describe("wiki engine", () => {
     releaseFirst();
     await Promise.all([first, second]);
     expect(order).toEqual(["first-analysis", "first-write", "second-analysis"]);
+  });
+
+  it("keeps the file fence when a custom prompt omits it", () => {
+    const prompt = buildGenerationPrompt({
+      sourcePath: "raw/sources/note.md",
+      source: "A pump",
+      schema: "",
+      analysis: "pump",
+      instruction: "Write about the source. Do not use fences.",
+    });
+    expect(prompt).toContain("---FILE: wiki/concepts/example.md---");
+    expect(prompt).toContain("Do not emit wiki/index.md");
+    expect(prompt).toContain("[[concepts/name]]");
+    expect(prompt).toContain("A pump");
+  });
+
+  it("recompiles when only the prompt revision changes", async () => {
+    const bound = io({
+      cacheGet: vi.fn(async () => cacheToken("abc", promptRevision({ analyze: "old" }))),
+    });
+    const skipped = await ingest({
+      project: "/proj",
+      sourcePath: "raw/sources/note.md",
+      io: bound,
+      prompts: { analyze: "old" },
+      complete: async () => "unused",
+    });
+    expect(skipped.skipped).toBe(true);
+    const again = await ingest({
+      project: "/proj",
+      sourcePath: "raw/sources/note.md",
+      io: bound,
+      prompts: { analyze: "new" },
+      complete: async (prompt) =>
+        prompt.includes("Purpose:") || prompt.includes("purpose:")
+          ? "entities"
+          : "---FILE: wiki/concepts/pump.md---\n# Pump\n---END FILE---",
+    });
+    expect(again.skipped).toBe(false);
+    expect(bound.cachePut).toHaveBeenCalledWith(
+      "/proj",
+      "raw/sources/note.md",
+      cacheToken("abc", promptRevision({ analyze: "new" })),
+    );
   });
 });

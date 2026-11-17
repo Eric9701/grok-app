@@ -13,10 +13,13 @@ import {
   wikiCompileActivity,
   type WikiCompileStage,
 } from "./compileTasks";
+import { promptRevision, sourceIsIngested } from "./engine";
 import { formatWikiNotice } from "./errors";
 import { buildWikiTree, groupWikiPages } from "./groups";
 import type { WikiLibrary } from "./libraries";
 import { WikiCreateDialog } from "./WikiCreateDialog";
+import { WikiGraphFrame } from "./WikiGraphFrame";
+import { WikiSessionsPanel } from "./WikiSessionsPanel";
 
 function pageLabel(path: string) {
   return path.replace(/^wiki\//, "").replace(/\.md$/, "");
@@ -84,7 +87,7 @@ export function WikiPage({
   const [sources, setSources] = useState<string[]>([]);
   const [dirs, setDirs] = useState<string[]>([]);
   const [ingested, setIngested] = useState<Record<string, boolean>>({});
-  const [view, setView] = useState<"library" | "files" | "raw">("library");
+  const [view, setView] = useState<"library" | "files" | "graph" | "raw" | "sessions">("library");
   const [openDirs, setOpenDirs] = useState<Record<string, boolean>>({ raw: true, wiki: true });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [createOpen, setCreateOpen] = useState(false);
@@ -198,13 +201,19 @@ export function WikiPage({
         setSources(rows);
         setDirs(folders);
         setSource((current) => (rows.includes(current) ? current : (rows[0] ?? "")));
+        const prompts = await api.wikiPromptsGet(projectPath).catch(() => ({
+          digest: "",
+          analyze: "",
+          generate: "",
+        }));
+        const revision = promptRevision(prompts);
         const flags = await Promise.all(
           rows.map(async (path) => {
             const [fingerprint, cached] = await Promise.all([
               api.wikiFingerprint(projectPath, path).catch(() => ""),
               api.wikiCacheGet(projectPath, path).catch(() => null),
             ]);
-            return [path, !!fingerprint && cached === fingerprint] as const;
+            return [path, sourceIsIngested(cached, fingerprint, revision)] as const;
           }),
         );
         if (!stop) setIngested(Object.fromEntries(flags));
@@ -336,11 +345,16 @@ export function WikiPage({
     }
     if (!force) {
       try {
-        const [fingerprint, cached] = await Promise.all([
+        const [fingerprint, cached, prompts] = await Promise.all([
           api.wikiFingerprint(projectPath, sourcePath),
           api.wikiCacheGet(projectPath, sourcePath),
+          api.wikiPromptsGet(projectPath).catch(() => ({
+            digest: "",
+            analyze: "",
+            generate: "",
+          })),
         ]);
-        if (cached && cached === fingerprint) {
+        if (sourceIsIngested(cached, fingerprint, promptRevision(prompts))) {
           setSource(sourcePath);
           setRecompileOpen(true);
           return;
@@ -389,6 +403,38 @@ export function WikiPage({
     } catch (err) {
       setNote("");
       setError(formatWikiNotice(tr, err, sourcePath));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const extractSources = async (paths: string[]) => {
+    if (!projectPath || busy || paths.length === 0) return;
+    setBusy(true);
+    setError("");
+    setNote("");
+    try {
+      const library = usable.find((item) => item.path === projectPath);
+      const latest = await api.settingsGet().catch(() => null);
+      const chosen = latest?.wikiCompileModelId?.trim() || modelId.trim() || undefined;
+      let pagesWritten = 0;
+      for (const sourcePath of paths) {
+        const result = await startWikiCompile({
+          projectPath,
+          projectName: library?.name || projectPath,
+          sourcePath,
+          modelId: chosen,
+        });
+        if (!result.skipped) pagesWritten += result.written.length;
+      }
+      const listed = await api.wikiList(projectPath);
+      setPages(listed);
+      setSourceTick((tick) => tick + 1);
+      setNote(tr("wiki.compiled", { count: pagesWritten }));
+      setView("library");
+    } catch (err) {
+      setNote("");
+      setError(formatWikiNotice(tr, err));
     } finally {
       setBusy(false);
     }
@@ -601,11 +647,27 @@ export function WikiPage({
           </button>
           <button
             type="button"
+            className={"wiki-chip" + (view === "graph" ? " is-selected" : "")}
+            aria-pressed={view === "graph"}
+            onClick={() => setView("graph")}
+          >
+            {tr("wiki.viewGraph")}
+          </button>
+          <button
+            type="button"
             className={"wiki-chip" + (view === "raw" ? " is-selected" : "")}
             aria-pressed={view === "raw"}
             onClick={() => setView("raw")}
           >
             {tr("wiki.kind.raw")}
+          </button>
+          <button
+            type="button"
+            className={"wiki-chip" + (view === "sessions" ? " is-selected" : "")}
+            aria-pressed={view === "sessions"}
+            onClick={() => setView("sessions")}
+          >
+            {tr("wiki.viewSessions")}
           </button>
         </div>
         {libraryName ? <p className="wiki-library-name">{libraryName}</p> : null}
@@ -618,6 +680,8 @@ export function WikiPage({
             )
           ) : view === "raw" ? (
             <p className="wiki-rail-note">{tr("wiki.rawPageHint")}</p>
+          ) : view === "sessions" ? (
+            <p className="wiki-rail-note">{tr("wiki.sessionsHint")}</p>
           ) : loading && visible.length === 0 ? (
             <div className="wiki-skeleton" aria-label={tr("wiki.loading")}>
               <span />
@@ -704,8 +768,26 @@ export function WikiPage({
           ) : null}
         </div>
       </aside>
-      <article className="wiki-article">
-        {view === "raw" ? (
+      <article className={"wiki-article" + (view === "graph" ? " wiki-article--graph" : "")}>
+        {view === "graph" ? (
+          <WikiGraphFrame
+            projectPath={projectPath}
+            pages={pages}
+            tr={tr}
+            onOpen={(path) => {
+              setSelected(path);
+              setView("library");
+            }}
+          />
+        ) : view === "sessions" ? (
+          <WikiSessionsPanel
+            projectPath={projectPath}
+            busy={busy}
+            locale={locale}
+            tr={tr}
+            onExtract={(paths) => extractSources(paths)}
+          />
+        ) : view === "raw" ? (
           <div className="wiki-raw-page">
             <header className="wiki-raw-page__head">
               <p className="wiki-kicker">

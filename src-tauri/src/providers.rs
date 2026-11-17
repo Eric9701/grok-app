@@ -838,7 +838,7 @@ pub(crate) fn get_models_default(text: &str) -> Option<String> {
     None
 }
 
-fn set_models_default(text: &str, model_id: &str) -> String {
+pub(crate) fn set_models_default(text: &str, model_id: &str) -> String {
     let mut lines: Vec<String> = text.lines().map(|s| s.to_string()).collect();
     let mut in_models = false;
     let mut models_start: Option<usize> = None;
