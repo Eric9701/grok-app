@@ -11,6 +11,36 @@ See `docs/llm-wiki/release.md`.
 
 **What's New popup:** each bullet's **first sentence** is what users see. Keep that sentence to one short line (added / fixed / improved — no paths, no implementation, no issue piles). A second short sentence is allowed for GitHub / this file only. Do **not** rewrite already-shipped `## [X.Y.Z]` sections.
 
+## [0.2.47]
+
+### Added
+
+- Fleet can pick a model for the task. Refresh loads the list from the local Atlas CLI, and blank keeps the CLI default.
+- A knowledge base can show how its pages link. Click a node to open that page.
+- A knowledge base can collect chats and compile them. Sources are Atlas, Claude Code, Cursor, and Codex.
+- You can set the default model in Available models. New chats use it, and a chat that already saved a model keeps that model.
+- Remote IM can save a note into the current chat with /$. The agent is not called.
+
+**中文 · 新增**
+
+- 机群派发任务时可以选择模型。刷新会从本机 Atlas 读取列表，留空则用 CLI 默认。
+- 知识库可以查看页面之间的链接。点击节点会打开对应页面。
+- 知识库可以收集会话并编译。来源包括 Atlas、Claude Code、Cursor 和 Codex。
+- 可用模型里可以把某一项设为默认。新会话用它，已经保存过模型的会话保持不变。
+- 远程 IM 可以用 /$ 把一段话记入当前会话。不会调用 Agent。
+
+### Changed
+
+- Session trace export stays on this machine. The upload action is gone.
+- WeCom can receive files and videos up to 100 MB. Images stay within 10 MB.
+- A Cursor chat matches a written model name to Cursor's list. An unknown name stays on that CLI's default.
+
+**中文 · 变更**
+
+- 会话 trace 只导出到本机。上传入口已去掉。
+- 企业微信可以接收不超过 100 MB 的文件和视频。图片仍不超过 10 MB。
+- Cursor 会话会把写下的模型名对上 Cursor 列出的模型。对不上就继续用该 CLI 的默认模型。
+
 ## [0.2.46]
 
 ### Added
@@ -124,10 +154,12 @@ See `docs/llm-wiki/release.md`.
 > **中文 · 亮点：** 自定义供应商的每个模型都能重新选择，选哪个就用哪个。
 
 ### Fixed
+
 - Every model of a custom provider shows in the model menu again, and the model you pick is the one sent.
 - Desktop notifications play their short sound when the sound setting is on, including the test notification.
 
 **中文 · 修复**
+
 - 自定义供应商的每个模型重新出现在模型菜单里，选哪个模型就发送哪个。
 - 开启提示音后，桌面通知（包括测试通知）会播放一声短音。
 
@@ -180,9 +212,11 @@ See `docs/llm-wiki/release.md`.
 > **中文 · 亮点：** Grok 目录里有 bundles 文件夹时，macOS 对话也能正常启动。
 
 ### Fixed
+
 - Chats with the macOS workspace sandbox start again when the Grok home has a `bundles` folder.
 
 **中文 · 修复**
+
 - Grok 目录里有 `bundles` 文件夹时，开了工作区沙箱的 macOS 对话也能正常启动。
 
 ## [0.2.45] - 2026-10-27
@@ -192,28 +226,34 @@ See `docs/llm-wiki/release.md`.
 > **中文 · 亮点：** 定时任务可以指定模型，macOS 沙箱对话也能重新正常启动。
 
 ### Added
+
 - Scheduled tasks can run on a chosen model from the official catalog or a custom provider. They no longer fall back to your current default model.
 - The interface zoom you set with Ctrl/Cmd and +/- is remembered the next time you open the app.
 - The local session API can put a new chat in an existing git worktree of a trusted project.
 
 **中文 · 新增**
+
 - 定时任务可以使用指定的官方或自定义提供商模型，不再回退到当前默认模型。
 - 用 Ctrl/Cmd 加减号调好的界面缩放，下次打开应用时会保留。
 - 本地会话接口可以把新对话放进受信项目已有的 git worktree。
 
 ### Changed
+
 - Sidebar text in the default light theme is darker and easier to read.
 - A custom relay channel shows only its own model in the model menu.
 
 **中文 · 变更**
+
 - 默认浅色主题下，侧栏文字更深、更清晰。
 - 自定义中转通道在模型菜单里只显示它自己的模型。
 
 ### Fixed
+
 - Chats started with the macOS workspace sandbox can create sessions again.
 - The Markdown composer no longer leaves a box character when you press the right arrow at the end.
 
 **中文 · 修复**
+
 - macOS 工作区沙箱下的对话可以重新正常新建会话。
 - Markdown 输入框在行尾按右方向键时，不再留下方框字符。
 
@@ -224,22 +264,27 @@ See `docs/llm-wiki/release.md`.
 > **中文 · 亮点：** 定时任务可以复用指定会话，回复也会边流式输出边淡入。
 
 ### Added
+
 - Scheduled tasks can run in a chat you choose instead of opening a new one every time. The chosen chat keeps its own model and reasoning.
 - Streamed replies fade in smoothly. Turn it off in Appearance; it follows the system Reduce Motion setting.
 - The local session API can start a new chat and report its status.
 
 **中文 · 新增**
+
 - 定时任务可以选择在指定会话中执行，不必每次新建。所选会话保留自己的模型与推理强度。
 - 流式回复会平滑淡入。可在外观里关闭，并跟随系统的减少动态效果设置。
 - 本地会话接口可以新建对话并查询状态。
 
 ### Changed
+
 - Long-running chats stay responsive: background chats now update the screen less often.
 
 **中文 · 变更**
+
 - 长时间运行的对话更不容易卡：后台对话降低了刷新频率。
 
 ### Fixed
+
 - Small icons in macOS System Settings no longer show colored stripes.
 - Follow System stays Simplified Chinese when that is the preferred language.
 - A trusted workspace no longer blocks sandboxed chats from starting.
@@ -262,6 +307,7 @@ See `docs/llm-wiki/release.md`.
 - The window rebuilds itself after a Windows WebView2 crash instead of staying blank.
 
 **中文 · 修复**
+
 - macOS 系统设置里的小图标不再出现彩色横纹。
 - 跟随系统时，首选简体中文就会显示简体。
 - 信任过工作区之后，沙箱对话可以正常启动。
@@ -1961,7 +2007,7 @@ See `docs/llm-wiki/release.md`.
 - **Default open target / open-with honesty**: Settings → Open files with lists probed editors (unavailable preferred soft-disabled + empty/preferred-missing honesty); Open Location menus put the preferred editor first with icons; Resource/Review open-in-editor uses session/global default and soft-fails with i18n copy when the editor is missing. Pure selection helpers + tests; en/zh/zh-TW.
 - **Sandbox product path honesty (F4)**: Settings → Permissions surfaces App **Workspace** default vs terminal CLI **Off**, Open sandbox guide wizard CTA, disabled-off soft-empty note, Linux userns / `SANDBOX_BLOCKED` platform note, and leader ↔ non-off sandbox mutual exclusion (also on Runtime → Leader). Wizard re-wired after project trust (when global profile is Off) and from project sandbox menu. Pure helpers + en/zh/zh-TW + tests.
 - **Export path honesty**: Session export menu shows clear format labels (name + extension) with **Journal** / **CLI export** badges. Markdown full-transcript download prefers `grok export` when an agent session is linked (soft-fails to local journal); other formats and copy stay journal-only. Pure path-resolution helpers + tests; en/zh/zh-TW.
-- **Live Voice delegate session honesty**: Overlay restores delegated/active session chips with real titles + liveMap progress while Live Voice is open; keep-agents default stays on (opt-out cancels turns). Soft-fail mic/auth/network/cli surfaces classified toasts in addition to overlay copy. Host never records blank delegated ids. Pure helpers + tests; existing en/zh/zh-TW `voice.err.`* / `voice.center.*`.
+- **Live Voice delegate session honesty**: Overlay restores delegated/active session chips with real titles + liveMap progress while Live Voice is open; keep-agents default stays on (opt-out cancels turns). Soft-fail mic/auth/network/cli surfaces classified toasts in addition to overlay copy. Host never records blank delegated ids. Pure helpers + tests; existing en/zh/zh-TW `voice.err.`* / `voice.center.`*.
 - **Composer voice dictation honesty**: Mic always visible with insert-vs-send tips (Settings auto-send), cancel mid-stream during requesting/transcribing (not hard-disabled), empty speech / auth soft-fail toasts without sticky error chrome, auto-send blocked soft-fail when permission-gated. Pure `voiceDictation` helpers + tests; en/zh/zh-TW. No Live Voice S2S in this residual.
 - **Appearance fonts (#553)**: Settings → Appearance can set UI font family and side-terminal font family/size (localStorage; terminal prefers Nerd Fonts for Starship glyphs).
 - **Preferred agent apply honesty (#564)**: Settings preferred-agent and Agents & Personas console document spawn-time `--agent` apply paths — live agent soft-respawns on change; idle waits for next connect. Soft-fail when the saved name is missing from the catalog or has invalid characters. Pure `preferredAgentApply` helpers + tests; en/zh/zh-TW.
@@ -1974,7 +2020,7 @@ See `docs/llm-wiki/release.md`.
 - **按提供商追加提示词**：编辑提供商表单新增**追加提示词**输入框，用于某些中转需要的针对性指令。它走 CLI 的 `--rules` 参数，因此是**追加**到系统提示词末尾，而不是替换。按渠道存在 agent-home 的 `config.toml` 里（键名 `app_append_prompt`），连接时与会话规则一并合并。默认为空。
 - **沙箱产品路径诚实说明**：设置标明 App 默认 Workspace 严于 CLI Off；打开沙箱指南；Off 空态 soft 说明；Linux userns 提示；leader 与非 Off 沙箱互斥；信任项目后/项目菜单可再次打开向导。
 - **导出路径诚实徽章**：导出会话菜单显示格式名+扩展名，并标注 **会话记录 / CLI 导出**。完整 Markdown 下载在已关联 agent 时优先 `grok export`（失败回退本地记录）；其他格式与复制仅用会话记录。纯路径解析 + 测试；中英繁。
-- **实时语音委派会话诚实**：叠加层恢复委派/活动会话芯片（真实标题 + liveMap 进度）；结束后默认保留 Agent（关闭则取消回合）。麦克风/鉴权/网络/CLI 软失败额外 toast 分类文案。Host 不记录空委派 id。纯 helper + 测试；沿用三语 `voice.err.`* / `voice.center.*`。
+- **实时语音委派会话诚实**：叠加层恢复委派/活动会话芯片（真实标题 + liveMap 进度）；结束后默认保留 Agent（关闭则取消回合）。麦克风/鉴权/网络/CLI 软失败额外 toast 分类文案。Host 不记录空委派 id。纯 helper + 测试；沿用三语 `voice.err.`* / `voice.center.`*。
 - **Composer 口述诚实性**：麦克风始终可见并标明插入/发送；转写中可取消；空语音/鉴权 soft-fail；自动发送被权限挡住时提示已插入。纯 helper + 测试；三语文案。不含 Live Voice S2S。
 - **默认打开目标 / 打开方式诚实提示**：设置「打开文件方式」列出探测到的编辑器（缺失首选软禁用 + 空/缺失诚实文案）；打开位置菜单优先默认编辑器并显示图标；资源/审查「在编辑器中打开」跟随会话/全局默认，缺失时 i18n 软失败。纯选择助手 + 测试；en/zh/zh-TW。
 - **Changes 接受/拒绝/还原诚实态**：内容缺失时按钮给出禁用原因；git checkout 失败分类 soft-fail；批量接受/拒绝诚实汇总部分成功；未跟踪删除确认走 GlassModal（不用 `window.confirm`）。
@@ -2828,7 +2874,7 @@ See `docs/llm-wiki/release.md`.
 - **Config workbench allowlist expand** (Settings → General → Agent → Agent config.toml sections): more safe bool keys under independent agent-home — `[workflows] enabled`, `[features] auto_wake` / `two_pass_compaction` / `lsp_tools` / `codebase_indexing` / `remote_fetch` (plus existing `[ui]` permission_mode / yolo, `[subagents]` / `[memory]` enabled). Shared mode remains read-only; never rewrites secrets or invents AppSettings for the new feature keys; soft-respawn on save; en/zh/zh-TW + pure helper tests
 - **Codebase indexing UX** (Settings → Agent; `[features].codebase_indexing`): honest enable/status for Grok Build **code graph** indexing (not memory embeddings). Missing key stays unset with CLI default **on** shown as effective status only; independent agent-home writes bool + soft-respawn; shared mode read-only; non-bool (glob) forms stay read-only custom; soft-fail when CLI is known older than 0.2.117. Pure helpers + tests; `settingsCatalog` + en/zh/zh-TW
 - **Memory browser pro** (Settings → Agent): kind chips apply after content-search merge (regression fix); contextual empty states (off / loading / empty catalog / searching / no matches / filtered) with mode-aware hints + **Clear filters**; honest keyword-only App search hints and soft-link to Memory embedding when model unset; name vs content match badges + match summary; pure `buildMemoryBrowserDisplayRows` / `resolveMemoryBrowserEmptyState` + tests; en/zh/zh-TW
-- **Memory embedding (CLI 0.2.117)** (Settings → Agent): host reads allowlisted `[memory.*]` keys from active GROK_HOME `config.toml` (`embedding.model` / `dimensions`, `search.`*, `search.mmr`, `search.temporal_decay`, `dream.*`, `watcher`, `initial_injection`) with soft-fail when missing; independent agent-home can write safe keys + soft-respawn (shared mode read-only). Memory browser shows honest **App keyword** vs **CLI hybrid/keyword** status and links to the panel. App `memory_search` stays path-scoped keyword scan — never invents embeddings client-side.
+- **Memory embedding (CLI 0.2.117)** (Settings → Agent): host reads allowlisted `[memory.*]` keys from active GROK_HOME `config.toml` (`embedding.model` / `dimensions`, `search.`*, `search.mmr`, `search.temporal_decay`, `dream.`*, `watcher`, `initial_injection`) with soft-fail when missing; independent agent-home can write safe keys + soft-respawn (shared mode read-only). Memory browser shows honest **App keyword** vs **CLI hybrid/keyword** status and links to the panel. App `memory_search` stays path-scoped keyword scan — never invents embeddings client-side.
 
 #### Remote control / phone mirror
 
