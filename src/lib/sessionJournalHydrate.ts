@@ -11,7 +11,11 @@ import {
   collectSessionRelativeMediaRefs,
   isDisplayableAttachmentPath,
 } from "@/lib/attachments";
-import { extractAutomationPayload } from "@/lib/automationSetup";
+import {
+  extractAutomationPayload,
+  leadingAutomationSetupLeak,
+  userRequestFromAutomationSetupLeak,
+} from "@/lib/automationSetup";
 import { parseScheduledUserContent } from "@/lib/automations";
 import {
   restoreContextUsageForSession,
@@ -102,6 +106,30 @@ export function journalHasScheduledUser(
   );
 }
 
+/** Drop a user row that was only the silent setup prefix. */
+export function redactAutomationSetupLeaks(
+  rows: ChatMessage[],
+): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  for (const m of rows) {
+    const raw = m.content || "";
+    if (!leadingAutomationSetupLeak(raw)) {
+      out.push(m);
+      continue;
+    }
+    const text = userRequestFromAutomationSetupLeak(raw);
+    if (
+      m.role === "user" &&
+      !text &&
+      !(m.attachments && m.attachments.length)
+    ) {
+      continue;
+    }
+    out.push(text === raw ? m : { ...m, content: text });
+  }
+  return out;
+}
+
 /**
  * Map stored journal → UI rows: prefer in-memory cache, weave tools, mark
  * the busy turn streaming so reload does not look idle mid-turn.
@@ -113,7 +141,12 @@ export function projectJournalToChat(opts: {
 }): ChatMessage[] {
   return ensureBusyTurnStreaming(
     weaveToolsIntoAssistantSegments(
-      preferSessionMessages(opts.cached, mapStoredMessagesToChat(opts.stored)),
+      redactAutomationSetupLeaks(
+        preferSessionMessages(
+          opts.cached,
+          mapStoredMessagesToChat(opts.stored),
+        ),
+      ),
     ),
     opts.liveState,
   );

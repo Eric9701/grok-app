@@ -33,6 +33,7 @@ import {
   type SessionRow,
 } from "@/lib/app/sidebarModels";
 import { revealInOsLabel, type AppPlatform } from "@/lib/appPlatform";
+import { sessionTitleWithoutAutomationSetupLeak } from "@/lib/automationSetup";
 import { parseScheduledUserContent } from "@/lib/automations";
 import type { ConnPill } from "@/lib/connStatus";
 import { isMirrorClient, mirrorToken } from "@/lib/mirrorTransport";
@@ -106,6 +107,7 @@ export type WorkbenchMainProps = {
   setSideWorkbench: Dispatch<SetStateAction<SideWorkbenchState>>;
   openAsidePane: () => void;
   showToast: (text: string, ms?: number) => void;
+  onGitChanged?: () => void;
 };
 
 export function WorkbenchMain(props: WorkbenchMainProps) {
@@ -152,12 +154,19 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
     setSideWorkbench,
     openAsidePane,
     showToast,
+    onGitChanged,
   } = props;
   const relayStatus = useAtlasRelayStatus();
 
   const cur = sessions.find((s) => s.id === session.sessionId);
+  const safeTitle = sessionTitleWithoutAutomationSetupLeak(
+    cur?.title || session.title || "",
+  );
   const title =
-    cur?.title || session.title || activeProject?.name || tr("session.new");
+    safeTitle ||
+    (session.sessionId
+      ? tr("session.untitled")
+      : activeProject?.name || tr("session.new"));
   const isScheduledSession =
     !!cur?.scheduled ||
     messages.some(
@@ -462,6 +471,8 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
                             }
                           : null
                   }
+                  onToast={showToast}
+                  onGitChanged={onGitChanged}
                   onJump={(jump) => {
                     if (jump.type === "review") {
                       const result = applySideContextOpen(

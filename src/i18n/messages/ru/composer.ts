@@ -178,6 +178,7 @@ export const ruComposer = {
   "composer.branchRemote": "удалённая",
   "composer.branchElsewhere": "другой worktree",
   "composer.branchSwitched": "Переключено на {branch}",
+  "composer.branchSwitching": "Переключение…",
   "composer.branchSwitchFailed": "Не удалось переключиться на {branch}: {reason}",
   "composer.branchFail.dirty": "Несохранённые изменения будут перезаписаны — сначала сделайте commit или stash",
   "composer.branchFail.elsewhere": "Уже извлечена в {path}",

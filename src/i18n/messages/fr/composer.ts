@@ -178,6 +178,7 @@ export const frComposer = {
   "composer.branchRemote": "distante",
   "composer.branchElsewhere": "autre worktree",
   "composer.branchSwitched": "Basculé sur {branch}",
+  "composer.branchSwitching": "Changement…",
   "composer.branchSwitchFailed": "Impossible de basculer sur {branch} : {reason}",
   "composer.branchFail.dirty": "Des modifications non commitées seraient écrasées — commitez ou stash d’abord",
   "composer.branchFail.elsewhere": "Déjà extraite dans {path}",

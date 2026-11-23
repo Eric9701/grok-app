@@ -453,6 +453,22 @@ html[data-wallpaper="1"]
   background: var(--rp-surface, transparent);
 }
 
+.sw-review__split.is-resizing,
+.sw-review__split.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* Match the files-tree hairline; the side pane no longer draws its own border. */
+.sw-review__split > .rp-split__resizer::after {
+  left: 2px;
+  width: 1px;
+}
+
+.sw-review__split.is-resizing .rp-split__resizer::after {
+  background: var(--border-focus, #6b8cff);
+}
+
 /* Left: stacked file blocks */
 .sw-review__stack {
   flex: 1 1 auto;

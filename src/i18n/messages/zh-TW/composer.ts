@@ -34,6 +34,7 @@ export const zhTWComposer = {
   "composer.branchRemote": "遠端",
   "composer.branchElsewhere": "其他 worktree",
   "composer.branchSwitched": "已切換到 {branch}",
+  "composer.branchSwitching": "切換中…",
   "composer.branchSwitchFailed": "無法切換到 {branch}：{reason}",
   "composer.branchFail.dirty": "未提交的變更會被覆蓋 — 請先提交或暫存",
   "composer.branchFail.elsewhere": "已在 {path} 檢出",

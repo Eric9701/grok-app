@@ -180,6 +180,7 @@ export const zhComposer = {
   "composer.branchRemote": "远程",
   "composer.branchElsewhere": "其他 worktree",
   "composer.branchSwitched": "已切换到 {branch}",
+  "composer.branchSwitching": "切换中…",
   "composer.branchSwitchFailed": "无法切换到 {branch}：{reason}",
   "composer.branchFail.dirty": "未提交的更改会被覆盖 — 请先提交或暂存",
   "composer.branchFail.elsewhere": "已在 {path} 检出",

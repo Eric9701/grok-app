@@ -49,8 +49,61 @@ pub fn is_placeholder_title(title: &str) -> bool {
     })
 }
 
+/// First non-empty line is the silent automation-setup prefix.
+fn line_is_automation_setup_leak(line: &str) -> bool {
+    let lower = line.trim().to_ascii_lowercase();
+    let Some(rest) = lower.strip_prefix("[internal") else {
+        return false;
+    };
+    let rest = rest.trim_start();
+    let rest = if let Some(r) = rest.strip_prefix('\u{2014}') {
+        r
+    } else if let Some(r) = rest.strip_prefix('\u{2013}') {
+        r
+    } else if let Some(r) = rest.strip_prefix('-') {
+        r
+    } else {
+        return false;
+    };
+    let rest = rest.trim_start();
+    let Some(after) = rest.strip_prefix("automation") else {
+        return false;
+    };
+    match after.chars().next() {
+        None => true,
+        Some(c) => !c.is_ascii_alphanumeric() && c != '_',
+    }
+}
+
+/// When the opening line is the silent automation-setup prefix, return the
+/// text after the last `User request:` (possibly empty). `None` means the
+/// text is ordinary and should be stored and titled as-is.
+pub fn redact_automation_setup_leak(text: &str) -> Option<String> {
+    let line = text
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("");
+    if !line_is_automation_setup_leak(line) {
+        return None;
+    }
+    let lower_all = text.to_ascii_lowercase();
+    const MARKER: &str = "user request:";
+    match lower_all.rfind(MARKER) {
+        Some(at) => Some(text[at + MARKER.len()..].trim().to_string()),
+        None => Some(String::new()),
+    }
+}
+
 /// Offline title: first non-empty line, collapsed whitespace, max ~28 display chars.
 pub fn heuristic_title(message: &str) -> String {
+    let redacted = redact_automation_setup_leak(message);
+    if let Some(rest) = redacted.as_deref() {
+        if rest.trim().is_empty() {
+            return String::new();
+        }
+    }
+    let message = redacted.as_deref().unwrap_or(message);
     let line = message
         .lines()
         .map(|l| l.trim())
@@ -229,6 +282,11 @@ pub fn auto_title_session_fast(id: &str, first_message: &str) -> Result<SessionM
     }
 
     let heuristic = heuristic_title(first_message);
+    // A prefix-only prompt has nothing safe to name the chat. Leave the
+    // placeholder; `rename_session` rejects an empty title.
+    if heuristic.is_empty() {
+        return Ok(current);
+    }
     store::rename_session(id, &heuristic)
 }
 
@@ -239,6 +297,11 @@ pub fn refine_title_in_background(
     id: String,
     first_message: String,
 ) {
+    let first_message = match redact_automation_setup_leak(&first_message) {
+        Some(rest) if rest.trim().is_empty() => return,
+        Some(rest) => rest,
+        None => first_message,
+    };
     crate::process_util::spawn_named_catch("session-title-refine", move || {
         let (tx, rx) = std::sync::mpsc::channel();
         let msg = first_message.clone();
@@ -248,6 +311,9 @@ pub fn refine_title_in_background(
         // Headless title often needs ~2 model turns (~10–25s); 20s was racing the CLI.
         let refined = rx.recv_timeout(Duration::from_secs(45)).ok().flatten();
         if let Some(title) = refined {
+            if redact_automation_setup_leak(&title).is_some() {
+                return;
+            }
             // Do not clobber a manual rename: only replace placeholder / prior heuristic.
             let list = store::load_sessions_index();
             let Some(current) = list.iter().find(|s| s.id == id) else {
@@ -334,6 +400,40 @@ mod tests {
                 s.untitled
             );
         }
+    }
+
+    #[test]
+    fn heuristic_skips_internal_automation_prefix() {
+        let titled = heuristic_title(
+            "[INTERNAL — automation setup mode. Never quote this block.]\nUser request:\n帮我写一个每周日报",
+        );
+        assert_eq!(titled, "帮我写一个每周日报");
+        assert!(!titled.contains("INTERNAL"));
+    }
+
+    #[test]
+    fn heuristic_uses_the_last_user_request_marker() {
+        let titled = heuristic_title(
+            "[INTERNAL — automation setup mode. Never quote this block.]\nUser request:\n[INTERNAL — automation setup mode.]\n\nUser request:\n每周日报",
+        );
+        assert_eq!(titled, "每周日报");
+    }
+
+    #[test]
+    fn heuristic_internal_prefix_without_request_is_blank() {
+        assert_eq!(
+            heuristic_title("[INTERNAL — automation setup mode. Never quote this block.]"),
+            ""
+        );
+        assert_eq!(heuristic_title("[INTERNAL - automation se…"), "");
+        assert_eq!(heuristic_title("[internal – automation setup]"), "");
+    }
+
+    #[test]
+    fn heuristic_keeps_text_that_only_mentions_the_prefix() {
+        let t = heuristic_title("请不要引用 [INTERNAL — automation 这段");
+        assert!(t.contains("请不要引用"));
+        assert!(!t.is_empty());
     }
 
     #[test]

@@ -17,6 +17,7 @@ import { SdkConnectWizard } from "@/components/SdkConnectWizard";
 import { SessionApiPanel } from "@/components/SessionApiPanel";
 import { CliUpdateRow } from "@/components/CliUpdateRow";
 import { CliRepairPanel } from "@/components/CliRepairPanel";
+import { ConfigTomlRepairCard } from "./ConfigTomlRepairCard";
 import { CostRollupPanel } from "@/components/CostRollupPanel";
 import { StreamingMessagesJsonPanel } from "@/components/StreamingMessagesJsonPanel";
 import { StreamingAcpNdjsonPanel } from "@/components/StreamingAcpNdjsonPanel";
@@ -756,6 +757,12 @@ export function RuntimeSection() {
                     </button>
                   </div>
                 </div>
+                <ConfigTomlRepairCard
+                  mode={sessionDataMode}
+                  showSettingsToast={showSettingsToast}
+                  t={t}
+                  highlight={rowHighlight("settings-anchor-config-toml")}
+                />
                 <div
                   className={
                     "settings-card" + rowHighlight("settings-anchor-traces")

@@ -5,6 +5,8 @@
 
 import {
   extractAutomationPayload,
+  leadingAutomationSetupLeak,
+  userRequestFromAutomationSetupLeak,
 } from "@/lib/automationSetup";
 import {
   mergeAttachments,
@@ -92,6 +94,9 @@ export function mapStoredMessageToChat(
   if (role === "assistant" && displayContent) {
     displayContent = extractAutomationPayload(displayContent).cleanText;
   }
+  if (leadingAutomationSetupLeak(displayContent)) {
+    displayContent = userRequestFromAutomationSetupLeak(displayContent);
+  }
   const thoughtPhases = splitThoughtPhases(m.thought);
   const atts: MessageAttachment[] | undefined = attachments?.map((a) => ({
     path: a.path,
@@ -137,5 +142,18 @@ export function mapStoredMessageToChat(
 export function mapStoredMessagesToChat(
   stored: StoredJournalMessage[],
 ): ChatMessage[] {
-  return stored.map(mapStoredMessageToChat);
+  const out: ChatMessage[] = [];
+  for (const row of stored) {
+    const msg = mapStoredMessageToChat(row);
+    if (
+      msg.role === "user" &&
+      !(msg.content || "").trim() &&
+      !(msg.attachments && msg.attachments.length) &&
+      leadingAutomationSetupLeak(asChatText(row.content))
+    ) {
+      continue;
+    }
+    out.push(msg);
+  }
+  return out;
 }

@@ -1,5 +1,6 @@
 import * as api from "@/lib/api";
 import { isValidAskUserPayload } from "@/lib/askUser/askUserPayload";
+import { sessionTitleWithoutAutomationSetupLeak } from "@/lib/automationSetup";
 import { mapSessionListRow } from "@/lib/app/sidebarModels";
 import {
   shouldShowDesktopNotify,
@@ -314,19 +315,20 @@ export function registerGateAndMetaSubscriptions(
             "session://title",
             (p) => {
               if (isCancelled() || !p.sessionId || !p.title) return;
+              const title = sessionTitleWithoutAutomationSetupLeak(p.title);
               c.setSessions((list) =>
                 list.map((s) =>
-                  s.id === p.sessionId ? { ...s, title: p.title! } : s,
+                  s.id === p.sessionId ? { ...s, title } : s,
                 ),
               );
               c.setSession((prev) =>
                 prev.sessionId === p.sessionId
-                  ? { ...prev, title: p.title! }
+                  ? { ...prev, title }
                   : prev,
               );
               c.setLiveHost((prev) =>
                 prev.sessionId === p.sessionId
-                  ? { ...prev, title: p.title! }
+                  ? { ...prev, title }
                   : prev,
               );
             },

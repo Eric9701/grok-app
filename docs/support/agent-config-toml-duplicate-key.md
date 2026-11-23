@@ -348,7 +348,7 @@ python -c "import tomllib; p=r'$env:APPDATA\Roaming\grokapp\grok-app\data\agent-
 - [x] fixture：`yolo_mode` + `yolo` → 精确匹配不产生双 `yolo`（`set_table_key_exact_not_prefix` / `agent_prefs::does_not_prefix_match_yolo_mode`）
 - [x] fixture：双 `[ui]` 各含 `yolo` → dedupe 后无重复键
 - [x] shared 模式：heal 跳过；write helpers 拒绝 `~/.grok`
-- [ ] 无法修复的半截引号文件：当前 heal **仅处理 duplicate assignment**；其它语法错误仍依赖用户手册修复
+- [x] 无法解析的文件：诊断里的「修复 config.toml」在用户确认后先备份，重复键去重，仍无法解析则换成空的合法文件（密钥只留在备份）。自动 heal 仍只去重，且只跑在独立 agent-home
 - [ ] UI/日志在 config 类崩溃时有可读归因（待产品文案）
 
 ### 4.8 已实现（代码）
@@ -358,6 +358,7 @@ python -c "import tomllib; p=r'$env:APPDATA\Roaming\grokapp\grok-app\data\agent-
 | 精确键匹配 + 表头尾注释 | `src-tauri/src/agent_home_config.rs`（`assignment_key` / `parse_table_header` / `set_table_key`） |
 | 写锁（cascade 防交错 RMW） | `with_config_write_lock` / `update_config_toml` |
 | 去重自愈 + backup | `dedupe_assignment_keys` / `ensure_agent_home_config_sane` → `config.toml.bak-heal-<unix>` |
+| 诊断里的修复（含共享 `~/.atlas`，需用户确认） | `diagnose_config_file` / `repair_config_file`；设置 → CLI / 运行时 → 诊断 |
 | spawn 前调用 | `src-tauri/src/acp_client.rs`（independent cascade 之后） |
 | prefs / subagents / memory 统一写入口 | `agent_prefs` / `agent_subagents` / `agent_memory` |
 | providers `[models]` 精确键 | `providers.rs`（`default` / `max_retries` 不再 `starts_with`） |
@@ -399,3 +400,4 @@ python -c "import tomllib; p=r'$env:APPDATA\Roaming\grokapp\grok-app\data\agent-
 |------|------|
 | 2026-08-11 | 依据 support `20260811-054802` 与本地复现（`yolo_mode`/`starts_with` → 双 `yolo`）初稿 |
 | 2026-08-11 | 落地精确匹配、表头注释、spawn 前 dedupe 自愈、写锁；排查 providers/MCP/prefs 写坏路径 |
+| 2026-11-22 | 诊断页可手动修复当前模式的 config.toml：备份后去重，仍无法解析则换成空的合法文件 |

@@ -123,7 +123,12 @@ export function useGitBranches(opts: {
           gitWorktrees.find((w) => pathsEqual(w.path, row.worktreePath)) ??
           null;
         if (wt) {
-          await switchToWorktree(wt);
+          setGitBranchesBusy(true);
+          try {
+            await switchToWorktree(wt);
+          } finally {
+            setGitBranchesBusy(false);
+          }
           return;
         }
         h.showToast(

@@ -45,6 +45,47 @@ export function wrapAutomationSetupAgentText(userVisibleText: string): string {
 }
 
 /**
+ * First non-empty line is the silent setup prefix (full block or a title
+ * truncated from it). Ordinary chat that merely mentions automation does not.
+ */
+export function leadingAutomationSetupLeak(text: string): boolean {
+  const line =
+    (text || "")
+      .replace(/^\uFEFF/, "")
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? "";
+  return /^\[INTERNAL\s*[—–-]\s*automation\b/i.test(line);
+}
+
+/** Text after the last `User request:` marker. Empty when the marker is absent. */
+export function userRequestFromAutomationSetupLeak(text: string): string {
+  const re = /user request:\s*/gi;
+  let end = -1;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text || ""))) {
+    end = match.index + match[0].length;
+  }
+  if (end < 0) return "";
+  return (text || "").slice(end).trim();
+}
+
+/**
+ * Session title that must not show the setup prefix.
+ * A leaked title with no recoverable request becomes "" so the row falls
+ * back to the localized untitled label.
+ */
+export function sessionTitleWithoutAutomationSetupLeak(title: string): string {
+  if (!leadingAutomationSetupLeak(title)) return title;
+  const line =
+    userRequestFromAutomationSetupLeak(title)
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .find((s) => s.length > 0) ?? "";
+  return line;
+}
+
+/**
  * Match ```grok-automation / ```json fences (optional lang spacing; closing fence optional final newline).
  */
 const FENCE_RE =

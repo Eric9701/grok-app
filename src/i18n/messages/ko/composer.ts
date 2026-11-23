@@ -178,6 +178,7 @@ export const koComposer = {
   "composer.branchRemote": "원격",
   "composer.branchElsewhere": "다른 worktree",
   "composer.branchSwitched": "{branch}(으)로 전환했습니다",
+  "composer.branchSwitching": "전환 중…",
   "composer.branchSwitchFailed": "{branch}(으)로 전환할 수 없습니다: {reason}",
   "composer.branchFail.dirty": "커밋하지 않은 변경이 덮어씌워집니다. 먼저 커밋하거나 stash 하세요",
   "composer.branchFail.elsewhere": "이미 {path}에서 체크아웃됨",

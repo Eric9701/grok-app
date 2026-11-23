@@ -1,23 +1,34 @@
 //! Unified write layer for App agent-home `config.toml`.
 //!
 //! Independent session-data mode (`GROK_HOME` = App agent-home) may write
-//! allowlisted keys. Shared mode always refuses path resolve / strict write so
-//! the App never rewrites the user's personal `~/.grok/config.toml`.
+//! allowlisted keys. Shared mode refuses path resolve and strict writes
+//! (`update_config_toml`) so ordinary saves never rewrite `~/.atlas/config.toml`.
+//!
+//! Diagnostics repair is the exception. An explicit user action may
+//! backup-and-dedupe, or backup-and-replace with an empty valid file, the
+//! `config.toml` for the active session mode — including shared `~/.atlas`.
+//! Spawn-time [`ensure_agent_home_config_sane`] stays independent-only.
 //!
 //! Pure TOML helpers are line-oriented upserts (no full parse) so unrelated
-//! sections and secrets stay intact.
+//! sections and secrets stay intact. Diagnosis uses `toml` only to decide
+//! whether the file already parses; it never logs file text.
 //!
 //! ## Safety
 //! - Key match is **exact** (never `starts_with`) so `yolo` cannot clobber `yolo_mode`.
 //! - Table headers accept trailing comments (`[ui] # note`).
 //! - [`ensure_agent_home_config_sane`] dedupes broken files only; valid configs are
 //!   never rewritten.
+//! - [`repair_config_file`] writes a backup before any change. A file that
+//!   already parses is left untouched, including its secrets.
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::Serialize;
 
 use crate::paths::{agent_config_toml, ensure_app_dirs};
 
@@ -623,6 +634,278 @@ pub fn update_config_toml_if_independent(
     update_config_toml(session_data_mode, transform).map(Some)
 }
 
+/// Hard cap so a huge non-config file is reported, not replaced.
+const MAX_CONFIG_REPAIR_BYTES: u64 = 8 * 1024 * 1024;
+
+/// Empty valid document written only after a backup, when the file does not parse.
+const REPAIR_RESET_BODY: &str = "\
+# AtlasBuddy repaired this file because it did not parse as TOML.\n\
+# The previous contents were copied to a .bak-heal file beside it.\n\
+";
+
+/// What Settings → diagnostics shows for the active `config.toml`.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigTomlDiagnosis {
+    pub path: String,
+    pub mode: String,
+    /// `ok` | `missing` | `empty` | `duplicate` | `syntax` | `unreadable`
+    pub status: String,
+    pub duplicate_count: u32,
+    pub examples: Vec<String>,
+    /// Stable code (`duplicate_keys`, `parse_error`, `not_utf8`, `too_large`) or a short I/O line.
+    /// Never the file body.
+    pub detail: String,
+    pub repairable: bool,
+}
+
+/// Result of an explicit diagnostics repair. A no-op leaves the file bytes unchanged.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigTomlRepairResult {
+    pub changed: bool,
+    pub path: String,
+    pub mode: String,
+    /// `deduped` | `reset` | `ok` | `missing` | `empty` | `unreadable` | `refused`
+    pub action: String,
+    pub removed_duplicates: u32,
+    pub backup_path: Option<String>,
+    pub status: String,
+    pub detail: String,
+}
+
+/// Diagnose the `config.toml` the active session mode actually reads.
+pub fn diagnose_active_config(session_data_mode: &str) -> ConfigTomlDiagnosis {
+    let path = crate::agent_config_view::config_toml_path(session_data_mode);
+    diagnose_config_file(session_data_mode, &path)
+}
+
+/// User-initiated repair of that same file, including shared `~/.atlas/config.toml`.
+pub fn repair_active_config(
+    session_data_mode: &str,
+) -> Result<ConfigTomlRepairResult, String> {
+    let path = crate::agent_config_view::config_toml_path(session_data_mode);
+    repair_config_file(session_data_mode, &path)
+}
+
+/// Diagnose `path` without writing. `session_data_mode` is recorded, not used to pick the path.
+pub fn diagnose_config_file(session_data_mode: &str, path: &Path) -> ConfigTomlDiagnosis {
+    with_config_write_lock(|| diagnose_config_file_unlocked(session_data_mode, path))
+}
+
+/// Repair `path`. Files that already parse are not written. Shared mode is allowed.
+pub fn repair_config_file(
+    session_data_mode: &str,
+    path: &Path,
+) -> Result<ConfigTomlRepairResult, String> {
+    with_config_write_lock(|| repair_config_file_unlocked(session_data_mode, path))
+}
+
+fn diagnose_config_file_unlocked(session_data_mode: &str, path: &Path) -> ConfigTomlDiagnosis {
+    let mode = normalize_mode(session_data_mode).to_string();
+    let path_s = path.display().to_string();
+    let make = |status: &str, dup: u32, examples: Vec<String>, detail: &str, repairable: bool| {
+        ConfigTomlDiagnosis {
+            path: path_s.clone(),
+            mode: mode.clone(),
+            status: status.to_string(),
+            duplicate_count: dup,
+            examples,
+            detail: detail.to_string(),
+            repairable,
+        }
+    };
+
+    if !path.is_file() {
+        return make("missing", 0, Vec::new(), "", false);
+    }
+    let meta = match fs::metadata(path) {
+        Ok(m) => m,
+        Err(e) => return make("unreadable", 0, Vec::new(), &io_detail(&e), false),
+    };
+    if meta.len() > MAX_CONFIG_REPAIR_BYTES {
+        return make("unreadable", 0, Vec::new(), "too_large", false);
+    }
+    let bytes = match fs::read(path) {
+        Ok(b) => b,
+        Err(e) => return make("unreadable", 0, Vec::new(), &io_detail(&e), false),
+    };
+    let text = match String::from_utf8(bytes) {
+        Ok(s) => s,
+        Err(_) => return make("syntax", 0, Vec::new(), "not_utf8", true),
+    };
+    if text.trim().is_empty() {
+        return make("empty", 0, Vec::new(), "", false);
+    }
+    if toml_parses(&text) {
+        return make("ok", 0, Vec::new(), "", false);
+    }
+    let (dup, raw_examples) = count_duplicate_assignments(&text);
+    let examples = safe_example_keys(&raw_examples);
+    let dup_u = u32::try_from(dup).unwrap_or(u32::MAX);
+    if dup > 0 {
+        let (healed, removed) = dedupe_assignment_keys(&text);
+        if removed > 0 && toml_parses(&healed) {
+            return make("duplicate", dup_u, examples, "duplicate_keys", true);
+        }
+    }
+    make("syntax", dup_u, examples, "parse_error", true)
+}
+
+fn repair_config_file_unlocked(
+    session_data_mode: &str,
+    path: &Path,
+) -> Result<ConfigTomlRepairResult, String> {
+    let before = diagnose_config_file_unlocked(session_data_mode, path);
+    if !before.repairable {
+        let action = if before.detail == "too_large" {
+            "refused"
+        } else {
+            before.status.as_str()
+        };
+        return Ok(repair_noop(&before, action));
+    }
+
+    let bytes = fs::read(path).map_err(|e| format!("read config.toml: {}", io_detail(&e)))?;
+    let text = match String::from_utf8(bytes) {
+        Ok(s) => s,
+        Err(_) => {
+            let backup = backup_config_file(path)?;
+            fs::write(path, REPAIR_RESET_BODY)
+                .map_err(|e| format!("write repaired config.toml: {}", io_detail(&e)))?;
+            return Ok(finish_repair(
+                session_data_mode,
+                path,
+                "reset",
+                0,
+                Some(backup),
+            ));
+        }
+    };
+
+    let (dup, _) = count_duplicate_assignments(&text);
+    if dup > 0 {
+        let (healed, removed) = dedupe_assignment_keys(&text);
+        if removed > 0 && healed != text && toml_parses(&healed) {
+            let backup = backup_config_file(path)?;
+            fs::write(path, &healed)
+                .map_err(|e| format!("write healed config.toml: {}", io_detail(&e)))?;
+            tracing::warn!(
+                target: "agent_home_config",
+                path = %path.display(),
+                backup = %backup.display(),
+                removed,
+                "diagnostics repair deduped config.toml (kept last assignment)"
+            );
+            let removed_u = u32::try_from(removed).unwrap_or(u32::MAX);
+            return Ok(finish_repair(
+                session_data_mode,
+                path,
+                "deduped",
+                removed_u,
+                Some(backup),
+            ));
+        }
+    }
+
+    let backup = backup_config_file(path)?;
+    fs::write(path, REPAIR_RESET_BODY)
+        .map_err(|e| format!("write repaired config.toml: {}", io_detail(&e)))?;
+    tracing::warn!(
+        target: "agent_home_config",
+        path = %path.display(),
+        backup = %backup.display(),
+        "diagnostics repair replaced unparseable config.toml with an empty valid file"
+    );
+    Ok(finish_repair(
+        session_data_mode,
+        path,
+        "reset",
+        0,
+        Some(backup),
+    ))
+}
+
+fn repair_noop(before: &ConfigTomlDiagnosis, action: &str) -> ConfigTomlRepairResult {
+    ConfigTomlRepairResult {
+        changed: false,
+        path: before.path.clone(),
+        mode: before.mode.clone(),
+        action: action.to_string(),
+        removed_duplicates: 0,
+        backup_path: None,
+        status: before.status.clone(),
+        detail: before.detail.clone(),
+    }
+}
+
+fn finish_repair(
+    session_data_mode: &str,
+    path: &Path,
+    action: &str,
+    removed: u32,
+    backup: Option<PathBuf>,
+) -> ConfigTomlRepairResult {
+    let after = diagnose_config_file_unlocked(session_data_mode, path);
+    ConfigTomlRepairResult {
+        changed: true,
+        path: path.display().to_string(),
+        mode: normalize_mode(session_data_mode).to_string(),
+        action: action.to_string(),
+        removed_duplicates: removed,
+        backup_path: backup.map(|p| p.display().to_string()),
+        status: after.status,
+        detail: after.detail,
+    }
+}
+
+fn backup_config_file(path: &Path) -> Result<PathBuf, String> {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let backup = path.with_file_name(format!("config.toml.bak-heal-{stamp}"));
+    fs::copy(path, &backup).map_err(|e| format!("backup config.toml: {}", io_detail(&e)))?;
+    Ok(backup)
+}
+
+fn toml_parses(text: &str) -> bool {
+    toml::from_str::<toml::Value>(text).is_ok()
+}
+
+fn safe_example_keys(keys: &[String]) -> Vec<String> {
+    keys.iter().filter_map(|k| safe_example_key(k)).take(5).collect()
+}
+
+fn safe_example_key(key: &str) -> Option<String> {
+    let t = key.trim().trim_matches('"').trim_matches('\'');
+    if t.is_empty() || t.len() > 48 {
+        return None;
+    }
+    if t.chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
+        Some(t.to_string())
+    } else {
+        None
+    }
+}
+
+fn io_detail(err: &std::io::Error) -> String {
+    let kind = match err.kind() {
+        ErrorKind::NotFound => "not_found",
+        ErrorKind::PermissionDenied => "permission_denied",
+        ErrorKind::AlreadyExists => "already_exists",
+        _ => "",
+    };
+    if !kind.is_empty() {
+        return kind.to_string();
+    }
+    let line = err.to_string();
+    let line = line.lines().next().unwrap_or("io");
+    line.chars().take(180).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -930,5 +1213,153 @@ command = \"y\"
 
         std::env::remove_var("GROK_APP_HOME");
         let _ = fs::remove_dir_all(&home);
+    }
+
+    fn temp_config_dir(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let p = std::env::temp_dir().join(format!(
+            "grok-config-repair-{}-{}-{}",
+            label,
+            std::process::id(),
+            nanos
+        ));
+        let _ = fs::remove_dir_all(&p);
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    fn bak_count(dir: &Path) -> usize {
+        fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .contains("config.toml.bak-heal-")
+            })
+            .count()
+    }
+
+    #[test]
+    fn diagnose_repair_dedupes_then_noops() {
+        let dir = temp_config_dir("dup");
+        let cfg = dir.join("config.toml");
+        let original = "\
+[ui]
+yolo = true
+yolo = false
+api_key = \"sk-keep-me\"
+";
+        fs::write(&cfg, original).unwrap();
+
+        let d = diagnose_config_file("shared", &cfg);
+        assert_eq!(d.mode, "shared");
+        assert_eq!(d.status, "duplicate");
+        assert!(d.repairable);
+        assert!(d.examples.iter().any(|k| k == "yolo"), "{:?}", d.examples);
+        assert!(!d.detail.contains("sk-keep"));
+
+        let r = repair_config_file("shared", &cfg).unwrap();
+        assert!(r.changed);
+        assert_eq!(r.action, "deduped");
+        assert!(r.removed_duplicates >= 1);
+        let backup = r.backup_path.expect("backup");
+        assert_eq!(fs::read_to_string(&backup).unwrap(), original);
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(after.contains("yolo = false"), "{after}");
+        assert!(after.contains("sk-keep-me"), "{after}");
+        assert!(toml::from_str::<toml::Value>(&after).is_ok(), "{after}");
+        assert_eq!(diagnose_config_file("shared", &cfg).status, "ok");
+
+        let before_bytes = fs::read(&cfg).unwrap();
+        let again = repair_config_file("shared", &cfg).unwrap();
+        assert!(!again.changed);
+        assert!(again.backup_path.is_none());
+        assert_eq!(fs::read(&cfg).unwrap(), before_bytes);
+        assert_eq!(bak_count(&dir), 1);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn diagnose_repair_resets_unparseable_and_keeps_backup() {
+        let dir = temp_config_dir("syntax");
+        let cfg = dir.join("config.toml");
+        let original = "this is not toml {\napi_key = \"sk-only-in-backup\"\n";
+        fs::write(&cfg, original).unwrap();
+
+        let d = diagnose_config_file("independent", &cfg);
+        assert_eq!(d.status, "syntax");
+        assert!(d.repairable);
+        assert!(!d.detail.contains("sk-only"));
+
+        let r = repair_config_file("independent", &cfg).unwrap();
+        assert!(r.changed);
+        assert_eq!(r.action, "reset");
+        let backup = r.backup_path.expect("backup");
+        assert_eq!(fs::read_to_string(&backup).unwrap(), original);
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(!after.contains("sk-only-in-backup"), "{after}");
+        assert!(toml::from_str::<toml::Value>(&after).is_ok(), "{after}");
+        assert_eq!(diagnose_config_file("independent", &cfg).status, "ok");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn diagnose_repair_leaves_valid_and_missing_alone() {
+        let dir = temp_config_dir("valid");
+        let cfg = dir.join("config.toml");
+        let original = "\
+[model.\"claude-glm-5.3[1M]\"]
+model = \"claude-glm-5.3[1M]\"
+api_key = \"sk-test\"
+";
+        fs::write(&cfg, original).unwrap();
+        let before = fs::read(&cfg).unwrap();
+        let d = diagnose_config_file("shared", &cfg);
+        assert_eq!(d.status, "ok");
+        assert!(!d.repairable);
+        let r = repair_config_file("shared", &cfg).unwrap();
+        assert!(!r.changed);
+        assert_eq!(fs::read(&cfg).unwrap(), before);
+        assert_eq!(bak_count(&dir), 0);
+
+        let missing = dir.join("nope.toml");
+        let m = diagnose_config_file("shared", &missing);
+        assert_eq!(m.status, "missing");
+        assert!(!m.repairable);
+        let mr = repair_config_file("shared", &missing).unwrap();
+        assert!(!mr.changed);
+        assert!(!missing.exists());
+
+        fs::write(&cfg, "   \n").unwrap();
+        assert_eq!(diagnose_config_file("shared", &cfg).status, "empty");
+        let er = repair_config_file("shared", &cfg).unwrap();
+        assert!(!er.changed);
+        assert_eq!(fs::read_to_string(&cfg).unwrap(), "   \n");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn diagnose_repair_resets_invalid_utf8() {
+        let dir = temp_config_dir("utf8");
+        let cfg = dir.join("config.toml");
+        let original = vec![0x61, 0x70, 0x69, 0xFF, 0x00];
+        fs::write(&cfg, &original).unwrap();
+        let d = diagnose_config_file("shared", &cfg);
+        assert_eq!(d.status, "syntax");
+        assert_eq!(d.detail, "not_utf8");
+        assert!(d.repairable);
+        let r = repair_config_file("shared", &cfg).unwrap();
+        assert_eq!(r.action, "reset");
+        let backup = fs::read(r.backup_path.expect("backup")).unwrap();
+        assert_eq!(backup, original);
+        assert!(toml::from_str::<toml::Value>(&fs::read_to_string(&cfg).unwrap()).is_ok());
+        let _ = fs::remove_dir_all(&dir);
     }
 }

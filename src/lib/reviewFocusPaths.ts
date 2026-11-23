@@ -44,6 +44,22 @@ export function reviewFocusPathParts(
   };
 }
 
+/** Lowercased rel + absolute keys for paths that must stay in Review. */
+export function reviewKeepPathKeys(
+  paths: readonly (string | null | undefined)[],
+  projectPath: string | null | undefined,
+): Set<string> {
+  const keep = new Set<string>();
+  for (const raw of paths) {
+    const text = (raw || "").trim();
+    if (!text) continue;
+    const parts = reviewFocusPathParts(text, projectPath);
+    if (parts.relPath) keep.add(normalizePath(parts.relPath).toLowerCase());
+    if (parts.path) keep.add(parts.path.toLowerCase());
+  }
+  return keep;
+}
+
 /** True when an entry already covers this focus path. */
 export function reviewEntryCoversPath(
   entry: { path?: string; relPath?: string; name?: string },

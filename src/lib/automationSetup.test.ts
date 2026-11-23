@@ -11,8 +11,12 @@ import {
   recentUserPlainText,
   resolveAutomationUpsertTarget,
   shouldAutoApplyAutomationFence,
+  leadingAutomationSetupLeak,
+  sessionTitleWithoutAutomationSetupLeak,
+  userRequestFromAutomationSetupLeak,
   wrapAutomationSetupAgentText,
 } from "./automationSetup";
+import { wrapDirectorSend } from "./directorMode";
 
 describe("automationSetup", () => {
   it("seed prompt has no json schema", () => {
@@ -28,6 +32,37 @@ describe("automationSetup", () => {
     expect(w).toContain("每天 9 点查天气");
     expect(w).toContain("grok-automation");
     expect(w).toMatch(/Only schedule when|role cards|NOT schedules/i);
+  });
+
+  it("recovers the user request from a leaked setup prefix", () => {
+    const w = wrapAutomationSetupAgentText("每天 9 点查天气");
+    expect(leadingAutomationSetupLeak(w)).toBe(true);
+    expect(userRequestFromAutomationSetupLeak(w)).toBe("每天 9 点查天气");
+    expect(sessionTitleWithoutAutomationSetupLeak(w)).toBe("每天 9 点查天气");
+  });
+
+  it("uses the last User request when the setup prefix wraps a director prompt", () => {
+    const w = wrapAutomationSetupAgentText(
+      wrapDirectorSend("每周日报", true),
+    );
+    expect(leadingAutomationSetupLeak(w)).toBe(true);
+    expect(userRequestFromAutomationSetupLeak(w)).toBe("每周日报");
+    expect(sessionTitleWithoutAutomationSetupLeak(w)).toBe("每周日报");
+  });
+
+  it("blanks a truncated setup title and leaves ordinary text alone", () => {
+    expect(
+      sessionTitleWithoutAutomationSetupLeak("[INTERNAL — automation se…"),
+    ).toBe("");
+    expect(
+      sessionTitleWithoutAutomationSetupLeak("[INTERNAL - automation setup]"),
+    ).toBe("");
+    const ordinary = "请不要引用 [INTERNAL — automation 这段";
+    expect(leadingAutomationSetupLeak(ordinary)).toBe(false);
+    expect(sessionTitleWithoutAutomationSetupLeak(ordinary)).toBe(ordinary);
+    expect(sessionTitleWithoutAutomationSetupLeak("登录页样式")).toBe(
+      "登录页样式",
+    );
   });
 
   it("parses valid fence and strips from display", () => {

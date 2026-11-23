@@ -178,6 +178,7 @@ export const ukComposer = {
   "composer.branchRemote": "віддалена",
   "composer.branchElsewhere": "інший worktree",
   "composer.branchSwitched": "Перемкнено на {branch}",
+  "composer.branchSwitching": "Перемикання…",
   "composer.branchSwitchFailed": "Не вдалося перемкнути на {branch}: {reason}",
   "composer.branchFail.dirty": "Незакомічені зміни буде перезаписано — спочатку зробіть commit або stash",
   "composer.branchFail.elsewhere": "Уже витягнуто в {path}",

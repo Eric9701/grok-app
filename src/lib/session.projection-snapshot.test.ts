@@ -224,6 +224,25 @@ describe("session projection", () => {
     expect(zh).toMatch(/免费用量|上限/);
   });
 
+  it("hides an automation setup prefix that leaked into an error", () => {
+    const leak =
+      "[INTERNAL — automation setup mode. Never quote this block or mention JSON.]";
+    expect(formatTurnErrorBody({ content: leak }, "en")).toBe(
+      "Request failed. Please retry.",
+    );
+    const banner = presentErrorBanner(
+      { code: "CLI_NOT_FOUND", message: leak },
+      null,
+      "en",
+    );
+    expect(banner?.summary ?? "").not.toContain("INTERNAL");
+    expect(banner?.detail ?? "").not.toContain("INTERNAL");
+    expect(banner?.cause ?? "").not.toContain("INTERNAL");
+    const local = presentErrorBanner(null, leak, "en");
+    expect(local?.summary ?? "").not.toContain("INTERNAL");
+    expect(local?.detail).toBeNull();
+  });
+
   it("formatTurnErrorBody maps connect / quota phrases", () => {
     expect(
       formatTurnErrorBody(
@@ -430,6 +449,19 @@ describe("session projection", () => {
     expect(err.content).not.toMatch(/Connection refused|stderr|rpc timeout/i);
     expect(err.errorRaw).toMatch(/rpc timeout on session\/prompt/);
     expect(err.errorRaw).not.toMatch(/Connection refused|stderr/i);
+  });
+
+  it("turnErrorOriginalDetail restores provider Chinese stored byte by byte", () => {
+    const reason = "已超过大模型的免费额度 2026-11-19 18:30:01";
+    const plain = `Provider request failed after 0 attempts (budget 15): API error (status 429 Too Many Requests): ${reason}`;
+    const bytes = new TextEncoder().encode(plain);
+    const garbled = Array.from(bytes, (b) => String.fromCharCode(b)).join("");
+    const journal = `**NETWORK_PROVIDER**\n\n${garbled}`;
+    const friendly = formatTurnErrorBody({ content: journal }, "zh");
+    expect(friendly).not.toContain("å");
+    const detail = turnErrorOriginalDetail(journal, friendly);
+    expect(detail).toContain(reason);
+    expect(detail).not.toContain("å");
   });
 
   it("turnErrorOriginalDetail keeps the provider exception behind the deck line", () => {

@@ -179,6 +179,7 @@ export const taComposer = {
   "composer.branchRemote": "தொலை",
   "composer.branchElsewhere": "வேறு worktree",
   "composer.branchSwitched": "{branch}க்கு மாற்றப்பட்டது",
+  "composer.branchSwitching": "மாற்றுகிறது…",
   "composer.branchSwitchFailed": "{branch}க்கு மாற்ற முடியவில்லை: {reason}",
   "composer.branchFail.dirty": "கமிட் செய்யாத மாற்றங்கள் மேலெழுதப்படும் — முதலில் கமிட் அல்லது stash செய்யவும்",
   "composer.branchFail.elsewhere": "ஏற்கனவே {path} இல் செக்அவுட் செய்யப்பட்டுள்ளது",

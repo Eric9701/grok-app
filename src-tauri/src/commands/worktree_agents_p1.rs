@@ -1045,6 +1045,8 @@ fn apply_ship_process_env(cmd: &mut std::process::Command) {
     if let Some(path_env) = crate::process_util::enriched_path_env() {
         cmd.env("PATH", path_env);
     }
+    // No TTY in the desktop host — fail instead of waiting on a hidden prompt.
+    cmd.env("GIT_TERMINAL_PROMPT", "0");
     // `gh pr create` stdout is parsed for the PR URL — keep it free of ANSI.
     crate::process_util::apply_no_color_env_std(cmd);
     #[cfg(unix)]

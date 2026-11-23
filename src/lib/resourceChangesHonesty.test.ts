@@ -6,6 +6,7 @@ import {
   filterEntriesByKind,
   filterWorkspaceByKind,
   normalizeChangesKindFilter,
+  omitCleanSessionReviewStubs,
   presentWorkspaceKindFilters,
   resolveChangesPreviewEmptyState,
   resolveReviewEmptyState,
@@ -298,5 +299,36 @@ describe("section empties + kind filters", () => {
     expect(workspaceGitUnavailableHintKey("load_error")).toBe(
       "changes.workspace.loadErrorHint",
     );
+  });
+});
+
+describe("omitCleanSessionReviewStubs", () => {
+  const stub = {
+    source: "session" as const,
+    added: 0,
+    removed: 0,
+    patch: null,
+    session: { path: "AGENTS.md" },
+    relPath: "AGENTS.md",
+    path: "E:/repo/AGENTS.md",
+  };
+
+  it("drops a committed session file that has no diff", () => {
+    expect(omitCleanSessionReviewStubs([stub], new Set())).toEqual([]);
+  });
+
+  it("keeps a session file the user focused", () => {
+    expect(
+      omitCleanSessionReviewStubs([stub], new Set(["agents.md"])),
+    ).toEqual([stub]);
+  });
+
+  it("keeps workspace rows and session rows that still have a patch", () => {
+    const workspace = { ...stub, source: "workspace" as const, session: undefined };
+    const patched = { ...stub, relPath: "CHANGELOG.md", patch: "@@ -1 +1 @@\n-a\n+b\n" };
+    expect(omitCleanSessionReviewStubs([workspace, patched], new Set())).toEqual([
+      workspace,
+      patched,
+    ]);
   });
 });

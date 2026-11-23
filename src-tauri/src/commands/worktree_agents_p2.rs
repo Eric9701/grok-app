@@ -713,6 +713,244 @@ pub async fn git_push_branch(project_path: String) -> Result<GitPushBranchResult
     }
 }
 
+/// Commit message for the env-menu commit. Empty / NUL / oversized → error code.
+pub fn sanitize_commit_message(raw: &str) -> Result<String, String> {
+    let s = raw.trim();
+    if s.is_empty() {
+        return Err("message_required".into());
+    }
+    if s.contains('\0') || s.chars().count() > 10_000 {
+        return Err("invalid_message".into());
+    }
+    Ok(s.to_string())
+}
+
+/// `git -C <project> add -A`
+pub fn build_git_add_all_args(project: &str) -> Result<Vec<String>, String> {
+    let project = normalize_fs_path(project);
+    if project.is_empty() || project.starts_with('-') {
+        return Err("invalid project path".into());
+    }
+    Ok(vec!["-C".into(), project, "add".into(), "-A".into()])
+}
+
+/// `git -C <project> commit -m <message>`
+pub fn build_git_commit_args(project: &str, message: &str) -> Result<Vec<String>, String> {
+    let project = normalize_fs_path(project);
+    if project.is_empty() || project.starts_with('-') {
+        return Err("invalid project path".into());
+    }
+    let message = sanitize_commit_message(message)?;
+    Ok(vec![
+        "-C".into(),
+        project,
+        "commit".into(),
+        "-m".into(),
+        message,
+    ])
+}
+
+/// Soft-fail result of committing the project worktree (`git add -A` + `git commit`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCommitWorktreeResult {
+    pub available: bool,
+    pub ok: bool,
+    /// True only when this call created a commit.
+    pub committed: bool,
+    pub branch: Option<String>,
+    pub stdout: String,
+    pub stderr: String,
+    pub reason: Option<String>,
+}
+
+fn git_commit_result(
+    available: bool,
+    ok: bool,
+    committed: bool,
+    branch: Option<String>,
+    reason: Option<String>,
+) -> GitCommitWorktreeResult {
+    GitCommitWorktreeResult {
+        available,
+        ok,
+        committed,
+        branch,
+        stdout: String::new(),
+        stderr: String::new(),
+        reason,
+    }
+}
+
+/// Stage every worktree change and commit it.
+///
+/// A clean worktree returns `ok` with `committed: false` (nothing to write).
+/// Detached HEAD is refused. Does not push.
+#[tauri::command]
+pub async fn git_commit_worktree(
+    project_path: String,
+    message: Option<String>,
+) -> Result<GitCommitWorktreeResult, String> {
+    let project = normalize_fs_path(&project_path);
+    if project.is_empty() {
+        return Ok(git_commit_result(
+            false,
+            false,
+            false,
+            None,
+            Some("empty path".into()),
+        ));
+    }
+    let proj = std::path::PathBuf::from(&project);
+    if !proj.is_dir() {
+        return Ok(git_commit_result(
+            false,
+            false,
+            false,
+            None,
+            Some("project not a directory".into()),
+        ));
+    }
+    if let Err(reason) = git_probe_work_tree(&project) {
+        return Ok(git_commit_result(
+            false,
+            false,
+            false,
+            None,
+            Some(reason),
+        ));
+    }
+
+    let project_for_cmd = project.clone();
+    let message = message.unwrap_or_default();
+    tokio::task::spawn_blocking(move || git_commit_worktree_blocking(project_for_cmd, message))
+        .await
+        .map_err(|e| format!("git commit worker panicked: {e}"))
+}
+
+fn git_commit_worktree_blocking(project: String, message: String) -> GitCommitWorktreeResult {
+    let branch = git_current_branch(&project);
+    if branch.is_none() {
+        return git_commit_result(true, false, false, None, Some("detached_head".into()));
+    }
+
+    let status = match git_ship_run(&project, &["status", "--porcelain=v1", "-z"]) {
+        Ok(out) => out,
+        Err(reason) => {
+            return git_commit_result(false, false, false, branch, Some(reason));
+        }
+    };
+    if !status.status.success() {
+        let stderr = String::from_utf8_lossy(&status.stderr);
+        let stdout = String::from_utf8_lossy(&status.stdout);
+        return GitCommitWorktreeResult {
+            available: true,
+            ok: false,
+            committed: false,
+            branch,
+            stdout: ship_redact_output(&stdout, 2000),
+            stderr: ship_redact_output(&stderr, 2000),
+            reason: Some(git_output_reason(&stdout, &stderr, "git status failed")),
+        };
+    }
+    if !porcelain_has_entries(&status.stdout) {
+        return git_commit_result(true, true, false, branch, None);
+    }
+
+    let message = match sanitize_commit_message(&message) {
+        Ok(m) => m,
+        Err(reason) => {
+            return git_commit_result(true, false, false, branch, Some(reason));
+        }
+    };
+
+    let add_args = match build_git_add_all_args(&project) {
+        Ok(a) => a,
+        Err(reason) => return git_commit_result(true, false, false, branch, Some(reason)),
+    };
+    let added = match git_ship_run_args(&add_args) {
+        Ok(out) => out,
+        Err(reason) => return git_commit_result(false, false, false, branch, Some(reason)),
+    };
+    if !added.status.success() {
+        let stderr = String::from_utf8_lossy(&added.stderr);
+        let stdout = String::from_utf8_lossy(&added.stdout);
+        return GitCommitWorktreeResult {
+            available: true,
+            ok: false,
+            committed: false,
+            branch,
+            stdout: ship_redact_output(&stdout, 2000),
+            stderr: ship_redact_output(&stderr, 2000),
+            reason: Some(git_output_reason(&stdout, &stderr, "git add failed")),
+        };
+    }
+
+    let commit_args = match build_git_commit_args(&project, &message) {
+        Ok(a) => a,
+        Err(reason) => return git_commit_result(true, false, false, branch, Some(reason)),
+    };
+    let committed = match git_ship_run_args(&commit_args) {
+        Ok(out) => out,
+        Err(reason) => return git_commit_result(false, false, false, branch, Some(reason)),
+    };
+    let stdout = ship_redact_output(&String::from_utf8_lossy(&committed.stdout), 2000);
+    let stderr = ship_redact_output(&String::from_utf8_lossy(&committed.stderr), 2000);
+    if committed.status.success() {
+        GitCommitWorktreeResult {
+            available: true,
+            ok: true,
+            committed: true,
+            branch,
+            stdout,
+            stderr,
+            reason: None,
+        }
+    } else {
+        GitCommitWorktreeResult {
+            available: true,
+            ok: false,
+            committed: false,
+            branch,
+            stdout: stdout.clone(),
+            stderr: stderr.clone(),
+            reason: Some(git_output_reason(&stdout, &stderr, "git commit failed")),
+        }
+    }
+}
+
+fn porcelain_has_entries(bytes: &[u8]) -> bool {
+    bytes.iter().any(|b| !b.is_ascii_whitespace())
+}
+
+fn git_output_reason(stdout: &str, stderr: &str, fallback: &str) -> String {
+    let stderr = stderr.trim();
+    if !stderr.is_empty() {
+        return stderr.chars().take(400).collect();
+    }
+    let stdout = stdout.trim();
+    if !stdout.is_empty() {
+        return stdout.chars().take(400).collect();
+    }
+    fallback.to_string()
+}
+
+fn git_ship_run(project: &str, args: &[&str]) -> Result<std::process::Output, String> {
+    let mut cmd = crate::process_util::command("git");
+    apply_ship_process_env(&mut cmd);
+    let mut full = vec!["-C".to_string(), project.to_string()];
+    full.extend(args.iter().map(|s| (*s).to_string()));
+    cmd.args(&full)
+        .output()
+        .map_err(|e| e.to_string())
+}
+
+fn git_ship_run_args(args: &[String]) -> Result<std::process::Output, String> {
+    let mut cmd = crate::process_util::command("git");
+    apply_ship_process_env(&mut cmd);
+    cmd.args(args).output().map_err(|e| e.to_string())
+}
+
 /// Create a GitHub pull request via `gh pr create` (argv only, no shell).
 /// Soft-fails when `gh` is missing. Never reports ok without a PR URL.
 #[tauri::command]
@@ -938,6 +1176,26 @@ mod ship_flow_tests {
     }
 
     #[test]
+    fn sanitize_commit_message_rules() {
+        assert_eq!(sanitize_commit_message("  hello  ").unwrap(), "hello");
+        assert!(sanitize_commit_message("  ").is_err());
+        assert!(sanitize_commit_message("a\0b").is_err());
+        let long = "x".repeat(10_001);
+        assert!(sanitize_commit_message(&long).is_err());
+    }
+
+    fn build_git_commit_args_keep_message_as_one_arg() {
+        let add = build_git_add_all_args("/repo/demo").unwrap();
+        assert_eq!(add, vec!["-C", "/repo/demo", "add", "-A"]);
+        let commit = build_git_commit_args("/repo/demo", "feat: ship\n\nwhy").unwrap();
+        assert_eq!(
+            commit,
+            vec!["-C", "/repo/demo", "commit", "-m", "feat: ship\n\nwhy"]
+        );
+        assert!(build_git_add_all_args("").is_err());
+        assert!(build_git_commit_args("-C", "msg").is_err());
+    }
+
     fn build_git_push_args_ok() {
         let a = build_git_push_args("/Users/me/repo").unwrap();
         assert_eq!(

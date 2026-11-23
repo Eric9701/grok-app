@@ -392,3 +392,43 @@ export async function atlasEndpointsRead(): Promise<AtlasEndpointsSnapshot> {
   return invoke<AtlasEndpointsSnapshot>("atlas_endpoints_read");
 }
 
+/** Diagnostics view of the config.toml the active session mode reads. */
+export type ConfigTomlDiagnosis = {
+  path: string;
+  /** `shared` | `independent` */
+  mode: string;
+  /** `ok` | `missing` | `empty` | `duplicate` | `syntax` | `unreadable` */
+  status: string;
+  duplicateCount: number;
+  examples: string[];
+  detail: string;
+  repairable: boolean;
+};
+
+/** Explicit diagnostics repair. `changed: false` means the file bytes were left as-is. */
+export type ConfigTomlRepairResult = {
+  changed: boolean;
+  path: string;
+  mode: string;
+  /** `deduped` | `reset` | `ok` | `missing` | `empty` | `unreadable` | `refused` */
+  action: string;
+  removedDuplicates: number;
+  backupPath: string | null;
+  status: string;
+  detail: string;
+};
+
+/** Read-only check. `mode` is the settings session data mode currently shown. */
+export async function configTomlDiagnose(mode?: string): Promise<ConfigTomlDiagnosis> {
+  return invoke<ConfigTomlDiagnosis>("config_toml_diagnose", {
+    mode: mode || null,
+  });
+}
+
+/** Backup, then dedupe duplicate keys or replace a file that still does not parse. */
+export async function configTomlRepair(mode?: string): Promise<ConfigTomlRepairResult> {
+  return invoke<ConfigTomlRepairResult>("config_toml_repair", {
+    mode: mode || null,
+  });
+}
+

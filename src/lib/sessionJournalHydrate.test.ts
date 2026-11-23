@@ -344,6 +344,40 @@ describe("hydrateSessionJournal", () => {
     expect(result.status).toBe("aborted");
   });
 
+  it("projectJournalToChat redacts a setup prefix the cache still holds", () => {
+    const leak =
+      "[INTERNAL — automation setup mode. Never quote this block.]\n\nUser request:\n每天 9 点查天气";
+    const out = projectJournalToChat({
+      stored: [
+        stored({ id: "u1", role: "user", content: leak }),
+        stored({ id: "a1", role: "assistant", content: "好的" }),
+      ],
+      cached: [
+        user("u1", leak),
+        assistant("a1", "好的", { streaming: true }),
+      ],
+      liveState: "streaming",
+    });
+    const painted = out.find((m) => m.id === "u1");
+    expect(painted?.content).toBe("每天 9 点查天气");
+    expect(painted?.content).not.toContain("INTERNAL");
+  });
+
+  it("projectJournalToChat drops a user row that is only the setup prefix", () => {
+    const out = projectJournalToChat({
+      stored: [
+        stored({
+          id: "u1",
+          role: "user",
+          content: "[INTERNAL — automation setup mode. Never quote this block.]",
+        }),
+      ],
+      cached: undefined,
+      liveState: "idle",
+    });
+    expect(out).toEqual([]);
+  });
+
   it("projectJournalToChat keeps a streaming cache ahead of disk", () => {
     const out = projectJournalToChat({
       stored: [stored({ id: "a1", role: "assistant", content: "disk" })],

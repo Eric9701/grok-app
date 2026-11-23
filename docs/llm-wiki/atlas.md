@@ -42,6 +42,8 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 例外：应用代装 CLI 成功后，按安装脚本把 `[cli] installer = "internal"` 和 `[endpoints]` 的 `login_base_url`、`cli_chat_proxy_base_url`、`cli_update_base_url` upsert 进共享 `~/.atlas/config.toml`，并同步到 App `agent-home/config.toml`。只替换这几项；stable 安装会去掉已有的 `[cli] channel`。不整文件重写，不动 `[model.*]` 和其它密钥。其它写入仍禁止改 shared CLI home。
 
+例外：设置 → CLI / 运行时 → 诊断里的「修复 config.toml」只在用户确认后处理当前会话模式正在读的那份文件（共享是 `~/.atlas/config.toml`，独立是 App `agent-home/config.toml`）。已经能解析的文件不改。重复键先备份再去重，保留后出现的赋值。仍然无法解析时，先备份，再写成一份空的合法 TOML，密钥只留在备份里。启动时的自动去重仍只处理独立 agent-home。
+
 ## 远程更新
 
 本白标**不**向 GitHub / 官方 updater 探活，也**不**在启动后跑 `atlas update --check`。桌面应用改走企业 atlas-server 的**自更新**（无签名，靠 SHA-256 校验）：

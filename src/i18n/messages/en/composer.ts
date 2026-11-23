@@ -180,6 +180,7 @@ export const enComposer = {
   "composer.branchRemote": "remote",
   "composer.branchElsewhere": "other worktree",
   "composer.branchSwitched": "Switched to {branch}",
+  "composer.branchSwitching": "Switching…",
   "composer.branchSwitchFailed": "Could not switch to {branch}: {reason}",
   "composer.branchFail.dirty": "Uncommitted changes would be overwritten — commit or stash first",
   "composer.branchFail.elsewhere": "Already checked out in {path}",

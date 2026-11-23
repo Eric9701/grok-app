@@ -178,6 +178,7 @@ export const jaComposer = {
   "composer.branchRemote": "リモート",
   "composer.branchElsewhere": "別の worktree",
   "composer.branchSwitched": "{branch} に切り替えました",
+  "composer.branchSwitching": "切り替え中…",
   "composer.branchSwitchFailed": "{branch} に切り替えられません：{reason}",
   "composer.branchFail.dirty": "未コミットの変更が上書きされます。先にコミットまたは stash してください",
   "composer.branchFail.elsewhere": "{path} ですでにチェックアウトされています",

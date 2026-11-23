@@ -178,6 +178,7 @@ export const deComposer = {
   "composer.branchRemote": "remote",
   "composer.branchElsewhere": "anderes Worktree",
   "composer.branchSwitched": "Zu {branch} gewechselt",
+  "composer.branchSwitching": "Wechseln…",
   "composer.branchSwitchFailed": "Wechsel zu {branch} fehlgeschlagen: {reason}",
   "composer.branchFail.dirty": "Uncommittete Änderungen würden überschrieben — zuerst committen oder stashen",
   "composer.branchFail.elsewhere": "Bereits ausgecheckt in {path}",

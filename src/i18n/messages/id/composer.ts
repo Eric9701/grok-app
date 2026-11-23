@@ -178,6 +178,7 @@ export const idComposer = {
   "composer.branchRemote": "remote",
   "composer.branchElsewhere": "worktree lain",
   "composer.branchSwitched": "Beralih ke {branch}",
+  "composer.branchSwitching": "Mengalihkan…",
   "composer.branchSwitchFailed": "Tidak dapat beralih ke {branch}: {reason}",
   "composer.branchFail.dirty": "Perubahan yang belum di-commit akan ditimpa — commit atau stash dulu",
   "composer.branchFail.elsewhere": "Sudah di-checkout di {path}",

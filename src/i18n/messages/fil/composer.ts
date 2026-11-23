@@ -178,6 +178,7 @@ export const filComposer = {
   "composer.branchRemote": "remote",
   "composer.branchElsewhere": "ibang worktree",
   "composer.branchSwitched": "Lumipat sa {branch}",
+  "composer.branchSwitching": "Lumilipat…",
   "composer.branchSwitchFailed": "Hindi makalipat sa {branch}: {reason}",
   "composer.branchFail.dirty": "Masusoverite ang mga hindi naka-commit na pagbabago — mag-commit o mag-stash muna",
   "composer.branchFail.elsewhere": "Naka-checkout na sa {path}",

@@ -548,6 +548,7 @@ import {
   extractAutomationPayload,
   recentUserPlainText,
   resolveAutomationUpsertTarget,
+  sessionTitleWithoutAutomationSetupLeak,
   shouldAutoApplyAutomationFence,
 } from "@/lib/automationSetup";
 
@@ -2028,7 +2029,7 @@ export function AppWorkbench() {
     projectPath: activeProject?.path ?? null,
   });
 
-  const { gitDirtySummary } = useGitDirtyStatus({
+  const { gitDirtySummary, refreshGitDirtyStatus } = useGitDirtyStatus({
     projectPath: activeProject?.path,
     busy:
       session.state === "streaming" || session.state === "awaiting_permission",
@@ -4080,11 +4081,12 @@ export function AppWorkbench() {
 
   const applySessionTitle = useCallback(
     (sessionId: string, title: string) => {
+      const safe = sessionTitleWithoutAutomationSetupLeak(title);
       setSessions((list) =>
-        list.map((s) => (s.id === sessionId ? { ...s, title } : s)),
+        list.map((s) => (s.id === sessionId ? { ...s, title: safe } : s)),
       );
       setSession((prev) =>
-        prev.sessionId === sessionId ? { ...prev, title } : prev,
+        prev.sessionId === sessionId ? { ...prev, title: safe } : prev,
       );
       void api.trayRefresh();
     },
@@ -12368,6 +12370,9 @@ export function AppWorkbench() {
           setSideWorkbench={setSideWorkbench}
           openAsidePane={openAsidePane}
           showToast={showToast}
+          onGitChanged={() => {
+            void refreshGitDirtyStatus();
+          }}
         >
           <WorkbenchMainPane
             mainPane={mainPane}

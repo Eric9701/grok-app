@@ -374,6 +374,32 @@ export async function gitPushBranch(
   return invoke<GitPushBranchResult>("git_push_branch", { projectPath });
 }
 
+/** Soft-fail result of `git add -A` + `git commit` in the project worktree. */
+export type GitCommitWorktreeResult = {
+  available: boolean;
+  ok: boolean;
+  /** False when the worktree was already clean. */
+  committed: boolean;
+  branch?: string | null;
+  stdout?: string | null;
+  stderr?: string | null;
+  reason?: string | null;
+};
+
+/**
+ * Commit every change in the project worktree.
+ * A clean tree returns `ok` with `committed: false`. Does not push.
+ */
+export async function gitCommitWorktree(
+  projectPath: string,
+  message?: string | null,
+): Promise<GitCommitWorktreeResult> {
+  return invoke<GitCommitWorktreeResult>("git_commit_worktree", {
+    projectPath,
+    message: message ?? null,
+  });
+}
+
 /** Soft-fail result of `gh pr create` (worktree ship flow). */
 export type GhPrCreateResult = {
   available: boolean;

@@ -19,6 +19,7 @@ import {
   IconTrash,
   IconUpload,
 } from "@/components/icons";
+import { Spinner } from "@/components/ui/spinner";
 import { Tip } from "@/components/ui/tooltip";
 import { useFloatingMenu } from "@/lib/floatingMenu";
 import {
@@ -86,6 +87,8 @@ export type ComposerWorktreeMenuLabels = {
   branchesTruncated?: string;
   branchRemote?: string;
   branchElsewhere?: string;
+  /** Chip label while an in-place checkout or worktree bind is in flight. */
+  branchSwitching?: string;
   /** Pull request section: every open PR of this repository. */
   pr?: string;
   prEmpty?: string;
@@ -358,9 +361,14 @@ export function ComposerWorktreeMenu({
   }, [open]);
 
   const isContext = variant === "context";
-  const tip = current?.path
-    ? `${labels.worktreeTip}\n${current.path}`
-    : labels.worktreeTip;
+  const switchingText = (labels.branchSwitching || "").trim();
+  const showSwitching = branchesBusy;
+  const tip =
+    showSwitching && switchingText
+      ? switchingText
+      : current?.path
+      ? `${labels.worktreeTip}\n${current.path}`
+      : labels.worktreeTip;
   // The chip says how many PRs this chat follows: a pull request belongs to the
   // repository, so naming one of them here would claim a branch binding that
   // does not exist.
@@ -369,9 +377,12 @@ export function ComposerWorktreeMenu({
     showChipWatch && labels.prChipCountTip
       ? labels.prChipCountTip.replace("{count}", String(prWatchingCount))
       : undefined;
-  const chipAria = showChipWatch
-    ? `${labels.worktreeTip} · ${chipWatchTitle ?? ""}`.trim()
-    : labels.worktreeTip;
+  const chipAria =
+    showSwitching && switchingText
+      ? switchingText
+      : showChipWatch
+      ? `${labels.worktreeTip} · ${chipWatchTitle ?? ""}`.trim()
+      : labels.worktreeTip;
 
   return (
     <div
@@ -389,24 +400,34 @@ export function ComposerWorktreeMenu({
               ? "composer__context-item composer__context-item--branch" +
                 (open ? " is-open" : "") +
                 (showLoading ? " is-loading" : "") +
-                (showChipWatch ? " has-pr" : "")
+                (showSwitching ? " is-switching" : "") +
+                (showChipWatch && !showSwitching ? " has-pr" : "")
               : "chip chip--branch" +
                 (open ? " is-open" : "") +
-                (showLoading ? " is-loading" : "")
+                (showLoading ? " is-loading" : "") +
+                (showSwitching ? " is-switching" : "")
           }
-          disabled={disabled}
+          disabled={disabled || branchesBusy}
           aria-haspopup="menu"
           aria-expanded={open}
+          aria-busy={branchesBusy || undefined}
           aria-label={chipAria}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            if (branchesBusy) return;
+            setOpen((v) => !v);
+          }}
         >
-          <IconGitBranch size={14} aria-hidden />
+          {showSwitching ? (
+            <Spinner size={14} className="composer__context-spinner" />
+          ) : (
+            <IconGitBranch size={14} aria-hidden />
+          )}
           <span
             className={isContext ? "composer__context-label" : "chip__label"}
           >
-            {branchLabel}
+            {showSwitching && switchingText ? switchingText : branchLabel}
           </span>
-          {showChipWatch ? (
+          {showChipWatch && !showSwitching ? (
             <span className="composer__context-pr" title={chipWatchTitle}>
               <IconBell size={11} aria-hidden />
               <span className="composer__context-pr-count">

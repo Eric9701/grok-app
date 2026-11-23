@@ -1,6 +1,6 @@
 [package]
 name = "grok-app"
-version = "0.2.47"
+version = "0.2.48"
 description = "Atlas — desktop workbench for Atlas CLI"
 authors = ["RongleCat"]
 edition = "2021"
@@ -33,6 +33,9 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Diagnose config.toml (duplicate keys are a parse error). 0.8 is already in
+# the lockfile; do not float onto 0.9/1.x.
+toml = "0.8.23"
 # Trimmed from "full": no `tokio::fs` / `tokio::signal` usage in this crate
 # (file IO goes through `spawn_blocking` + `std::fs`). Add a feature here
 # only when a new `tokio::<feature>::…` call site actually appears.

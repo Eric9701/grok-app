@@ -11,6 +11,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
+import { sessionTitleWithoutAutomationSetupLeak } from "@/lib/automationSetup";
 import { isSelectModifierEvent } from "@/lib/sessionSelect";
 import { nextSessionTitle } from "@/lib/sidebarSessionRename";
 import type { Locale } from "@/i18n";
@@ -133,7 +134,8 @@ function SidebarSessionRowInner({
   onMenu,
   onRename,
 }: SidebarSessionRowProps) {
-  const displayTitle = session.title || labels.untitled;
+  const displayTitle =
+    sessionTitleWithoutAutomationSetupLeak(session.title) || labels.untitled;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const editingRef = useRef(false);

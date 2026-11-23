@@ -57,22 +57,21 @@ pub(super) fn sanitize_error_detail(raw: &str) -> String {
         s.truncate(idx);
     }
     // Strip ANSI SGR if any leaked through.
+    // Walk chars, not bytes: `bytes[i] as char` splits UTF-8 and shows
+    // provider Chinese as latin-1 mojibake in the original-exception box.
     let mut cleaned = String::with_capacity(s.len());
-    let bytes = s.as_bytes();
-    let mut i = 0usize;
-    while i < bytes.len() {
-        if bytes[i] == 0x1b && i + 1 < bytes.len() && bytes[i + 1] == b'[' {
-            i += 2;
-            while i < bytes.len() && !bytes[i].is_ascii_alphabetic() {
-                i += 1;
-            }
-            if i < bytes.len() {
-                i += 1;
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' && chars.peek() == Some(&'[') {
+            chars.next();
+            for n in chars.by_ref() {
+                if n.is_ascii_alphabetic() {
+                    break;
+                }
             }
             continue;
         }
-        cleaned.push(bytes[i] as char);
-        i += 1;
+        cleaned.push(c);
     }
     let s = cleaned.trim().to_string();
     // Compact known host timeouts to a short stable tag (UI maps via code + this).
@@ -2225,6 +2224,19 @@ mod sanitize_error_detail_tests {
         let out = sanitize_error_detail(&body);
         assert!(out.ends_with('…'));
         assert_eq!(out.chars().count(), 4001);
+    }
+
+    #[test]
+    fn keeps_utf8_provider_chinese() {
+        let raw = "API error (status 429 Too Many Requests): 已超过大模型的免费额度";
+        assert_eq!(sanitize_error_detail(raw), raw);
+        assert!(sanitize_error_detail(raw).contains("免费额度"));
+    }
+
+    #[test]
+    fn strips_ansi_without_splitting_utf8() {
+        let raw = "\u{1b}[31m已超过免费额度\u{1b}[0m";
+        assert_eq!(sanitize_error_detail(raw), "已超过免费额度");
     }
 
     #[test]

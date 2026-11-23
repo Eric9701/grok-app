@@ -40,6 +40,7 @@ import {
 import {
   reviewEntryCoversPath,
   reviewFocusPathParts,
+  reviewKeepPathKeys,
   scrollChildToContainerStart,
 } from "@/lib/reviewFocusPaths";
 import {
@@ -57,6 +58,7 @@ import {
   countWorkspaceKinds,
   filterEntriesByKind,
   normalizeChangesKindFilter,
+  omitCleanSessionReviewStubs,
   presentWorkspaceKindFilters,
   resolveReviewEmptyState,
   shouldShowKindFilters,
@@ -71,6 +73,13 @@ import {
   resolveOpenEditorError,
 } from "@/lib/openEditorHonesty";
 import type { WorkspaceGitFile, WorkspaceGitKind } from "@/lib/workspaceGit";
+import {
+  REVIEW_TREE_WIDTH_MAX,
+  REVIEW_TREE_WIDTH_MIN,
+  clampReviewTreeWidth,
+  loadReviewTreeWidth,
+  persistReviewTreeWidth,
+} from "@/lib/reviewTreeLayout";
 import type { MessageKey } from "@/i18n";
 
 export type ReviewTabProps = {
@@ -141,6 +150,7 @@ function composeReviewList(
   snap: WorkspaceSnap | null,
   scope: ReviewScope,
   projectPath: string | null | undefined,
+  keepKeys: ReadonlySet<string>,
 ): {
   list: ReviewFileEntry[];
   meta: BundleMeta;
@@ -198,9 +208,11 @@ function composeReviewList(
     }
   }
 
-  const list = Array.from(byRel.values()).sort((a, b) =>
-    a.relPath.localeCompare(b.relPath),
-  );
+  let rows = Array.from(byRel.values());
+  if (includeWorkspace && snap && snap.error == null) {
+    rows = omitCleanSessionReviewStubs(rows, keepKeys);
+  }
+  const list = rows.sort((a, b) => a.relPath.localeCompare(b.relPath));
 
   if (scope !== "workspace" || !meta.totalAdded) {
     let a = 0;
@@ -379,8 +391,8 @@ function TreeNodes({
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
-                flex: 1,
-                minWidth: 0,
+                flex: "0 0 auto",
+                minWidth: "max-content",
                 padding: 0,
                 cursor: "pointer",
                 textAlign: "left",
@@ -389,9 +401,7 @@ function TreeNodes({
             >
               <span className="sw-review-tree__chev sw-review-tree__chev--spacer" />
               <ReviewKindChip name={n.name} />
-              <span className="sw-review-tree__name">
-                {truncateMiddle(n.name, 22)}
-              </span>
+              <span className="sw-review-tree__name">{n.name}</span>
             </button>
             {isNew ? (
               <span
@@ -458,7 +468,11 @@ export function ReviewTab({
   const [kindFilter, setKindFilter] = useState<ChangesKindFilter>("all");
   const [moreOpen, setMoreOpen] = useState(false);
   const [sideCollapsed, setSideCollapsed] = useState(false);
+  const [treeWidth, setTreeWidth] = useState(loadReviewTreeWidth);
+  const [resizingTree, setResizingTree] = useState(false);
+  const preferredTreeWidth = useRef(treeWidth);
   const stackRef = useRef<HTMLDivElement>(null);
+  const splitRef = useRef<HTMLDivElement>(null);
   const fileEls = useRef<Map<string, HTMLElement>>(new Map());
   const loadSeq = useRef(0);
   const scopeMenuRef = useRef<HTMLDivElement>(null);
@@ -527,6 +541,14 @@ export function ReviewTab({
     return entries;
   }, [sessionChanges, projectPath, focusPath, pinnedFocusPaths]);
 
+  const focusKeepKey = `${focusPath ?? ""}\0${pinnedFocusPaths.join("\0")}`;
+  const keepKeys = useMemo(
+    () => reviewKeepPathKeys([focusPath, ...pinnedFocusPaths], projectPath),
+    // focusKeepKey is the path list; the array identity changes every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- serialized paths
+    [focusKeepKey, projectPath],
+  );
+
   const applyComposed = useCallback(
     (sessionEntries: ReviewFileEntry[], snap: WorkspaceSnap | null) => {
       const { list, meta, error } = composeReviewList(
@@ -534,6 +556,7 @@ export function ReviewTab({
         snap,
         scope,
         projectPath,
+        keepKeys,
       );
       setLoadErrorKind(error);
       setBundle(meta);
@@ -553,7 +576,7 @@ export function ReviewTab({
         return list[0]?.key ?? null;
       });
     },
-    [projectPath, scope],
+    [keepKeys, projectPath, scope],
   );
 
   const loadWorkspaceBundle = useCallback(async () => {
@@ -660,6 +683,46 @@ export function ReviewTab({
     focusToken,
     pinnedFocusPaths,
   ]);
+
+  // Tree sits on the right; width is the distance from the pointer to the split's right edge.
+  useEffect(() => {
+    if (!resizingTree) return;
+    const onMove = (e: PointerEvent) => {
+      const el = splitRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const next = clampReviewTreeWidth(rect.right - e.clientX, rect.width);
+      preferredTreeWidth.current = next;
+      setTreeWidth(next);
+    };
+    const onUp = () => {
+      setResizingTree(false);
+      const box = splitRef.current?.getBoundingClientRect();
+      const next = persistReviewTreeWidth(
+        preferredTreeWidth.current,
+        box?.width ?? 0,
+      );
+      preferredTreeWidth.current = next;
+      setTreeWidth(next);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [resizingTree]);
+
+  useEffect(() => {
+    const fit = () => {
+      const box = splitRef.current?.getBoundingClientRect();
+      if (!box?.width) return;
+      setTreeWidth(clampReviewTreeWidth(preferredTreeWidth.current, box.width));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
 
   // Close menus on outside click
   useEffect(() => {
@@ -1240,7 +1303,10 @@ export function ReviewTab({
         </div>
       </div>
 
-      <div className="sw-review__split">
+      <div
+        className={"sw-review__split" + (resizingTree ? " is-resizing" : "")}
+        ref={splitRef}
+      >
         <div
           className="sw-review__stack"
           data-testid="review-diff"
@@ -1370,7 +1436,31 @@ export function ReviewTab({
         </div>
 
         {!sideCollapsed ? (
-          <aside className="sw-review__side" data-testid="review-tree">
+          <>
+          <div
+            className="rp-split__resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-valuenow={treeWidth}
+            aria-valuemin={REVIEW_TREE_WIDTH_MIN}
+            aria-valuemax={REVIEW_TREE_WIDTH_MAX}
+            aria-label={tr("resources.resizeTree")}
+            data-testid="review-tree-resizer"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              setResizingTree(true);
+            }}
+          />
+          <aside
+            className="sw-review__side"
+            data-testid="review-tree"
+            style={{
+              width: treeWidth,
+              flex: `0 0 ${treeWidth}px`,
+              maxWidth: treeWidth,
+              minWidth: treeWidth,
+            }}
+          >
             <div className="sw-review__filter">
               <span className="sw-review__filter-icon" aria-hidden>
                 <IconSearch size={13} />
@@ -1460,6 +1550,7 @@ export function ReviewTab({
               )}
             </div>
           </aside>
+          </>
         ) : null}
       </div>
     </div>

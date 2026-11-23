@@ -96,6 +96,8 @@ From a worktree-bound session or the branch menu / Changes → Workspace:
 4. On success with a PR URL: success panel shows the URL + **Open in browser** + **Open in PR hub** (deep link `#/settings/runtime/tools?pr=N` → Runtime → Tools hub card, optional row highlight). Soft-fail toast if project/hub unavailable.
 5. Pure helpers + tests: `src/lib/wtShipFlow.ts` (push/PR argv) · `src/lib/prHubDeepLink.ts` (hash parse/build). Output is redacted before UI/toasts.
 
+环境信息里的「提交或推送」是另一条路径：有工作区改动时先 `git add -A` 再 `git commit -m`（`git_commit_worktree`），然后同样 `git push -u origin HEAD`。干净工作区只推送。不调用 `gh`，分离 HEAD 会拒绝。提交说明为空时不写提交。推送失败且提交已写入时，对话框保留并说明提交已在本地。同一菜单的「变更」数字在拿到 `git status` 之后只统计未提交文件；工作区干净后不再显示。审阅的「全部变更」在 git 状态已知且该文件没有 diff 时，不再列出这些已提交的会话记录；用户点开过的文件仍保留。
+
 ### CLI worktrees list (`grok worktree list`)
 
 The branch menu also shows a **CLI worktrees** section fed by the Grok Build index (not only `git worktree list`):

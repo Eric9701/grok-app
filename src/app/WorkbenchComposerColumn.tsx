@@ -809,6 +809,7 @@ export function WorkbenchComposerColumn(p: WorkbenchComposerColumnProps) {
                       branchesTruncated: tr("composer.branchesTruncated"),
                       branchRemote: tr("composer.branchRemote"),
                       branchElsewhere: tr("composer.branchElsewhere"),
+                      branchSwitching: tr("composer.branchSwitching"),
                       worktreeNew: tr("composer.worktreeNew"),
                       worktreeNewChat: tr("composer.worktreeNewChat"),
                       worktreeGc: tr("composer.worktreeGc"),

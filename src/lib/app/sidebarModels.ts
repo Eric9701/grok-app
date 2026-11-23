@@ -3,6 +3,7 @@
  * Extracted from AppWorkbench (residual-appworkbench).
  */
 import type { MessageKey } from "@/i18n";
+import { sessionTitleWithoutAutomationSetupLeak } from "@/lib/automationSetup";
 import { normalizeProjectColor } from "@/lib/projectColor";
 import { sanitizeExtraRules } from "@/lib/sessionExtraRules";
 import { normalizeMaxAgentTurns } from "@/lib/sessionMaxAgentTurns";
@@ -113,7 +114,7 @@ export function normalizeSessionRow(
   const agentSessionId = (x.agentSessionId || "").trim() || null;
   return {
     id: x.id,
-    title: x.title || "",
+    title: sessionTitleWithoutAutomationSetupLeak(x.title || ""),
     projectId: normalizeProjectId(x.projectId),
     updatedAt: x.updatedAt || "",
     archived: !!x.archived,

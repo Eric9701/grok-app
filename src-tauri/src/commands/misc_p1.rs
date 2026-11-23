@@ -81,6 +81,36 @@ pub async fn agent_config_toml_read(
         .map_err(|e| format!("agent config.toml read task failed: {e}"))
 }
 
+async fn config_toml_repair_mode(mode: Option<String>) -> String {
+    match mode.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
+        Some(m) => m,
+        None => store::load_settings_async().await.session_data_mode,
+    }
+}
+
+/// Diagnose the config.toml the active session mode reads. Does not write.
+#[tauri::command]
+pub async fn config_toml_diagnose(
+    mode: Option<String>,
+) -> Result<crate::agent_home_config::ConfigTomlDiagnosis, String> {
+    let mode = config_toml_repair_mode(mode).await;
+    tokio::task::spawn_blocking(move || crate::agent_home_config::diagnose_active_config(&mode))
+        .await
+        .map_err(|e| format!("config.toml diagnose task failed: {e}"))
+}
+
+/// User-initiated repair: backup, then dedupe or replace an unparseable file.
+/// A file that already parses is not written. Shared `~/.atlas` is allowed.
+#[tauri::command]
+pub async fn config_toml_repair(
+    mode: Option<String>,
+) -> Result<crate::agent_home_config::ConfigTomlRepairResult, String> {
+    let mode = config_toml_repair_mode(mode).await;
+    tokio::task::spawn_blocking(move || crate::agent_home_config::repair_active_config(&mode))
+        .await
+        .map_err(|e| format!("config.toml repair task failed: {e}"))?
+}
+
 /// Search path-scoped memory files (name + content) under agent GROK_HOME/memory.
 /// Snippets are redacted; hard caps on hits and bytes read per file.
 ///

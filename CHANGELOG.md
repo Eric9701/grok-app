@@ -11,6 +11,34 @@ See `docs/llm-wiki/release.md`.
 
 **What's New popup:** each bullet's **first sentence** is what users see. Keep that sentence to one short line (added / fixed / improved — no paths, no implementation, no issue piles). A second short sentence is allowed for GitHub / this file only. Do **not** rewrite already-shipped `## [X.Y.Z]` sections.
 
+## [Unreleased]
+
+### Added
+
+- The environment menu can commit every change and push the current branch. A clean checkout only pushes, and a detached HEAD is refused.
+- Diagnostics can repair the config.toml this session mode uses. Duplicate keys keep the last value, and an unreadable file is replaced after a backup.
+
+**中文 · 新增**
+
+- 环境信息里可以提交全部改动并推送当前分支。没有改动时只推送，不在分支上时会拒绝。
+- 诊断可以修复当前会话模式使用的 config.toml。重复键保留后出现的值，仍然无法解析的文件会在备份后换成空的合法文件。
+
+### Changed
+
+- The Changes count shows uncommitted files once git status is known. A clean checkout hides the number.
+- Review hides files that are already committed and have no diff. A file you opened stays, and the file tree width can be dragged.
+- Switching branches shows that the checkout is still running.
+- A scheduled chat no longer shows its setup note. The title, transcript, and error use the request instead.
+- Garbled text in an error detail is readable again.
+
+**中文 · 变更**
+
+- 「变更」数字在拿到 git 状态后只统计未提交文件。工作区干净后不再显示。
+- 审阅会藏起已经提交且没有差异的文件。点开过的文件会留下，文件树也可以拖宽。
+- 切换分支时会显示正在切换。
+- 定时会话不再把内部设置说明显示出来。标题、对话和错误改用真正的请求。
+- 错误详情里的乱码会恢复成可读文字。
+
 ## [0.2.47]
 
 ### Added

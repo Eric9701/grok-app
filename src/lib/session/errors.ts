@@ -1,5 +1,7 @@
 import { t, type Locale } from "../../i18n";
+import { leadingAutomationSetupLeak } from "../automationSetup";
 import { stripAnsi } from "../ansi";
+import { repairLatin1Utf8Mojibake } from "../utf8Mojibake";
 import {
   buildErrorDeck,
   isAuthDeckCode,
@@ -175,7 +177,9 @@ export { stripAnsi };
 
 /** Drop stderr tails and other bulky transport noise from error strings. */
 export function stripErrorNoise(text: string): string {
-  let s = stripAnsi(text).trim();
+  // Repair before ANSI stripping: the corrupted form uses U+009B, which the
+  // ANSI cleaner treats as a CSI introducer and would eat.
+  let s = stripAnsi(repairLatin1Utf8Mojibake(text)).trim();
   const stderrIdx = s.search(/;?\s*stderr:/i);
   if (stderrIdx >= 0) s = s.slice(0, stderrIdx).trim();
   // Collapse multi-line dumps to first useful line for classification.
@@ -199,6 +203,7 @@ export function turnErrorOriginalDetail(
   raw: string | null | undefined,
   friendly?: string | null,
 ): string | null {
+  if (leadingAutomationSetupLeak(raw || "")) return null;
   let text = stripErrorNoise(raw || "").trim();
   if (!text) return null;
   const md = text.match(JOURNAL_ERROR_RE);
@@ -233,6 +238,9 @@ export function formatTurnErrorBody(
   const rawCombined = [payload.content, payload.message, payload.code]
     .filter(Boolean)
     .join("\n");
+  if (leadingAutomationSetupLeak(rawCombined)) {
+    return t(locale, "error.requestFailedRetry");
+  }
   const cleaned = stripErrorNoise(rawCombined);
 
   let code: AgentErrorCode | null = isAgentErrorCode(payload.code)
@@ -428,6 +436,9 @@ export function presentErrorBanner(
   opts?: Pick<ErrorDeckResolveOpts, "activeSource">,
 ): ErrorBannerView | null {
   if (error) {
+    if (leadingAutomationSetupLeak(error.message || "")) {
+      return bannerFromDeck(buildErrorDeck("GENERIC", locale), null, null);
+    }
     const body = formatTurnErrorBody(
       { code: error.code, message: error.message, content: undefined },
       locale,
@@ -455,6 +466,9 @@ export function presentErrorBanner(
     );
   }
   if (!localError?.trim()) return null;
+  if (leadingAutomationSetupLeak(localError)) {
+    return bannerFromDeck(buildErrorDeck("GENERIC", locale), null, null);
+  }
 
   const cleaned = stripErrorNoise(localError);
   const coded = cleaned.match(AGENT_ERROR_CODE_RE);

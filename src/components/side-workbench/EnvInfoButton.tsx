@@ -35,8 +35,10 @@ import {
 } from "@/lib/envInfoPinnedPref";
 import { useFloatingMenu } from "@/lib/floatingMenu";
 import { OPEN_PRESENCE_MS, useOpenPresence } from "@/lib/openPresence";
+import { envChangesBadge } from "@/lib/envChangesBadge";
 import { pathBaseName } from "@/lib/sessionChanges";
 import { envReviewJumpEnabled } from "@/lib/sideWorkbench";
+import { EnvCommitPushDialog } from "./EnvCommitPushDialog";
 
 export type EnvInfoJump =
   | { type: "review" }
@@ -67,12 +69,18 @@ export type EnvInfoButtonProps = {
   asideOpen?: boolean;
   className?: string;
   onJump?: (jump: EnvInfoJump) => void;
+  onToast?: (message: string, ms?: number) => void;
+  /** Refresh git dirty state after a commit or push. */
+  onGitChanged?: () => void;
 };
 
 type EnvSnapshot = {
   branch: string | null;
   dirtyCount: number;
   isGit: boolean;
+  /** Git status for `loadedPath` has finished. */
+  gitLoaded: boolean;
+  loadedPath: string;
   prLabel: string | null;
   prChecking: boolean;
 };
@@ -82,6 +90,8 @@ function emptySnapshot(isGit: boolean): EnvSnapshot {
     branch: null,
     dirtyCount: 0,
     isGit,
+    gitLoaded: false,
+    loadedPath: "",
     prLabel: null,
     prChecking: false,
   };
@@ -97,9 +107,12 @@ export function EnvInfoButton({
   asideOpen = false,
   className = "",
   onJump,
+  onToast,
+  onGitChanged,
 }: EnvInfoButtonProps) {
   const tr = useMemo(() => createT(locale as Locale), [locale]);
   const [open, setOpen] = useState(false);
+  const [commitOpen, setCommitOpen] = useState(false);
   const [pinned, setPinned] = useState(loadEnvInfoPinnedPref);
   const [parked, setParked] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -189,6 +202,7 @@ export function EnvInfoButton({
     setSnap((prev) => ({
       ...prev,
       isGit: isGitProject,
+      gitLoaded: prev.loadedPath === path ? prev.gitLoaded : false,
       prChecking: isGitProject,
       prLabel: null,
       branch: branchProp?.trim() || prev.branch,
@@ -213,6 +227,8 @@ export function EnvInfoButton({
       branch,
       dirtyCount,
       isGit,
+      gitLoaded: true,
+      loadedPath: path,
       prLabel: null,
       prChecking: isGit,
     });
@@ -277,34 +293,40 @@ export function EnvInfoButton({
     tr("side.env.branch");
 
   const changesRight = useMemo((): ReactNode => {
-    const add = changeSummary?.add;
-    const del = changeSummary?.del;
-    if (
-      changeSummary &&
-      typeof add === "number" &&
-      typeof del === "number" &&
-      (add > 0 || del > 0)
-    ) {
+    const path = (projectPath || "").trim();
+    const badge = envChangesBadge({
+      gitLoaded: snap.gitLoaded && snap.loadedPath === path,
+      isGit: snap.isGit,
+      dirtyCount: snap.dirtyCount,
+      sessionAdd: changeSummary?.add,
+      sessionDel: changeSummary?.del,
+      sessionFileCount: changeSummary?.fileCount,
+    });
+    if (badge.kind === "delta") {
       return (
         <span className="sw-env-menu__delta" data-testid="env-changes-delta">
-          <span className="sw-env-menu__add">+{add}</span>
-          <span className="sw-env-menu__del">−{del}</span>
+          <span className="sw-env-menu__add">+{badge.add}</span>
+          <span className="sw-env-menu__del">−{badge.del}</span>
         </span>
       );
     }
-    const files =
-      changeSummary?.fileCount && changeSummary.fileCount > 0
-        ? changeSummary.fileCount
-        : snap.dirtyCount;
-    if (files > 0) {
+    if (badge.kind === "files") {
       return (
         <span className="sw-env-menu__right-text" data-testid="env-changes-files">
-          {tr("changes.count", { n: String(files) })}
+          {tr("changes.count", { n: String(badge.count) })}
         </span>
       );
     }
     return null;
-  }, [changeSummary, snap.dirtyCount, tr]);
+  }, [
+    changeSummary,
+    projectPath,
+    snap.dirtyCount,
+    snap.gitLoaded,
+    snap.isGit,
+    snap.loadedPath,
+    tr,
+  ]);
 
   const gitReady = snap.isGit || isGitProject;
   const chevron = (
@@ -328,6 +350,7 @@ export function EnvInfoButton({
       onClick={() => {
         if (!jump || !enabled) return;
         if (!pinned) setOpen(false);
+        if (jump.type === "push") setCommitOpen(true);
         onJump?.(jump);
       }}
     >
@@ -480,6 +503,29 @@ export function EnvInfoButton({
         </button>
       </Tip>
       {overlay}
+      <EnvCommitPushDialog
+        open={commitOpen}
+        locale={locale}
+        projectPath={projectPath}
+        branchHint={(branchProp || snap.branch || "").trim() || null}
+        onClose={() => setCommitOpen(false)}
+        onToast={onToast}
+        onDone={() => {
+          onGitChanged?.();
+          const path = (projectPath || "").trim();
+          setSnap((prev) =>
+            prev.isGit
+              ? {
+                  ...prev,
+                  dirtyCount: 0,
+                  gitLoaded: true,
+                  loadedPath: path || prev.loadedPath,
+                }
+              : prev,
+          );
+          void loadSnapshot();
+        }}
+      />
     </>
   );
 }

@@ -435,6 +435,55 @@ export function filterWorkspaceByKind(
   return files.filter((f) => (f.kind || "unknown") === kind);
 }
 
+/**
+ * Session row that has nothing to review: no line delta and no patch.
+ * Pin/focus stubs omit `session` and stay. Workspace rows are not stubs.
+ */
+export function isCleanSessionReviewStub(entry: {
+  source: string;
+  added: number;
+  removed: number;
+  patch: string | null;
+  binary?: boolean;
+  session?: unknown;
+  relPath: string;
+  path?: string;
+}): boolean {
+  if (entry.source !== "session") return false;
+  if (!entry.session) return false;
+  if (entry.binary) return false;
+  if (entry.added > 0 || entry.removed > 0) return false;
+  if (entry.patch && entry.patch.trim()) return false;
+  return true;
+}
+
+/**
+ * Drop session leftovers once git status is known and the worktree no longer
+ * lists them. `keepKeys` are lowercased rel paths and absolute paths the user
+ * explicitly focused.
+ */
+export function omitCleanSessionReviewStubs<
+  T extends {
+    source: string;
+    added: number;
+    removed: number;
+    patch: string | null;
+    binary?: boolean;
+    session?: unknown;
+    relPath: string;
+    path?: string;
+  },
+>(entries: readonly T[], keepKeys: ReadonlySet<string>): T[] {
+  return entries.filter((entry) => {
+    if (!isCleanSessionReviewStub(entry)) return true;
+    const rel = entry.relPath.trim().toLowerCase();
+    const abs = (entry.path || "").trim().replace(/\\/g, "/").toLowerCase();
+    if (rel && keepKeys.has(rel)) return true;
+    if (abs && keepKeys.has(abs)) return true;
+    return false;
+  });
+}
+
 /** Filter review/session-ish entries that carry a `kind` field. */
 export function filterEntriesByKind<T extends { kind?: string | null }>(
   entries: readonly T[],

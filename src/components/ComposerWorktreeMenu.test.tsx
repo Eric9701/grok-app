@@ -52,6 +52,18 @@ describe("ComposerWorktreeMenu branch chip", () => {
     expect(html).toContain("master");
   });
 
+  it("shows a switching label and spinner while checkout is in flight", () => {
+    const html = renderChip(parseWorktreePorcelain(PORCELAIN), {
+      branchesBusy: true,
+      labels: { ...LABELS, branchSwitching: "Switching…" },
+    });
+    expect(html).toContain("Switching…");
+    expect(html).toContain("animate-spin");
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain("is-switching");
+    expect(html).not.toContain(">master<");
+  });
+
   it("updates the trigger after an in-place checkout without opening the menu", () => {
     const cached = parseWorktreePorcelain(PORCELAIN);
     expect(renderChip(cached)).toContain("master");

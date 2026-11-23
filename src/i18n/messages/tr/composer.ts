@@ -181,6 +181,7 @@ export const trComposer = {
   "composer.branchRemote": "uzak",
   "composer.branchElsewhere": "başka çalışma ağacı",
   "composer.branchSwitched": "{branch} dalına geçildi",
+  "composer.branchSwitching": "Geçiliyor…",
   "composer.branchSwitchFailed": "{branch} dalına geçilemedi: {reason}",
   "composer.branchFail.dirty": "Kaydedilmemiş değişikliklerin üzerine yazılır; önce commit ya da stash yapın",
   "composer.branchFail.elsewhere": "Zaten {path} konumunda açık",

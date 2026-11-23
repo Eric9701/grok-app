@@ -203,6 +203,17 @@ button.composer__context-item {
   opacity: 0.72;
 }
 
+.composer__context-item--branch.is-switching:disabled,
+.chip--branch.is-switching:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+.composer__context-spinner {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
 /* Watch count on the branch chip: how many PRs this chat follows. A pull
    request belongs to the repository, so the chip names none of them. */
 .composer__context-item--branch.has-pr {

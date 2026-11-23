@@ -178,6 +178,7 @@ export const ptBRComposer = {
   "composer.branchRemote": "remota",
   "composer.branchElsewhere": "outro worktree",
   "composer.branchSwitched": "Alterado para {branch}",
+  "composer.branchSwitching": "Trocando…",
   "composer.branchSwitchFailed": "Não foi possível mudar para {branch}: {reason}",
   "composer.branchFail.dirty": "Alterações não commitadas seriam sobrescritas — faça commit ou stash primeiro",
   "composer.branchFail.elsewhere": "Já está em checkout em {path}",

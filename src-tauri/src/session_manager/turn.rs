@@ -15,6 +15,15 @@ use crate::store::{self, ChatMessageStored, MessageAttachmentStored};
 
 use super::*;
 
+/// Journal text must not keep the silent automation-setup prefix.
+/// The agent prompt is left unchanged.
+fn journal_visible_content(content: String) -> String {
+    match crate::session_title::redact_automation_setup_leak(&content) {
+        Some(visible) => visible,
+        None => content,
+    }
+}
+
 impl SessionManager {
     pub async fn send_message(
         self: &Arc<Self>,
@@ -52,6 +61,7 @@ impl SessionManager {
             grant_journal_attachment_paths(atts);
             journal_content = append_journal_attachment_refs(journal_content, atts);
         }
+        journal_content = journal_visible_content(journal_content);
         // Note: image @path stripping + Host vision runs on the *final*
         // agent_prompt after history bootstrap (see below). Do not rewrite
         // here only — bootstrap can reintroduce @image paths from the journal.
@@ -724,6 +734,7 @@ impl SessionManager {
             grant_journal_attachment_paths(atts);
             journal_content = append_journal_attachment_refs(journal_content, atts);
         }
+        journal_content = journal_visible_content(journal_content);
         let target = session_id.as_deref();
 
         // Take any pending ask-user / plan reverse-RPC so steer is not blocked

@@ -83,15 +83,15 @@
 [data-theme="dark"] .sw-review-chip--rs { color: #de7e5a; }
 [data-theme="dark"] .sw-review-chip--py { color: #6cb6f5; }
 
-/* Right: filter + tree */
+/* Right: filter + tree. Width comes from the drag handle (inline). */
 .sw-review__side {
-  flex: 0 0 240px;
-  min-width: 180px;
-  max-width: 42%;
+  flex: 0 0 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  overflow: hidden;
+  border-left: none;
   background: color-mix(in srgb, var(--bg-elevated, #161616) 94%, transparent);
 }
 
@@ -132,13 +132,49 @@
 .sw-review__tree-scroll {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow: auto;
   padding: 4px 4px 12px;
+  /* Global `*:not(textarea)` hides native bars. Long tree names need a
+     visible horizontal bar; the vertical bar follows the same thin thumb. */
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--scrollbar-thumb, rgba(128, 128, 128, 0.35)) transparent !important;
+  -ms-overflow-style: auto !important;
+}
+
+.sw-review__tree-scroll::-webkit-scrollbar {
+  display: block !important;
+  width: var(--scrollbar-size, 8px) !important;
+  height: var(--scrollbar-size, 8px) !important;
+  background: transparent !important;
+}
+
+.sw-review__tree-scroll::-webkit-scrollbar-track,
+.sw-review__tree-scroll::-webkit-scrollbar-track-piece,
+.sw-review__tree-scroll::-webkit-scrollbar-corner {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.sw-review__tree-scroll::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.sw-review__tree-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb, rgba(128, 128, 128, 0.35)) !important;
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  background-clip: padding-box !important;
 }
 
 .sw-review-tree__row {
   appearance: none;
-  width: 100%;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
   border: 0;
   display: flex;
   align-items: center;
@@ -181,10 +217,10 @@
 }
 
 .sw-review-tree__name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 0 auto;
+  min-width: max-content;
+  overflow: visible;
+  text-overflow: clip;
   white-space: nowrap;
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 11.5px;

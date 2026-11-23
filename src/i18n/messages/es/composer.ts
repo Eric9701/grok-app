@@ -178,6 +178,7 @@ export const esComposer = {
   "composer.branchRemote": "remota",
   "composer.branchElsewhere": "otro worktree",
   "composer.branchSwitched": "Cambiado a {branch}",
+  "composer.branchSwitching": "Cambiando…",
   "composer.branchSwitchFailed": "No se pudo cambiar a {branch}: {reason}",
   "composer.branchFail.dirty": "Los cambios sin confirmar se sobrescribirían — confirma o guarda en stash primero",
   "composer.branchFail.elsewhere": "Ya está en checkout en {path}",

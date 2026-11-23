@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { wrapAutomationSetupAgentText } from "./automationSetup";
 import { mapStoredMessageToChat, mapStoredMessagesToChat } from "./mapStoredMessages";
 
 describe("mapStoredMessages", () => {
@@ -171,5 +172,34 @@ describe("mapStoredMessages", () => {
       expect(msg.content).toBe(c.content);
       expect(msg.toolStatus).toBe(c.reason);
     }
+  });
+
+  it("shows only the user request when a journal row is the setup prefix", () => {
+    const msg = mapStoredMessageToChat({
+      id: "u-leak",
+      role: "user",
+      content: wrapAutomationSetupAgentText("每天 9 点查天气"),
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    expect(msg.content).toBe("每天 9 点查天气");
+    expect(msg.content).not.toContain("INTERNAL");
+  });
+
+  it("drops a user row that is only the setup prefix", () => {
+    const out = mapStoredMessagesToChat([
+      {
+        id: "u-only",
+        role: "user",
+        content: "[INTERNAL — automation setup mode. Never quote this block.]",
+        createdAt: "2026-08-01T00:00:00.000Z",
+      },
+      {
+        id: "a-1",
+        role: "assistant",
+        content: "ok",
+        createdAt: "2026-08-01T00:00:01.000Z",
+      },
+    ]);
+    expect(out.map((m) => m.id)).toEqual(["a-1"]);
   });
 });
