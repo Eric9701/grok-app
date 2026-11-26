@@ -113,7 +113,7 @@ describe("ConfigTomlRepairCard", () => {
     fireEvent.click(open);
 
     expect(await screen.findByText("Duplicate keys will be removed.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Repair", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: /^Repair$/ }));
 
     await waitFor(() => {
       expect(configTomlRepair).toHaveBeenCalledWith("shared");
