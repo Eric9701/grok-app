@@ -86,7 +86,7 @@ export const emptyForm = (): FormState => ({
   apiBackend: "responses",
   providerMode: "generic",
   appendPrompt: "",
-  supportsVision: false,
+  supportsVision: true,
   models: [],
   efforts: defaultCustomChannelEfforts().map((e) => ({
     id: e.id,

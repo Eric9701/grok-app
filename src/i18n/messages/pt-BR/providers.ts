@@ -38,7 +38,7 @@ export const ptBRProviders = {
   "prov.supportsVision": "Este modelo pode ver imagens",
   "prov.supportsVisionOn": "Ligado",
   "prov.supportsVisionOff": "Desligado",
-  "prov.supportsVisionHint": "Ligue se este relay aceitar pixels de imagem (OpenAI image_url). Deixe desligado para APIs só texto no estilo DeepSeek. Nomes ou ids de modelo que parecem Atlas / GPT-4o / Claude / Gemini já contam como visão.",
+  "prov.supportsVisionHint": "Ligado por padrão. Desligue só se esta API rejeitar pixels de imagem.",
   "prov.modelSettings": "Configurações do modelo",
   "prov.modelSettingsTitle": "Configurações de {name}",
   "prov.modelContextWindow": "Janela de contexto",

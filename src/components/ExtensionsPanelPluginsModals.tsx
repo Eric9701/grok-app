@@ -134,6 +134,7 @@ export type ExtensionsPanelPluginsModalsProps = {
   pluginAuthServer: string | null;
   setPluginAuthServer: (v: string | null) => void;
   refresh: (opts?: { forcePlugins?: boolean }) => Promise<void>;
+  onSourcesChanged?: () => void;
 
   tr: TFn;
   locale: Locale;
@@ -199,6 +200,7 @@ export function ExtensionsPanelPluginsModals(p: ExtensionsPanelPluginsModalsProp
     pluginAuthServer,
     setPluginAuthServer,
     refresh,
+    onSourcesChanged,
     tr,
     locale,
     actionBusy,
@@ -634,6 +636,7 @@ export function ExtensionsPanelPluginsModals(p: ExtensionsPanelPluginsModalsProp
               invalidatePluginsListCache();
               void refresh({ forcePlugins: true });
             }}
+            onSourcesChanged={onSourcesChanged}
           />
         </div>
       </GlassModal>

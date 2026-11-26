@@ -82,18 +82,43 @@ describe("marketplaceDefaults", () => {
     expect(res.sources.every((s) => !isClaudeMarketplaceSource(s))).toBe(true);
   });
 
-  it("filters catalog rows from Claude marketplaces", () => {
+  it("filters catalog rows from Claude marketplaces while keeping custom git sources", () => {
     const filtered = filterCatalogToDefaultSources(
       [
         { name: "a", marketplace: "xAI Official" },
         { name: "b", marketplace: "claude-plugins-official" },
         { name: "c", marketplace: "plugins" },
+        { name: "open-code-review", marketplace: "atlas-plugins" },
+        { name: "hidden-claude", marketplace: "my-corp-alias" },
       ],
       [
         { name: "xAI Official", url: XAI_OFFICIAL_MARKETPLACE_URL },
         { name: "plugins", url: OPENAI_PLUGINS_MARKETPLACE_URL },
+        {
+          name: "atlas-plugins",
+          url: "https://git.example.test/team/atlas-plugins.git",
+        },
+        {
+          name: "my-corp-alias",
+          url: "https://github.com/anthropics/claude-plugins-official.git",
+        },
       ],
     );
-    expect(filtered.map((p) => p.name)).toEqual(["a", "c"]);
+    expect(filtered.map((p) => p.name)).toEqual([
+      "a",
+      "c",
+      "open-code-review",
+    ]);
+  });
+
+  it("keeps custom marketplace plugins even when sources list is empty", () => {
+    const filtered = filterCatalogToDefaultSources(
+      [
+        { name: "open-code-review", marketplace: "atlas-plugins" },
+        { name: "c-plugin", marketplace: "anthropic-official" },
+      ],
+      [],
+    );
+    expect(filtered.map((p) => p.name)).toEqual(["open-code-review"]);
   });
 });

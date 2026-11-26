@@ -490,7 +490,7 @@ export function ExtensionsPanel({
       setCatalogLoading(true);
       setCatalogError(null);
       try {
-        await ensureDefaultMarketplaces({
+        const ensure = await ensureDefaultMarketplaces({
           list: async () => {
             const r = await api.marketplaceList();
             return (r.sources ?? []).map((s: Record<string, unknown>) => ({
@@ -514,7 +514,9 @@ export function ExtensionsPanel({
           },
           removeClaude: true,
         });
-        if (force) invalidateMarketplaceCatalogCache();
+        const forceReload =
+          force || ensure.added.length > 0 || ensure.removed.length > 0;
+        if (forceReload) invalidateMarketplaceCatalogCache();
 
         const result = await loadMarketplaceCatalog(async () => {
           const [srcRes, availRes] = await Promise.all([
@@ -584,7 +586,7 @@ export function ExtensionsPanel({
             available,
             error: srcRes.error?.trim() || availRes.error?.trim() || null,
           };
-        }, { force });
+        }, { force: forceReload });
 
         setCatalogPlugins(dedupeAvailablePluginsByName(result.available));
         setCatalogError(result.error);
@@ -2959,6 +2961,10 @@ export function ExtensionsPanel({
         pluginAuthServer={pluginAuthServer}
         setPluginAuthServer={setPluginAuthServer}
         refresh={refresh}
+        onSourcesChanged={() => {
+          invalidateMarketplaceCatalogCache();
+          void loadCatalog(true);
+        }}
         tr={tr}
         locale={locale}
         actionBusy={actionBusy}

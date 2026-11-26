@@ -72,7 +72,6 @@ import {
   ensureDefaultMarketplaces,
   filterCatalogToDefaultSources,
   isClaudeMarketplaceSource,
-  isDefaultAllowedMarketplaceSource,
 } from "@/lib/marketplaceDefaults";
 import {
   buildPluginMarketErrorView,
@@ -113,6 +112,8 @@ export type ExtensionsBuildExtrasProps = {
   onEnsureOpenaiError?: (message: string | null) => void;
   /** After plugin install — parent can refresh plugins list. */
   onPluginsChanged?: () => void;
+  /** After marketplace source add / remove / update — parent can refresh Discover catalog. */
+  onSourcesChanged?: () => void;
   /** Navigate to Settings → Runtime when CLI is missing / too old. */
   onOpenRuntime?: () => void;
   /** Tab-level search query (Agents / market filter). */
@@ -199,6 +200,7 @@ export function ExtensionsBuildExtras({
   sourcesOnly = false,
   onEnsureOpenaiError,
   onPluginsChanged,
+  onSourcesChanged,
   onOpenRuntime,
   query = "",
   hidePageToolbar = false,
@@ -505,12 +507,6 @@ export function ExtensionsBuildExtras({
           (srcRes.sources ?? [])
             .map((r) => asSource(r as Record<string, unknown>))
             .filter((x): x is MarketplaceSourceLike => !!x)
-            // Keep only default-allowed sources in the UI list.
-            .filter(
-              (s) =>
-                isDefaultAllowedMarketplaceSource(s) ||
-                !isClaudeMarketplaceSource(s),
-            )
             .filter((s) => !isClaudeMarketplaceSource(s)),
         );
         let avail = sortAvailablePluginsByName(
@@ -710,6 +706,7 @@ export function ExtensionsBuildExtras({
       setAddSource("");
       invalidateMarketplaceCatalogCache();
       await loadMarket(true);
+      onSourcesChanged?.();
     } catch (e) {
       setMarketError(String(e));
     } finally {
@@ -731,6 +728,7 @@ export function ExtensionsBuildExtras({
       setRemoveSource(null);
       invalidateMarketplaceCatalogCache();
       await loadMarket(true);
+      onSourcesChanged?.();
     } catch (e) {
       setMarketError(String(e));
     } finally {
@@ -749,6 +747,7 @@ export function ExtensionsBuildExtras({
       }
       invalidateMarketplaceCatalogCache();
       await loadMarket(true);
+      onSourcesChanged?.();
     } catch (e) {
       setMarketError(String(e));
     } finally {

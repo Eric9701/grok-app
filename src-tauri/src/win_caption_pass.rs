@@ -1,15 +1,17 @@
-//! Let caption buttons receive clicks that land on a child WebView2.
+//! Keep the self-drawn title row above child WebView2 windows.
 //!
 //! Octo and Atlas Cloud stay mounted as child webviews. Those HWNDs paint
-//! above HTML, so the self-drawn minimize / maximize / close controls never
-//! see the pointer once a child covers that corner — including when a bounds
-//! update leaves the child at the window origin. CSS z-index cannot fix it.
+//! above HTML, so a child that reaches the top of the client area covers the
+//! session title and the minimize / maximize / close controls. CSS z-index
+//! cannot put that row back.
 //!
 //! For every side-browser container (and the WebView2 windows it owns) we:
-//! - return `HTTRANSPARENT` from `WM_NCHITTEST` inside the caption button band
-//!   so the click falls through to the main webview on the same thread
-//! - clip that band out of the container's window region so the buttons stay
-//!   visible, and put the region back when the child no longer overlaps
+//! - place the child below the title row
+//! - return `HTTRANSPARENT` from `WM_NCHITTEST` inside that row so a click
+//!   falls through to the main webview on the same thread
+//! - clip that row out of the container's window region so the title and
+//!   buttons stay visible, and put the region back when the child no longer
+//!   overlaps it
 
 #![cfg(windows)]
 
@@ -28,15 +30,15 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, GetAncestor, GetClientRect, KillTimer, SetTimer, SetWindowPos, GA_ROOT,
-    HTTRANSPARENT, SWP_NOACTIVATE, SWP_NOZORDER, WM_CREATE, WM_NCDESTROY, WM_NCHITTEST,
-    WM_PARENTNOTIFY, WM_TIMER, WM_WINDOWPOSCHANGED,
+    HTTRANSPARENT, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOZORDER, WM_CREATE, WM_NCDESTROY,
+    WM_NCHITTEST, WM_PARENTNOTIFY, WM_TIMER, WM_WINDOWPOSCHANGED,
 };
 
-/// Matches `--titlebar-height` (40px) and `--window-controls-inset` (3 × 46px).
+/// Matches `--titlebar-height` (40px). The whole row, not only the three
+/// caption buttons: the session title sits in the same band.
 const CAPTION_HEIGHT_DIP: f64 = 40.0;
-const CAPTION_BUTTONS_DIP: f64 = 138.0;
-/// Extra DIPs so a subpixel gap does not leave the button edge dead.
-const CAPTION_SLOP_DIP: f64 = 4.0;
+/// Extra DIPs so a subpixel gap does not leave the title edge dead.
+const CAPTION_SLOP_DIP: f64 = 2.0;
 
 const SUBCLASS_ID: usize = 0x4154_4350;
 const TIMER_ID: usize = 0x4154_5452;
@@ -78,7 +80,18 @@ fn hwnd_key(hwnd: HWND) -> isize {
 }
 
 fn dpi_of(hwnd: HWND) -> u32 {
+    use windows::Win32::UI::HiDpi::GetDpiForWindow;
+
+    // Match wry's child placement (`GetDpiForWindow`). On a per-monitor v2
+    // process, `GetDeviceCaps(LOGPIXELSX)` stays at 96 or the system DPI while
+    // the window sits on a 125% / 150% monitor. Scaling the DOM rect with that
+    // value rewrites the bounds wry just set and leaves a gap beside Octo and
+    // Atlas Cloud. GDI is only the fallback when the window has no DPI yet.
     unsafe {
+        let dpi = GetDpiForWindow(hwnd);
+        if dpi > 0 {
+            return dpi;
+        }
         let hdc = GetDC(Some(hwnd));
         if hdc.is_invalid() {
             return 96;
@@ -103,9 +116,8 @@ fn caption_band(root: HWND) -> Option<RECT> {
     }
     let scale = dpi_of(root) as f64 / 96.0;
     let band_h = ((CAPTION_HEIGHT_DIP + CAPTION_SLOP_DIP) * scale).ceil() as i32;
-    let band_w = ((CAPTION_BUTTONS_DIP + CAPTION_SLOP_DIP) * scale).ceil() as i32;
     Some(RECT {
-        left: client.right.saturating_sub(band_w),
+        left: 0,
         top: 0,
         right: client.right,
         bottom: band_h.min(client.bottom),
@@ -315,21 +327,50 @@ unsafe extern "system" fn caption_proc(
     result
 }
 
-/// Place the child and keep the caption button band clickable.
+/// Place the child under the title row and keep that row clickable.
 ///
 /// `x`/`y`/`width`/`height` are logical pixels (same as the DOM rect).
+/// The scale must be `GetDpiForWindow`, the same one wry used for `set_bounds`.
 pub fn apply(controller: ICoreWebView2Controller, x: f64, y: f64, width: f64, height: f64) {
     let mut hwnd = HWND::default();
     if unsafe { controller.ParentWindow(&mut hwnd) }.is_err() || hwnd.0.is_null() {
         return;
     }
     let scale = dpi_of(hwnd) as f64 / 96.0;
-    let px = (x * scale).round() as i32;
-    let py = (y * scale).round() as i32;
-    let pw = (width * scale).round().max(1.0) as i32;
-    let ph = (height * scale).round().max(1.0) as i32;
+    // A negative origin is the off-screen park. Do not scale it: logical
+    // -32000 at 150% is -48000, and Windows wraps that 16-bit move back
+    // into the parent so the child covers settings and other pages.
+    let (px, py, pw, ph) = if x < 0.0 || y < 0.0 {
+        (-30_000, -30_000, 1, 1)
+    } else {
+        let mut py = (y * scale).round() as i32;
+        let mut ph = (height * scale).round().max(1.0) as i32;
+        // Title row is self-drawn HTML. A child whose top lands inside it
+        // covers the session title. Push the window down and keep its
+        // bottom edge. Queued after wry's own async move so this one sticks.
+        let band_h = ((CAPTION_HEIGHT_DIP + CAPTION_SLOP_DIP) * scale).ceil() as i32;
+        if py < band_h {
+            let shift = band_h - py;
+            py = band_h;
+            ph = (ph - shift).max(1);
+        }
+        (
+            (x * scale).round() as i32,
+            py,
+            (width * scale).round().max(1.0) as i32,
+            ph,
+        )
+    };
     unsafe {
-        let _ = SetWindowPos(hwnd, None, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE);
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            px,
+            py,
+            pw,
+            ph,
+            SWP_ASYNCWINDOWPOS | SWP_NOZORDER | SWP_NOACTIVATE,
+        );
         let _ = controller.SetBounds(RECT {
             left: 0,
             top: 0,

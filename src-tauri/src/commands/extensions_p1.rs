@@ -788,9 +788,13 @@ fn run_grok_cli_args(args: &[&str], timeout_secs: u64) -> Result<(String, String
     }
 }
 
-/// Path to the user-level Grok config that tracks plugin enable/disable.
-/// Same file Grok Build reads for `[plugins].enabled` / `[plugins].disabled`.
+/// Path to the user-level CLI config that tracks plugin enable/disable.
+/// Prefers shared Atlas CLI home (`~/.atlas/config.toml`), falling back to legacy `~/.grok/config.toml`.
 fn user_grok_config_toml() -> std::path::PathBuf {
+    let atlas = crate::paths::shared_cli_home().join("config.toml");
+    if atlas.is_file() {
+        return atlas;
+    }
     crate::process_util::user_home()
         .join(".grok")
         .join("config.toml")

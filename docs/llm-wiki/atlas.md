@@ -36,7 +36,7 @@ GUI 进程 PATH 很瘦：`enriched_path_env` 会补上 `~/.atlas/bin`。
 
 例外：设置里的 **从 CC Switch 导入** 会把自定义 `[model.<id>]` 合并进共享 `~/.atlas/config.toml`，供终端 `atlas` 按段 id 选用。不改 `[models].default`，不覆盖 `api_key = "ENC(...)"` 或 `hidden = true` 的企业段，也不导入 Grok Official。同名非企业段允许覆盖。
 
-例外：设置 → 常规 → 对话偏好 → **可用模型** 旁的 **新增模型**（Host `providers_atlas_model_add`）只往共享 `~/.atlas/config.toml` **追加**一段 `[model.<id>]`。段 id 已存在则拒绝（含大小写、企业 `ENC(...)` 与 `hidden` 段），不覆盖。不改 `[models].default`，不写 App `agent-home`，也不把这段变成自定义中转，不删除 `auth.json`。终端 `atlas` 和共享模式会读到这段；独立模式的对话进程仍读 `agent-home`。
+例外：设置 → 常规 → 对话偏好 → **可用模型** 旁的 **新增模型**（Host `providers_atlas_model_add`）只往共享 `~/.atlas/config.toml` **追加**一段 `[model.<id>]`。段 id 已存在则拒绝（含大小写、企业 `ENC(...)` 与 `hidden` 段），不覆盖。不改 `[models].default`，不写 App `agent-home`，也不把这段变成自定义中转，不删除 `auth.json`。终端 `atlas` 和共享模式会读到这段；独立模式的对话进程仍读 `agent-home`。勾选「这个模型能看图」为默认开启，写入 `app_supports_vision = "true"`。未写这个键的已有段也按能看图处理，共享模式不再剥图片路径。取消勾选写入 `"false"`，Host 才把该默认模型当纯文本。
 
 同一列表里，每一行都可以 **设为默认**（`providers_atlas_model_set_default`）。它只改共享配置的 `[models].default`，并同步应用设置里的 `modelId`。已经保存模型的会话不改。当前默认行显示「默认」，不再出现这个按钮。只有共享配置中**非托管**的明文段（没有 `managed = true`、`api_key = "ENC(...)"`、`hidden = true`）另外显示 **编辑** / **删除**（`providers_atlas_model_get` / `update` / `delete`）。编辑不改段 id；API Key 留空则保留原密钥。删除不改 `[models].default`，默认模型本身不能删。托管段和只存在于模型缓存或 `agent-home` 的条目没有编辑和删除。
 

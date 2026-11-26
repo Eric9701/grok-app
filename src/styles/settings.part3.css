@@ -274,6 +274,12 @@
   color: var(--text-tertiary);
 }
 
+.settings-atlas-model-field__hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
 .settings-atlas-model-form .settings-input {
   font-variant-numeric: tabular-nums;
   transition:

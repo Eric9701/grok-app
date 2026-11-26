@@ -38,7 +38,7 @@ export const ruProviders = {
   "prov.supportsVision": "Модель поддерживает изображения",
   "prov.supportsVisionOn": "Вкл.",
   "prov.supportsVisionOff": "Выкл.",
-  "prov.supportsVisionHint": "Включите, если relay принимает изображения. Для текстовых API вроде DeepSeek оставьте выключенным. Модели, похожие по имени на Atlas / GPT-4o / Claude / Gemini, автоматически считаются поддерживающими изображения.",
+  "prov.supportsVisionHint": "Включено по умолчанию. Выключайте только если этот API отклоняет пиксели изображений.",
   "prov.modelSettings": "Настройки модели",
   "prov.modelSettingsTitle": "Настройки {name}",
   "prov.modelContextWindow": "Контекстное окно",

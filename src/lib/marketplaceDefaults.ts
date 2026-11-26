@@ -141,29 +141,29 @@ export async function ensureDefaultMarketplaces(
   return { added, removed, errors, sources };
 }
 
-/** Filter catalog plugins to default-allowed marketplaces only. */
+/**
+ * Filter catalog plugins to exclude Claude / Anthropic marketplaces while
+ * preserving built-in defaults (xAI Official, openai/plugins) and user-configured
+ * custom marketplaces (e.g. from Atlas CLI config.toml or `plugin marketplace add`).
+ */
 export function filterCatalogToDefaultSources<
   T extends { marketplace?: string | null },
 >(
   plugins: readonly T[],
   sources: readonly MarketplaceSourceRow[],
 ): T[] {
-  const allowedNames = new Set(
+  const claudeNames = new Set(
     sources
-      .filter((s) => isDefaultAllowedMarketplaceSource(s))
+      .filter((s) => isClaudeMarketplaceSource(s))
       .map((s) => (s.name ?? "").trim().toLowerCase())
       .filter(Boolean),
   );
-  // Also allow empty marketplace if only defaults exist
   return plugins.filter((p) => {
     const m = (p.marketplace ?? "").trim().toLowerCase();
     if (!m) return true;
-    if (allowedNames.has(m)) return true;
-    if (m.includes("xai") || m.includes("openai") || m === "plugins") {
-      return true;
-    }
+    if (claudeNames.has(m)) return false;
     // Drop Claude-tagged marketplace rows
     if (m.includes("claude") || m.includes("anthropic")) return false;
-    return false;
+    return true;
   });
 }

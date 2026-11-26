@@ -38,7 +38,7 @@ export const ukProviders = {
   "prov.supportsVision": "Ця модель бачить зображення",
   "prov.supportsVisionOn": "Увімк.",
   "prov.supportsVisionOff": "Вимк.",
-  "prov.supportsVisionHint": "Увімкніть, якщо це реле приймає пікселі зображення (OpenAI image_url). Залиште вимкнути лише текстові API у стилі DeepSeek. Імена або ідентифікатори моделей, які виглядають як Atlas / GPT-4o / Claude / Gemini, уже зараховуються як бачення.",
+  "prov.supportsVisionHint": "Увімкнено за замовчуванням. Вимикайте лише якщо цей API відхиляє пікселі зображення.",
   "prov.modelSettings": "Налаштування моделі",
   "prov.modelSettingsTitle": "Налаштування {name}",
   "prov.modelContextWindow": "Контекстне вікно",

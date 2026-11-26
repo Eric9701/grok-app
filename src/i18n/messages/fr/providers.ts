@@ -38,7 +38,7 @@ export const frProviders = {
   "prov.supportsVision": "Ce modèle peut voir les images",
   "prov.supportsVisionOn": "Activé",
   "prov.supportsVisionOff": "Désactivé",
-  "prov.supportsVisionHint": "Activez si ce relais accepte les pixels d’image (OpenAI image_url). Laissez désactivé pour les API texte seul style DeepSeek. Les noms ou ids de modèle qui ressemblent à Atlas / GPT-4o / Claude / Gemini comptent déjà comme vision.",
+  "prov.supportsVisionHint": "Activé par défaut. Désactivez seulement si cette API refuse les pixels d’image.",
   "prov.modelSettings": "Réglages du modèle",
   "prov.modelSettingsTitle": "Réglages de {name}",
   "prov.modelContextWindow": "Fenêtre de contexte",

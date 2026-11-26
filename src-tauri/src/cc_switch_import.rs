@@ -1020,6 +1020,13 @@ pub struct AtlasModelAddRequest {
     pub api_backend: String,
     pub context_window: u64,
     pub api_key: String,
+    /// Missing means the model accepts image pixels. False writes an opt-out.
+    #[serde(default = "default_supports_vision")]
+    pub supports_vision: bool,
+}
+
+fn default_supports_vision() -> bool {
+    true
 }
 
 /// Append `[model.<id>]` to the shared Atlas CLI config.
@@ -1070,6 +1077,14 @@ pub(crate) fn add_atlas_catalog_model_at(
         ("api_backend".to_string(), api_backend),
         ("context_window".to_string(), req.context_window.to_string()),
         ("api_key".to_string(), api_key),
+        (
+            "app_supports_vision".to_string(),
+            if req.supports_vision {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            },
+        ),
     ];
     fields.retain(|(_, value)| !value.trim().is_empty());
     let next = append_model_section(&original, &id, &fields);
@@ -1129,6 +1144,7 @@ pub struct AtlasModelEditView {
     pub api_backend: String,
     pub context_window: u64,
     pub has_api_key: bool,
+    pub supports_vision: bool,
 }
 
 /// Fields written back onto an existing section. An empty `api_key` keeps the stored key.
@@ -1144,6 +1160,9 @@ pub struct AtlasModelUpdateRequest {
     pub context_window: u64,
     #[serde(default)]
     pub api_key: String,
+    /// When false, write `app_supports_vision = "false"`. True writes `"true"`.
+    #[serde(default = "default_supports_vision")]
+    pub supports_vision: bool,
 }
 
 /// Section ids in `text` that the settings list may edit or delete.
@@ -1209,6 +1228,9 @@ pub(crate) fn get_atlas_catalog_model_in(
             .unwrap_or_else(|| "messages".into()),
         context_window,
         has_api_key: !api_key.is_empty(),
+        supports_vision: crate::providers::app_supports_vision_enabled(
+            section.fields.get("app_supports_vision").map(|value| value.as_str()),
+        ),
     })
 }
 
@@ -1264,6 +1286,7 @@ pub(crate) fn update_atlas_catalog_model_at(
         "api_backend",
         "context_window",
         "api_key",
+        "app_supports_vision",
     ];
     let mut fields = vec![
         ("model".to_string(), model),
@@ -1273,6 +1296,14 @@ pub(crate) fn update_atlas_catalog_model_at(
         ("api_backend".to_string(), api_backend),
         ("context_window".to_string(), req.context_window.to_string()),
         ("api_key".to_string(), api_key),
+        (
+            "app_supports_vision".to_string(),
+            if req.supports_vision {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            },
+        ),
     ];
     let mut extra: Vec<_> = section
         .fields
@@ -1761,6 +1792,7 @@ api_backend = \"responses\"
             api_backend: "messages".into(),
             context_window: 200_000,
             api_key: "sk-test-key".into(),
+            supports_vision: false,
         }
     }
 
@@ -1782,10 +1814,43 @@ api_backend = \"responses\"
         assert!(text.contains("api_backend = \"messages\""));
         assert!(!text.contains("description ="));
         assert!(text.contains("api_key = \"ENC(secret)\""));
+        assert!(text.contains("app_supports_vision = \"false\""));
         assert_eq!(
             providers::get_models_default(&text).as_deref(),
             Some("arch-glm-5.2")
         );
+    }
+
+    #[test]
+    fn add_writes_vision_flag_when_requested() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        fs::write(&path, "[models]\ndefault = \"arch-kimi-see\"\n").unwrap();
+        let mut req = sample_add("arch-kimi-see");
+        req.supports_vision = true;
+        add_atlas_catalog_model_at(&path, req).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("app_supports_vision = \"true\""));
+        assert!(!crate::models_aux::cli_config_main_is_text_only(&text));
+    }
+
+    #[test]
+    fn update_clears_vision_flag_when_unchecked() {
+        let dir = tempfile_dir();
+        let path = dir.join("config.toml");
+        fs::write(
+            &path,
+            "[models]\ndefault = \"arch-glm-5.2\"\n\n[model.arch-kimi-new]\nmodel = \"kimi-for-coding\"\nname = \"Kimi\"\nbase_url = \"https://api.kimi.com/coding/v1\"\napi_backend = \"messages\"\ncontext_window = 200000\napi_key = \"sk-old\"\napp_supports_vision = \"true\"\n",
+        )
+        .unwrap();
+        let view = get_atlas_catalog_model_in(&fs::read_to_string(&path).unwrap(), "arch-kimi-new")
+            .unwrap();
+        assert!(view.supports_vision);
+        update_atlas_catalog_model_at(&path, sample_update("arch-kimi-new", "")).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("app_supports_vision = \"true\""));
+        assert!(text.contains("app_supports_vision = \"false\""));
+        assert!(text.contains("api_key = \"sk-old\""));
     }
 
     #[test]
@@ -1842,6 +1907,7 @@ api_backend = \"responses\"
             api_backend: "messages".into(),
             context_window: 200_000,
             api_key: api_key.into(),
+            supports_vision: false,
         }
     }
 

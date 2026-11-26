@@ -196,16 +196,34 @@ function loadDpi(): Promise<DpiMod> {
   return dpiModPromise;
 }
 
-/** Bottom of the self-drawn caption buttons, or 0 when that chrome is absent. */
-function captionBottomLimit(): number {
-  if (typeof document === "undefined") return 0;
-  const el = document.querySelector(".window-controls");
+/** Bottom edge of one chrome strip, or 0 when it is not on screen. */
+function elementBottom(el: Element | null): number {
   if (!(el instanceof HTMLElement)) return 0;
   const style = window.getComputedStyle(el);
   if (style.display === "none" || style.visibility === "hidden") return 0;
   const rect = el.getBoundingClientRect();
   if (rect.width < 2 || rect.height < 2) return 0;
   return rect.bottom;
+}
+
+/**
+ * Lowest chrome the child must stay under: caption buttons, and the title
+ * row of the column this host lives in. A native webview paints above that
+ * HTML, so a rect that starts inside the row hides the session title.
+ */
+function chromeBottomLimit(host: HTMLElement | null): number {
+  if (typeof document === "undefined") return 0;
+  let limit = elementBottom(document.querySelector(".window-controls"));
+  const column = host?.closest(".main, .settings-page");
+  if (column) {
+    limit = Math.max(
+      limit,
+      elementBottom(column.querySelector(":scope > .main__top")),
+      elementBottom(column.querySelector(":scope > .settings-page__chrome")),
+      elementBottom(column.querySelector(":scope > .settings-page__titlebar")),
+    );
+  }
+  return limit;
 }
 
 /**
@@ -326,7 +344,9 @@ export function EmbeddedBrowser({
   const appliedReloadKeyRef = useRef(0);
   const onLoadingChangeRef = useRef(onLoadingChange);
   activeRef.current = active;
-  coveredRef.current = covered;
+  // `coveredRef` is written by the cover subscription, which runs before
+  // React commits `covered`. Assigning from state here would put it back
+  // to false and a bounds sync would show the child over settings.
   pageLoadingRef.current = pageLoading;
   bootUrlRef.current = url.trim();
   onLoadingChangeRef.current = onLoadingChange;
@@ -473,7 +493,7 @@ export function EmbeddedBrowser({
     // Clip past left-edge pane resizers first (native webviews paint above DOM).
     const measured = hostRectForWebview(el);
     const rect = measured
-      ? clipHostRectBelowTop(measured, captionBottomLimit())
+      ? clipHostRectBelowTop(measured, chromeBottomLimit(el))
       : null;
     if (!rect || rect.width < 2 || rect.height < 2) {
       await concealWebview(wv);
@@ -515,11 +535,17 @@ export function EmbeddedBrowser({
     // Keep webview visible during document loads — progress lives in chrome.
     // Tying visibility to pageLoading caused hide/show flicker on every
     // redirect / iframe PageLoadEvent.
-    const wantShow = activeRef.current && !coveredRef.current;
     const boundsSame = boundsNearlyEqual(lastBoundsRef.current, next, 0.5);
 
     if (boundsSame) {
-      await setWebviewVisible(wv, wantShow);
+      if (!activeRef.current || coveredRef.current) {
+        await concealWebview(wv);
+        return;
+      }
+      await setWebviewVisible(wv, true);
+      if (!activeRef.current || coveredRef.current) {
+        await concealWebview(wv);
+      }
       return;
     }
 
@@ -527,8 +553,17 @@ export function EmbeddedBrowser({
       // One bounds update. A later setSize would re-read the origin, and on
       // Windows that read can still be (0, 0) and cover the caption buttons.
       await moveChildWebview(webviewLabel, next);
+      // Settings (and other covers) can open while this move is in flight.
+      // Showing the rect we measured before that covers the page underneath.
+      if (!activeRef.current || coveredRef.current) {
+        await concealWebview(wv);
+        return;
+      }
       lastBoundsRef.current = next;
-      await setWebviewVisible(wv, wantShow);
+      await setWebviewVisible(wv, true);
+      if (!activeRef.current || coveredRef.current) {
+        await concealWebview(wv);
+      }
     } catch (e) {
       console.error("[EmbeddedBrowser] syncBounds", e);
     }
@@ -556,11 +591,12 @@ export function EmbeddedBrowser({
     return subscribeNativeWebviewCover((next) => {
       coveredRef.current = next;
       setCovered(next);
-      if (next) {
-        const wv = webviewRef.current;
-        if (wv) void concealWebview(wv);
-      }
+      // Join the bounds flight. A direct conceal here races an in-flight
+      // show and the child stays on top of settings.
+      scheduleSync();
     });
+    // scheduleSync reads a ref; the subscription stays for the mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Floating composer moved / sized — re-clip native webview without full hide.
@@ -724,7 +760,7 @@ export function EmbeddedBrowser({
         const el = hostRef.current;
         const measured = el ? hostRectForWebview(el) : null;
         const fitted = measured
-          ? clipHostRectBelowTop(measured, captionBottomLimit())
+          ? clipHostRectBelowTop(measured, chromeBottomLimit(el))
           : null;
         // No layout yet: do not spawn a child at (0, 0). That rect grows over
         // the caption buttons before the first real sync.
@@ -981,12 +1017,7 @@ export function EmbeddedBrowser({
   // Hide parks the child. Leaving the last rect in place keeps it under
   // the caption buttons on Windows even after hide().
   useEffect(() => {
-    const wv = webviewRef.current;
-    if (!wv || !isTauri()) return;
-    if (!active || covered) {
-      void concealWebview(wv);
-      return;
-    }
+    if (!isTauri()) return;
     scheduleSync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, covered]);

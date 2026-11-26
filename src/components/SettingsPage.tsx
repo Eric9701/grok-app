@@ -1171,6 +1171,8 @@ export function SettingsPage({
       }
       if (!wikiChromeVisible && hit.entry.section === "wiki") return false;
       if (!agentCliVisible && hit.entry.section === "agent_cli") return false;
+      // 宠物入口已注释：设置搜索不再露出宠物。
+      if (hit.entry.section === "pet") return false;
       return true;
     });
   }, [trimmedQuery, t, tEn, remoteChromeVisible, wikiChromeVisible, agentCliVisible]);
@@ -1185,6 +1187,8 @@ export function SettingsPage({
       if (!remoteChromeVisible && n.id === "remote_im") return false;
       if (!wikiChromeVisible && n.id === "wiki") return false;
       if (!agentCliVisible && n.id === "agent_cli") return false;
+      // 宠物入口已注释：侧栏不展示「宠物」。
+      if (n.id === "pet") return false;
       return true;
     });
     if (!hitSections) return [...base];

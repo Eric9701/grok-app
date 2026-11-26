@@ -44,9 +44,18 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent, WebviewBuilder};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
-use tauri::{LogicalPosition, LogicalSize, Url};
+use tauri::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, Url};
 
 const LABEL_PREFIX: &str = "resource-browser";
+
+/// Physical park for a hidden child. Windows packs `WM_MOVE` into 16-bit
+/// coordinates, so a logical -32000 scaled at 125%+ wraps into the parent
+/// and the webview covers settings and the other pages.
+const PARK_PHYSICAL: i32 = -30_000;
+
+fn is_parked(x: f64, y: f64) -> bool {
+    x < 0.0 || y < 0.0
+}
 const DOWNLOAD_EVENT: &str = "side-browser://download";
 const PAGE_LOAD_EVENT: &str = "side-browser://page-load";
 
@@ -174,6 +183,20 @@ pub fn set_bounds(
     height: f64,
 ) -> Result<(), String> {
     let wv = get_side_webview(app, &label)?;
+    if is_parked(x, y) {
+        // Physical pixels, not logical. wry would multiply a logical park by
+        // the monitor scale and push it past the 16-bit move limit.
+        wv.set_bounds(tauri::Rect {
+            position: tauri::Position::Physical(PhysicalPosition::new(
+                PARK_PHYSICAL,
+                PARK_PHYSICAL,
+            )),
+            size: tauri::Size::Physical(PhysicalSize::new(1, 1)),
+        })
+        .map_err(|e| format!("side browser bounds: {e}"))?;
+        pass_caption_through(&wv, -1.0, -1.0, 1.0, 1.0);
+        return Ok(());
+    }
     let width = width.max(1.0);
     let height = height.max(1.0);
     wv.set_bounds(tauri::Rect {
@@ -352,8 +375,9 @@ pub fn create(
         return Err("window_label empty".into());
     }
 
-    let width = width.max(40.0);
-    let height = height.max(40.0);
+    let parked = is_parked(x, y);
+    let width = if parked { 1.0 } else { width.max(40.0) };
+    let height = if parked { 1.0 } else { height.max(40.0) };
 
     let window = app
         .get_window(win_label)
@@ -687,6 +711,15 @@ pub fn create(
         "creating side browser child webview"
     );
 
+    // wry multiplies logical coordinates by the monitor scale. A raw park of
+    // -32000 becomes -48000 at 150% and Windows wraps that move on screen.
+    let (x, y) = if parked {
+        let scale = window.scale_factor().unwrap_or(1.0).max(1.0);
+        let logical = f64::from(PARK_PHYSICAL) / scale;
+        (logical, logical)
+    } else {
+        (x, y)
+    };
     let created = window
         .add_child(
             builder,
@@ -694,7 +727,13 @@ pub fn create(
             LogicalSize::new(width, height),
         )
         .map_err(|e| format!("side browser create: {e}"))?;
-    pass_caption_through(&created, x, y, width, height);
+    pass_caption_through(
+        &created,
+        if parked { -1.0 } else { x },
+        if parked { -1.0 } else { y },
+        width,
+        height,
+    );
 
     tracing::info!(
         target: "side_browser",

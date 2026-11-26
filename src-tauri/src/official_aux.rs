@@ -56,9 +56,23 @@ pub fn official_aux_available() -> bool {
     }
 }
 
+/// CLI login file for the isolated aux home.
+///
+/// Atlas writes `~/.atlas/auth.json`. Use that when it exists. A machine that
+/// only has the legacy `~/.grok/auth.json` still copies that file.
+pub(crate) fn cli_oidc_auth_json(atlas_auth: &Path, legacy_auth: &Path) -> PathBuf {
+    if atlas_auth.is_file() {
+        return atlas_auth.to_path_buf();
+    }
+    if legacy_auth.is_file() {
+        return legacy_auth.to_path_buf();
+    }
+    atlas_auth.to_path_buf()
+}
+
 /// Ensure `agent-home-official` exists with official auth + grok-4.5 default.
 ///
-/// - Copies `~/.grok/auth.json` when present (OIDC for official path only).
+/// - Copies `~/.atlas/auth.json` when present (legacy `~/.grok/auth.json` if not).
 /// - Writes `[models] default = grok-4.5` and optional `[model.grok-4.5] api_key`.
 pub fn ensure_official_aux_home() -> Result<PathBuf, String> {
     let _ = ensure_app_dirs();
@@ -66,7 +80,10 @@ pub fn ensure_official_aux_home() -> Result<PathBuf, String> {
     fs::create_dir_all(&home).map_err(|e| format!("official aux home: {e}"))?;
 
     // Sync CLI OIDC into this isolated home only (never main agent-home here).
-    let cli_auth = process_util::user_home().join(".grok").join("auth.json");
+    let cli_auth = cli_oidc_auth_json(
+        &crate::paths::shared_cli_home().join("auth.json"),
+        &process_util::user_home().join(".grok").join("auth.json"),
+    );
     let dest_auth = home.join("auth.json");
     if cli_auth.is_file() {
         let need = match (cli_auth.metadata(), dest_auth.metadata()) {
@@ -2343,6 +2360,29 @@ mod tests {
     fn official_home_path_under_app_data() {
         let h = official_aux_home();
         assert!(h.to_string_lossy().contains("agent-home-official"));
+    }
+
+    #[test]
+    fn oidc_auth_prefers_atlas_over_legacy_grok() {
+        let dir = std::env::temp_dir().join(format!(
+            "grok-aux-auth-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let atlas = dir.join("atlas-auth.json");
+        let legacy = dir.join("grok-auth.json");
+        fs::write(&atlas, "atlas").unwrap();
+        fs::write(&legacy, "grok").unwrap();
+        assert_eq!(cli_oidc_auth_json(&atlas, &legacy), atlas);
+        let _ = fs::remove_file(&atlas);
+        assert_eq!(cli_oidc_auth_json(&atlas, &legacy), legacy);
+        let _ = fs::remove_file(&legacy);
+        assert_eq!(cli_oidc_auth_json(&atlas, &legacy), atlas);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

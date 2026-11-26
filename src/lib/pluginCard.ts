@@ -289,6 +289,7 @@ export function pluginIconPathCandidates(pluginRoot: string): string[] {
     "codex/assets/logo-light.png",
     "codex/assets/logo.png",
     "claude/assets/logo-light.png",
+    ".atlas-plugin/logo.png",
     ".grok-plugin/logo.png",
     ".codex-plugin/logo.png",
   ];
@@ -300,6 +301,7 @@ export function pluginManifestPathCandidates(pluginRoot: string): string[] {
   const root = pluginRoot.replace(/[/\\]+$/, "");
   if (!root) return [];
   return [
+    `${root}/.atlas-plugin/plugin.json`,
     `${root}/.grok-plugin/plugin.json`,
     `${root}/.codex-plugin/plugin.json`,
     `${root}/codex/.codex-plugin/plugin.json`,

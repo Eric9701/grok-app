@@ -38,7 +38,7 @@ export const idProviders = {
   "prov.supportsVision": "Model ini dapat melihat gambar",
   "prov.supportsVisionOn": "Aktif",
   "prov.supportsVisionOff": "Mati",
-  "prov.supportsVisionHint": "Aktifkan jika relai ini menerima piksel gambar (OpenAI image_url). Biarkan mati untuk API hanya-teks gaya DeepSeek. Nama atau id model yang tampak seperti Atlas / GPT-4o / Claude / Gemini sudah dihitung sebagai visi.",
+  "prov.supportsVisionHint": "Aktif secara default. Matikan hanya jika API ini menolak piksel gambar.",
   "prov.modelSettings": "Pengaturan model",
   "prov.modelSettingsTitle": "Pengaturan {name}",
   "prov.modelContextWindow": "Jendela konteks",

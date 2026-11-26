@@ -38,7 +38,7 @@ export const enProviders = {
   "prov.supportsVision": "This model can see images",
   "prov.supportsVisionOn": "On",
   "prov.supportsVisionOff": "Off",
-  "prov.supportsVisionHint": "Turn on if this relay accepts image pixels (OpenAI image_url). Leave off for DeepSeek-style text-only APIs. Names or model ids that look like Atlas / GPT-4o / Claude / Gemini already count as vision.",
+  "prov.supportsVisionHint": "On by default. Turn off only when this API rejects image pixels.",
   "prov.modelSettings": "Model settings",
   "prov.modelSettingsTitle": "Settings for {name}",
   "prov.modelContextWindow": "Context window",

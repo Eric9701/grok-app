@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GlassModal } from "@/components/GlassModal";
 import { Select } from "@/components/Select";
+import { UiCheck } from "@/components/settings/shared";
 import * as api from "@/lib/api";
 import { catalogFromAvailableModels } from "@/lib/availableModelsCatalog";
 import type { ModelOption } from "@/lib/grokCatalog";
@@ -88,6 +89,7 @@ export function AtlasModelAddDialog({
   const [apiBackend, setApiBackend] = useState<string>("messages");
   const [contextWindow, setContextWindow] = useState("200000");
   const [apiKey, setApiKey] = useState("");
+  const [supportsVision, setSupportsVision] = useState(true);
   const [showKey, setShowKey] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -110,6 +112,7 @@ export function AtlasModelAddDialog({
       setApiBackend("messages");
       setContextWindow("200000");
       setApiKey("");
+      setSupportsVision(true);
       setLoading(false);
       return;
     }
@@ -129,6 +132,7 @@ export function AtlasModelAddDialog({
         setApiBackend(view.apiBackend || "messages");
         setContextWindow(String(view.contextWindow || 200000));
         setApiKey("");
+        setSupportsVision(!!view.supportsVision);
       })
       .catch((err: unknown) => {
         if (cancel) return;
@@ -201,6 +205,7 @@ export function AtlasModelAddDialog({
       apiBackend,
       contextWindow: windowTokens,
       apiKey: apiKey.trim(),
+      supportsVision,
     };
     const request = editing
       ? api.providersAtlasModelUpdate(payload)
@@ -216,6 +221,7 @@ export function AtlasModelAddDialog({
         setApiBackend("messages");
         setContextWindow("200000");
         setApiKey("");
+        setSupportsVision(true);
         setShowKey(false);
         showToast(
           t(
@@ -413,6 +419,17 @@ export function AtlasModelAddDialog({
                 setContextWindow(value);
               }}
             />
+            <div className="settings-atlas-model-field settings-atlas-model-field--wide">
+              <UiCheck
+                checked={supportsVision}
+                disabled={locked}
+                onChange={setSupportsVision}
+                label={t("prov.supportsVision")}
+              />
+              <span className="settings-atlas-model-field__hint">
+                {t("prov.supportsVisionHint")}
+              </span>
+            </div>
             <div className="settings-atlas-model-field settings-atlas-model-field--wide">
               <span className="settings-atlas-model-field__label">
                 <span>{t("settings.availableModelsAddApiKey")}</span>

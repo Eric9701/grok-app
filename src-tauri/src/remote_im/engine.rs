@@ -1685,12 +1685,16 @@ impl Engine {
         let usage = result.usage.clone();
         let compact = result.compact.clone();
 
-        let mut next = binding_after_agent_turn(
-            &binding,
-            result.session_id.as_deref().or(resume_id.as_deref()),
-        );
-        // If we started new and got no session id back, still Continue with local bookkeeping
-        if next.agent_session_id.is_none() {
+        let kept_resume = if result.resume_dropped {
+            result.session_id.as_deref()
+        } else {
+            result.session_id.as_deref().or(resume_id.as_deref())
+        };
+        let mut next = binding_after_agent_turn(&binding, kept_resume);
+        if result.resume_dropped {
+            // Do not put the missing id back. A later message starts a new agent session.
+            next.agent_session_id = result.session_id.clone();
+        } else if next.agent_session_id.is_none() {
             if let Some(r) = resume_id {
                 next.agent_session_id = Some(r);
             }

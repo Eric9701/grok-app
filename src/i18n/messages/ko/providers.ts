@@ -38,7 +38,7 @@ export const koProviders = {
   "prov.supportsVision": "이 모델은 이미지를 볼 수 있습니다",
   "prov.supportsVisionOn": "켜짐",
   "prov.supportsVisionOff": "꺼짐",
-  "prov.supportsVisionHint": "이 릴레이가 이미지 픽셀(OpenAI image_url)을 받으면 켜세요. DeepSeek 스타일 텍스트 전용 API는 꺼 두세요. Atlas / GPT-4o / Claude / Gemini처럼 보이는 이름이나 모델 id는 이미 비전으로 취급됩니다.",
+  "prov.supportsVisionHint": "기본값은 켜짐입니다. 이 API가 이미지 픽셀을 거부할 때만 끄세요.",
   "prov.modelSettings": "모델 설정",
   "prov.modelSettingsTitle": "{name} 설정",
   "prov.modelContextWindow": "컨텍스트 창",

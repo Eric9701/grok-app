@@ -382,6 +382,7 @@ export async function providersAtlasModelAdd(body: {
   apiBackend: string;
   contextWindow: number;
   apiKey: string;
+  supportsVision?: boolean;
 }) {
   return invoke<void>("providers_atlas_model_add", { body });
 }
@@ -395,6 +396,7 @@ export interface AtlasModelEditView {
   apiBackend: string;
   contextWindow: number;
   hasApiKey: boolean;
+  supportsVision: boolean;
 }
 
 export async function providersAtlasModelGet(id: string) {
@@ -410,6 +412,7 @@ export async function providersAtlasModelUpdate(body: {
   apiBackend: string;
   contextWindow: number;
   apiKey?: string;
+  supportsVision?: boolean;
 }) {
   return invoke<void>("providers_atlas_model_update", { body });
 }

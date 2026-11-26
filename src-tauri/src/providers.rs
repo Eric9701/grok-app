@@ -542,9 +542,23 @@ pub fn base_url_full_path_from_fields(fields: &std::collections::HashMap<String,
     parse_app_bool_field(fields.get(APP_BASE_URL_FULL_PATH_KEY).map(|s| s.as_str()))
 }
 
+/// Whether this section accepts image pixels.
+///
+/// Missing `app_supports_vision` means yes. Only an explicit false opt-out
+/// (`false` / `0` / `no` / `off`) marks the model text-only.
+pub fn app_supports_vision_enabled(raw: Option<&str>) -> bool {
+    match raw.map(str::trim).filter(|s| !s.is_empty()) {
+        None => true,
+        Some(s) => !matches!(
+            s.trim_matches('"').trim().to_ascii_lowercase().as_str(),
+            "false" | "0" | "no" | "off"
+        ),
+    }
+}
+
 /// Whether the user marked this section as vision-capable.
 pub fn supports_vision_from_fields(fields: &std::collections::HashMap<String, String>) -> bool {
-    parse_app_bool_field(fields.get(APP_SUPPORTS_VISION_KEY).map(|s| s.as_str()))
+    app_supports_vision_enabled(fields.get(APP_SUPPORTS_VISION_KEY).map(|s| s.as_str()))
 }
 
 /// Grok Build joins `{base_url}/chat/completions` (or `/responses`).
@@ -2709,7 +2723,7 @@ pub fn upsert_custom_provider(input: UpsertProviderInput) -> Result<ProvidersLis
             .unwrap_or_else(|| {
                 existing
                     .map(|s| supports_vision_from_fields(&s.fields))
-                    .unwrap_or(false)
+                    .unwrap_or(true)
             }),
     };
 
@@ -2735,9 +2749,14 @@ pub fn upsert_custom_provider(input: UpsertProviderInput) -> Result<ProvidersLis
     if full_path {
         fields.push((APP_BASE_URL_FULL_PATH_KEY.into(), "true".into()));
     }
-    if supports_vision {
-        fields.push((APP_SUPPORTS_VISION_KEY.into(), "true".into()));
-    }
+    fields.push((
+        APP_SUPPORTS_VISION_KEY.into(),
+        if supports_vision {
+            "true".into()
+        } else {
+            "false".into()
+        },
+    ));
     if !app_efforts_json.is_empty() && app_efforts_json != "[]" {
         fields.push((APP_EFFORTS_KEY.into(), app_efforts_json));
     }

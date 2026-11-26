@@ -681,9 +681,7 @@ pub fn diagnose_active_config(session_data_mode: &str) -> ConfigTomlDiagnosis {
 }
 
 /// User-initiated repair of that same file, including shared `~/.atlas/config.toml`.
-pub fn repair_active_config(
-    session_data_mode: &str,
-) -> Result<ConfigTomlRepairResult, String> {
+pub fn repair_active_config(session_data_mode: &str) -> Result<ConfigTomlRepairResult, String> {
     let path = crate::agent_config_view::config_toml_path(session_data_mode);
     repair_config_file(session_data_mode, &path)
 }
@@ -874,7 +872,10 @@ fn toml_parses(text: &str) -> bool {
 }
 
 fn safe_example_keys(keys: &[String]) -> Vec<String> {
-    keys.iter().filter_map(|k| safe_example_key(k)).take(5).collect()
+    keys.iter()
+        .filter_map(|k| safe_example_key(k))
+        .take(5)
+        .collect()
 }
 
 fn safe_example_key(key: &str) -> Option<String> {

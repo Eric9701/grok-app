@@ -4,8 +4,8 @@
 
 | 主路由 | 行为 |
 |--------|------|
-| **官方 Grok 订阅**（`active_source == official`，且 CLI `[models].default` 也是 Grok 等多模态模型） | **严禁** 注入 MCP `official-aux`、Host 识图预跑、侧信道 session rules。使用 Grok Build **默认原生** vision / `x_*` / `web_search`，避免双轨污染。共享模式若 `~/.atlas` 的默认模型是 GLM / MiniMax / Kimi 等纯文本模型，仍要 Host 识图：这些 API 会拒收 `image_url`，CLI 会在发送前丢掉画面。 |
-| **自定义 / 第三方**（DeepSeek、中转等） | 开关开启且官方凭证可用时，注入 **可调用** MCP `official-aux`；附图且主模型纯文本时 Host 识图预跑。通道勾了 **这个模型能看图**（或名称/模型 id 像 Grok / GPT-4o / Claude / Gemini）则主模型按多模态发像素，不剥 `@path`、不拦 `read_file` 读图。 |
+| **官方 Grok 订阅**（`active_source == official`） | **严禁** 注入 MCP `official-aux`、Host 识图预跑、侧信道 session rules。使用 Grok Build **默认原生** vision / `x_*` / `web_search`。 |
+| **自定义 / 第三方** | 开关开启且官方凭证可用时，注入 **可调用** MCP `official-aux`。`app_supports_vision` 缺省为能看图：主模型按多模态发像素，不剥 `@path`。只有该键显式为 `false` 时才做 Host 识图预跑。 |
 
 X / web **不做 Host 关键词预跑**；由 agent 通过 tools 调用 `official-aux__x_*` / `web_search`。
 
@@ -74,7 +74,7 @@ ACP `mcpServers` 省略用户 MCP **不够**。Grok CLI 仍会从 agent `config.
    - **PreToolUse hook**（可靠）：`{agent-home}/hooks/grok-app-block-native-imagine.json`，matcher 匹配上述工具并 `decision: deny`，reason 指引改走 `official-aux__*`。spawn / 开关变更时 `sync_native_media_block_hook`。  
 2. 模型必须 `use_tool` → MCP `official-aux__image_*` / `image_to_video` / `reference_to_video`，侧信道 `GROK_HOME=agent-home-official`：  
    - 有 Settings 官方 API Key → 写入 `[model.grok-4.7] api_key`  
-   - 仅 SuperGrok OIDC → 同步 `~/.grok/auth.json`，并 **去掉** 过期/错误 api_key，强制用订阅凭证  
+   - 仅订阅 OIDC → 同步 `~/.atlas/auth.json`（没有该文件时用 `~/.grok/auth.json`），并 **去掉** 过期/错误 api_key，强制用订阅凭证  
 3. **禁止** 在 API key 失败后改用 PIL/代码画图。  
 4. **禁止** 对 `.png/.jpg/.webp…` 调用 `read_file` 做「验图」——纯文本主模型（DeepSeek 等）会因 tool result 里的 `image_url` 块 400 崩溃（`unknown variant image_url`）。Hook 同步拦截；成功后只回报绝对路径，UI 从路径挂附件。  
 5. Host 从 MCP `rawOutput.output.OkayOutput` / markdown 反引号路径提取媒体路径 → `session://generated_image` / journal attachments。  

@@ -38,7 +38,7 @@ export const trProviders = {
   "prov.supportsVision": "Bu model görselleri görebilir",
   "prov.supportsVisionOn": "Açık",
   "prov.supportsVisionOff": "Kapalı",
-  "prov.supportsVisionHint": "Bu aktarıcı görsel piksellerini kabul ediyorsa açın (OpenAI image_url). DeepSeek tarzı yalnızca metin API'leri için kapalı bırakın. Grok / GPT-4o / Claude / Gemini gibi görünen adlar ya da model kimlikleri zaten görsel destekli sayılır.",
+  "prov.supportsVisionHint": "Varsayılan olarak açık. Yalnızca bu API görsel piksellerini reddederse kapatın.",
   "prov.modelSettings": "Model ayarları",
   "prov.modelSettingsTitle": "{name} ayarları",
   "prov.modelContextWindow": "Bağlam penceresi",

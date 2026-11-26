@@ -360,6 +360,7 @@ pub async fn codebase_indexing_set(
 // Install uses `plugin install <name|name@market|url> --trust` + soft-respawn.
 
 const PLUGIN_MARKETPLACE_MUTATE_TIMEOUT_SECS: u64 = 120;
+const PLUGIN_AVAILABLE_SLOW_FETCH_SECS: u64 = 8;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -675,10 +676,47 @@ fn collect_marketplace_list() -> Result<Vec<MarketplaceSourceDto>, String> {
 }
 
 
+/// Merge two `plugin list --available` snapshots, keeping every unique
+/// `(marketplace, name)` pair without dropping sources that succeeded in either pass.
+pub fn merge_available_plugins(
+    primary: Vec<AvailablePluginDto>,
+    secondary: Vec<AvailablePluginDto>,
+) -> Vec<AvailablePluginDto> {
+    let mut out: Vec<AvailablePluginDto> = Vec::with_capacity(primary.len() + secondary.len());
+    let mut index: std::collections::HashMap<(String, String), usize> =
+        std::collections::HashMap::new();
+    for item in primary.into_iter().chain(secondary.into_iter()) {
+        let key = (
+            item.marketplace
+                .as_deref()
+                .unwrap_or("")
+                .trim()
+                .to_ascii_lowercase(),
+            item.name.trim().to_ascii_lowercase(),
+        );
+        if let Some(&pos) = index.get(&key) {
+            let prev_desc = out[pos].description.as_deref().map(str::len).unwrap_or(0);
+            let next_desc = item.description.as_deref().map(str::len).unwrap_or(0);
+            if next_desc > prev_desc {
+                out[pos] = item;
+            }
+        } else {
+            index.insert(key, out.len());
+            out.push(item);
+        }
+    }
+    out
+}
+
+
 fn collect_available_plugins() -> Result<Vec<AvailablePluginDto>, String> {
+    // `plugin list --available` may sync multiple git marketplace caches
+    // (including custom/internal repos), so give it the same generous timeout
+    // as marketplace mutating ops instead of 30s.
+    let started = std::time::Instant::now();
     let (stdout, stderr, ok) = run_grok_cli_args(
         &["plugin", "list", "--json", "--available"],
-        PLUGIN_CMD_TIMEOUT_SECS,
+        PLUGIN_MARKETPLACE_MUTATE_TIMEOUT_SECS,
     )?;
     if !ok {
         let msg = if !stderr.is_empty() {
@@ -690,7 +728,26 @@ fn collect_available_plugins() -> Result<Vec<AvailablePluginDto>, String> {
         };
         return Err(msg);
     }
-    parse_available_plugins_json(&stdout)
+    let primary = parse_available_plugins_json(&stdout)?;
+
+    // Workaround for Atlas CLI: when a marketplace's git cache TTL expires and
+    // `git fetch` fails (e.g. GitHub unreachable on an internal network), the
+    // CLI drops that source from that single run's JSON even though it touches
+    // `.git/FETCH_HEAD` and keeps the existing on-disk clone. One fast cache-hit
+    // re-read recovers all locally cached marketplaces without losing any source
+    // from the first pass.
+    if started.elapsed() >= std::time::Duration::from_secs(PLUGIN_AVAILABLE_SLOW_FETCH_SECS) {
+        if let Ok((retry_out, _, true)) = run_grok_cli_args(
+            &["plugin", "list", "--json", "--available"],
+            PLUGIN_CMD_TIMEOUT_SECS,
+        ) {
+            if let Ok(secondary) = parse_available_plugins_json(&retry_out) {
+                return Ok(merge_available_plugins(primary, secondary));
+            }
+        }
+    }
+
+    Ok(primary)
 }
 
 
@@ -1060,6 +1117,7 @@ fn scan_plugin_dir(plugin_root: &std::path::Path) -> Option<MarketplacePluginMet
         return None;
     }
     let manifest_candidates = [
+        plugin_root.join(".atlas-plugin").join("plugin.json"),
         plugin_root.join(".grok-plugin").join("plugin.json"),
         plugin_root.join(".codex-plugin").join("plugin.json"),
         plugin_root.join(".claude-plugin").join("plugin.json"),
@@ -1097,6 +1155,14 @@ fn collect_marketplace_plugin_meta_index() -> std::collections::HashMap<String, 
         for ent in entries.flatten() {
             let hash_dir = ent.path();
             if !hash_dir.is_dir() {
+                continue;
+            }
+            if hash_dir
+                .file_name()
+                .and_then(|s| s.to_str())
+                .map(|s| s.starts_with('.'))
+                .unwrap_or(false)
+            {
                 continue;
             }
             for sub in ["plugins", "external_plugins"] {
@@ -1478,5 +1544,49 @@ pub async fn batch_agents_headless(
     })
     .await
     .map_err(|e| format!("batch_agents_headless: {e}"))
+}
+
+#[cfg(test)]
+mod marketplace_merge_tests {
+    use super::*;
+
+    fn mk(name: &str, marketplace: &str, desc: Option<&str>) -> AvailablePluginDto {
+        AvailablePluginDto {
+            name: name.to_string(),
+            status: "available".to_string(),
+            marketplace: Some(marketplace.to_string()),
+            description: desc.map(|s| s.to_string()),
+            version: None,
+            skill_count: None,
+            has_hooks: false,
+            has_agents: false,
+            has_mcp: false,
+        }
+    }
+
+    #[test]
+    fn merge_available_plugins_keeps_custom_and_recovered_official_sources() {
+        let primary = vec![mk("open-code-review", "atlas-plugins", Some("Code review"))];
+        let secondary = vec![
+            mk("open-code-review", "atlas-plugins", Some("Code review")),
+            mk("vercel", "xAI Official", Some("Vercel integration")),
+            mk("sentry", "xAI Official", Some("Sentry integration")),
+        ];
+        let merged = merge_available_plugins(primary, secondary);
+        let names: Vec<&str> = merged.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, vec!["open-code-review", "vercel", "sentry"]);
+    }
+
+    #[test]
+    fn merge_available_plugins_prefers_richer_description_on_duplicate() {
+        let primary = vec![mk("vercel", "xAI Official", Some("short"))];
+        let secondary = vec![mk("vercel", "xAI Official", Some("much longer description"))];
+        let merged = merge_available_plugins(primary, secondary);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            merged[0].description.as_deref(),
+            Some("much longer description")
+        );
+    }
 }
 

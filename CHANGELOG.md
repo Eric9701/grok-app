@@ -17,11 +17,13 @@ See `docs/llm-wiki/release.md`.
 
 - The environment menu can commit every change and push the current branch. A clean checkout only pushes, and a detached HEAD is refused.
 - Diagnostics can repair the config.toml this session mode uses. Duplicate keys keep the last value, and an unreadable file is replaced after a backup.
+- The plugin list includes marketplaces you added. Claude and Anthropic sources stay hidden, and Atlas plugin folders are recognized.
 
 **中文 · 新增**
 
 - 环境信息里可以提交全部改动并推送当前分支。没有改动时只推送，不在分支上时会拒绝。
 - 诊断可以修复当前会话模式使用的 config.toml。重复键保留后出现的值，仍然无法解析的文件会在备份后换成空的合法文件。
+- 插件列表会带上你添加的市场。Claude 和 Anthropic 的来源仍不显示，Atlas 插件目录也会被认出来。
 
 ### Changed
 
@@ -30,6 +32,9 @@ See `docs/llm-wiki/release.md`.
 - Switching branches shows that the checkout is still running.
 - A scheduled chat no longer shows its setup note. The title, transcript, and error use the request instead.
 - Garbled text in an error detail is readable again.
+- A model can see images unless you turn that off. New models start checked, and an existing section with no flag keeps the picture.
+- The app icon is the Atlas mark.
+- The desktop pet is hidden from the sidebar and the slash menu.
 
 **中文 · 变更**
 
@@ -38,6 +43,19 @@ See `docs/llm-wiki/release.md`.
 - 切换分支时会显示正在切换。
 - 定时会话不再把内部设置说明显示出来。标题、对话和错误改用真正的请求。
 - 错误详情里的乱码会恢复成可读文字。
+- 模型默认能看图，除非你关掉。新建时这项是开的，没有写下这一项的旧模型也会保留图片。
+- 应用图标换成了 Atlas 标记。
+- 桌面宠物不再出现在侧栏和斜杠菜单里。
+
+### Fixed
+
+- A remote chat continues in a new turn when that CLI session is gone. The missing-session line is not shown as the reply.
+- The in-app browser stays under the title and off Settings. On a scaled Windows display it no longer leaves a gap.
+
+**中文 · 修复**
+
+- 远程会话在原来的 CLI 会话不存在时会新开一轮。“会话不存在”不会被当成回复。
+- 内置浏览器会停在标题栏下面，也不会盖住设置页。Windows 缩放后不再在标题旁留一条缝。
 
 ## [0.2.47]
 

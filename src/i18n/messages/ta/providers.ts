@@ -38,7 +38,7 @@ export const taProviders = {
   "prov.supportsVision": "இந்த மாதிரி படங்களை பார்க்க முடியும்",
   "prov.supportsVisionOn": "இயக்கம்",
   "prov.supportsVisionOff": "அணைப்பு",
-  "prov.supportsVisionHint": "இந்த ரிலே பட பிக்சல்களை ஏற்றுக்கொண்டால் இயக்கவும் (OpenAI image_url). DeepSeek-பாணியில் உரை-மட்டும் APIகளை விட்டுவிடவும். Atlas / GPT-4o / Claude / Gemini போன்று தோற்றமளிக்கும் பெயர்கள் அல்லது மாதிரி ஐடிகள் ஏற்கனவே பார்வையாகக் கணக்கிடப்படுகின்றன.",
+  "prov.supportsVisionHint": "இயல்பாக இயக்கம். இந்த API பட பிக்சல்களை நிராகரித்தால் மட்டும் அணைக்கவும்.",
   "prov.modelSettings": "மாதிரி அமைப்புகள்",
   "prov.modelSettingsTitle": "{name} அமைப்புகள்",
   "prov.modelContextWindow": "சூழல் சாளரம்",

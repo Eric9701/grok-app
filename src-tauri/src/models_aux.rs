@@ -587,29 +587,10 @@ pub fn looks_vision_model(id_or_name: &str) -> bool {
         || s.contains("qwen-vl")
 }
 
-/// Known text-only / non-vision main model heuristics (provider id or upstream id).
-pub fn looks_text_only_model(id_or_name: &str) -> bool {
-    let s = id_or_name.trim().to_ascii_lowercase();
-    if s.is_empty() {
-        return false;
-    }
-    if looks_vision_model(&s) {
-        return false;
-    }
-    s.contains("deepseek")
-        || s.contains("coder")
-        || s.contains("r1")
-        || s.contains("v3")
-        || s.contains("v4-flash")
-        || s.contains("v4-pro")
-        || s.contains("v4_flash")
-        || s.contains("v4_pro")
-}
-
-/// Custom channel is vision-capable when the **active** model opted in, or the
-/// id / name / active model looks multimodal. Unknown relays stay text-only.
-/// Per-model `supports_vision` wins over the channel flag so mixed catalogs
-/// (DeepSeek flash + vision-exp) do not treat every row as vision.
+/// Custom channel is text-only only when the active row or the channel flag
+/// explicitly opts out. A missing flag means the model accepts image pixels.
+/// Per-model `supports_vision` wins over the channel flag so one catalog row
+/// can opt out while another stays multimodal.
 pub fn custom_provider_is_text_only(p: &crate::providers::CustomProvider) -> bool {
     let active = p
         .models
@@ -679,29 +660,18 @@ fn model_section_field(config_text: &str, id: &str, key: &str) -> Option<String>
 
 /// Whether `[models].default` in a CLI `config.toml` cannot accept image pixels.
 ///
-/// Empty or Grok-like defaults stay multimodal. A custom section is text-only
-/// unless its name, model id, or `app_supports_vision` says otherwise.
-/// GLM / MiniMax / Kimi fall in the text-only bucket, matching the CLI which
-/// drops `image_url` before those APIs.
+/// Missing `app_supports_vision` means the model is multimodal. Host vision
+/// strips `@path` pixels only when that key is an explicit false opt-out.
 pub fn cli_config_main_is_text_only(config_text: &str) -> bool {
     let Some(def) = crate::providers::get_models_default(config_text) else {
         return false;
     };
     let def = def.trim();
-    if def.is_empty() || looks_vision_model(def) {
+    if def.is_empty() {
         return false;
     }
-    let name = model_section_field(config_text, def, "name").unwrap_or_default();
-    let model = model_section_field(config_text, def, "model").unwrap_or_default();
-    if looks_vision_model(&name) || looks_vision_model(&model) {
-        return false;
-    }
-    if model_section_field(config_text, def, "app_supports_vision")
-        .is_some_and(|value| value.eq_ignore_ascii_case("true"))
-    {
-        return false;
-    }
-    true
+    let raw = model_section_field(config_text, def, "app_supports_vision");
+    !crate::providers::app_supports_vision_enabled(raw.as_deref())
 }
 
 pub fn main_is_text_only(text: &str, list: &crate::providers::ProvidersListResult) -> bool {
@@ -715,7 +685,7 @@ pub fn main_is_text_only(text: &str, list: &crate::providers::ProvidersListResul
     if let Some(p) = list.providers.iter().find(|p| p.id == def) {
         return custom_provider_is_text_only(p);
     }
-    looks_text_only_model(&def)
+    false
 }
 
 /// Collect absolute `@/path` / `@C:\path` image refs from a prompt (any line).
@@ -1654,7 +1624,7 @@ yolo = false
     }
 
     #[test]
-    fn cli_glm_default_is_text_only() {
+    fn cli_glm_default_keeps_pixels_without_flag() {
         let cfg = r#"
 [model."arch-glm-5.2"]
 model = "glm-5.2"
@@ -1664,11 +1634,11 @@ base_url = "https://example.invalid/v1"
 [models]
 default = "arch-glm-5.2"
 "#;
-        assert!(cli_config_main_is_text_only(cfg));
+        assert!(!cli_config_main_is_text_only(cfg));
     }
 
     #[test]
-    fn cli_minimax_default_is_text_only() {
+    fn cli_minimax_default_keeps_pixels_without_flag() {
         let cfg = r#"
 [model.arch-minimax]
 model = "MiniMax-M2.7"
@@ -1677,6 +1647,21 @@ base_url = "https://example.invalid/anthropic/v1"
 
 [models]
 default = "arch-minimax"
+"#;
+        assert!(!cli_config_main_is_text_only(cfg));
+    }
+
+    #[test]
+    fn cli_explicit_vision_off_is_text_only() {
+        let cfg = r#"
+[model.relay]
+model = "custom-v1"
+name = "relay"
+base_url = "https://example.invalid/v1"
+app_supports_vision = false
+
+[models]
+default = "relay"
 "#;
         assert!(cli_config_main_is_text_only(cfg));
     }

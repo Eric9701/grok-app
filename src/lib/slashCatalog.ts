@@ -298,15 +298,16 @@ export function builtinSlashItems(): SlashItem[] {
       descriptionKey: "slash.settingsDesc",
       action: "settings",
     },
-    {
-      id: "pet",
-      kind: "action",
-      name: "pet",
-      titleKey: "slash.pet",
-      descriptionKey: "slash.petDesc",
-      action: "pet",
-      aliases: ["宠物", "寵物", "companion"],
-    },
+    // 宠物入口已注释：斜杠菜单不再提供 /pet。
+    // {
+    //   id: "pet",
+    //   kind: "action",
+    //   name: "pet",
+    //   titleKey: "slash.pet",
+    //   descriptionKey: "slash.petDesc",
+    //   action: "pet",
+    //   aliases: ["宠物", "寵物", "companion"],
+    // },
     {
       id: "export",
       kind: "action",

@@ -38,7 +38,7 @@ export const deProviders = {
   "prov.supportsVision": "Dieses Modell kann Bilder sehen",
   "prov.supportsVisionOn": "Ein",
   "prov.supportsVisionOff": "Aus",
-  "prov.supportsVisionHint": "Einschalten, wenn dieses Relay Bildpixel akzeptiert (OpenAI image_url). Aus für DeepSeek-artige Nur-Text-APIs. Namen oder Modell-IDs, die nach Atlas / GPT-4o / Claude / Gemini aussehen, gelten bereits als Vision.",
+  "prov.supportsVisionHint": "Standardmäßig an. Nur ausschalten, wenn diese API Bildpixel ablehnt.",
   "prov.modelSettings": "Modelleinstellungen",
   "prov.modelSettingsTitle": "Einstellungen für {name}",
   "prov.modelContextWindow": "Kontextfenster",

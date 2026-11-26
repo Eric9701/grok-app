@@ -21,6 +21,8 @@ pub struct GrokTurnResult {
     pub usage: Option<ContextUsageSnapshot>,
     pub compact: Option<ContextCompactSnapshot>,
     pub cancelled: bool,
+    /// `--resume` missed (session gone). The dead id must not be kept.
+    pub resume_dropped: bool,
 }
 
 fn cancelled_result() -> GrokTurnResult {
@@ -31,7 +33,41 @@ fn cancelled_result() -> GrokTurnResult {
         usage: None,
         compact: None,
         cancelled: true,
+        resume_dropped: false,
     }
+}
+
+/// True when a resume id was rejected because that agent session is gone.
+/// Answer text only matches the session-miss phrases. The error channel also
+/// keeps the older broad `not found` / `404` checks.
+pub fn resume_was_rejected(session_id: Option<&str>, acc: &str, err: Option<&str>) -> bool {
+    if session_id
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .is_none()
+    {
+        return false;
+    }
+    if missing_agent_session(acc) {
+        return true;
+    }
+    err.is_some_and(|e| {
+        let lower = e.to_ascii_lowercase();
+        missing_agent_session(&lower)
+            || lower.contains("not found")
+            || lower.contains("404")
+            || lower.contains("failed to restore")
+    })
+}
+
+fn missing_agent_session(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("not found locally")
+        || lower.contains("failed to restore session")
+        || lower.contains("404 not found")
+        || lower.contains("session does not exist")
+        || lower.contains("session not found")
+        || lower.contains("no such session")
 }
 
 fn cancellation_requested(cancel: &mut Option<oneshot::Receiver<()>>) -> bool {
@@ -297,6 +333,7 @@ async fn run_turn_with_binary_and_env(
                 usage: None,
                 compact: None,
                 cancelled: false,
+                resume_dropped: false,
             };
         }
     };
@@ -437,18 +474,9 @@ async fn run_turn_with_binary_and_env(
         }
     }
 
-    // Resume failed under wrong home historically; if we still got a "not found" style
-    // error with no useful answer, retry once without --resume so the user is not stuck.
-    let resume_failed = session_id.is_some()
-        && (acc.contains("not found locally")
-            || acc.contains("Failed to restore session")
-            || acc.contains("404 Not Found")
-            || err_msg
-                .as_ref()
-                .map(|e| {
-                    e.contains("not found") || e.contains("404") || e.contains("Failed to restore")
-                })
-                .unwrap_or(false));
+    // The CLI session id is gone ("Session does not exist" / not found).
+    // Retry once without --resume so the WeCom turn is not stuck on that id.
+    let resume_failed = resume_was_rejected(session_id, &acc, err_msg.as_deref());
 
     if resume_failed {
         tracing::warn!(
@@ -470,6 +498,7 @@ async fn run_turn_with_binary_and_env(
         if fresh.cancelled {
             return fresh;
         }
+        fresh.resume_dropped = true;
         if fresh.text.trim().is_empty() && fresh.error.is_none() {
             fresh.error = Some(format!(
                 "无法恢复会话 `{}`（本地 agent-home 未命中）。已尝试新开一轮但无输出。",
@@ -532,6 +561,7 @@ async fn run_turn_with_binary_and_env(
         usage: context_usage,
         compact: context_compact,
         cancelled: false,
+        resume_dropped: false,
     }
 }
 
@@ -576,6 +606,7 @@ async fn run_turn_simple(
                 usage: None,
                 compact: None,
                 cancelled: false,
+                resume_dropped: false,
             };
         }
     };
@@ -643,6 +674,7 @@ async fn run_turn_simple(
                 usage: None,
                 compact: None,
                 cancelled: false,
+                resume_dropped: false,
             }
         }
         Err(e) => GrokTurnResult {
@@ -654,6 +686,7 @@ async fn run_turn_simple(
             usage: None,
             compact: None,
             cancelled: false,
+            resume_dropped: false,
         },
     }
 }
@@ -713,6 +746,36 @@ mod tests {
         assert!(!cancellation_signaled(&mut rx));
         tx.send(()).expect("receiver still alive");
         assert!(cancellation_signaled(&mut rx));
+    }
+
+    #[test]
+    fn session_does_not_exist_drops_resume() {
+        assert!(resume_was_rejected(
+            Some("sess-old"),
+            "",
+            Some("Error: Session does not exist")
+        ));
+        assert!(resume_was_rejected(
+            Some("sess-old"),
+            "Session does not exist",
+            None
+        ));
+        assert!(resume_was_rejected(
+            Some("sess-old"),
+            "Session not found locally",
+            None
+        ));
+        assert!(resume_was_rejected(
+            Some("sess-old"),
+            "",
+            Some("404 Not Found")
+        ));
+        assert!(!resume_was_rejected(None, "Session does not exist", None));
+        assert!(!resume_was_rejected(
+            Some("sess-old"),
+            "the file does not exist",
+            None
+        ));
     }
 
     #[test]

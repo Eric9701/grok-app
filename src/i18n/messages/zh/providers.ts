@@ -38,7 +38,7 @@ export const zhProviders = {
   "prov.supportsVision": "这个模型能看图",
   "prov.supportsVisionOn": "开",
   "prov.supportsVisionOff": "关",
-  "prov.supportsVisionHint": "中转按像素收图（OpenAI image_url）时打开。DeepSeek 这类纯文本接口请关掉。名称或模型 id 带 Atlas / GPT-4o / Claude / Gemini 的通道本身就算能看图。",
+  "prov.supportsVisionHint": "默认开启。只有接口拒收图片像素时再关掉。",
   "prov.modelSettings": "模型设置",
   "prov.modelSettingsTitle": "{name} 的设置",
   "prov.modelContextWindow": "上下文窗口",

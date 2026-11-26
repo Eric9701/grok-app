@@ -38,7 +38,7 @@ export const filProviders = {
   "prov.supportsVision": "Nakakakita ng larawan ang modelong ito",
   "prov.supportsVisionOn": "Naka-on",
   "prov.supportsVisionOff": "Naka-off",
-  "prov.supportsVisionHint": "I-on kung tumatanggap ang relay na ito ng pixel ng larawan (OpenAI image_url). Iwanang naka-off para sa DeepSeek-style na text-only API. Ang mga pangalan o model id na mukhang Atlas / GPT-4o / Claude / Gemini ay binibilang nang vision.",
+  "prov.supportsVisionHint": "Naka-on bilang default. I-off lang kung tinatanggihan ng API na ito ang pixel ng larawan.",
   "prov.modelSettings": "Mga setting ng modelo",
   "prov.modelSettingsTitle": "Mga setting para sa {name}",
   "prov.modelContextWindow": "Window ng konteksto",

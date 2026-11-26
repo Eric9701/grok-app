@@ -222,7 +222,7 @@ Telegram：启动 / 测试连接时 `setMyCommands` 注册上表到原生 **`/` 
 规则：
 
 1. 选项目后直接说话 = **新 Grok 会话**（写 App index，`source=remote:<channel>`）  
-2. `/r` 选定后说话 = **load agentSessionId**  
+2. `/r` 选定后说话 = **load agentSessionId**。续聊时若 CLI 回报该会话不存在（`Session does not exist`），丢掉这个 id，在同一项目新开一轮，不把这句错误当成回复。  
 3. 未绑项目拒绝 agent turn  
 4. 选择模式中数字不进 Grok  
 

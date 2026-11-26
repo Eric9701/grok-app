@@ -1,7 +1,7 @@
 import { IconGrokMark } from "@/components/icons";
 
 /**
- * App brand mark — Grok glyph with fill=currentColor.
+ * App brand mark — Atlas A with fill=currentColor.
  * Inherits text color from parent so dark/light themes invert automatically.
  */
 export function GrokLogo({ size = 22 }: { size?: number }) {

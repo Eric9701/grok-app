@@ -7,7 +7,7 @@ import type { AvailablePluginLike, MarketplaceSourceLike } from "./pluginMarketp
 
 /** Default TTL: 6 hours. Refresh button / mutations force a reload. */
 export const MARKETPLACE_CATALOG_TTL_MS = 6 * 60 * 60 * 1000;
-const STORAGE_KEY = "grok-app.marketplaceCatalog.v1";
+const STORAGE_KEY = "grok-app.marketplaceCatalog.v2";
 
 export type MarketplaceCatalogSnapshot = {
   fetchedAt: number;

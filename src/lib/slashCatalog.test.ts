@@ -38,7 +38,6 @@ describe("builtinSlashItems", () => {
       "automations",
       "live-voice",
       "settings",
-      "pet",
       "export",
       "copy",
       "find",

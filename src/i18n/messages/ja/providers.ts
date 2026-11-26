@@ -38,7 +38,7 @@ export const jaProviders = {
   "prov.supportsVision": "このモデルは画像を認識できます",
   "prov.supportsVisionOn": "オン",
   "prov.supportsVisionOff": "オフ",
-  "prov.supportsVisionHint": "リレーが画像ピクセル（OpenAI image_url）を受け取るならオン。DeepSeek のようなテキスト専用 API はオフのまま。名前やモデル id に Atlas / GPT-4o / Claude / Gemini が含まれる経路は、もともとビジョン対応とみなします。",
+  "prov.supportsVisionHint": "既定でオンです。この API が画像ピクセルを拒否する場合だけオフにしてください。",
   "prov.modelSettings": "モデル設定",
   "prov.modelSettingsTitle": "{name} の設定",
   "prov.modelContextWindow": "コンテキストウィンドウ",

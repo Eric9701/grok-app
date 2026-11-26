@@ -8695,9 +8695,10 @@ export function AppWorkbench() {
           case "settings":
             navigateSettings();
             return;
-          case "pet":
-            void import("@/lib/api/pet").then((m) => m.petToggle());
-            return;
+          // 宠物入口已注释：/pet 不再切换桌面宠物。
+          // case "pet":
+          //   void import("@/lib/api/pet").then((m) => m.petToggle());
+          //   return;
           case "export":
             void exportActiveSessionMd();
             return;
