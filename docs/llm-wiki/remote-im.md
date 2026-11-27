@@ -222,7 +222,7 @@ Telegram：启动 / 测试连接时 `setMyCommands` 注册上表到原生 **`/` 
 规则：
 
 1. 选项目后直接说话 = **新 Grok 会话**（写 App index，`source=remote:<channel>`）  
-2. `/r` 选定后说话 = **load agentSessionId**。续聊时若 CLI 回报该会话不存在（`Session does not exist`），丢掉这个 id，在同一项目新开一轮，不把这句错误当成回复。  
+2. `/r` 选定后说话 = **load agentSessionId**。续聊时若 CLI 回报该会话不存在（`Session does not exist`），丢掉这个 id，在同一项目新开一轮，不把这句错误当成回复。`--model` 只传当前 CLI 家目录里已经列出的 id；`grok-4.7` 这类产品默认若不在目录里就省略，让 CLI 用自己的默认模型。若 CLI 仍以 `unknown model id` 拒绝，去掉 `--model` 再跑一轮。  
 3. 未绑项目拒绝 agent turn  
 4. 选择模式中数字不进 Grok  
 

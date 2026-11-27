@@ -947,6 +947,18 @@ pub fn headless_turn_model<'a>(
     default_model.map(str::trim).filter(|id| !id.is_empty())
 }
 
+/// Drop an App model id the CLI catalog does not list. Passing it makes the
+/// turn fail with `unknown model id` before any reply (`grok-4.7` on a CLI
+/// that has not published that id yet).
+pub fn headless_model_if_listed<'a>(chosen: Option<&'a str>, listed: bool) -> Option<&'a str> {
+    let chosen = chosen.map(str::trim).filter(|id| !id.is_empty())?;
+    if listed {
+        Some(chosen)
+    } else {
+        None
+    }
+}
+
 /// Full headless `-p` argv: format, optional partial-stream flags, model, resume, bg-wait.
 pub fn grok_turn_cli_args_full(
     prompt: &str,
@@ -1392,6 +1404,22 @@ mod tests {
         assert_eq!(
             headless_turn_model(Some("  "), false, Some("arch-minimax")),
             Some("arch-minimax")
+        );
+        assert_eq!(
+            headless_model_if_listed(headless_turn_model(None, false, Some("grok-4.7")), false),
+            None,
+            "an unlisted product id must not be passed as --model"
+        );
+        assert_eq!(
+            headless_model_if_listed(
+                headless_turn_model(Some("grok-4.7"), true, Some("other")),
+                false
+            ),
+            None
+        );
+        assert_eq!(
+            headless_model_if_listed(headless_turn_model(None, false, Some("grok-4.7")), true),
+            Some("grok-4.7")
         );
         let args = grok_turn_cli_args_full(
             "hi",

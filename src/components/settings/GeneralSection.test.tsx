@@ -148,6 +148,27 @@ describe("GeneralSection voice — custom STT", () => {
     expect(html).toContain("glm-5");
   });
 
+  it("keeps set-as-default when the only model is a fallback badge", () => {
+    const html = renderSection(
+      buildModel({
+        activeTab: "composer",
+        composerMinRows: "3",
+        availableModels: [
+          {
+            id: "only-model",
+            label: "Only",
+            isDefault: true,
+            defaultWritten: false,
+          },
+        ],
+      }),
+    );
+    expect(html).toContain("settings.availableModelsSetDefault");
+    expect(
+      html.replaceAll("settings.availableModelsDefaultHint", ""),
+    ).not.toContain("settings.availableModelsDefault");
+  });
+
   it("key field ships a show/hide reveal button (same as provider keys)", () => {
     const html = renderSection(buildModel({ sttEngine: "custom" }));
     // Default state is hidden → the reveal button offers "show" (shared label

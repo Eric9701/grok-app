@@ -70,6 +70,11 @@ pub struct AvailableModel {
     /// enterprise-managed (`managed`, `ENC(...)`, or `hidden`).
     #[serde(default)]
     pub editable: bool,
+    /// `[models].default` in a scanned CLI config names this id.
+    /// `is_default` can still be the composer fallback when this is false,
+    /// so the settings row keeps 「设为默认」 until the user writes it.
+    #[serde(default)]
+    pub default_written: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -203,6 +208,7 @@ fn insert_fallback_model(
             context_window: Some(OFFICIAL_FALLBACK_CONTEXT_WINDOW),
             context_windows: OFFICIAL_FALLBACK_CONTEXT_WINDOWS.to_vec(),
             editable: false,
+            default_written: false,
         },
     );
 }
@@ -406,6 +412,7 @@ fn insert_parsed_models(
             context_window: parsed.context_window,
             context_windows: parsed.context_windows,
             editable: false,
+            default_written: false,
         });
     }
 }
@@ -751,21 +758,22 @@ fn list_available_models_from_caches(
 
     // Settings model id, then CLI `[models].default`, then newest official.
     // A saved provider route id (e.g. "yunyi") is ignored when it is not in
-    // this catalog. The badge on Available Models is the CLI default when
-    // that id is actually listed; the preferred id only fills in when the
-    // config has no usable default.
+    // this catalog. Composer `default_model_id` still uses that preferred id
+    // when config has no usable default. The settings badge is only the
+    // written `[models].default`, so a single fallback row can still be set.
     let preferred = preferred_official_model_id(&by_id, settings_model, config_default.as_deref());
-    let marked = config_default
+    let persisted = config_default
         .as_deref()
         .map(str::trim)
         .filter(|id| !id.is_empty() && by_id.contains_key(*id))
-        .unwrap_or(preferred.as_str())
-        .to_string();
+        .map(str::to_string);
+    let marked = persisted.clone().unwrap_or(preferred);
 
     let mut models: Vec<AvailableModel> = by_id.into_values().collect();
     models.sort_by(|a, b| a.id.cmp(&b.id));
     for m in &mut models {
         m.is_default = m.id == marked;
+        m.default_written = persisted.as_deref() == Some(m.id.as_str());
     }
 
     AvailableModelsResult {
@@ -1140,6 +1148,7 @@ hidden = true
                 context_window: None,
                 context_windows: Vec::new(),
                 editable: false,
+                default_written: false,
             },
         );
         let pick =
@@ -1193,6 +1202,7 @@ hidden = true
             context_window: grok.context_window,
             context_windows: grok.context_windows.clone(),
             editable: false,
+            default_written: false,
         };
         assert!(model_supports_context_window(&supported, 256000));
         assert!(model_supports_context_window(&supported, 500000));
@@ -1208,6 +1218,7 @@ hidden = true
             context_window: Some(256_000),
             context_windows: vec![128_000, 256_000],
             editable: false,
+            default_written: false,
         };
         assert_eq!(app_default_context_window(&camel_only), None);
         assert_eq!(
@@ -1250,6 +1261,7 @@ hidden = true
             context_window: Some(500_000),
             context_windows: Vec::new(),
             editable: false,
+            default_written: false,
         }
     }
 

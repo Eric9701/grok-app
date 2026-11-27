@@ -60,6 +60,16 @@ pub fn resume_was_rejected(session_id: Option<&str>, acc: &str, err: Option<&str
     })
 }
 
+/// CLI refused `--model` (`Couldn't set model '…': unknown model id`).
+pub fn model_was_rejected(text: &str, err: Option<&str>) -> bool {
+    let mut blob = text.to_ascii_lowercase();
+    if let Some(err) = err {
+        blob.push('\n');
+        blob.push_str(&err.to_ascii_lowercase());
+    }
+    blob.contains("unknown model id") && blob.contains("set model")
+}
+
 fn missing_agent_session(text: &str) -> bool {
     let lower = text.to_ascii_lowercase();
     lower.contains("not found locally")
@@ -550,7 +560,7 @@ async fn run_turn_with_binary_and_env(
         return simple;
     }
 
-    GrokTurnResult {
+    let result = GrokTurnResult {
         text: acc.trim().to_string(),
         session_id: out_sid.or_else(|| {
             session_id
@@ -562,7 +572,29 @@ async fn run_turn_with_binary_and_env(
         compact: context_compact,
         cancelled: false,
         resume_dropped: false,
+    };
+    if model.is_some()
+        && !result.cancelled
+        && model_was_rejected(&result.text, result.error.as_deref())
+    {
+        tracing::warn!(
+            model,
+            "remote_im: CLI rejected --model; retrying without it"
+        );
+        return Box::pin(run_turn_with_binary_and_env(
+            binary,
+            work_dir,
+            prompt,
+            session_id,
+            always_approve,
+            cancel,
+            on_delta,
+            None,
+            configure_command,
+        ))
+        .await;
     }
+    result
 }
 
 async fn run_turn_simple(
@@ -776,6 +808,15 @@ mod tests {
             "the file does not exist",
             None
         ));
+    }
+
+    #[test]
+    fn unknown_model_id_is_a_model_rejection() {
+        let err = "Error: Couldn't set model 'grok-4.7': Invalid params: \"unknown model id\". Run 'grok models' to see available models.";
+        assert!(model_was_rejected("", Some(err)));
+        assert!(model_was_rejected(err, None));
+        assert!(!model_was_rejected("hello", None));
+        assert!(!model_was_rejected("Session does not exist", None));
     }
 
     #[test]

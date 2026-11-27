@@ -35,6 +35,8 @@ export interface ModelOption {
   contextWindows?: number[] | null;
   /** Shared CLI section the settings list can edit and delete. */
   editable?: boolean;
+  /** CLI `[models].default` names this id. Absent follows `isDefault`. */
+  defaultWritten?: boolean;
 }
 
 export interface SessionModeOption {

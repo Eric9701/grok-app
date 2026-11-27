@@ -1229,7 +1229,10 @@ pub(crate) fn get_atlas_catalog_model_in(
         context_window,
         has_api_key: !api_key.is_empty(),
         supports_vision: crate::providers::app_supports_vision_enabled(
-            section.fields.get("app_supports_vision").map(|value| value.as_str()),
+            section
+                .fields
+                .get("app_supports_vision")
+                .map(|value| value.as_str()),
         ),
     })
 }

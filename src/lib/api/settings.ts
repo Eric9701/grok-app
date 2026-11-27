@@ -341,6 +341,8 @@ export interface AvailableModel {
   contextWindows?: number[] | null;
   /** Plaintext, non-managed section in shared `~/.atlas/config.toml`. */
   editable?: boolean;
+  /** `[models].default` already names this id. False keeps 「设为默认」. */
+  defaultWritten?: boolean;
 }
 
 export interface AvailableModelsResult {

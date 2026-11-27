@@ -68,6 +68,7 @@ fn newest_snapshot_wins_in_either_home_order_and_keeps_its_metadata() {
         assert_eq!(result.models[0].context_window, Some(256000));
         assert_eq!(result.default_model_id, "grok-4.7");
         assert!(result.models[1].is_default);
+        assert!(result.models.iter().all(|m| !m.default_written));
         let saved = list_available_models_from_caches(&paths, Some("grok-4.5"));
         assert_eq!(saved.default_model_id, "grok-4.5");
         assert!(saved.models[0].is_default);
@@ -95,6 +96,43 @@ fn newer_catalog_does_not_resurrect_hidden_or_removed_models() {
     assert_eq!(ids(&result), ["grok-4.6"]);
     assert_eq!(result.default_model_id, "grok-4.6");
     assert!(result.models[0].is_default);
+    assert!(!result.models[0].default_written);
+}
+
+#[test]
+fn sole_model_stays_settable_until_cli_default_names_it() {
+    let files = CacheFiles::new();
+    let cache = files.write(
+        "models_cache.json",
+        snapshot(
+            Some("2026-11-01T00:00:00Z"),
+            serde_json::json!({"only-model": {"info": {"name": "Only"}}}),
+        ),
+    );
+    let unset = list_available_models_from_caches(&[cache.clone()], Some("grok-4.7"));
+    assert_eq!(ids(&unset), ["only-model"]);
+    assert_eq!(unset.default_model_id, "only-model");
+    assert!(unset.models[0].is_default);
+    assert!(!unset.models[0].default_written);
+
+    fs::write(
+        files.0.join("config.toml"),
+        "[models]\ndefault = \"grok-4.7\"\n",
+    )
+    .unwrap();
+    let stale = list_available_models_from_caches(&[cache.clone()], Some("grok-4.7"));
+    assert_eq!(stale.default_model_id, "only-model");
+    assert!(stale.models[0].is_default);
+    assert!(!stale.models[0].default_written);
+
+    fs::write(
+        files.0.join("config.toml"),
+        "[models]\ndefault = \"only-model\"\n",
+    )
+    .unwrap();
+    let written = list_available_models_from_caches(&[cache], None);
+    assert!(written.models[0].is_default);
+    assert!(written.models[0].default_written);
 }
 
 #[test]

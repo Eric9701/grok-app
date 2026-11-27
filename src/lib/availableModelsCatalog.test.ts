@@ -29,6 +29,7 @@ describe("catalogFromAvailableModels", () => {
         contextWindow: 128000,
         contextWindows: [128000],
         editable: false,
+        defaultWritten: false,
       },
     ]);
   });

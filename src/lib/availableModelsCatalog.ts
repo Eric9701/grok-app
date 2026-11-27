@@ -26,6 +26,7 @@ export function catalogFromAvailableModels(
       contextWindow: m.contextWindow ?? null,
       contextWindows: positiveContextWindows(m.contextWindows),
       editable: m.editable === true,
+      defaultWritten: m.defaultWritten === true,
     };
   });
 }

@@ -1231,16 +1231,16 @@ impl Engine {
                     .and_then(|item| item.tokens_after)
             });
         let compact_model = headless_model_for_binding(&binding, true);
-        let result = grok_agent::run_turn(
-            &PathBuf::from(&binding.work_dir),
-            &compact_prompt,
-            Some(&agent_session_id),
-            self.allow_remote_yolo,
-            Some(cancel_rx),
-            None,
-            compact_model.as_deref(),
-        )
-        .await;
+        let result = self
+            .run_headless_turn(
+                &binding.work_dir,
+                &compact_prompt,
+                Some(&agent_session_id),
+                cancel_rx,
+                compact_model.as_deref(),
+            )
+            .await
+            .0;
         if result.cancelled || !active_turn.complete() {
             tracing::info!(scope = %scope, "remote_im: compact turn cancelled");
             return;
@@ -1594,6 +1594,35 @@ impl Engine {
         }
     }
 
+    /// One headless CLI turn. A model the CLI rejects is not returned for saving.
+    async fn run_headless_turn(
+        &self,
+        work_dir: &str,
+        prompt: &str,
+        session_id: Option<&str>,
+        cancel: oneshot::Receiver<()>,
+        model: Option<&str>,
+    ) -> (grok_agent::GrokTurnResult, Option<String>) {
+        let result = grok_agent::run_turn(
+            &PathBuf::from(work_dir),
+            prompt,
+            session_id,
+            self.allow_remote_yolo,
+            Some(cancel),
+            None,
+            model,
+        )
+        .await;
+        let kept = if result.cancelled
+            || grok_agent::model_was_rejected(&result.text, result.error.as_deref())
+        {
+            None
+        } else {
+            model.map(str::to_string)
+        };
+        (result, kept)
+    }
+
     async fn run_agent_turn(
         &self,
         msg: &IncomingMessage,
@@ -1666,16 +1695,15 @@ impl Engine {
         };
 
         let turn_model = headless_model_for_binding(&binding, resume_id.is_some());
-        let result = grok_agent::run_turn(
-            &PathBuf::from(&wd),
-            &agent_prompt,
-            resume_id.as_deref(),
-            self.allow_remote_yolo,
-            Some(cancel_rx),
-            None,
-            turn_model.as_deref(),
-        )
-        .await;
+        let (result, turn_model) = self
+            .run_headless_turn(
+                &wd,
+                &agent_prompt,
+                resume_id.as_deref(),
+                cancel_rx,
+                turn_model.as_deref(),
+            )
+            .await;
 
         if result.cancelled || !active_turn.complete() {
             tracing::info!(scope = %scope, "remote_im: grok turn cancelled");
@@ -1892,22 +1920,38 @@ impl Engine {
     }
 }
 
-/// Empty / narrowed project scope must not start a compact or resume turn
-/// (and leftover out-of-scope bindings are treated as blocked).
+/// Session or composer model, but only when this turn's CLI home lists it.
 fn headless_model_for_binding(binding: &ScopeBinding, resuming: bool) -> Option<String> {
     let session_model = crate::store::load_sessions_index()
         .into_iter()
         .find(|row| row.id == binding.local_session_id)
         .and_then(|row| row.model_id);
     let default_model = crate::store::resolve_composer_prefs(None, None).model_id;
-    control_plane::headless_turn_model(
+    let chosen = control_plane::headless_turn_model(
         session_model.as_deref(),
         resuming,
         Some(default_model.as_str()),
-    )
-    .map(str::to_string)
+    );
+    let listed = chosen.is_some_and(remote_cli_lists_model);
+    control_plane::headless_model_if_listed(chosen, listed).map(str::to_string)
 }
 
+/// True when the GROK_HOME this turn will spawn already lists `model_id`.
+fn remote_cli_lists_model(model_id: &str) -> bool {
+    let home = grok_agent::resolve_remote_grok_home();
+    if crate::models_catalog::cache_file_has_model(&home.join("models_cache.json"), model_id) {
+        return true;
+    }
+    let Ok(text) = std::fs::read_to_string(home.join("config.toml")) else {
+        return false;
+    };
+    crate::providers::parse_model_sections_for_proxy(&text)
+        .iter()
+        .any(|section| section.id == model_id)
+}
+
+/// Empty / narrowed project scope must not start a compact or resume turn
+/// (and leftover out-of-scope bindings are treated as blocked).
 fn scope_blocks_agent_io(
     default_wd: &str,
     scoped: &[TrustedProject],

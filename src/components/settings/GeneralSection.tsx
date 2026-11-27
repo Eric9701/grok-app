@@ -100,6 +100,17 @@ import {
   resolveOpenEditorEmptyState,
 } from "@/lib/openEditorHonesty";
 
+/** Badge only after `[models].default` names this row. A fallback flag still shows the button. */
+function showsWrittenModelDefault(model: {
+  isDefault?: boolean;
+  defaultWritten?: boolean;
+}): boolean {
+  return (
+    model.defaultWritten === true ||
+    (model.defaultWritten == null && !!model.isDefault)
+  );
+}
+
 export function GeneralSection() {
   const directorEnabled = useDirectorSettingEnabled();
   const s = useSettingsModel();
@@ -420,7 +431,7 @@ export function GeneralSection() {
                         </span>
                         <span className="settings-models-list__id">{m.id}</span>
                         <span className="settings-models-list__actions">
-                          {m.isDefault ? (
+                          {showsWrittenModelDefault(m) ? (
                             <span className="settings-models-list__badge">
                               {t("settings.availableModelsDefault")}
                             </span>
