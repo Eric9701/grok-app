@@ -1798,6 +1798,126 @@ struct PrUnwatchBody {
     pr_number: u64,
 }
 
+fn host_token_ok(headers: &HeaderMap, expected: &str) -> bool {
+    if token_ok(headers, expected) {
+        return true;
+    }
+    if let Some(value) = headers
+        .get("x-tabularis-host-token")
+        .and_then(|header| header.to_str().ok())
+    {
+        return constant_time_eq(value.trim(), expected);
+    }
+    false
+}
+
+fn tabularis_origin_ok(headers: &HeaderMap) -> bool {
+    let Some(origin) = headers.get(header::ORIGIN).and_then(|value| value.to_str().ok()) else {
+        return true;
+    };
+    let origin = origin.trim();
+    origin.starts_with("http://127.0.0.1:") || origin.starts_with("http://localhost:")
+}
+
+async fn post_tabularis_event(
+    State(state): State<HttpState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    if !host_token_ok(&headers, &state.token) || !tabularis_origin_ok(&headers) {
+        return unauthorized().into_response();
+    }
+    match crate::tabularis::approvals::record(&state.app, body) {
+        Ok(notice) => Json(serde_json::json!({ "ok": true, "id": notice.id })).into_response(),
+        Err(message) => bad_request(&message).into_response(),
+    }
+}
+
+async fn post_tabularis_pick_file(
+    State(state): State<HttpState>,
+    headers: HeaderMap,
+    Json(body): Json<crate::tabularis::bridge::PickRequest>,
+) -> impl IntoResponse {
+    bridge_dialog(&state, &headers, move |app| {
+        crate::tabularis::bridge::pick_file(app, body)
+    })
+    .await
+}
+
+async fn post_tabularis_save_file(
+    State(state): State<HttpState>,
+    headers: HeaderMap,
+    Json(body): Json<crate::tabularis::bridge::PickRequest>,
+) -> impl IntoResponse {
+    bridge_dialog(&state, &headers, move |app| {
+        crate::tabularis::bridge::save_file(app, body)
+    })
+    .await
+}
+
+async fn post_tabularis_pick_dir(
+    State(state): State<HttpState>,
+    headers: HeaderMap,
+    Json(body): Json<crate::tabularis::bridge::PickRequest>,
+) -> impl IntoResponse {
+    bridge_dialog(&state, &headers, move |app| {
+        crate::tabularis::bridge::pick_dir(app, body)
+    })
+    .await
+}
+
+async fn post_tabularis_reveal(
+    State(state): State<HttpState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    if !host_token_ok(&headers, &state.token) || !tabularis_origin_ok(&headers) {
+        return unauthorized().into_response();
+    }
+    let path = body
+        .get("path")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .to_string();
+    let result = tokio::task::spawn_blocking(move || crate::tabularis::bridge::reveal_path(&path)).await;
+    match result {
+        Ok(Ok(value)) => Json(value).into_response(),
+        Ok(Err(message)) => bad_request(&message).into_response(),
+        Err(error) => bad_request(&error.to_string()).into_response(),
+    }
+}
+
+async fn post_tabularis_send_to_chat(
+    State(state): State<HttpState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    if !host_token_ok(&headers, &state.token) || !tabularis_origin_ok(&headers) {
+        return unauthorized().into_response();
+    }
+    match crate::tabularis::bridge::send_to_chat(&state.app, body) {
+        Ok(value) => Json(value).into_response(),
+        Err(message) => bad_request(&message).into_response(),
+    }
+}
+
+async fn bridge_dialog(
+    state: &HttpState,
+    headers: &HeaderMap,
+    pick: impl FnOnce(&AppHandle) -> Result<serde_json::Value, String> + Send + 'static,
+) -> axum::response::Response {
+    if !host_token_ok(headers, &state.token) || !tabularis_origin_ok(headers) {
+        return unauthorized().into_response();
+    }
+    let app = state.app.clone();
+    let result = tokio::task::spawn_blocking(move || pick(&app)).await;
+    match result {
+        Ok(Ok(value)) => Json(value).into_response(),
+        Ok(Err(message)) => bad_request(&message).into_response(),
+        Err(error) => bad_request(&error.to_string()).into_response(),
+    }
+}
+
 fn bad_request(message: &str) -> impl IntoResponse {
     (
         StatusCode::BAD_REQUEST,
@@ -1883,6 +2003,12 @@ pub async fn start(app: AppHandle, mgr: Arc<SessionManager>) -> Result<SessionAp
         .route("/v1/pr-monitor/watches", get(get_pr_watches))
         .route("/v1/pr-monitor/watches", post(post_pr_watch))
         .route("/v1/pr-monitor/watches", delete(delete_pr_watch))
+        .route("/v1/tabularis/events", post(post_tabularis_event))
+        .route("/v1/tabularis/bridge/pick-file", post(post_tabularis_pick_file))
+        .route("/v1/tabularis/bridge/save-file", post(post_tabularis_save_file))
+        .route("/v1/tabularis/bridge/pick-dir", post(post_tabularis_pick_dir))
+        .route("/v1/tabularis/bridge/reveal-path", post(post_tabularis_reveal))
+        .route("/v1/tabularis/bridge/send-to-chat", post(post_tabularis_send_to_chat))
         .with_state(state);
 
     let listener = TcpListener::bind("127.0.0.1:0")

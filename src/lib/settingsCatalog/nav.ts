@@ -99,6 +99,13 @@ export const SETTINGS_NAV: readonly SettingsNavDef[] = [
     tabs: [],
   },
   {
+    id: "database",
+    icon: "database",
+    labelKey: "settings.nav.database",
+    group: "system",
+    tabs: [],
+  },
+  {
     id: "wiki",
     icon: "wiki",
     labelKey: "settings.nav.wiki",

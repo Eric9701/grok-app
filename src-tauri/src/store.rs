@@ -777,6 +777,16 @@ pub struct AppSettings {
     /// Applied on write/rotate and via explicit prune. Default **0** (unlimited).
     #[serde(default)]
     pub audit_ledger_retention_days: u32,
+    /// Tabularis data directory: `shared` uses the system install, `isolated`
+    /// uses this app's data directory.
+    #[serde(default)]
+    pub tabularis_data_dir_mode: Option<String>,
+    /// Inject `tabularis --mcp` into agent sessions. Default on.
+    #[serde(default = "default_true")]
+    pub tabularis_mcp_enabled: bool,
+    /// Optional absolute path to the headless `tabularis` binary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tabularis_binary_path: Option<String>,
 }
 
 fn default_composer_prefs_scope() -> String {
@@ -1076,6 +1086,9 @@ impl Default for AppSettings {
             allow_unverified_cli_install: false,
             last_cli_checksum_verified: None,
             audit_ledger_retention_days: 0,
+            tabularis_data_dir_mode: None,
+            tabularis_mcp_enabled: true,
+            tabularis_binary_path: None,
         }
     }
 }

@@ -313,6 +313,12 @@ export interface AppSettings {
    * Applied on write/rotate and explicit prune. Default 0.
    */
   auditLedgerRetentionDays?: number;
+  /** `shared` uses the system Tabularis directory. `isolated` uses app data. */
+  tabularisDataDirMode?: string | null;
+  /** Inject `tabularis --mcp` into new agent sessions. Default on. */
+  tabularisMcpEnabled?: boolean;
+  /** Optional absolute path to the headless Tabularis binary. */
+  tabularisBinaryPath?: string | null;
   /**
    * Composer 输入框使用的编辑器：`legacy`（内置，默认）| `tiptap`（Markdown 编辑器，实验性）。
    * 缺省即 `legacy`，读取处按缺省处理，不做一次性迁移。

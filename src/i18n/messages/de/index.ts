@@ -18,6 +18,7 @@ import { deFeatures } from "./features";
 import { deKanban } from "./kanban";
 import { deFleet } from "./fleet";
 import { deWiki } from "./wiki";
+import { deDatabase } from "./database";
 import { deSettings } from "./settings";
 import { deSettingsUi } from "./settings-ui";
 import { deSettingsAgent } from "./settings-agent";
@@ -49,6 +50,7 @@ export const de: Record<MessageKey, string> = {
   ...deKanban,
   ...deFleet,
   ...deWiki,
+  ...deDatabase,
   ...deSettings,
   ...deSettingsUi,
   ...deSettingsAgent,

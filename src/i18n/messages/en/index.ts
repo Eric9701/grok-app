@@ -18,6 +18,7 @@ import { enFeatures } from "./features";
 import { enKanban } from "./kanban";
 import { enFleet } from "./fleet";
 import { enWiki } from "./wiki";
+import { enDatabase } from "./database";
 import { enSettings } from "./settings";
 import { enSettingsUi } from "./settings-ui";
 import { enSettingsAgent } from "./settings-agent";
@@ -47,6 +48,7 @@ export const en = {
   ...enKanban,
   ...enFleet,
   ...enWiki,
+  ...enDatabase,
   ...enSettings,
   ...enSettingsUi,
   ...enSettingsAgent,

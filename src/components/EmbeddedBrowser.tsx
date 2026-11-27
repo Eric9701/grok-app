@@ -266,6 +266,11 @@ export interface EmbeddedBrowserProps {
   reloadKey?: number;
   /** Notify parent chrome (side BrowserTab) when document load state changes. */
   onLoadingChange?: (loading: boolean) => void;
+  /**
+   * Hide the address bar while the page is up. A short status strip stays
+   * for the first load, a download, or an error.
+   */
+  hideChromeBar?: boolean;
 }
 
 /** Public label scheme for automation / host commands. */
@@ -301,6 +306,7 @@ export function EmbeddedBrowser({
   showAddress = true,
   reloadKey = 0,
   onLoadingChange,
+  hideChromeBar = false,
 }: EmbeddedBrowserProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   // Dynamic import type — keep loose to avoid hard coupling on Tauri version.
@@ -1061,6 +1067,8 @@ export function EmbeddedBrowser({
   // Full-host spinner only while the child webview is being created.
   // In-navigation feedback is chrome progress only (native surface stays up).
   const showBootLoading = !ready && !error;
+  const showChromeBar =
+    !hideChromeBar || Boolean(error) || Boolean(downloadStatus) || showBootLoading;
   const displayUrl = url.trim();
   const addressNode = showAddress ? (
     <span className="embedded-browser__url" title={url}>
@@ -1147,6 +1155,7 @@ export function EmbeddedBrowser({
       data-webview-label={webviewLabel}
       data-page-loading={pageLoading ? "1" : "0"}
     >
+      {showChromeBar ? (
       <div className="embedded-browser__bar">
         {addressNode}
         {downloadStatus ? (
@@ -1189,6 +1198,7 @@ export function EmbeddedBrowser({
           <IconExternalLink size={14} />
         </button>
       </div>
+      ) : null}
       <div
         className="embedded-browser__progress"
         data-active={pageLoading || showBootLoading ? "1" : "0"}

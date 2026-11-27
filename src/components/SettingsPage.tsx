@@ -222,6 +222,7 @@ import { RemoteImSection } from "@/components/settings/RemoteImSection";
 import { RuntimeSection } from "@/components/settings/RuntimeSection";
 import { AgentCliSection } from "@/components/settings/AgentCliSection";
 import { AtlasSection } from "@/components/settings/AtlasSection";
+import { DatabaseSection } from "@/components/settings/DatabaseSection";
 import { WikiSection } from "@/components/settings/WikiSection";
 import { FleetListenCard } from "@/fleet/FleetListenCard";
 import { ShortcutsSection } from "@/components/settings/ShortcutsSection";
@@ -2024,6 +2025,7 @@ export function SettingsPage({
             <FleetListenCard />
           </>
         )}
+        {section === "database" && <DatabaseSection />}
         {section === "wiki" && wikiChromeVisible && <WikiSection />}
         {section === "agent_cli" && agentCliVisible && <AgentCliSection />}
         {section === "shortcuts" && <ShortcutsSection />}

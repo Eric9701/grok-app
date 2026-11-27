@@ -14,6 +14,7 @@ mod atlas_endpoints;
 
 mod atlas_relay_agent;
 mod fleet;
+mod tabularis;
 mod wiki;
 mod wiki_libraries;
 
@@ -1153,6 +1154,7 @@ pub fn run() {
                 pet_window::persist_pet_window_pos(app);
 
                 crate::host_runtime::on_process_shutdown();
+                crate::tabularis::lifecycle::stop_blocking(app);
 
                 if let Some(host) = app.try_state::<Arc<MirrorHost>>() {
 

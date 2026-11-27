@@ -18,6 +18,7 @@ import { zhFeatures } from "./features";
 import { zhKanban } from "./kanban";
 import { zhFleet } from "./fleet";
 import { zhWiki } from "./wiki";
+import { zhDatabase } from "./database";
 import { zhSettings } from "./settings";
 import { zhSettingsUi } from "./settings-ui";
 import { zhSettingsAgent } from "./settings-agent";
@@ -49,6 +50,7 @@ export const zh: Record<MessageKey, string> = {
   ...zhKanban,
   ...zhFleet,
   ...zhWiki,
+  ...zhDatabase,
   ...zhSettings,
   ...zhSettingsUi,
   ...zhSettingsAgent,

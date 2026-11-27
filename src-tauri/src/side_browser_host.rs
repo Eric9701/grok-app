@@ -422,7 +422,15 @@ pub fn create(
     let webview_label = label.clone();
     // Polyfill blob:/data: `<a download>` (ChatCut etc.) — WKWebView skips on_download.
     // Bridge: FileReader in-page → document.title signal → host eval pull → Downloads.
-    let polyfill = crate::side_browser_blob::blob_download_polyfill(&label);
+    let mut polyfill = crate::side_browser_blob::blob_download_polyfill(&label);
+    if label.contains("tabularis") {
+        if let Some(endpoint) = crate::session_api::read_endpoint_file() {
+            polyfill.push_str(&crate::tabularis::bridge::host_script(
+                &endpoint.url,
+                &endpoint.token,
+            ));
+        }
+    }
     let polyfill_reload = polyfill.clone();
     let title_label = label.clone();
     let page_load_label = label.clone();
@@ -448,10 +456,17 @@ pub fn create(
         .on_navigation(move |url| !handoff_google_auth_externally(&nav_app, &nav_label, url))
         .on_new_window(move |url, _features| {
             if handoff_google_auth_externally(&new_win_app, &new_win_label, &url) {
-                NewWindowResponse::Deny
-            } else {
-                NewWindowResponse::Allow
+                return NewWindowResponse::Deny;
             }
+            if new_win_label.contains("tabularis") {
+                let host = url.host_str().unwrap_or("");
+                let loopback = host == "127.0.0.1" || host == "localhost";
+                if !loopback {
+                    let _ = crate::commands::open_http_url(url.as_str());
+                }
+                return NewWindowResponse::Deny;
+            }
+            NewWindowResponse::Allow
         })
         // Drive UI loading bar + re-assert download polyfill after navigations.
         // Polyfill early-returns if already installed — cheap.

@@ -117,6 +117,9 @@
         "release": "1"
       }
     },
+    "resources": {
+      "resources/tabularis/": "tabularis/"
+    },
     "macOS": {
       "infoPlist": "Info.plist",
       "entitlements": "Entitlements.plist"

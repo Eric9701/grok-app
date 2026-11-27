@@ -17,6 +17,8 @@ import { ImageUi, imageUiLabels } from "@/components/ImageUi";
 import { VideoUi, videoUiLabels } from "@/components/VideoUi";
 import { MermaidBlock } from "@/components/lobe-chat/MermaidBlock";
 import { isMermaidLanguage } from "@/lib/mermaidRender";
+import { isTauri } from "@/lib/api/host";
+import { openSqlInDatabase } from "@/lib/api/tabularis";
 import {
   isImagePath,
   isPlausibleLocalMediaAbs,
@@ -173,6 +175,30 @@ export function MarkdownBody({
                 >
                   {c}
                 </MermaidBlock>
+              );
+            }
+            const language = (match?.[1] ?? "").toLowerCase();
+            const sqlBlock =
+              language === "sql" ||
+              language === "postgresql" ||
+              language === "postgres" ||
+              language === "mysql" ||
+              language === "sqlite";
+            if (sqlBlock && isTauri()) {
+              const source = textFromChildren(c);
+              return (
+                <>
+                  <button
+                    type="button"
+                    className="chrome-btn"
+                    onClick={() => {
+                      void openSqlInDatabase(source);
+                    }}
+                  >
+                    {tr("database.openInDatabase")}
+                  </button>
+                  <code className={className}>{c}</code>
+                </>
               );
             }
             return <code className={className}>{c}</code>;

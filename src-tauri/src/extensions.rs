@@ -1422,6 +1422,15 @@ pub fn build_session_mcp_servers_with_opts(
             ),
         }
     }
+    arr.retain(|v| {
+        v.get("name")
+            .and_then(|n| n.as_str())
+            .map(|n| n != "tabularis")
+            .unwrap_or(true)
+    });
+    if let Some(entry) = crate::tabularis::mcp::mcp_server_acp_entry() {
+        arr.push(entry);
+    }
     Value::Array(arr)
 }
 

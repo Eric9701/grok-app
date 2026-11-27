@@ -18,6 +18,7 @@ import { idFeatures } from "./features";
 import { idKanban } from "./kanban";
 import { idFleet } from "./fleet";
 import { idWiki } from "./wiki";
+import { idDatabase } from "./database";
 import { idSettings } from "./settings";
 import { idSettingsUi } from "./settings-ui";
 import { idSettingsAgent } from "./settings-agent";
@@ -49,6 +50,7 @@ export const id: Record<MessageKey, string> = {
   ...idKanban,
   ...idFleet,
   ...idWiki,
+  ...idDatabase,
   ...idSettings,
   ...idSettingsUi,
   ...idSettingsAgent,

@@ -102,11 +102,40 @@ First-time deps: pnpm install && pnpm setup:cross
 EOF
 }
 
+# Copy a headless Tabularis binary into the installer when one is already built.
+# A missing binary does not fail the AtlasBuddy build; the app still probes PATH.
+stage_tabularis() {
+  local dest="$ROOT/src-tauri/resources/tabularis"
+  mkdir -p "$dest"
+  local name="tabularis"
+  if [[ "${1:-}" == *windows* ]]; then
+    name="tabularis.exe"
+  fi
+  local candidates=(
+    "${ATLAS_TABULARIS_BIN:-}"
+    "$ROOT/../tabularis/src-tauri/target/release/$name"
+  )
+  local src=""
+  for candidate in "${candidates[@]}"; do
+    if [[ -n "$candidate" && -f "$candidate" ]]; then
+      src="$candidate"
+      break
+    fi
+  done
+  if [[ -n "$src" ]]; then
+    cp -f "$src" "$dest/$name"
+    echo "staged tabularis: $src"
+  else
+    echo "tabularis binary not staged; runtime probe still applies"
+  fi
+}
+
 build_target() {
   local triple="$1"
   echo ""
   echo "======== Building target: $triple ========"
   rustup target add "$triple" >/dev/null 2>&1 || true
+  stage_tabularis "$triple"
   # Frontend is built via beforeBuildCommand in tauri.conf.json
   pnpm exec tauri build --target "$triple"
   list_artifacts "$triple"
@@ -119,6 +148,7 @@ build_windows() {
   echo ""
   echo "======== Building target: $triple ========"
   rustup target add "$triple" >/dev/null 2>&1 || true
+  stage_tabularis "$triple"
 
   if [[ "$OS" == "Darwin" ]] || [[ "$OS" == "Linux" ]]; then
     prepend_homebrew_llvm
@@ -156,6 +186,7 @@ case "$TARGET_ALIAS" in
       build_target "$triple"
     else
       echo "======== Building host default ========"
+      stage_tabularis ""
       pnpm exec tauri build
       # Host default without --target often lands under target/release/bundle
       if [[ -d src-tauri/target/release/bundle ]]; then

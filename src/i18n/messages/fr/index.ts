@@ -18,6 +18,7 @@ import { frFeatures } from "./features";
 import { frKanban } from "./kanban";
 import { frFleet } from "./fleet";
 import { frWiki } from "./wiki";
+import { frDatabase } from "./database";
 import { frSettings } from "./settings";
 import { frSettingsUi } from "./settings-ui";
 import { frSettingsAgent } from "./settings-agent";
@@ -49,6 +50,7 @@ export const fr: Record<MessageKey, string> = {
   ...frKanban,
   ...frFleet,
   ...frWiki,
+  ...frDatabase,
   ...frSettings,
   ...frSettingsUi,
   ...frSettingsAgent,

@@ -27,6 +27,10 @@ describe("resolveWorkbenchHash", () => {
       kind: "pane",
       pane: "octo",
     });
+    expect(resolveWorkbenchHash("#/database")).toEqual({
+      kind: "pane",
+      pane: "database",
+    });
     expect(resolveWorkbenchHash("#/octo/inbox")).toEqual({
       kind: "pane",
       pane: "octo",

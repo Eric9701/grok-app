@@ -36,6 +36,7 @@ import {
 } from "@/components/icons";
 import { createT } from "@/i18n";
 import { useFeatureMask } from "@/lib/featureMask";
+import { useTabularisApprovals } from "@/lib/tabularisStore";
 import {
   isDesktopHost,
   type AccountStatus,
@@ -157,6 +158,7 @@ export type WorkbenchSidebarProps = {
 export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
   const [themeEditorOpen, setThemeEditorOpen] = useState(false);
   const relayStatus = useAtlasRelayStatus();
+  const databaseApprovals = useTabularisApprovals();
   useEffect(() => {
     const onHash = () => {
       if ((window.location.hash || "").startsWith("#/settings")) {
@@ -460,6 +462,29 @@ export function WorkbenchSidebar(props: WorkbenchSidebarProps) {
               {tr("mirror.connect")}
             </button>
           ) : null}
+          <button
+            type="button"
+            className={
+              "nav-item" + (mainPane === "database" ? " nav-item--active" : "")
+            }
+            onClick={() => {
+              setShowUserMenu(false);
+              window.location.hash = "#/database";
+            }}
+          >
+            <span className="nav-item__icon">
+              <IconFileText size={16} />
+            </span>
+            {tr("sidebar.database")}
+            {databaseApprovals.length > 0 ? (
+              <span
+                className="nav-item__badge"
+                title={tr("sidebar.databasePending", { n: databaseApprovals.length })}
+              >
+                {databaseApprovals.length}
+              </span>
+            ) : null}
+          </button>
           <button
             type="button"
             className={

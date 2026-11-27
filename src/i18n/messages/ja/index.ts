@@ -18,6 +18,7 @@ import { jaFeatures } from "./features";
 import { jaKanban } from "./kanban";
 import { jaFleet } from "./fleet";
 import { jaWiki } from "./wiki";
+import { jaDatabase } from "./database";
 import { jaSettings } from "./settings";
 import { jaSettingsUi } from "./settings-ui";
 import { jaSettingsAgent } from "./settings-agent";
@@ -49,6 +50,7 @@ export const ja: Record<MessageKey, string> = {
   ...jaKanban,
   ...jaFleet,
   ...jaWiki,
+  ...jaDatabase,
   ...jaSettings,
   ...jaSettingsUi,
   ...jaSettingsAgent,

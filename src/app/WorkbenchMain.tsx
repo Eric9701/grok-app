@@ -9,6 +9,8 @@ import { Tip } from "@/components/ui/tooltip";
 import { OpenLocationButton } from "@/components/OpenLocationButton";
 import { AtlasCloudSlot } from "@/components/AtlasCloudPane";
 import { OctoSlot } from "@/components/OctoPane";
+import { DatabaseSlot } from "@/components/DatabasePane";
+import { DatabaseHostBridge } from "@/components/DatabaseApprovalBanner";
 import { EnvInfoButton } from "@/components/side-workbench/EnvInfoButton";
 import { BottomTerminalToggle } from "@/components/bottom-terminal/BottomTerminalToggle";
 import { PaneToggleButton } from "@/components/PaneToggleButton";
@@ -263,6 +265,17 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
                 {atlasCloudNavLabel(tr, relayStatus?.phase)}
               </h1>
             </>
+          ) : mainPane === "database" ? (
+            <>
+              {!phoneLayout ? (
+                <span className="main__title-icon">
+                  <IconFileText size={16} />
+                </span>
+              ) : null}
+              <h1 className="main__title" data-tauri-drag-region={dragRegion}>
+                {tr("sidebar.database")}
+              </h1>
+            </>
           ) : mainPane === "octo" ? (
             <>
               {!phoneLayout ? (
@@ -510,6 +523,12 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
           )}
         </div>
       </div>
+      <DatabaseHostBridge locale={locale} mainPane={mainPane} />
+      <DatabaseSlot
+        open={mainPane === "database"}
+        locale={locale}
+        title={tr("sidebar.database")}
+      />
       <OctoSlot
         open={mainPane === "octo"}
         locale={locale}
@@ -521,7 +540,7 @@ export function WorkbenchMain(props: WorkbenchMainProps) {
         title={atlasCloudNavLabel(tr, relayStatus?.phase)}
         tr={tr}
       />
-      {mainPane === "atlasCloud" || mainPane === "octo" ? null : children}
+      {mainPane === "atlasCloud" || mainPane === "octo" || mainPane === "database" ? null : children}
       </main>
     </>
   );

@@ -11,6 +11,7 @@ import { trFeatures } from "./features";
 import { trKanban } from "./kanban";
 import { trFleet } from "./fleet";
 import { trWiki } from "./wiki";
+import { trDatabase } from "./database";
 import { trProject } from "./project";
 import { trProviders } from "./providers";
 import { trSession } from "./session";
@@ -42,6 +43,7 @@ export const tr: Record<MessageKey, string> = {
   ...trKanban,
   ...trFleet,
   ...trWiki,
+  ...trDatabase,
   ...trProject,
   ...trProviders,
   ...trSession,

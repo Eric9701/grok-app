@@ -15,6 +15,7 @@ export type WorkbenchHashPane =
   | "automations"
   | "kanban"
   | "octo"
+  | "database"
   | "atlasCloud"
   | "fleet"
   | "wiki";
@@ -59,6 +60,9 @@ export function resolveWorkbenchHash(
   }
   if (raw === "octo" || raw.startsWith("octo")) {
     return { kind: "pane", pane: "octo" };
+  }
+  if (raw === "database" || raw.startsWith("database")) {
+    return { kind: "pane", pane: "database" };
   }
   if (raw === "atlas-cloud" || raw.startsWith("atlas-cloud")) {
     return { kind: "pane", pane: "atlasCloud" };

@@ -18,6 +18,7 @@ import { ukFeatures } from "./features";
 import { ukKanban } from "./kanban";
 import { ukFleet } from "./fleet";
 import { ukWiki } from "./wiki";
+import { ukDatabase } from "./database";
 import { ukSettings } from "./settings";
 import { ukSettingsUi } from "./settings-ui";
 import { ukSettingsAgent } from "./settings-agent";
@@ -49,6 +50,7 @@ export const uk: Record<MessageKey, string> = {
   ...ukKanban,
   ...ukFleet,
   ...ukWiki,
+  ...ukDatabase,
   ...ukSettings,
   ...ukSettingsUi,
   ...ukSettingsAgent,

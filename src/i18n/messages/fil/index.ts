@@ -18,6 +18,7 @@ import { filFeatures } from "./features";
 import { filKanban } from "./kanban";
 import { filFleet } from "./fleet";
 import { filWiki } from "./wiki";
+import { filDatabase } from "./database";
 import { filSettings } from "./settings";
 import { filSettingsUi } from "./settings-ui";
 import { filSettingsAgent } from "./settings-agent";
@@ -49,6 +50,7 @@ export const fil: Record<MessageKey, string> = {
   ...filKanban,
   ...filFleet,
   ...filWiki,
+  ...filDatabase,
   ...filSettings,
   ...filSettingsUi,
   ...filSettingsAgent,
