@@ -693,6 +693,9 @@ pub struct AppSettings {
     /// Turns allowed for one knowledge-base compile step. 1–20; anything else is 6.
     #[serde(default = "default_wiki_compile_max_turns")]
     pub wiki_compile_max_turns: u32,
+    /// Minutes one knowledge-base compile step may run. 1–60; anything else is 15.
+    #[serde(default = "default_wiki_compile_timeout_min")]
+    pub wiki_compile_timeout_min: u32,
     /// Model id used when compiling a knowledge base. Empty uses the app model.
     #[serde(default)]
     pub wiki_compile_model_id: String,
@@ -850,6 +853,10 @@ fn default_background_wait_timeout_sec() -> u32 {
 
 fn default_wiki_compile_max_turns() -> u32 {
     6
+}
+
+fn default_wiki_compile_timeout_min() -> u32 {
+    crate::wiki::DEFAULT_WIKI_COMPILE_TIMEOUT_MIN
 }
 
 fn default_voice_id() -> String {
@@ -1046,6 +1053,7 @@ impl Default for AppSettings {
             ssh_watch_aliases: Vec::new(),
             wiki_libraries: Vec::new(),
             wiki_compile_max_turns: default_wiki_compile_max_turns(),
+            wiki_compile_timeout_min: default_wiki_compile_timeout_min(),
             wiki_compile_model_id: String::new(),
             voice_id: default_voice_id(),
             voice_dictation_auto_send: false,

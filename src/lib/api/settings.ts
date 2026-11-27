@@ -91,6 +91,8 @@ export interface AppSettings {
   wikiLibraries?: WikiLibraryRecord[] | null;
   /** Turns for one knowledge-base compile step. 1–20; other values become 6. */
   wikiCompileMaxTurns?: number | null;
+  /** Minutes one knowledge-base compile step may run. 1–60; other values become 15. */
+  wikiCompileTimeoutMin?: number | null;
   /** Model id for knowledge-base compile. Empty uses the app model. */
   wikiCompileModelId?: string | null;
   /** Max warm/live agent processes (default 3). */

@@ -29,19 +29,19 @@ pub async fn settings_set(
     // Normalize denylist / allowlist so spawn / equality see stable lists.
     settings.disallowed_tools =
         crate::acp_client::normalize_disallowed_tools(&settings.disallowed_tools);
-    settings.allowed_tools =
-        crate::acp_client::normalize_allowed_tools(&settings.allowed_tools);
+    settings.allowed_tools = crate::acp_client::normalize_allowed_tools(&settings.allowed_tools);
     // Normalize optional agent profile path (trim / drop control chars).
     settings.agent_profile_path =
         crate::agents_catalog::normalize_agent_profile_path(&settings.agent_profile_path)
             .unwrap_or_default();
     // Normalize / validate optional agents JSON (reject invalid non-empty).
-    settings.agents_json =
-        crate::agents_catalog::normalize_agents_json(&settings.agents_json)?;
+    settings.agents_json = crate::agents_catalog::normalize_agents_json(&settings.agents_json)?;
     settings.wiki_libraries =
         crate::wiki_libraries::normalize_libraries(std::mem::take(&mut settings.wiki_libraries));
     settings.wiki_compile_max_turns =
         crate::wiki::clamp_wiki_compile_turns(settings.wiki_compile_max_turns);
+    settings.wiki_compile_timeout_min =
+        crate::wiki::clamp_wiki_compile_timeout_min(settings.wiki_compile_timeout_min);
     settings.wiki_compile_model_id = settings
         .wiki_compile_model_id
         .trim()
@@ -54,10 +54,9 @@ pub async fn settings_set(
         crate::acp_client::normalize_background_wait_policy(&settings.background_wait_policy)
             .as_str()
             .to_string();
-    settings.background_wait_timeout_sec =
-        crate::acp_client::normalize_background_wait_timeout_sec(
-            settings.background_wait_timeout_sec,
-        );
+    settings.background_wait_timeout_sec = crate::acp_client::normalize_background_wait_timeout_sec(
+        settings.background_wait_timeout_sec,
+    );
     // Normalize compaction mode/detail enums (CLI 0.2.117+).
     settings.compaction_mode =
         crate::acp_client::normalize_compaction_mode(&settings.compaction_mode).to_string();
@@ -74,18 +73,15 @@ pub async fn settings_set(
     // Audit ledger retention presets: 7 / 30 / 90 / 0 (unlimited).
     settings.audit_ledger_retention_days =
         crate::audit_ledger::normalize_retention_days(settings.audit_ledger_retention_days);
-    let audit_retention_flip = crate::audit_ledger::normalize_retention_days(
-        prev.audit_ledger_retention_days,
-    ) != settings.audit_ledger_retention_days;
-    let keychain_flip =
-        prev.store_api_keys_in_keychain != settings.store_api_keys_in_keychain;
-    let session_data_mode_changed =
-        prev.session_data_mode != settings.session_data_mode;
+    let audit_retention_flip =
+        crate::audit_ledger::normalize_retention_days(prev.audit_ledger_retention_days)
+            != settings.audit_ledger_retention_days;
+    let keychain_flip = prev.store_api_keys_in_keychain != settings.store_api_keys_in_keychain;
+    let session_data_mode_changed = prev.session_data_mode != settings.session_data_mode;
     let memory_flip = prev.experimental_memory != settings.experimental_memory;
     let web_search_flip = prev.disable_web_search != settings.disable_web_search;
-    let official_aux_inject_flip =
-        prev.official_aux_inject != settings.official_aux_inject
-            || prev.official_aux_with_user_mcp != settings.official_aux_with_user_mcp;
+    let official_aux_inject_flip = prev.official_aux_inject != settings.official_aux_inject
+        || prev.official_aux_with_user_mcp != settings.official_aux_with_user_mcp;
     // Keep native-Imagine PreToolUse hook in sync with inject / route (independent home only).
     if official_aux_inject_flip || session_data_mode_changed {
         let mode = settings.session_data_mode.clone();
@@ -97,15 +93,12 @@ pub async fn settings_set(
         &prev.disallowed_tools,
         &settings.disallowed_tools,
     );
-    let allowed_tools_flip = !crate::acp_client::allowed_tools_equal(
-        &prev.allowed_tools,
-        &settings.allowed_tools,
-    );
+    let allowed_tools_flip =
+        !crate::acp_client::allowed_tools_equal(&prev.allowed_tools, &settings.allowed_tools);
     // Normalize TodoGate max fires (1–20; 0 → default 3).
-    settings.todo_gate_max_fires_per_prompt =
-        crate::agent_todo_gate::normalize_todo_gate_max_fires(Some(
-            settings.todo_gate_max_fires_per_prompt,
-        ));
+    settings.todo_gate_max_fires_per_prompt = crate::agent_todo_gate::normalize_todo_gate_max_fires(
+        Some(settings.todo_gate_max_fires_per_prompt),
+    );
     let todo_gate_flip = prev.todo_gate_enabled != settings.todo_gate_enabled
         || crate::agent_todo_gate::normalize_todo_gate_max_fires(Some(
             prev.todo_gate_max_fires_per_prompt,
@@ -113,14 +106,13 @@ pub async fn settings_set(
     let plan_enabled_flip = prev.plan_enabled != settings.plan_enabled;
     let use_leader_changed = prev.use_leader != settings.use_leader;
     let subagents_flip = prev.subagents_enabled != settings.subagents_enabled;
-    let subagent_wt_snap_flip = prev.subagent_worktree_snapshot_enabled
-        != settings.subagent_worktree_snapshot_enabled;
+    let subagent_wt_snap_flip =
+        prev.subagent_worktree_snapshot_enabled != settings.subagent_worktree_snapshot_enabled;
     let auto_wake_flip = prev.auto_wake_enabled != settings.auto_wake_enabled;
     let workflows_flip = prev.workflows_enabled != settings.workflows_enabled;
     let two_pass_compaction_flip =
         prev.two_pass_compaction_enabled != settings.two_pass_compaction_enabled;
-    let preferred_agent_flip =
-        prev.preferred_agent.trim() != settings.preferred_agent.trim();
+    let preferred_agent_flip = prev.preferred_agent.trim() != settings.preferred_agent.trim();
     let agent_profile_flip = prev.agent_profile_path.trim() != settings.agent_profile_path.trim();
     let agents_json_flip = prev.agents_json.trim() != settings.agents_json.trim();
     let max_turns_flip = prev.max_agent_turns != settings.max_agent_turns;
@@ -361,13 +353,15 @@ pub async fn settings_set(
 }
 
 #[tauri::command]
-pub async fn models_list_available() -> Result<crate::models_catalog::AvailableModelsResult, String> {
+pub async fn models_list_available() -> Result<crate::models_catalog::AvailableModelsResult, String>
+{
     Ok(crate::models_catalog::list_available_models())
 }
 
 /// `atlas models refresh`, then the same catalog `models_list_available` reads.
 #[tauri::command]
-pub async fn models_refresh_catalog() -> Result<crate::models_catalog::AvailableModelsResult, String> {
+pub async fn models_refresh_catalog() -> Result<crate::models_catalog::AvailableModelsResult, String>
+{
     crate::models_catalog::refresh_cli_model_catalog().await
 }
 
@@ -457,12 +451,7 @@ pub async fn composer_prefs_set(
     if let Some(eff) = effort {
         let effort_changed = previous_effort.as_deref() != Some(eff.trim());
         if let Err(e) = mgr
-            .set_effort_and_respawn_needed(
-                &app,
-                eff,
-                session_id.as_deref(),
-                effort_changed,
-            )
+            .set_effort_and_respawn_needed(&app, eff, session_id.as_deref(), effort_changed)
             .await
         {
             tracing::warn!("composer_prefs_set set_effort soft-fail: {e}");
@@ -550,8 +539,7 @@ pub async fn session_set_context_window(
 ) -> Result<(), String> {
     let (_live_proj, live_sess) = mgr.current_context_ids();
     let session_id = session_id.or(live_sess);
-    mgr.set_context_window(tokens, session_id.as_deref())
-        .await
+    mgr.set_context_window(tokens, session_id.as_deref()).await
 }
 
 /// Live session info for `/context` (`x.ai/session/info`).
@@ -618,12 +606,7 @@ pub async fn fs_write_file(
     content: String,
     expected_mtime_ms: Option<u64>,
 ) -> Result<crate::fs_browser::FsWriteResult, String> {
-    crate::fs_browser::write_text_file(
-        &project_path,
-        &relative,
-        &content,
-        expected_mtime_ms,
-    )
+    crate::fs_browser::write_text_file(&project_path, &relative, &content, expected_mtime_ms)
 }
 
 /// Write UTF-8 text to an absolute path already open in the resource pane.
@@ -638,9 +621,7 @@ pub async fn fs_write_absolute(
 
 /// Read an absolute path for resource-pane preview (chat file cards, agent outputs).
 #[tauri::command]
-pub async fn fs_read_absolute(
-    path: String,
-) -> Result<crate::fs_browser::FsReadResult, String> {
+pub async fn fs_read_absolute(path: String) -> Result<crate::fs_browser::FsReadResult, String> {
     crate::fs_browser::read_absolute_file(&path)
 }
 
@@ -739,24 +720,20 @@ pub async fn secrets_set(
     let mut s = store::load_secrets();
     // Empty string clears the secret (needed when revoking speech/API credentials).
     if let Some(k) = official_api_key {
-        s.official_api_key = if k.trim().is_empty() {
-            None
-        } else {
-            Some(k)
-        };
+        s.official_api_key = if k.trim().is_empty() { None } else { Some(k) };
     }
     if let Some(u) = relay_base_url {
         s.relay_base_url = if u.is_empty() { None } else { Some(u) };
     }
     if let Some(k) = relay_api_key {
-        s.relay_api_key = if k.trim().is_empty() {
-            None
-        } else {
-            Some(k)
-        };
+        s.relay_api_key = if k.trim().is_empty() { None } else { Some(k) };
     }
     if let Some(k) = pexels_api_key {
-        s.pexels_api_key = if k.trim().is_empty() { None } else { Some(k.trim().to_string()) };
+        s.pexels_api_key = if k.trim().is_empty() {
+            None
+        } else {
+            Some(k.trim().to_string())
+        };
     }
     if let Some(m) = default_model {
         s.default_model = if m.is_empty() { None } else { Some(m) };
@@ -852,7 +829,12 @@ pub async fn provider_ping() -> Result<serde_json::Value, String> {
             "class": "OK",
             "message": "CLI auth.json present (cached_token). Use Doctor + real chat to verify."
         }))
-    } else if secrets.official_api_key.as_ref().map(|k| !k.is_empty()).unwrap_or(false) {
+    } else if secrets
+        .official_api_key
+        .as_ref()
+        .map(|k| !k.is_empty())
+        .unwrap_or(false)
+    {
         Ok(serde_json::json!({
             "ok": true,
             "class": "OK",

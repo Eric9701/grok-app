@@ -11,11 +11,19 @@ import { WikiLibrariesField } from "./WikiLibrariesField";
 import { WikiSessionFields } from "./WikiSessionFields";
 
 export const DEFAULT_WIKI_COMPILE_TURNS = 6;
+export const DEFAULT_WIKI_COMPILE_TIMEOUT_MIN = 15;
 
 export function clampWikiCompileTurns(raw: number): number {
   if (!Number.isFinite(raw)) return DEFAULT_WIKI_COMPILE_TURNS;
   const rounded = Math.round(raw);
   if (rounded < 1 || rounded > 20) return DEFAULT_WIKI_COMPILE_TURNS;
+  return rounded;
+}
+
+export function clampWikiCompileTimeoutMin(raw: number): number {
+  if (!Number.isFinite(raw)) return DEFAULT_WIKI_COMPILE_TIMEOUT_MIN;
+  const rounded = Math.round(raw);
+  if (rounded < 1 || rounded > 60) return DEFAULT_WIKI_COMPILE_TIMEOUT_MIN;
   return rounded;
 }
 
@@ -82,6 +90,82 @@ function WikiCompileTurnsField({
           onBlur={() => {
             const next = clampWikiCompileTurns(Number(turns));
             setTurns(String(next));
+            void persist(next);
+          }}
+        />
+        {error ? (
+          <p className="settings-row__desc" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function WikiCompileTimeoutField({
+  t,
+  rowHighlight,
+}: {
+  t: (key: string, vars?: Vars) => string;
+  rowHighlight: (anchorId: string) => string;
+}) {
+  const [minutes, setMinutes] = useState(String(DEFAULT_WIKI_COMPILE_TIMEOUT_MIN));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!api.isTauri()) return;
+    let stop = false;
+    void api.settingsGet().then((settings) => {
+      if (stop) return;
+      setMinutes(String(clampWikiCompileTimeoutMin(settings.wikiCompileTimeoutMin ?? DEFAULT_WIKI_COMPILE_TIMEOUT_MIN)));
+    }).catch(() => {
+      if (!stop) setError(t("wiki.pathInvalid"));
+    });
+    return () => {
+      stop = true;
+    };
+  }, [t]);
+
+  const persist = useCallback(async (next: number) => {
+    if (!api.isTauri() || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const settings = await api.settingsGet();
+      const saved = await api.settingsSet({ ...settings, wikiCompileTimeoutMin: next });
+      setMinutes(String(clampWikiCompileTimeoutMin(saved.wikiCompileTimeoutMin ?? next)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("wiki.pathInvalid"));
+    } finally {
+      setSaving(false);
+    }
+  }, [saving, t]);
+
+  return (
+    <div
+      className={"settings-card" + rowHighlight("settings-anchor-wikiCompileTimeout")}
+      id="settings-anchor-wikiCompileTimeout"
+    >
+      <div className="settings-row settings-row--stack">
+        <div className="settings-row__text">
+          <div className="settings-row__label">{t("wiki.compileTimeout")}</div>
+          <div className="settings-row__desc">{t("wiki.compileTimeoutDesc")}</div>
+        </div>
+        <input
+          className="settings-input wiki-turns"
+          type="number"
+          min={1}
+          max={60}
+          step={1}
+          value={minutes}
+          disabled={saving || !api.isTauri()}
+          aria-label={t("wiki.compileTimeout")}
+          onChange={(event) => setMinutes(event.target.value)}
+          onBlur={() => {
+            const next = clampWikiCompileTimeoutMin(Number(minutes));
+            setMinutes(String(next));
             void persist(next);
           }}
         />
@@ -271,6 +355,7 @@ export function WikiSection() {
       <WikiSessionFields t={t} rowHighlight={rowHighlight} />
       <WikiCompileModelField t={t} rowHighlight={rowHighlight} />
       <WikiCompileTurnsField t={t} rowHighlight={rowHighlight} />
+      <WikiCompileTimeoutField t={t} rowHighlight={rowHighlight} />
       <WikiCompileHistory />
     </>
   );

@@ -7,7 +7,7 @@ AtlasBuddy 里的独立引擎：把项目目录中的原文编成 `wiki/*.md`。
 - `wiki_open` / `wiki_read` / `wiki_write_pages` / `wiki_list` / `wiki_lint` / `wiki_search`
 - `wiki_session_config_get` / `wiki_session_config_set` / `wiki_prompts_get` / `wiki_prompts_set` / `wiki_sessions_scan` / `wiki_sessions_sync`
 - `wiki_fingerprint` 与 `{知识库}/.atlas-wiki/ingest-cache.json`：原文哈希没变就先确认；确认后会忽略这条记录再编译一次，并允许覆盖已有页面
-- `wiki_complete`：另起一次 Atlas headless 补全，在后台线程等待，不卡住窗口。一次编译调用两次：先分析原文，再按 `FILE` 块生成 `wiki/*.md`。编译所用的模型在设置 → 知识库配置里选择；没选时用应用当前模型，再退到目录里的默认模型。子进程的工作目录是当前知识库目录。`GROK_HOME` 用能列出所选模型的家目录：独立模式下企业模型在共享的 `~/.atlas`，不在应用的 `agent-home`。单次超过 300 秒会结束进程。生成页面的轮次在设置 → 知识库配置里调整，范围 1 到 20，默认 6，并禁止读文件和改文件，避免轮次耗在工具调用上。提示写在临时文件里，用 `--prompt-file` 传入，避免 Windows 命令行放不下长原文。不进入正在打开的桌面会话，不改 `config.toml`，也不传 `--always-approve`。命令行进程启动后，页面提示「已经开始编译」
+- `wiki_complete`：另起一次 Atlas headless 补全，在后台线程等待，不卡住窗口。一次编译调用两次：先分析原文，再按 `FILE` 块生成 `wiki/*.md`。编译所用的模型在设置 → 知识库配置里选择；没选时用应用当前模型，再退到目录里的默认模型。子进程的工作目录是当前知识库目录。`GROK_HOME` 用能列出所选模型的家目录：独立模式下企业模型在共享的 `~/.atlas`，不在应用的 `agent-home`。单次时限在设置 → 知识库配置里调整，范围 1 到 60 分钟，默认 15；等待时持续读走输出，避免长回复把管道写满后停住。生成页面的轮次在设置 → 知识库配置里调整，范围 1 到 20，默认 6，并禁止读文件和改文件，避免轮次耗在工具调用上。提示写在临时文件里，用 `--prompt-file` 传入，避免 Windows 命令行放不下长原文。不进入正在打开的桌面会话，不改 `config.toml`，也不传 `--always-approve`。命令行进程启动后，页面提示「已经开始编译」
 
 写入只接受项目内 `wiki/*.md`。一批页面有一条路径不合法，整批不落盘。默认不覆盖。`src/wiki/engine.ts` 负责两次提示和 `FILE` 块解析，模型通过 `complete` 注入。每次编译会在智能体看板的「工作中」放一张知识库卡片，排在当前会话前面。卡片和知识库页面都会显示当前阶段和已用时间；命令行进程每两秒回报一次，超过约 8 秒没有回报会提示进程没有继续回报。点击卡片可以看到读取、分析、生成、写入的进度。生成回复如果没有 `FILE` 块，会再要一次；仍然没有时，把正文存成 `wiki/sources/<原文名>.md`。模型不写 `wiki/index.md`、`wiki/overview.md`、`wiki/log.md`。页面落盘后，程序把新页面追加到目录和概览的「最近更新」，并在日志末尾追加一条 `ingest` 记录。后一页以新的 `---FILE:` 开头时，即使中间漏了 `---END FILE---` 也会切开。这次写出了正式页面后，删掉同一篇原文上次留下的 `wiki/sources/` 占位页。
 

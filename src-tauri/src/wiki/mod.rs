@@ -13,12 +13,14 @@ mod sessions;
 mod usage;
 
 use std::path::PathBuf;
-use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-pub use complete::{clamp_wiki_compile_turns, headless_args, resolve_model_id, WikiUsage};
+pub use complete::{
+    clamp_wiki_compile_timeout_min, clamp_wiki_compile_turns, headless_args, resolve_model_id,
+    WikiUsage, DEFAULT_WIKI_COMPILE_TIMEOUT_MIN,
+};
 pub use gate::{WikiOpen, WikiPageInput, WikiText};
 pub use lint::WikiLint;
 pub use path::{user_path, user_path_string};
@@ -185,7 +187,7 @@ fn complete_prompt(
         &model,
         &prompt,
         &workdir,
-        Duration::from_secs(300),
+        complete::wiki_compile_timeout(settings.wiki_compile_timeout_min),
         clamp_wiki_compile_turns(settings.wiki_compile_max_turns),
         || {
             let _ = app.emit(complete::WIKI_CLI_STARTED_EVENT, &project);
@@ -414,6 +416,9 @@ mod tests {
         assert_eq!(clamp_wiki_compile_turns(0), 6);
         assert_eq!(clamp_wiki_compile_turns(4), 4);
         assert_eq!(clamp_wiki_compile_turns(99), 6);
+        assert_eq!(clamp_wiki_compile_timeout_min(0), 15);
+        assert_eq!(clamp_wiki_compile_timeout_min(15), 15);
+        assert_eq!(clamp_wiki_compile_timeout_min(90), 15);
         assert!(args
             .windows(2)
             .any(|pair| pair[0] == "--prompt-file" && pair[1] == "prompt.txt"));

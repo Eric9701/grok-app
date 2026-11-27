@@ -38,6 +38,8 @@ export const zhWiki = {
   "wiki.settingsEmpty": "还没有知识库目录。",
   "wiki.compileTurns": "编译轮次",
   "wiki.compileTurnsDesc": "单次编译最多使用的轮次，范围 1 到 20。默认 6。",
+  "wiki.compileTimeout": "编译超时",
+  "wiki.compileTimeoutDesc": "单次编译最多等待的时间，范围 1 到 60 分钟。默认 15。",
   "wiki.create": "新建知识库",
   "wiki.createTitle": "新建知识库",
   "wiki.createParent": "父目录",

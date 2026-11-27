@@ -57,6 +57,22 @@ export const WIKI_ENTRIES: readonly SettingsEntry[] = [
     ],
   },
   {
+    id: "wiki.compileTimeout",
+    section: "wiki",
+    anchorId: "settings-anchor-wikiCompileTimeout",
+    labelKey: "wiki.compileTimeout",
+    descKeys: ["wiki.compileTimeoutDesc"],
+    keywords: [
+      "timeout",
+      "minutes",
+      "compile timeout",
+      "编译超时",
+      "編譯逾時",
+      "超时",
+      "逾時",
+    ],
+  },
+  {
     id: "wiki.sessionIngest",
     section: "wiki",
     anchorId: "settings-anchor-wikiSessions",

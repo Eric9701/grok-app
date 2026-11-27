@@ -38,6 +38,8 @@ export const itWiki = {
   "wiki.settingsEmpty": "No knowledge base yet.",
   "wiki.compileTurns": "Compile turns",
   "wiki.compileTurnsDesc": "How many turns one compile step may use, from 1 to 20. The default is 6.",
+  "wiki.compileTimeout": "Compile timeout",
+  "wiki.compileTimeoutDesc": "How long one compile step may run, from 1 to 60 minutes. The default is 15.",
   "wiki.create": "New knowledge base",
   "wiki.createTitle": "New knowledge base",
   "wiki.createParent": "Parent folder",

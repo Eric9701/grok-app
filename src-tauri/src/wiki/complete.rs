@@ -3,9 +3,13 @@
 //! Spawns the CLI directly. It does not touch the open desktop session and
 //! does not write `config.toml`.
 
+use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
+
+/// Default wall clock for one compile step, in minutes.
+pub const DEFAULT_WIKI_COMPILE_TIMEOUT_MIN: u32 = 15;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -52,6 +56,19 @@ pub fn clamp_wiki_compile_turns(raw: u32) -> u32 {
     } else {
         6
     }
+}
+
+/// Compile timeout outside 1–60 minutes becomes the default of 15.
+pub fn clamp_wiki_compile_timeout_min(raw: u32) -> u32 {
+    if (1..=60).contains(&raw) {
+        raw
+    } else {
+        DEFAULT_WIKI_COMPILE_TIMEOUT_MIN
+    }
+}
+
+pub fn wiki_compile_timeout(minutes: u32) -> Duration {
+    Duration::from_secs(u64::from(clamp_wiki_compile_timeout_min(minutes)) * 60)
 }
 
 /// Argument list for a text-only compile. No config path and no `--always-approve`.
@@ -267,13 +284,17 @@ pub fn run(
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("wiki_complete_spawn:{e}"))?;
+    let stdout_pipe = child.stdout.take().map(drain_pipe);
+    let stderr_pipe = child.stderr.take().map(drain_pipe);
     on_started();
-    loop {
+    let status = loop {
         match child.try_wait() {
-            Ok(Some(_)) => break,
+            Ok(Some(status)) => break status,
             Ok(None) if started.elapsed() >= timeout => {
                 let _ = child.kill();
                 let _ = child.wait();
+                let _ = stdout_pipe.map(|pipe| pipe.join());
+                let _ = stderr_pipe.map(|pipe| pipe.join());
                 return Err("wiki_complete_timeout".into());
             }
             Ok(None) => {
@@ -283,15 +304,38 @@ pub fn run(
                 }
                 std::thread::sleep(Duration::from_millis(50));
             }
-            Err(e) => return Err(format!("wiki_complete_spawn:{e}")),
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = stdout_pipe.map(|pipe| pipe.join());
+                let _ = stderr_pipe.map(|pipe| pipe.join());
+                return Err(format!("wiki_complete_spawn:{e}"));
+            }
         }
-    }
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("wiki_complete_spawn:{e}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    finish_complete(output.status.success(), &stdout, &stderr, model_id)
+    };
+    let stdout = String::from_utf8_lossy(&join_pipe(stdout_pipe)).into_owned();
+    let stderr = String::from_utf8_lossy(&join_pipe(stderr_pipe)).into_owned();
+    finish_complete(status.success(), &stdout, &stderr, model_id)
+}
+
+/// Read the pipe on another thread so a long JSON reply cannot fill it and stall.
+fn drain_pipe(mut pipe: impl Read + Send + 'static) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 8192];
+        loop {
+            match pipe.read(&mut chunk) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => buf.extend_from_slice(&chunk[..n]),
+            }
+        }
+        buf
+    })
+}
+
+fn join_pipe(pipe: Option<std::thread::JoinHandle<Vec<u8>>>) -> Vec<u8> {
+    pipe.and_then(|handle| handle.join().ok())
+        .unwrap_or_default()
 }
 
 /// Keep a page draft when the process stops on the turn cap after already

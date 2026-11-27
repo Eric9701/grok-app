@@ -293,6 +293,7 @@ describe("settingsCatalog", () => {
       tab: null,
     });
     expect(SETTINGS_ENTRIES.some((e) => e.id === "wiki.compileTurns")).toBe(true);
+    expect(SETTINGS_ENTRIES.some((e) => e.id === "wiki.compileTimeout")).toBe(true);
     expect(SETTINGS_ENTRIES.some((e) => e.id === "general.wikiLibraries")).toBe(false);
   });
 

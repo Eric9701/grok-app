@@ -38,6 +38,8 @@ export const zhTWWiki = {
   "wiki.settingsEmpty": "還沒有知識庫目錄。",
   "wiki.compileTurns": "編譯輪次",
   "wiki.compileTurnsDesc": "單次編譯最多使用的輪次，範圍 1 到 20。預設 6。",
+  "wiki.compileTimeout": "編譯逾時",
+  "wiki.compileTimeoutDesc": "單次編譯最多等待的時間，範圍 1 到 60 分鐘。預設 15。",
   "wiki.create": "新建知識庫",
   "wiki.createTitle": "新建知識庫",
   "wiki.createParent": "父目錄",
